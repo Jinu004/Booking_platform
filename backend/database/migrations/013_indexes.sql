@@ -1,0 +1,10 @@
+CREATE INDEX IF NOT EXISTS idx_customers_tenant      ON customers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_customers_phone       ON customers(tenant_id, phone);
+CREATE INDEX IF NOT EXISTS idx_conversations_tenant  ON conversations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_status  ON conversations(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_bookings_tenant       ON bookings(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_date         ON bookings(tenant_id, booking_date);
+CREATE INDEX IF NOT EXISTS idx_notifications_tenant  ON notifications(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_sched   ON notifications(status, scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_messages_conv         ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_clinic_doctors_tenant ON clinic_doctors(tenant_id);
