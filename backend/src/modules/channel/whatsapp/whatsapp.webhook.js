@@ -1,17 +1,12 @@
 const express = require('express')
 const router = express.Router()
 const { parseIncoming } = require('./whatsapp.adapter')
-const { identifyTenant } = require('../../tenant/tenant.middleware')
-const { getOrCreateSession, updateSession } =
-  require('../../conversation/conversation.session')
-const { successResponse, errorResponse } =
-  require('../../../utils/response')
+const { successResponse } = require('../../../utils/response')
 const logger = require('../../../utils/logger')
 
 /**
  * GET /webhook/whatsapp
  * Meta webhook verification endpoint
- * Meta calls this to verify our webhook URL
  */
 router.get('/', (req, res) => {
   const meta = require('./whatsapp.meta')
@@ -32,72 +27,91 @@ router.get('/', (req, res) => {
  * Works for both WAHA and Meta payloads
  */
 router.post('/', async (req, res) => {
-  try {
-    const body = req.body
+  // Always respond 200 immediately — WhatsApp requirements
+  res.status(200).json({ success: true, data: { received: true }, error: null })
 
-    // Detect provider from payload structure
-    const source = body.object === 'whatsapp_business_account'
-      ? 'meta'
-      : 'waha'
+  // Process asynchronously so response is never delayed
+  setImmediate(async () => {
+    try {
+      const body = req.body
 
-    // Parse incoming message to standard format
-    const message = parseIncoming(body, source)
+      // Detect provider from payload structure
+      const source = body.object === 'whatsapp_business_account'
+        ? 'meta'
+        : 'waha'
 
-    if (!message) {
-      return successResponse(res, { received: true })
-    }
+      // Parse incoming message to standard format
+      const message = parseIncoming(body, source)
+      if (!message) return
 
-    logger.info(
-      `Incoming ${source} message from ${message.from}`
-    )
+      logger.info(`Incoming ${source} message from ${message.from}`)
 
-    // Identify tenant from phone number
-    const TenantService = require('../../tenant/tenant.service')
-    const tenant = await TenantService
-      .getTenantByWhatsapp(message.from)
+      // Identify tenant from WhatsApp number
+      const TenantService = require('../../tenant/tenant.service')
+      const tenant = await TenantService.getTenantByWhatsapp(message.from)
 
-    if (!tenant) {
-      logger.warn(
-        `No tenant found for number: ${message.from}`
+      if (!tenant) {
+        logger.warn(`No tenant found for number: ${message.from}`)
+        return
+      }
+
+      // Process through conversation service (saves message, manages session)
+      const ConversationService = require('../../conversation/conversation.service')
+      const context = await ConversationService.handleIncomingMessage(tenant, message)
+
+      logger.info(`Conversation ${context.conversation.id} updated`)
+
+      // Load tenant configs for AI prompt
+      const configs = await TenantService.getAllConfigs(tenant.id)
+
+      // Load additional data for clinic (available doctors today)
+      let additionalData = {}
+      if (tenant.industry === 'clinic') {
+        try {
+          const pool = require('../../../config/database')
+          const doctorsResult = await pool.query(
+            `SELECT * FROM clinic_doctors WHERE tenant_id = $1 AND available_today = true`,
+            [tenant.id]
+          )
+          additionalData.doctors = doctorsResult.rows
+        } catch (err) {
+          logger.warn('Could not load doctors:', err.message)
+          additionalData.doctors = []
+        }
+      }
+
+      // Process through Gemini AI
+      const AIService = require('../../ai-engine/ai.service')
+      const aiResponse = await AIService.processMessage({
+        tenant,
+        customer: context.customer,
+        conversation: context.conversation,
+        recentMessages: context.recentMessages,
+        session: context.session,
+        configs,
+        additionalData
+      })
+
+      // Save AI response to database
+      await ConversationService.saveOutboundMessage(
+        context.conversation.id,
+        aiResponse,
+        'assistant'
       )
-      return successResponse(res, { received: true })
+
+      // Send via WhatsApp with built-in human-like delay
+      const { sendMessage } = require('./whatsapp.adapter')
+      await sendMessage(message.from, aiResponse)
+
+      logger.info(
+        `Gemini responded to ${message.from}: ${aiResponse.substring(0, 80)}...`
+      )
+
+    } catch (err) {
+      logger.error('Async webhook processing error:', err.message)
     }
-
-    // Load or create conversation session
-    const session = await getOrCreateSession(
-      tenant.id,
-      message.from
-    )
-
-    // Update session with new message
-    await updateSession(tenant.id, message.from, {
-      messageCount: (session.messageCount || 0) + 1,
-      lastMessage: message.message,
-      lastMessageAt: new Date().toISOString()
-    })
-
-    // Process message through conversation service
-    const ConversationService = require('../../conversation/conversation.service')
-    
-    const context = await ConversationService.handleIncomingMessage(tenant, message)
-    
-    // TODO Sprint 3 — pass context to AI engine here
-    // context contains: conversation, customer,
-    // recentMessages, session
-    logger.info(
-      `Conversation ${context.conversation.id} updated`
-    )
-
-    // Always return 200 to WhatsApp immediately
-    // Processing happens asynchronously
-    return successResponse(res, { received: true })
-
-  } catch (err) {
-    logger.error('Webhook error:', err.message)
-    // Always return 200 to WhatsApp even on error
-    // Otherwise WhatsApp retries indefinitely
-    return successResponse(res, { received: true })
-  }
+  })
 })
 
 module.exports = router
+
