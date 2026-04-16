@@ -53,10 +53,26 @@ app.use('/webhook', channelRouter);
 const conversationRoutes = require('./modules/conversation/conversation.routes');
 app.use('/api/v1/conversations', conversationRoutes);
 
-// 8. Global Error Handler must be the last middleware
+// 9. /api/v1/bookings routes
+const bookingRoutes = require('./modules/booking/booking.routes');
+app.use('/api/v1/bookings', bookingRoutes);
+
+// 10. /api/v1/customers routes
+const crmRoutes = require('./modules/crm/crm.routes');
+app.use('/api/v1/customers', crmRoutes);
+
+// 11. /api/v1/clinic routes
+const clinicRoutes = require('./modules/industries/clinic/clinic.routes');
+app.use('/api/v1/clinic', clinicRoutes);
+
+// 12. Global Error Handler must be the last middleware
 app.use(errorHandler);
 
 const PORT = env.PORT || 3001;
+
+// Initialize Scheduled Jobs
+const { initializeSchedulers } = require('./modules/notification/notification.scheduler');
+initializeSchedulers();
 
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);

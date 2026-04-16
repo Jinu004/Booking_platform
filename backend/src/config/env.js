@@ -5,8 +5,6 @@ const requiredVariables = [
   'NODE_ENV',
   'DATABASE_URL',
   'REDIS_URL',
-  'CLERK_SECRET_KEY',
-  'CLAUDE_API_KEY'
 ];
 
 for (const key of requiredVariables) {
@@ -25,7 +23,7 @@ const env = {
   META_WHATSAPP_TOKEN: process.env.META_WHATSAPP_TOKEN,
   META_WEBHOOK_VERIFY_TOKEN: process.env.META_WEBHOOK_VERIFY_TOKEN,
   META_PHONE_NUMBER_ID: process.env.META_PHONE_NUMBER_ID,
-  CLAUDE_API_KEY: process.env.CLAUDE_API_KEY,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   WAHA_BASE_URL: process.env.WAHA_BASE_URL,
   WAHA_API_KEY: process.env.WAHA_API_KEY
 };
