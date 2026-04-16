@@ -19,23 +19,17 @@ const logger = require('../../utils/logger');
  * @returns {Promise<object>} Context for AI engine
  */
 async function handleIncomingMessage(tenant, message) {
+  const CRMService = require('../crm/crm.service');
+
   let customer = { id: null };
 
   // 1. Find or create customer
   try {
-    const custRes = await pool.query(
-      'SELECT * FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1',
-      [tenant.id, message.from]
+    customer = await CRMService.findOrCreateCustomer(
+      tenant.id,
+      message.from,
+      message.customerName || ''
     );
-    if (custRes.rows.length > 0) {
-      customer = custRes.rows[0];
-    } else {
-      const insRes = await pool.query(
-        'INSERT INTO customers (tenant_id, phone, name) VALUES ($1, $2, $3) RETURNING *',
-        [tenant.id, message.from, message.customerName || 'Unknown']
-      );
-      customer = insRes.rows[0];
-    }
   } catch (err) {
     logger.warn('Failed to find/create customer, proceeding with null ID:', err.message);
   }
