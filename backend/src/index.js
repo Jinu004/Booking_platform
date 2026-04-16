@@ -14,6 +14,8 @@ require('./config/database');
 require('./config/redis');
 
 const app = express();
+app.set('trust proxy', 1)
+
 
 // 1. Middleware inside app
 app.use(helmet());
