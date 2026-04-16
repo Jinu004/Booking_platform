@@ -22,3 +22,10 @@ Thumbs.db
 # PM2
 .pm2/
 
+
+*.log
+*.txt
+dev_output.*
+server_output.*
+combined.log
+error.log
