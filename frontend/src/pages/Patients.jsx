@@ -23,8 +23,18 @@ const Patients = () => {
     try {
       setLoading(true);
       const res = await getPatients({ search, limit: 20 });
-      setPatients(res.data?.customers || []);
-      setTotal(res.data?.total || 0);
+      let customersArray = [];
+      if (res.data?.customers) customersArray = res.data.customers;
+      else if (res.customers) customersArray = res.customers;
+      else if (Array.isArray(res.data)) customersArray = res.data;
+      else if (Array.isArray(res)) customersArray = res;
+
+      let count = 0;
+      if (res.data?.total !== undefined) count = res.data.total;
+      else if (res.total !== undefined) count = res.total;
+
+      setPatients(customersArray);
+      setTotal(count);
     } catch (err) {
       console.error(err);
     } finally {

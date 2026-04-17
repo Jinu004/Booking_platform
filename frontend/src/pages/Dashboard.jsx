@@ -37,18 +37,41 @@ const Dashboard = () => {
         getBookings({ limit: 5 }).catch(() => ({ data: { bookings: [] } }))
       ]);
 
-      const activeConvs = convRes.data?.conversations || [];
-      const waitingTokens = (tokensRes.data || []).filter(t => t.status === 'waiting');
+      // Doctor stats
+      const docsArray = Array.isArray(docsRes.data) ? docsRes.data : (Array.isArray(docsRes) ? docsRes : []);
+      
+      // Tokens stats
+      const tokensArray = Array.isArray(tokensRes.data) ? tokensRes.data : (Array.isArray(tokensRes) ? tokensRes : []);
+      const waitingTokens = tokensArray.filter(t => t.status === 'waiting');
+
+      // Conversations stats
+      let activeConvs = [];
+      if (convRes.data?.conversations) activeConvs = convRes.data.conversations;
+      else if (convRes.conversations) activeConvs = convRes.conversations;
+      else if (Array.isArray(convRes.data)) activeConvs = convRes.data;
+      else if (Array.isArray(convRes)) activeConvs = convRes;
+
+      // Bookings stats
+      let totalBookings = 0;
+      if (statsRes.data?.total !== undefined) totalBookings = statsRes.data.total;
+      else if (statsRes.total !== undefined) totalBookings = statsRes.total;
+
+      // Recent Bookings
+      let bookingsArray = [];
+      if (bookingsRes.data?.bookings) bookingsArray = bookingsRes.data.bookings;
+      else if (bookingsRes.bookings) bookingsArray = bookingsRes.bookings;
+      else if (Array.isArray(bookingsRes.data)) bookingsArray = bookingsRes.data;
+      else if (Array.isArray(bookingsRes)) bookingsArray = bookingsRes;
 
       setStats({
-        bookingsToday: statsRes.data?.total || 0,
+        bookingsToday: totalBookings,
         activeConversations: activeConvs.length,
-        availableDoctors: (docsRes.data || []).length,
+        availableDoctors: docsArray.length,
         pendingTokens: waitingTokens.length
       });
 
       setRecentConversations(activeConvs.slice(0, 5));
-      setRecentBookings(bookingsRes.data?.bookings || []);
+      setRecentBookings(bookingsArray.slice(0, 5));
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
