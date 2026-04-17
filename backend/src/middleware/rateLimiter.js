@@ -4,11 +4,11 @@ const logger = require('../utils/logger')
 /**
  * General API rate limiter
  * Applies to all /api routes
- * 100 requests per 15 minutes per IP
+ * 500 requests per 15 minutes per IP
  */
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 500,
   message: {
     success: false,
     data: null,
