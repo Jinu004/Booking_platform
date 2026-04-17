@@ -9,17 +9,24 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
+  async (config) => {
     if (import.meta.env.VITE_BYPASS_AUTH === 'true') {
-      const devRole = localStorage.getItem('dev_role');
-      const devTenantId = localStorage.getItem('dev_tenant_id');
-      if (devRole) config.headers['x-dev-role'] = devRole;
-      if (devTenantId) config.headers['x-dev-tenant-id'] = devTenantId;
+      const defaultTenantId = '262467ed-7cf3-418b-b46c-6038540f9260';
+      const devTenantId = localStorage.getItem('dev_tenant_id') || defaultTenantId;
+      
+      config.headers['x-dev-role'] = 'admin';
+      config.headers['x-dev-tenant-id'] = devTenantId;
+    } else {
+      if (window.Clerk && window.Clerk.session) {
+        try {
+          const token = await window.Clerk.session.getToken();
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+        } catch (e) {
+          console.error('Failed to get Clerk token', e);
+        }
+      }
     }
     
     return config;

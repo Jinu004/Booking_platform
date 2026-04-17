@@ -1,20 +1,21 @@
-import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import useStore from '../../store/useStore';
-import Spinner from './Spinner';
+import { Navigate, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import LoadingScreen from './LoadingScreen'
 
-const PrivateRoute = () => {
-  const { isAuthenticated, isLoading } = useStore();
+export default function PrivateRoute({ children }) {
+  const [ready, setReady] = useState(false)
+  const bypassAuth = import.meta.env.VITE_BYPASS_AUTH === 'true'
 
-  if (isLoading) {
-    return (
-      <div className="h-screen w-full flex items-center justify-center bg-gray-50">
-        <Spinner size="lg" color="blue" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (bypassAuth) {
+      setReady(true)
+      return
+    }
+    // Production Clerk auth check here
+    setReady(true)
+  }, [])
 
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
-};
+  if (!ready) return <LoadingScreen />
 
-export default PrivateRoute;
+  return children ? children : <Outlet />
+}

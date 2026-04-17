@@ -32,8 +32,8 @@ const Settings = () => {
         getSettings().catch(() => ({ data: { general: {}, booking: {}, ai: {}, notifications: {} } })),
         getClinicSettings().catch(() => ({ data: {} }))
       ]);
-      setSettings(appRes.data);
-      setClinic({...clinic, ...clinicRes.data});
+      setSettings(appRes?.data || { general: {}, booking: {}, ai: {}, notifications: {} });
+      setClinic({...clinic, ...(clinicRes?.data || {})});
     } catch (err) {
       console.error(err);
     } finally {
@@ -101,7 +101,7 @@ const Settings = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">Language</label>
                 <select 
-                  value={settings.general.language || 'english'}
+                  value={settings?.general?.language || 'english'}
                   onChange={(e) => updateNestedState('general', 'language', e.target.value)}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border"
                 >
@@ -130,7 +130,7 @@ const Settings = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">Booking Mode</label>
                 <select 
-                  value={settings.booking.booking_mode || 'appointment'}
+                  value={settings?.booking?.booking_mode || 'appointment'}
                   onChange={(e) => updateNestedState('booking', 'booking_mode', e.target.value)}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border"
                 >
@@ -142,7 +142,7 @@ const Settings = () => {
                 <label className="block text-sm font-medium text-gray-700">Max Tokens/Appointments Per Day</label>
                 <input 
                   type="number" 
-                  value={settings.booking.max_tokens_per_day || 50}
+                  value={settings?.booking?.max_tokens_per_day || 50}
                   onChange={(e) => updateNestedState('booking', 'max_tokens_per_day', e.target.value)}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border"
                 />
@@ -151,7 +151,7 @@ const Settings = () => {
                 <label className="block text-sm font-medium text-gray-700">Average Consultation Time (mins)</label>
                 <input 
                   type="number" 
-                  value={settings.booking.avg_consultation_minutes || 15}
+                  value={settings?.booking?.avg_consultation_minutes || 15}
                   onChange={(e) => updateNestedState('booking', 'avg_consultation_minutes', e.target.value)}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border"
                 />
@@ -159,7 +159,7 @@ const Settings = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">Weekly Off Day</label>
                 <select 
-                  value={settings.booking.weekly_off || 'Sunday'}
+                  value={settings?.booking?.weekly_off || 'Sunday'}
                   onChange={(e) => updateNestedState('booking', 'weekly_off', e.target.value)}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border"
                 >
@@ -189,7 +189,7 @@ const Settings = () => {
                 <label className="block text-sm font-medium text-gray-700">Greeting Message</label>
                 <textarea 
                   rows={3}
-                  value={settings.ai.greeting_message || ''}
+                  value={settings?.ai?.greeting_message || ''}
                   onChange={(e) => updateNestedState('ai', 'greeting_message', e.target.value)}
                   placeholder="Hello! I am your clinic's assistant..."
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border"
@@ -199,7 +199,7 @@ const Settings = () => {
                 <label className="block text-sm font-medium text-gray-700">Escalation Message</label>
                 <textarea 
                   rows={2}
-                  value={settings.ai.escalation_message || ''}
+                  value={settings?.ai?.escalation_message || ''}
                   onChange={(e) => updateNestedState('ai', 'escalation_message', e.target.value)}
                   placeholder="I'll transfer you to a human agent now."
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border"

@@ -14,7 +14,7 @@ const Toast = () => {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col space-y-3 pointer-events-none">
+    <div className="fixed top-4 right-4 z-[9999] flex flex-col space-y-3 pointer-events-none">
       {toasts.map((toast) => {
         const config = typeConfig[toast.type] || typeConfig.info;
         
