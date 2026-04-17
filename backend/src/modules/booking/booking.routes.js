@@ -1,8 +1,6 @@
 const express = require('express');
-const { validationResult } = require('express-validator');
 const { validationErrorResponse } = require('../../utils/response');
-// For BYPASS_AUTH pattern, we might be using tenant.middleware or auth middleware. Let's assume tenant.middleware provides req.tenant.
-const { identifyTenant } = require('../tenant/tenant.middleware');
+const { requireAuth, loadTenant } = require('../auth/auth.middleware');
 const {
   getBookings,
   getBookingStats,
@@ -29,7 +27,8 @@ const validate = (req, res, next) => {
 };
 
 // All routes require tenant auth
-router.use(identifyTenant);
+router.use(requireAuth);
+router.use(loadTenant);
 
 router.get('/', getBookings);
 router.get('/stats', getBookingStats);

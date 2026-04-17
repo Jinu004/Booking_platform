@@ -65,7 +65,23 @@ app.use('/api/v1/customers', crmRoutes);
 const clinicRoutes = require('./modules/industries/clinic/clinic.routes');
 app.use('/api/v1/clinic', clinicRoutes);
 
-// 12. Global Error Handler must be the last middleware
+// 12. /api/v1/auth routes
+const authRoutes = require('./modules/auth/auth.routes');
+app.use('/api/v1/auth', authRoutes);
+
+// 13. /api/v1/staff routes
+const staffRoutes = require('./modules/staff/staff.routes');
+app.use('/api/v1/staff', staffRoutes);
+
+// 14. /api/v1/analytics routes
+const analyticsRoutes = require('./modules/analytics/analytics.routes');
+app.use('/api/v1/analytics', analyticsRoutes);
+
+// 15. /api/v1/settings routes
+const settingsRoutes = require('./modules/settings/settings.routes');
+app.use('/api/v1/settings', settingsRoutes);
+
+// 16. Global Error Handler must be the last middleware
 app.use(errorHandler);
 
 const PORT = env.PORT || 3001;

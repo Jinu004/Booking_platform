@@ -15,9 +15,10 @@ const Sidebar = () => {
   const links = [
     { name: 'Dashboard', path: '/dashboard', icon: '🏠' },
     { name: 'Bookings', path: '/bookings', icon: '📅' },
+    { name: 'Conversations', path: '/conversations', icon: '💬' },
     { name: 'Patients', path: '/patients', icon: '👥' },
     { name: 'Doctors', path: '/doctors', icon: '👨‍⚕️' },
-    { name: 'Conversations', path: '/conversations', icon: '💬' },
+    { name: 'Staff', path: '/staff', icon: '👔' },
     { name: 'Analytics', path: '/analytics', icon: '📊' },
     { name: 'Settings', path: '/settings', icon: '⚙️' }
   ];

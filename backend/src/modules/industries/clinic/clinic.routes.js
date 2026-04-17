@@ -1,5 +1,5 @@
 const express = require('express');
-const { identifyTenant } = require('../../tenant/tenant.middleware');
+const { requireAuth, loadTenant } = require('../../auth/auth.middleware');
 const {
   getDoctors,
   getDoctorById,
@@ -12,7 +12,8 @@ const {
 
 const router = express.Router();
 
-router.use(identifyTenant);
+router.use(requireAuth);
+router.use(loadTenant);
 
 router.get('/doctors', getDoctors);
 router.get('/doctors/:id', getDoctorById);

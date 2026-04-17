@@ -13,6 +13,7 @@ import Conversations from './pages/Conversations';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import Staff from './pages/Staff';
 import Onboarding from './pages/Onboarding';
 import NotFound from './pages/NotFound';
 
@@ -32,6 +33,7 @@ const App = () => {
             <Route path="bookings" element={<Bookings />} />
             <Route path="patients" element={<Patients />} />
             <Route path="doctors" element={<Doctors />} />
+            <Route path="staff" element={<Staff />} />
             <Route path="conversations" element={<Conversations />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="settings" element={<Settings />} />
