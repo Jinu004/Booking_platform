@@ -263,16 +263,12 @@ async function createManualBooking(req, res, next) {
 
     // Create clinic_token record
     await pool.query(
-      `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, customer_id, token_number, status) 
-       VALUES ($1, $2, $3, $4, $5, 'waiting')`,
-      [tenantId, booking.id, doctorId, customerId, tokenNumber]
-    ).catch(() => {
-      // Fallback if schema doesn't match perfectly, just try minimal
-      return pool.query(
-        `INSERT INTO clinic_tokens (tenant_id, booking_id, token_number, status) VALUES ($1, $2, $3, 'waiting')`,
-        [tenantId, booking.id, tokenNumber]
-      );
-    });
+      `INSERT INTO clinic_tokens
+       (tenant_id, booking_id, doctor_id,
+        token_number, status)
+       VALUES ($1, $2, $3, $4, 'waiting')`,
+      [tenantId, booking.id, doctorId, tokenNumber]
+    );
 
     // Return the correctly mapped booking
     const docRes = await pool.query('SELECT name FROM clinic_doctors WHERE id = $1', [doctorId]);
