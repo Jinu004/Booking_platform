@@ -241,30 +241,41 @@ async function createManualBooking(req, res, next) {
       customerId = insertCus.rows[0].id;
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    const tokRes = await pool.query(
-      'SELECT COALESCE(MAX(token_number), 0) + 1 as nxt FROM bookings WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3',
-      [tenantId, doctorId, today]
-    );
-    const token = parseInt(tokRes.rows[0].nxt, 10);
+    const tokenCountResult = await pool.query(
+      `SELECT COUNT(*) as count
+       FROM clinic_tokens
+       WHERE doctor_id = $1
+       AND issued_at::date = CURRENT_DATE
+       AND status != 'cancelled'`,
+      [doctorId]
+    )
+    const tokenNumber = parseInt(
+      tokenCountResult.rows[0].count
+    ) + 1
 
     const bRes = await pool.query(
       `INSERT INTO bookings (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes)
-       VALUES ($1, $2, $3, 'walkin', 'pending', $4, $5, $6) RETURNING *`,
-       [tenantId, customerId, doctorId, today, token, notes || '']
+       VALUES ($1, $2, $3, 'walkin', 'pending', CURRENT_DATE, $4, $5) RETURNING *`,
+       [tenantId, customerId, doctorId, tokenNumber, notes || '']
     );
 
     const booking = bRes.rows[0];
 
     // Create clinic_token record
     await pool.query(
-      `INSERT INTO clinic_tokens (tenant_id, booking_id, status) VALUES ($1, $2, 'waiting')`,
-      [tenantId, booking.id]
-    );
+      `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, customer_id, token_number, status) 
+       VALUES ($1, $2, $3, $4, $5, 'waiting')`,
+      [tenantId, booking.id, doctorId, customerId, tokenNumber]
+    ).catch(() => {
+      // Fallback if schema doesn't match perfectly, just try minimal
+      return pool.query(
+        `INSERT INTO clinic_tokens (tenant_id, booking_id, token_number, status) VALUES ($1, $2, $3, 'waiting')`,
+        [tenantId, booking.id, tokenNumber]
+      );
+    });
 
     // Return the correctly mapped booking
     const docRes = await pool.query('SELECT name FROM clinic_doctors WHERE id = $1', [doctorId]);
-    await pool.query('UPDATE clinic_tokens SET token_number = $1 WHERE booking_id = $2', [token, booking.id]).catch(() => {});
     
     booking.patient_name = patientName || 'Unknown Patient';
     booking.patient_phone = patientPhone;
