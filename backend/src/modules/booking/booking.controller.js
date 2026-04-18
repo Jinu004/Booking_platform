@@ -154,9 +154,18 @@ async function markNoShow(req, res, next) {
 async function getTodayBookings(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const today = new Date().toISOString().split('T')[0];
-    const result = await BookingService.getBookingsDashboard(tenantId, { date: today, limit: 100 });
-    return successResponse(res, result);
+    const sql = `
+      SELECT b.id, b.token_number, b.status, b.source, b.booking_date, b.created_at,
+             c.name as patient_name, c.phone as patient_phone, 
+             d.name as doctor_name
+      FROM bookings b
+      LEFT JOIN customers c ON b.customer_id = c.id
+      LEFT JOIN clinic_doctors d ON b.doctor_id = d.id
+      WHERE b.tenant_id = $1 AND b.booking_date = CURRENT_DATE
+      ORDER BY b.token_number ASC
+    `;
+    const result = await pool.query(sql, [tenantId]);
+    return successResponse(res, result.rows);
   } catch (error) {
     next(error);
   }
@@ -245,7 +254,23 @@ async function createManualBooking(req, res, next) {
        [tenantId, customerId, doctorId, today, token, notes || '']
     );
 
-    return successResponse(res, bRes.rows[0], 201);
+    const booking = bRes.rows[0];
+
+    // Create clinic_token record
+    await pool.query(
+      `INSERT INTO clinic_tokens (tenant_id, booking_id, status) VALUES ($1, $2, 'waiting')`,
+      [tenantId, booking.id]
+    );
+
+    // Return the correctly mapped booking
+    const docRes = await pool.query('SELECT name FROM clinic_doctors WHERE id = $1', [doctorId]);
+    await pool.query('UPDATE clinic_tokens SET token_number = $1 WHERE booking_id = $2', [token, booking.id]).catch(() => {});
+    
+    booking.patient_name = patientName || 'Unknown Patient';
+    booking.patient_phone = patientPhone;
+    booking.doctor_name = docRes.rows[0]?.name;
+
+    return successResponse(res, booking, 201);
   } catch (error) {
     next(error);
   }

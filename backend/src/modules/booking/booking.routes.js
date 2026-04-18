@@ -9,7 +9,10 @@ const {
   updateBookingStatus,
   cancelBooking,
   completeBooking,
-  markNoShow
+  markNoShow,
+  getTodayBookings,
+  exportBookings,
+  createManualBooking
 } = require('./booking.controller');
 const {
   validateCreateBooking,
