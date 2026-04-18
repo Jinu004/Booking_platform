@@ -128,6 +128,77 @@ async function updateTokenStatus(req, res, next) {
   }
 }
 
+/**
+ * PATCH /clinic/doctors/:id
+ * Updates doctor details
+ */
+async function updateDoctor(req, res, next) {
+  try {
+    const { id } = req.params;
+    const tenantId = req.tenant.id;
+
+    const result = await pool.query(
+      `UPDATE clinic_doctors
+       SET name = COALESCE($1, name),
+           specialization = COALESCE($2, specialization),
+           phone = COALESCE($3, phone),
+           qualification = COALESCE($4, qualification),
+           max_tokens_daily = COALESCE($5, max_tokens_daily),
+           consultation_fee = COALESCE($6, consultation_fee)
+       WHERE id = $7 AND tenant_id = $8
+       RETURNING *`,
+      [
+        req.body.name,
+        req.body.specialization,
+        req.body.phone,
+        req.body.qualification,
+        req.body.maxTokensDaily,
+        req.body.consultationFee,
+        id,
+        tenantId
+      ]
+    );
+
+    if (!result.rows[0]) {
+      return errorResponse(res, 'Doctor not found', 404);
+    }
+
+    return successResponse(res, result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * DELETE /clinic/doctors/:id
+ * Soft deletes doctor by marking inactive
+ */
+async function deleteDoctor(req, res, next) {
+  try {
+    const { id } = req.params;
+    const tenantId = req.tenant.id;
+
+    const result = await pool.query(
+      `UPDATE clinic_doctors
+       SET available_today = false,
+           leave_days = 999
+       WHERE id = $1 AND tenant_id = $2
+       RETURNING *`,
+      [id, tenantId]
+    );
+
+    if (!result.rows[0]) {
+      return errorResponse(res, 'Doctor not found', 404);
+    }
+
+    return successResponse(
+      res, { message: 'Doctor removed successfully' }
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getDoctors,
   getDoctorById,
@@ -135,5 +206,7 @@ module.exports = {
   updateAvailability,
   addLeave,
   getTokenQueue,
-  updateTokenStatus
+  updateTokenStatus,
+  updateDoctor,
+  deleteDoctor
 };
