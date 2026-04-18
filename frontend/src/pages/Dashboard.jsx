@@ -28,12 +28,12 @@ const Dashboard = () => {
         getBookings({ limit: 5 }).catch(() => ({ data: { bookings: [] } }))
       ]);
 
-      const docsArray = Array.isArray(docsRes.data) ? docsRes.data : (Array.isArray(docsRes) ? docsRes : []);
-      const tokensArray = Array.isArray(tokensRes.data) ? tokensRes.data : (Array.isArray(tokensRes) ? tokensRes : []);
+      const docsArray = docsRes?.data || [];
+      const tokensArray = tokensRes?.data || [];
       
-      let activeConvs = convRes.data?.conversations || convRes.conversations || (Array.isArray(convRes.data) ? convRes.data : []);
-      let totalBookings = statsRes.data?.total ?? statsRes.total ?? 0;
-      let bookingsArray = bookingsRes.data?.bookings || bookingsRes.bookings || (Array.isArray(bookingsRes.data) ? bookingsRes.data : []);
+      let activeConvs = convRes?.data?.conversations || [];
+      let totalBookings = statsRes?.data?.total || 0;
+      let bookingsArray = bookingsRes?.data?.bookings || [];
 
       setStats({
         bookingsToday: totalBookings,

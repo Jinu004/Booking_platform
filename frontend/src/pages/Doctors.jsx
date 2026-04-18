@@ -27,8 +27,8 @@ const Doctors = () => {
 
   const fetchDoctors = async () => {
     try {
-      const res = await getDoctors();
-      setDoctors(Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
+      const result = await getDoctors();
+      setDoctors(result?.data || []);
     } catch (err) {
       console.error(err);
     }
@@ -36,8 +36,8 @@ const Doctors = () => {
 
   const fetchQueue = async () => {
     try {
-      const res = await getTokenQueue();
-      setQueue(Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
+      const result = await getTokenQueue();
+      setQueue(result?.data || []);
     } catch (err) {
       console.error(err);
     }

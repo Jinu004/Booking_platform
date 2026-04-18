@@ -1,21 +1,17 @@
 import api from '../utils/api';
 
 export async function getPatients(params) {
-  const res = await api.get('/customers', { params });
-  return res.data;
+  return api.get('/customers', { params });
 }
 
 export async function getPatientById(id) {
-  const res = await api.get(`/customers/${id}`);
-  return res.data;
+  return api.get(`/customers/${id}`);
 }
 
 export async function getPatientHistory(id) {
-  const res = await api.get(`/customers/${id}/history`);
-  return res.data;
+  return api.get(`/customers/${id}/history`);
 }
 
 export async function updatePatient(id, data) {
-  const res = await api.patch(`/customers/${id}`, data);
-  return res.data;
+  return api.patch(`/customers/${id}`, data);
 }

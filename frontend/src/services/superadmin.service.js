@@ -1,4 +1,4 @@
-import api from './api';
+import api from '../utils/api';
 
 export const getAllTenants = () => {
   return api.get('/superadmin/tenants');

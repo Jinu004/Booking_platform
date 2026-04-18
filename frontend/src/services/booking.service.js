@@ -5,46 +5,25 @@ import api from '../utils/api';
  * @param {object} params - { date, status, page }
  */
 export async function getBookings(params) {
-  const res = await api.get('/bookings', { params });
-  return res.data;
+  return api.get('/bookings', { params });
 }
 
-/**
- * Gets booking statistics
- */
 export async function getBookingStats() {
-  const res = await api.get('/bookings/stats');
-  return res.data;
+  return api.get('/bookings/stats');
 }
 
-/**
- * Creates new booking
- */
 export async function createBooking(data) {
-  const res = await api.post('/bookings', data);
-  return res.data;
+  return api.post('/bookings', data);
 }
 
-/**
- * Cancels a booking
- */
 export async function cancelBooking(id) {
-  const res = await api.post(`/bookings/${id}/cancel`);
-  return res.data;
+  return api.post(`/bookings/${id}/cancel`);
 }
 
-/**
- * Marks booking complete
- */
 export async function completeBooking(id) {
-  const res = await api.post(`/bookings/${id}/complete`);
-  return res.data;
+  return api.post(`/bookings/${id}/complete`);
 }
 
-/**
- * Marks no show
- */
 export async function markNoShow(id) {
-  const res = await api.post(`/bookings/${id}/noshow`);
-  return res.data;
+  return api.post(`/bookings/${id}/noshow`);
 }
