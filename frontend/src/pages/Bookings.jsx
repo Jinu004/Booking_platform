@@ -16,6 +16,8 @@ const Bookings = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [statusFilter, setStatusFilter] = useState('');
   
+  const [selectedDoctor, setSelectedDoctor] = useState(null);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [doctors, setDoctors] = useState([]);
   
@@ -36,18 +38,24 @@ const Bookings = () => {
 
   const fetchData = async () => {
     try {
-      const [bookingsRes, statsRes] = await Promise.all([
+      const [bookingsRes, statsRes, docsRes] = await Promise.all([
         getBookings({ date, status: statusFilter }),
-        getBookingStats()
+        getBookingStats(),
+        getDoctors()
       ]);
-      setBookings(bookingsRes.data?.bookings || []);
-      setStats(statsRes.data || { total: 0, confirmed: 0, completed: 0, noshow: 0 });
+      setBookings(bookingsRes?.data?.bookings || bookingsRes?.data || []);
+      setStats(statsRes?.data || { total: 0, confirmed: 0, completed: 0, noshow: 0 });
+      setDoctors(docsRes?.data || []);
     } catch (err) {
       console.error('Failed to fetch bookings', err);
     } finally {
       setLoading(false);
     }
   };
+
+  const filteredBookings = selectedDoctor
+    ? bookings.filter(b => b.doctor_name === selectedDoctor.name)
+    : bookings;
 
   const loadFormDependencies = async () => {
     try {
@@ -133,6 +141,34 @@ const Bookings = () => {
         })}
       </div>
 
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        <button
+          onClick={() => setSelectedDoctor(null)}
+          className={selectedDoctor === null
+            ? 'bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
+            : 'bg-white text-gray-600 px-4 py-2 rounded-lg text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
+          }
+        >
+          All Doctors ({bookings.length})
+        </button>
+
+        {doctors.map(doctor => {
+          const count = bookings.filter(b => b.doctor_name === doctor.name).length;
+          return (
+            <button
+              key={doctor.id}
+              onClick={() => setSelectedDoctor(doctor)}
+              className={selectedDoctor?.id === doctor.id
+                ? 'bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
+                : 'bg-white text-gray-600 px-4 py-2 rounded-lg text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
+              }
+            >
+              {doctor.name} ({count})
+            </button>
+          )
+        })}
+      </div>
+
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -148,10 +184,10 @@ const Bookings = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {loading ? (
               <tr><td colSpan="6" className="p-0"><TableRowSkeleton rows={3}/></td></tr>
-            ) : bookings.length === 0 ? (
+            ) : filteredBookings.length === 0 ? (
               <tr><td colSpan="6" className="text-center py-10 text-gray-500 font-medium">No bookings found</td></tr>
             ) : (
-              bookings.map(b => (
+              filteredBookings.map(b => (
                 <tr key={b.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-indigo-700">
                     <div className="bg-indigo-50 w-10 h-10 flex items-center justify-center rounded-full">
