@@ -76,7 +76,7 @@ const Settings = () => {
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
-          {['general', 'booking', 'ai', 'clinic profile'].map((tab) => (
+          {['general', 'booking', 'ai', 'clinic profile', 'whatsapp'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -257,6 +257,25 @@ const Settings = () => {
               >
                 {saving ? 'Saving...' : 'Save Clinic Profile'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* WHATSAPP TAB */}
+        {activeTab === 'whatsapp' && (
+          <div className="p-6 space-y-6">
+            <h3 className="text-lg font-medium text-gray-900 border-b pb-2">WhatsApp Configuration</h3>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 max-w-2xl">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <span className="font-semibold text-gray-800">WhatsApp Status: Not Connected</span>
+              </div>
+              <p className="text-sm text-gray-600 mb-6">
+                To connect: Install WAHA on your server and scan the QR code to pair your clinic's WhatsApp number.
+              </p>
+              <div className="border-t pt-4">
+                 <a href="https://waha.devlike.pro/docs/how-to-start/" target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Read WAHA Documentation &rarr;</a>
+              </div>
             </div>
           </div>
         )}

@@ -48,11 +48,21 @@ router.post('/', async (req, res) => {
 
       // Identify tenant from WhatsApp number
       const TenantService = require('../../tenant/tenant.service')
-      const tenant = await TenantService.getTenantByWhatsapp(message.from)
+      let tenant = null;
 
-      if (!tenant) {
-        logger.warn(`No tenant found for number: ${message.from}`)
-        return
+      if (source === 'waha') {
+        const tenantId = process.env.WAHA_DEFAULT_TENANT_ID || '262467ed-7cf3-418b-b46c-6038540f9260'
+        tenant = await TenantService.getTenantById(tenantId)
+        if (!tenant) {
+          logger.warn(`No tenant configured for WAHA. Set WAHA_DEFAULT_TENANT_ID in .env`)
+          return
+        }
+      } else {
+        tenant = await TenantService.getTenantByWhatsapp(message.from)
+        if (!tenant) {
+          logger.warn(`No tenant found for number: ${message.from}`)
+          return
+        }
       }
 
       // Process through conversation service (saves message, manages session)
@@ -82,15 +92,22 @@ router.post('/', async (req, res) => {
 
       // Process through Gemini AI
       const AIService = require('../../ai-engine/ai.service')
-      const aiResponse = await AIService.processMessage({
-        tenant,
-        customer: context.customer,
-        conversation: context.conversation,
-        recentMessages: context.recentMessages,
-        session: context.session,
-        configs,
-        additionalData
-      })
+      let aiResponse;
+      try {
+        aiResponse = await AIService.processMessage({
+          tenant,
+          customer: context.customer,
+          conversation: context.conversation,
+          recentMessages: context.recentMessages,
+          session: context.session,
+          configs,
+          additionalData
+        })
+        logger.info(`AI response for ${message.from}: ${aiResponse.substring(0, 100)}`)
+      } catch (err) {
+        logger.error(`AI processing crashed for ${message.from}:`, err.message)
+        aiResponse = 'Sorry, I am having trouble right now. Please try again in a moment or call us directly.'
+      }
 
       // Save AI response to database
       await ConversationService.saveOutboundMessage(
@@ -103,12 +120,16 @@ router.post('/', async (req, res) => {
       const { sendMessage } = require('./whatsapp.adapter')
       await sendMessage(message.from, aiResponse)
 
-      logger.info(
-        `Gemini responded to ${message.from}: ${aiResponse.substring(0, 80)}...`
-      )
-
     } catch (err) {
       logger.error('Async webhook processing error:', err.message)
+      const { sendMessage } = require('./whatsapp.adapter')
+      const fallbackMessage = 'Sorry, I am having trouble right now. Please try again in a moment or call us directly.'
+      
+      if (req.body?.payload?.from) {
+        try { 
+           await sendMessage(req.body.payload.from, fallbackMessage) 
+        } catch(e){}
+      }
     }
   })
 })
