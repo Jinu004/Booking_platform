@@ -140,7 +140,7 @@ const Dashboard = () => {
                       {t.token_number}
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500 font-bold uppercase tracking-wider mb-0.5">Dr. {t.doctor_name}</p>
+                      <p className="text-sm text-gray-500 font-bold uppercase tracking-wider mb-0.5">{t.doctor_name}</p>
                       <p className="text-lg font-bold text-gray-900 leading-tight">{t.patient_name || 'Walkin Patient'}</p>
                     </div>
                   </div>

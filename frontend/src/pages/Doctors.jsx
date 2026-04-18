@@ -150,7 +150,7 @@ const Doctors = () => {
                 <tr key={t.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   <td className="px-6 py-4 whitespace-nowrap text-lg font-bold text-gray-900">#{t.token_number}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{t.patient_name || 'Unknown'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Dr. {t.doctor_name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.doctor_name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${tokenStatusColors[t.status] || 'bg-gray-100 text-gray-800'}`}>
                       {t.status.replace('_', ' ')}

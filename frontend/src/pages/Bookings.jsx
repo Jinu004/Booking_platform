@@ -163,7 +163,7 @@ const Bookings = () => {
                     <div className="text-sm text-gray-500 font-medium">{b.patient_phone}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">
-                    Dr. {b.doctor_name || 'Unassigned'}
+                    {b.doctor_name || 'Unassigned'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
                     {new Date(b.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
