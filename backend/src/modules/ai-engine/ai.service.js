@@ -8,7 +8,7 @@ const client = new GoogleGenerativeAI(
   process.env.GEMINI_API_KEY || ''
 )
 
-const MODEL = 'gemini-2.0-flash'
+const MODEL = 'gemini-2.5-flash'
 
 /**
  * Processes an incoming message through Gemini
