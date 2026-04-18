@@ -43,6 +43,14 @@ app.get('/health', (req, res) => {
 const tenantRoutes = require('./modules/tenant/tenant.routes');
 app.use('/api/v1/tenants', tenantRoutes);
 
+// Super Admin Routes
+const superAdminRoutes = require('./modules/superadmin/superadmin.routes');
+app.use('/api/v1/superadmin', superAdminRoutes);
+
+// Onboarding Routes
+const onboardingRoutes = require('./modules/onboarding/onboarding.routes');
+app.use('/api/v1/onboarding', onboardingRoutes);
+
 // 6. /api/v1/auth routes (when built)
 // app.use('/api/v1/auth', ...);
 

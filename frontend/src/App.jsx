@@ -16,6 +16,7 @@ import Login from './pages/Login';
 import Staff from './pages/Staff';
 import Onboarding from './pages/Onboarding';
 import NotFound from './pages/NotFound';
+import SuperAdmin from './pages/SuperAdmin';
 
 const App = () => {
   return (
@@ -37,6 +38,7 @@ const App = () => {
             <Route path="conversations" element={<Conversations />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="superadmin" element={<SuperAdmin />} />
           </Route>
         </Route>
 

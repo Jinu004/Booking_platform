@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "migrate": "node src/database/migrate.js"
+    "migrate": "node src/database/migrate.js",
+    "seed": "node src/database/seed.js"
   },
   "dependencies": {
     "@clerk/clerk-sdk-node": "^4.12.0",

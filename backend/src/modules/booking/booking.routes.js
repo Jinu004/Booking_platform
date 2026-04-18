@@ -31,9 +31,12 @@ router.use(requireAuth);
 router.use(loadTenant);
 
 router.get('/', getBookings);
+router.get('/today', getTodayBookings);
+router.get('/export', exportBookings);
 router.get('/stats', getBookingStats);
 router.get('/:id', getBookingById);
 router.post('/', validateCreateBooking, validate, createBooking);
+router.post('/manual', createManualBooking);
 router.patch('/:id/status', validateUpdateStatus, validate, updateBookingStatus);
 router.post('/:id/cancel', cancelBooking);
 router.post('/:id/complete', completeBooking);
