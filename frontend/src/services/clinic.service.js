@@ -9,6 +9,14 @@ export async function createDoctor(data) {
   return api.post('/clinic/doctors', data);
 }
 
+export async function updateDoctor(id, data) {
+  return api.patch(`/clinic/doctors/${id}`, data);
+}
+
+export async function deleteDoctor(id) {
+  return api.delete(`/clinic/doctors/${id}`);
+}
+
 export async function updateAvailability(id, data) {
   return api.patch(`/clinic/doctors/${id}/availability`, data);
 }

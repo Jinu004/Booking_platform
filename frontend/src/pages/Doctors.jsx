@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { getDoctors, updateAvailability, addLeave, getTokenQueue, updateTokenStatus } from '../services/clinic.service';
+import { getDoctors, createDoctor, updateDoctor, deleteDoctor, updateAvailability, addLeave, getTokenQueue, updateTokenStatus } from '../services/clinic.service';
 
 const Doctors = () => {
   const [doctors, setDoctors] = useState([]);
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Management state
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const [manageMode, setManageMode] = useState('add');
+  const [manageDoctorForm, setManageDoctorForm] = useState({
+    id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: 0
+  });
+
+  const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
+  const [doctorToRemove, setDoctorToRemove] = useState(null);
 
   // Leave modal state
   const [leaveModalDoc, setLeaveModalDoc] = useState(null);
@@ -40,6 +50,53 @@ const Doctors = () => {
       setQueue(result?.data || []);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const openAddDoctor = () => {
+    setManageMode('add');
+    setManageDoctorForm({ id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: 0 });
+    setIsManageModalOpen(true);
+  };
+
+  const openEditDoctor = (doc) => {
+    setManageMode('edit');
+    setManageDoctorForm({
+      id: doc.id,
+      name: doc.name,
+      specialization: doc.specialization || '',
+      phone: doc.phone || '',
+      qualification: doc.qualification || '',
+      maxTokensDaily: doc.max_tokens_daily || 30,
+      consultationFee: doc.consultation_fee || 0
+    });
+    setIsManageModalOpen(true);
+  };
+
+  const handleManageSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (manageMode === 'add') {
+        await createDoctor(manageDoctorForm);
+      } else {
+        await updateDoctor(manageDoctorForm.id, manageDoctorForm);
+      }
+      setIsManageModalOpen(false);
+      fetchDoctors();
+    } catch (err) {
+      alert(`Failed to ${manageMode} doctor`);
+    }
+  };
+
+  const handleRemoveConfirm = async () => {
+    if (!doctorToRemove) return;
+    try {
+      await deleteDoctor(doctorToRemove.id);
+      setIsRemoveModalOpen(false);
+      setDoctorToRemove(null);
+      fetchDoctors();
+    } catch (err) {
+      alert('Failed to remove doctor');
     }
   };
 
@@ -92,21 +149,68 @@ const Doctors = () => {
 
   return (
     <div className="p-8 space-y-8">
-      {/* SECTION 1 - Doctors */}
+      {/* SECTION 1 - Doctor Management */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Doctor Availability</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Doctors</h2>
+          <button 
+            onClick={openAddDoctor}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-sm hover:bg-blue-700 transition"
+          >
+            + Add Doctor
+          </button>
+        </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading && doctors.length === 0 ? <p>Loading doctors...</p> : doctors.map(doc => (
-            <div key={doc.id} className="bg-white rounded-lg shadow border border-gray-200 p-6 flex flex-col justify-between">
+            <div key={doc.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col justify-between hover:shadow-md transition">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">{doc.name}</h3>
-                <p className="text-sm text-gray-500 mb-4">{doc.specialization || 'General'}</p>
-                
-                <div className="text-sm text-gray-600 mb-6">
+                <p className="text-sm text-gray-500 mb-2">{doc.specialization || 'General'}</p>
+                <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded-md mb-4 space-y-1">
+                  <p><span className="font-medium text-gray-500">Qualification:</span> {doc.qualification || 'N/A'}</p>
+                  <p><span className="font-medium text-gray-500">Consultation:</span> ₹{doc.consultation_fee || 0}</p>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-gray-100 flex items-center justify-end space-x-3">
+                <button
+                  onClick={() => openEditDoctor(doc)}
+                  className="text-gray-400 hover:text-blue-600 transition"
+                  title="Edit Doctor"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+                <button
+                  onClick={() => { setDoctorToRemove(doc); setIsRemoveModalOpen(true); }}
+                  className="text-gray-400 hover:text-red-600 transition"
+                  title="Remove Doctor"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* SECTION 2 - Today's Availability */}
+      <div className="pt-8 border-t border-gray-200">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Today's Availability</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {doctors.map(doc => (
+            <div key={doc.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 flex flex-col justify-between">
+              <div>
+                <h3 className="text-md font-bold text-gray-900">{doc.name}</h3>
+                <div className="text-sm text-gray-600 my-3">
                   {doc.available_today ? (
-                    <span className="text-green-600 font-medium">Available</span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Available
+                    </span>
                   ) : (
-                    <span className="text-red-500 font-medium">On Leave {doc.leave_days > 0 ? `(${doc.leave_days} days)` : ''}</span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      On Leave {doc.leave_days > 0 ? `(${doc.leave_days}d)` : ''}
+                    </span>
                   )}
                 </div>
               </div>
@@ -129,8 +233,8 @@ const Doctors = () => {
         </div>
       </div>
 
-      {/* SECTION 2 - Token Queue */}
-      <div>
+      {/* SECTION 3 - Token Queue */}
+      <div className="pt-8 border-t border-gray-200">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Token Queue (Live)</h2>
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <table className="min-w-full divide-y divide-gray-200">
@@ -229,6 +333,66 @@ const Doctors = () => {
                 <button type="submit" className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Confirm Leave</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Doctor Modal */}
+      {isManageModalOpen && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl">
+            <h2 className="text-xl font-bold mb-4">{manageMode === 'add' ? 'Add Doctor' : 'Edit Doctor'}</h2>
+            <form onSubmit={handleManageSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Full Name *</label>
+                <input required type="text" value={manageDoctorForm.name} onChange={e => setManageDoctorForm({...manageDoctorForm, name: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Specialization *</label>
+                  <input required type="text" value={manageDoctorForm.specialization} onChange={e => setManageDoctorForm({...manageDoctorForm, specialization: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone *</label>
+                  <input required type="text" value={manageDoctorForm.phone} onChange={e => setManageDoctorForm({...manageDoctorForm, phone: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Qualification *</label>
+                  <input required type="text" value={manageDoctorForm.qualification} onChange={e => setManageDoctorForm({...manageDoctorForm, qualification: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Daily Token Limit *</label>
+                  <input required type="number" min="0" value={manageDoctorForm.maxTokensDaily} onChange={e => setManageDoctorForm({...manageDoctorForm, maxTokensDaily: parseInt(e.target.value) || 0})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Consultation Fee *</label>
+                <input required type="number" min="0" value={manageDoctorForm.consultationFee} onChange={e => setManageDoctorForm({...manageDoctorForm, consultationFee: parseFloat(e.target.value) || 0})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+                <button type="button" onClick={() => setIsManageModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium">Save Details</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Confirmation Modal */}
+      {isRemoveModalOpen && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Remove Doctor</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Are you sure you want to remove <strong>{doctorToRemove?.name}</strong>? This will not delete their booking history.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button onClick={() => { setIsRemoveModalOpen(false); setDoctorToRemove(null); }} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
+              <button onClick={handleRemoveConfirm} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium">Remove</button>
+            </div>
           </div>
         </div>
       )}
