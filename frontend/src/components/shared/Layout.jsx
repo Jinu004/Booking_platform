@@ -13,7 +13,7 @@ const Layout = () => {
         <header className="bg-white border-b border-gray-200 h-16 flex-shrink-0 mt-0 flex items-center px-4 md:px-6">
           <button 
             className="md:hidden mr-4 text-gray-600 hover:text-gray-900 focus:outline-none"
-            onClick={() => setIsSidebarOpen(true)}
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           >
             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
           </button>

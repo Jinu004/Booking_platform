@@ -236,7 +236,7 @@ const Doctors = () => {
       {/* SECTION 3 - Token Queue */}
       <div className="pt-8 border-t border-gray-200">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Token Queue (Live)</h2>
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div className="bg-white shadow overflow-x-auto sm:rounded-lg">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>

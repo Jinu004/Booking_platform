@@ -147,8 +147,9 @@ const Analytics = () => {
               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                 <h2 className="text-lg font-bold text-gray-900">Doctor Stats</h2>
               </div>
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-white">
+              <div className="overflow-x-auto">
+                <table className="min-w-[500px] w-full divide-y divide-gray-200">
+                  <thead className="bg-white">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Bookings</th>
@@ -168,6 +169,7 @@ const Analytics = () => {
                   {doctorData.length === 0 && <tr><td colSpan="4" className="text-center py-4 text-gray-500">No data available</td></tr>}
                 </tbody>
               </table>
+              </div>
             </div>
 
             <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">

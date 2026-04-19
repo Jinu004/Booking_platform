@@ -98,8 +98,8 @@ const Bookings = () => {
 
   return (
     <div className="p-8 space-y-6 relative">
-      <div className="flex justify-between items-center">
-        <div className="flex space-x-4">
+      <div className="flex flex-col md:flex-row flex-wrap justify-between items-start md:items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
           <input 
             type="date" 
             value={date} 
@@ -128,7 +128,7 @@ const Bookings = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {['Total Today', 'Confirmed', 'Completed', 'No Shows'].map((s, i) => {
           const vals = [stats.total, stats.confirmed, stats.completed, stats.noshow];
           if (loading) return <StatCardSkeleton key={i} />
@@ -145,8 +145,8 @@ const Bookings = () => {
         <button
           onClick={() => setSelectedDoctor(null)}
           className={selectedDoctor === null
-            ? 'bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
-            : 'bg-white text-gray-600 px-4 py-2 rounded-lg text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
+            ? 'bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
+            : 'bg-white text-gray-600 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
           }
         >
           All Doctors ({bookings.length})
@@ -159,8 +159,8 @@ const Bookings = () => {
               key={doctor.id}
               onClick={() => setSelectedDoctor(doctor)}
               className={selectedDoctor?.id === doctor.id
-                ? 'bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
-                : 'bg-white text-gray-600 px-4 py-2 rounded-lg text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
+                ? 'bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
+                : 'bg-white text-gray-600 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
               }
             >
               {doctor.name} ({count})
@@ -169,8 +169,8 @@ const Bookings = () => {
         })}
       </div>
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
+      <div className="bg-white shadow overflow-x-auto -mx-4 px-4 sm:rounded-lg">
+        <table className="min-w-[600px] w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Token</th>

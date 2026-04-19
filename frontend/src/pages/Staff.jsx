@@ -88,7 +88,33 @@ const Staff = () => {
         </button>
       </div>
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          <div className="text-center py-4">Loading...</div>
+        ) : staffList.length === 0 ? (
+          <div className="text-center py-4 text-gray-500">No staff found</div>
+        ) : staffList.map(s => (
+          <div key={s.id} className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex justify-between">
+              <div>
+                <p className="font-medium text-gray-900">{s.name}</p>
+                <p className="text-sm text-gray-500">{s.email || '-'}</p>
+                <p className="text-sm text-gray-500 capitalize">{s.role}</p>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                {s.is_active ? (
+                  <span className="text-green-600 font-medium text-xs">Active</span>
+                ) : (
+                  <span className="text-red-500 font-medium text-xs">Inactive</span>
+                )}
+                <button onClick={() => setEditRoleModal({ id: s.id, role: s.role })} className="text-sm text-indigo-600">Edit Role</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden md:block bg-white shadow overflow-x-auto sm:rounded-lg">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>

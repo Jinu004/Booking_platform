@@ -98,9 +98,9 @@ export default function Conversations() {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <PageHeader title="Conversations" />
       
-      <div className="flex flex-1 overflow-hidden bg-white rounded-lg shadow mt-4 border border-gray-200">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden bg-white rounded-lg shadow mt-4 border border-gray-200">
         {/* Left Column - List */}
-        <div className="w-[35%] border-r border-gray-200 flex flex-col">
+        <div className="w-full md:w-1/3 border-r border-gray-200 flex flex-col md:max-h-full max-h-64">
           <div className="p-4 border-b border-gray-200 bg-gray-50 flex-shrink-0">
             <h2 className="text-lg font-semibold text-gray-800">Recent Conversations</h2>
           </div>
@@ -124,8 +124,8 @@ export default function Conversations() {
                     className={`p-3 mb-2 rounded cursor-pointer transition-colors ${selectedId === conv.id ? 'bg-blue-50 border-blue-200 border' : 'hover:bg-gray-100 border border-transparent'}`}
                   >
                     <div className="flex justify-between items-center mb-1">
-                      <span className="font-semibold text-gray-800 truncate">{phone}</span>
-                      <span className={`text-xs px-2 py-1 rounded-full ${badgeClass}`}>
+                      <span className="font-semibold text-gray-800 break-words">{phone}</span>
+                      <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${badgeClass}`}>
                         {conv.status}
                       </span>
                     </div>
@@ -139,7 +139,7 @@ export default function Conversations() {
         </div>
 
         {/* Right Column - Detail */}
-        <div className="w-[65%] flex flex-col items-stretch">
+        <div className="w-full md:w-2/3 flex flex-col items-stretch flex-1">
           {!selectedId || !activeConversation ? (
             <div className="flex-1 flex items-center justify-center text-gray-500 bg-gray-50">
               Select a conversation to view details
