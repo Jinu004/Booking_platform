@@ -52,8 +52,63 @@ function parseIncoming(payload, source) {
   return waha.parseIncomingMessage(payload)
 }
 
+/**
+ * Sends interactive button message
+ * Only available with Meta — falls back to
+ * plain text with WAHA
+ *
+ * @param {string} to
+ * @param {string} bodyText
+ * @param {Array} buttons - [{ id, title }]
+ */
+async function sendButtons(to, bodyText, buttons) {
+  await randomDelay(2000, 5000)
+  const provider = getProvider()
+
+  if (provider === 'meta') {
+    return meta.sendInteractiveButtons(to, bodyText, buttons)
+  }
+
+  // WAHA fallback — plain text with numbered options
+  const numberedText = bodyText + '\n\n' +
+    buttons.map((btn, i) => `${i + 1} → ${btn.title}`).join('\n')
+  return waha.sendTextMessage(to, numberedText)
+}
+
+/**
+ * Sends doctor selection list
+ * Meta uses list message — WAHA uses plain text
+ *
+ * @param {string} to
+ * @param {string} bodyText
+ * @param {Array} items - [{ id, title, description }]
+ */
+async function sendDoctorList(to, bodyText, items) {
+  await randomDelay(2000, 5000)
+  const provider = getProvider()
+
+  if (provider === 'meta') {
+    return meta.sendListMessage(
+      to,
+      bodyText,
+      'Select Doctor',
+      items
+    )
+  }
+
+  // WAHA fallback — plain text list
+  const listText = bodyText + '\n\n' +
+    items.map(item =>
+      `🩺 ${item.title}\n   ${item.description}`
+    ).join('\n\n') +
+    '\n\nReply with doctor name'
+  return waha.sendTextMessage(to, listText)
+}
+
 module.exports = {
   sendMessage,
+  sendButtons,
+  sendDoctorList,
   parseIncoming,
   getProvider
 }

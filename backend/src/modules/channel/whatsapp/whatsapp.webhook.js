@@ -117,8 +117,31 @@ router.post('/', async (req, res) => {
       )
 
       // Send via WhatsApp with built-in human-like delay
-      const { sendMessage } = require('./whatsapp.adapter')
-      await sendMessage(message.from, aiResponse)
+      const { sendMessage, sendButtons } = require('./whatsapp.adapter')
+      
+      // Check if this is a greeting response
+      // Greeting responses contain the welcome text
+      if (aiResponse.includes('How can I help you today')) {
+        // Send interactive buttons instead of plain text
+        await sendButtons(
+          message.from,
+          aiResponse,
+          [
+            { id: 'book', title: '📅 Book Appointment' },
+            { id: 'check', title: '📋 My Booking' },
+            { id: 'staff', title: '👤 Talk to Staff' }
+          ]
+        )
+      } else if (aiResponse.includes('Which doctor would you like')) {
+        // Parse doctor list from AI response
+        // Send as list message
+        // For now send as plain text — doctor list
+        // interactive will be added in next sprint
+        await sendMessage(message.from, aiResponse)
+      } else {
+        // Regular text response
+        await sendMessage(message.from, aiResponse)
+      }
 
     } catch (err) {
       logger.error('Async webhook processing error:', err.message)

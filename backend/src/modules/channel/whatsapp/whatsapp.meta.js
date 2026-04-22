@@ -95,8 +95,113 @@ function verifyWebhook(query) {
   return null
 }
 
+/**
+ * Sends interactive button message via Meta
+ * Used for welcome menu
+ * Maximum 3 buttons
+ *
+ * @param {string} to - Phone number
+ * @param {string} bodyText - Message body
+ * @param {Array} buttons - Array of button objects
+ *   each button: { id, title }
+ * @returns {Promise<object>}
+ */
+async function sendInteractiveButtons(to, bodyText, buttons) {
+  try {
+    const response = await axios.post(
+      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace('+', ''),
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: { text: bodyText },
+          action: {
+            buttons: buttons.map(btn => ({
+              type: 'reply',
+              reply: {
+                id: btn.id,
+                title: btn.title
+              }
+            }))
+          }
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${META_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+    logger.info(`Meta interactive buttons sent to ${to}`)
+    return response.data
+  } catch (err) {
+    logger.error('Meta interactive buttons failed:', err.message)
+    throw err
+  }
+}
+
+/**
+ * Sends list message via Meta
+ * Used for doctor selection
+ * Up to 10 items
+ *
+ * @param {string} to - Phone number
+ * @param {string} bodyText - Message body
+ * @param {string} buttonText - Button label (max 20 chars)
+ * @param {Array} items - Array of list items
+ *   each item: { id, title, description }
+ * @returns {Promise<object>}
+ */
+async function sendListMessage(to, bodyText, buttonText, items) {
+  try {
+    const response = await axios.post(
+      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace('+', ''),
+        type: 'interactive',
+        interactive: {
+          type: 'list',
+          body: { text: bodyText },
+          action: {
+            button: buttonText,
+            sections: [
+              {
+                title: 'Available Doctors',
+                rows: items.map(item => ({
+                  id: item.id,
+                  title: item.title,
+                  description: item.description
+                }))
+              }
+            ]
+          }
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${META_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+    logger.info(`Meta list message sent to ${to}`)
+    return response.data
+  } catch (err) {
+    logger.error('Meta list message failed:', err.message)
+    throw err
+  }
+}
+
 module.exports = {
   sendTextMessage,
+  sendInteractiveButtons,
+  sendListMessage,
   parseIncomingMessage,
   verifyWebhook
 }

@@ -19,24 +19,32 @@ async function executeFunction(name, args, ctx) {
 
       case 'get_clinic_info': {
         const result = await pool.query(
-          `SELECT cp.clinic_name, cp.address, cp.working_hours,
-                  cp.weekly_off, cp.phone
+          `SELECT cp.clinic_name as name, cp.address, cp.working_hours,
+                  cp.weekly_off, cp.phone as whatsapp_number
            FROM clinic_profiles cp
            WHERE cp.tenant_id = $1
            LIMIT 1`,
           [tenant.id]
         )
-        if (!result.rows.length) {
-          return { info: `${tenant.name} — no additional clinic info configured yet.` }
-        }
-        const c = result.rows[0]
-        return {
-          clinic_name: c.clinic_name || tenant.name,
-          address: c.address || 'Not set',
-          working_hours: c.working_hours || 'Please contact clinic',
-          weekly_off: c.weekly_off || 'Sunday',
-          phone: c.phone || 'Not set'
-        }
+        const info = result.rows[0] || { name: tenant.name, whatsapp_number: 'Not set' }
+
+        const configResult = await pool.query(
+          `SELECT key, value FROM tenant_configs
+           WHERE tenant_id = $1
+           AND key IN ('opening_time', 'closing_time',
+                       'weekly_off')`,
+          [tenant.id]
+        )
+        const configs = {}
+        configResult.rows.forEach(r => {
+          configs[r.key] = r.value
+        })
+
+        return `${info.name}
+📍 WhatsApp: ${info.whatsapp_number}
+🕘 Opening: ${configs.opening_time || '9:00 AM'}
+🕔 Closing: ${configs.closing_time || '5:00 PM'}
+📅 Weekly off: ${configs.weekly_off || 'Sunday'}`
       }
 
       case 'check_doctor_availability': {
@@ -66,14 +74,18 @@ async function executeFunction(name, args, ctx) {
         if (remaining <= 0) {
           return { available: false, message: `Dr. ${doctor.name} is fully booked for today.` }
         }
-        return {
-          available: true,
-          doctor_name: doctor.name,
-          specialization: doctor.specialization,
-          tokens_remaining: remaining,
-          next_token: parseInt(doctor.booked_count || 0) + 1,
-          message: `Dr. ${doctor.name} is available. ${remaining} tokens remaining. Your token would be #${parseInt(doctor.booked_count || 0) + 1}.`
-        }
+        const configResult = await pool.query(
+          `SELECT value FROM tenant_configs
+           WHERE tenant_id = $1
+           AND key = 'opening_time'`,
+          [tenant.id]
+        )
+        const openingTime = configResult.rows[0]?.value || '9:00 AM'
+
+        return `Dr. ${doctor.name} (${doctor.specialization})
+is available today.
+Session starts: ${openingTime}
+${remaining} tokens remaining.`
       }
 
       case 'create_token_booking': {
@@ -122,13 +134,24 @@ async function executeFunction(name, args, ctx) {
           ]
         )
         const booking = bookingRes.rows[0]
-        return {
-          success: true,
-          booking_id: booking.id,
-          token_number: booking.token_number,
-          doctor_name: doctor.name,
-          message: `✅ Booking confirmed! Token #${booking.token_number} with Dr. ${doctor.name} for today.`
-        }
+        const configResult = await pool.query(
+          `SELECT value FROM tenant_configs
+           WHERE tenant_id = $1
+           AND key = 'opening_time'`,
+          [tenant.id]
+        )
+        const openingTime = configResult.rows[0]?.value || '9:00 AM'
+
+        return `Booking confirmed! 🏥
+
+Token Number: ${tokenNumber}
+Doctor: ${doctor.name}
+${doctor.specialization}
+
+🕘 Consultation starts at ${openingTime}
+Please arrive before session begins.
+
+Reply CANCEL to cancel your booking.`
       }
 
       case 'cancel_booking': {
