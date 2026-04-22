@@ -17,6 +17,15 @@ function getFunctionDefinitions(industry) {
       }
     },
     {
+      name: 'get_available_doctors',
+      description: 'Gets list of all doctors available today with their specialization, tokens remaining and session start time. Call this when patient wants to book an appointment and you need to show them which doctors are available.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {},
+        required: []
+      }
+    },
+    {
       name: 'check_doctor_availability',
       description: 'Check if a specific doctor is available today and how many tokens remain',
       parameters: {
