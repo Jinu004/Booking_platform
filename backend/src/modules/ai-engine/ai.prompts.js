@@ -34,15 +34,9 @@ Always use these functions. Never guess availability or make up token numbers.`
  *
  * @param {object} tenant
  * @param {object} configs
- * @param {Array} doctors
  * @returns {string}
  */
-function getClinicPrompt(tenant, configs, doctors) {
-  const doctorList = doctors
-    .filter(d => d.available_today)
-    .map(d => `- ${d.name} (${d.specialization || 'General'})`)
-    .join('\n')
-
+function getClinicPrompt(tenant, configs) {
   return `${getBasePrompt(tenant, configs)}
 
 CLINIC INFORMATION:
@@ -52,8 +46,16 @@ Weekly off: ${configs.weekly_off || 'sunday'}
 Average consultation: ${configs.avg_consultation_minutes || 10} minutes
 Max tokens per doctor: ${configs.max_tokens_per_day || 50}
 
-AVAILABLE DOCTORS TODAY:
-${doctorList || 'No doctors available today'}
+AVAILABLE DOCTORS:
+Do NOT assume doctor availability.
+Always call check_doctor_availability
+function for EACH doctor to get
+real time availability before
+showing the doctor list to patient.
+Get the full list of doctors from
+the get_clinic_info function first,
+then call check_doctor_availability
+for each one.
 
 COMMON PATIENT REQUESTS:
 1. "I want to book" / "appointment" / "token"
@@ -172,8 +174,7 @@ function getSystemPrompt(tenant, configs, additionalData = {}) {
     case 'clinic':
       return getClinicPrompt(
         tenant,
-        configs,
-        additionalData.doctors || []
+        configs
       )
     default:
       return getBasePrompt(tenant, configs)
