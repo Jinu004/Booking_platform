@@ -4,6 +4,7 @@ import { getBookingStats, getBookings } from '../services/booking.service';
 import { getDoctors, getTokenQueue } from '../services/clinic.service';
 import { getConversations } from '../services/conversation.service';
 import { StatCardSkeleton, TableRowSkeleton, CardSkeleton } from '../components/shared/Skeleton';
+import useStore from '../store/useStore';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({ bookingsToday: 0, activeConversations: 0, availableDoctors: 0, pendingTokens: 0 });
@@ -11,6 +12,8 @@ const Dashboard = () => {
   const [tokenQueue, setTokenQueue] = useState([]);
   const [recentConversations, setRecentConversations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { tenant } = useStore();
+  const [hasDoctors, setHasDoctors] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
@@ -45,6 +48,7 @@ const Dashboard = () => {
       setTokenQueue(tokensArray);
       setRecentConversations(activeConvs.slice(0, 5));
       setRecentBookings(bookingsArray.slice(0, 5));
+      setHasDoctors(docsArray.length > 0);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -79,6 +83,54 @@ const Dashboard = () => {
 
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
+      {(!hasDoctors || !tenant?.whatsapp_number) && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+          <h3 className="font-semibold text-blue-900 mb-3">
+            👋 Complete your setup
+          </h3>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <span className="text-green-500">✅</span>
+              <span className="text-sm text-gray-700">
+                Clinic created
+              </span>
+            </div>
+            {!hasDoctors && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-400">⬜</span>
+                  <span className="text-sm text-gray-700">
+                    Add your first doctor
+                  </span>
+                </div>
+                <Link
+                  to="/doctors"
+                  className="text-sm text-blue-600 font-medium hover:underline"
+                >
+                  Add Doctor →
+                </Link>
+              </div>
+            )}
+            {!tenant?.whatsapp_number && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-400">⬜</span>
+                  <span className="text-sm text-gray-700">
+                    Connect WhatsApp
+                  </span>
+                </div>
+                <Link
+                  to="/settings"
+                  className="text-sm text-blue-600 font-medium hover:underline"
+                >
+                  Learn How →
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-black text-gray-900 tracking-tight">Overview</h1>
         <div className="flex space-x-3 w-full md:w-auto">
