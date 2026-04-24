@@ -92,7 +92,16 @@ const Staff = () => {
         {loading ? (
           <div className="text-center py-4">Loading...</div>
         ) : staffList.length === 0 ? (
-          <div className="text-center py-4 text-gray-500">No staff found</div>
+          <div className="text-center py-16 flex flex-col items-center justify-center space-y-3">
+            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+            <p className="text-gray-500 font-medium text-lg">No staff members yet</p>
+            <button 
+              onClick={() => setInviteModalOpen(true)}
+              className="mt-2 text-indigo-600 font-bold hover:text-indigo-800"
+            >
+              + Invite Staff
+            </button>
+          </div>
         ) : staffList.map(s => (
           <div key={s.id} className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="flex justify-between">
@@ -129,7 +138,20 @@ const Staff = () => {
             {loading ? (
               <tr><td colSpan="5" className="text-center py-4">Loading...</td></tr>
             ) : staffList.length === 0 ? (
-              <tr><td colSpan="5" className="text-center py-4 text-gray-500">No staff found</td></tr>
+              <tr>
+                <td colSpan="5" className="text-center py-16">
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                    <p className="text-gray-500 font-medium text-lg">No staff members yet</p>
+                    <button 
+                      onClick={() => setInviteModalOpen(true)}
+                      className="mt-2 text-indigo-600 font-bold hover:text-indigo-800"
+                    >
+                      + Invite Staff
+                    </button>
+                  </div>
+                </td>
+              </tr>
             ) : staffList.map(s => (
               <tr key={s.id}>
                 <td className="px-6 py-4 whitespace-nowrap">

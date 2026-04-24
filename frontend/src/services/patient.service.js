@@ -15,3 +15,7 @@ export async function getPatientHistory(id) {
 export async function updatePatient(id, data) {
   return api.patch(`/customers/${id}`, data);
 }
+
+export async function globalSearch(query) {
+  return api.get(`/crm/search?q=${encodeURIComponent(query)}`);
+}

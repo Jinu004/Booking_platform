@@ -185,7 +185,23 @@ const Bookings = () => {
             {loading ? (
               <tr><td colSpan="6" className="p-0"><TableRowSkeleton rows={3}/></td></tr>
             ) : filteredBookings.length === 0 ? (
-              <tr><td colSpan="6" className="text-center py-10 text-gray-500 font-medium">No bookings found</td></tr>
+              <tr>
+                <td colSpan="6" className="text-center py-16">
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <p className="text-gray-500 font-medium text-lg">No bookings yet today</p>
+                    <button 
+                      onClick={() => {
+                        loadFormDependencies();
+                        setIsModalOpen(true);
+                      }}
+                      className="mt-2 text-indigo-600 font-bold hover:text-indigo-800"
+                    >
+                      + New Booking
+                    </button>
+                  </div>
+                </td>
+              </tr>
             ) : (
               filteredBookings.map(b => (
                 <tr key={b.id} className="hover:bg-gray-50 transition-colors">

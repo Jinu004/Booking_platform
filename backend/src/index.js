@@ -68,6 +68,7 @@ app.use('/api/v1/bookings', bookingRoutes);
 // 10. /api/v1/customers routes
 const crmRoutes = require('./modules/crm/crm.routes');
 app.use('/api/v1/customers', crmRoutes);
+app.use('/api/v1/crm', crmRoutes);
 
 // 11. /api/v1/clinic routes
 const clinicRoutes = require('./modules/industries/clinic/clinic.routes');

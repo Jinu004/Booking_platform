@@ -2,6 +2,7 @@ const CRMService = require('./crm.service');
 const CRMModel = require('./crm.model');
 const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
+const logger = require('../../utils/logger');
 
 /**
  * GET /customers
@@ -84,10 +85,76 @@ async function getCustomerHistory(req, res, next) {
   }
 }
 
+/**
+ * GET /crm/search?q=query
+ * Global search across patients and bookings
+ * Searches by patient name or phone number
+ */
+async function globalSearch(req, res) {
+  try {
+    const tenantId = req.tenant.id
+    const { q } = req.query
+
+    if (!q || q.trim().length < 2) {
+      return successResponse(res, {
+        patients: [],
+        bookings: []
+      })
+    }
+
+    const searchTerm = q.trim()
+
+    // Search patients by name or phone
+    const patientsResult = await pool.query(
+      `SELECT id, name, phone, last_seen,
+              created_at
+       FROM customers
+       WHERE tenant_id = $1
+       AND (
+         LOWER(name) LIKE LOWER($2)
+         OR phone LIKE $2
+       )
+       ORDER BY name ASC
+       LIMIT 5`,
+      [tenantId, `%${searchTerm}%`]
+    )
+
+    // Search recent bookings by patient name or phone
+    const bookingsResult = await pool.query(
+      `SELECT b.id, b.token_number,
+              b.booking_date, b.status,
+              b.source,
+              c.name AS patient_name,
+              c.phone AS patient_phone,
+              cd.name AS doctor_name
+       FROM bookings b
+       JOIN customers c ON c.id = b.customer_id
+       JOIN clinic_doctors cd ON cd.id = b.doctor_id
+       WHERE b.tenant_id = $1
+       AND (
+         LOWER(c.name) LIKE LOWER($2)
+         OR c.phone LIKE $2
+       )
+       ORDER BY b.booking_date DESC
+       LIMIT 5`,
+      [tenantId, `%${searchTerm}%`]
+    )
+
+    return successResponse(res, {
+      patients: patientsResult.rows,
+      bookings: bookingsResult.rows
+    })
+  } catch (err) {
+    logger.error('Global search error:', err.message)
+    return errorResponse(res, 'Search failed')
+  }
+}
+
 module.exports = {
   getCustomers,
   getCustomerById,
   createCustomer,
   updateCustomer,
-  getCustomerHistory
+  getCustomerHistory,
+  globalSearch
 };
