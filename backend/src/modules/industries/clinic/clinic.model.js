@@ -94,22 +94,24 @@ async function addDoctorLeave(pool, tenantId, doctorId, leaveDate, reason) {
 /**
  * Gets token queue for today
  */
-async function getTokenQueue(pool, tenantId, date = 'CURRENT_DATE') {
-  let dateFilter = date === 'CURRENT_DATE' ? 'CURRENT_DATE' : '$2';
-  let sql = `
-    SELECT ct.*, b.notes, c.name AS patient_name, cd.name AS doctor_name
+async function getTokenQueue(pool, tenantId) {
+  const sql = `
+    SELECT ct.*, b.notes, 
+           c.name AS patient_name, 
+           cd.name AS doctor_name
     FROM clinic_tokens ct
     JOIN bookings b ON b.id = ct.booking_id
     LEFT JOIN customers c ON c.id = b.customer_id
     JOIN clinic_doctors cd ON cd.id = ct.doctor_id
-    WHERE ct.tenant_id = $1 AND DATE(ct.issued_at) = ${dateFilter}
+    WHERE ct.tenant_id = $1
+    AND ct.status != 'cancelled'
+    AND ct.issued_at >= CURRENT_DATE
+    AND ct.issued_at < CURRENT_DATE + INTERVAL '1 day'
     ORDER BY ct.token_number ASC
-  `;
-  const params = date === 'CURRENT_DATE' ? [] : [date];
-  const result = await tenantQuery(tenantId, pool, sql, params);
-  return result.rows;
+  `
+  const result = await tenantQuery(tenantId, pool, sql, [])
+  return result.rows
 }
-
 /**
  * Updates token status
  */
