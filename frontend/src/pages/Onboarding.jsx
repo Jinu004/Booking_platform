@@ -13,6 +13,7 @@ const Onboarding = () => {
   const [loading, setLoading] = useState(false);
   const [plans, setPlans] = useState({});
   const [errors, setErrors] = useState({});
+  const [error, setError] = useState(null);
 
   const [formData, setFormData] = useState({
     clinicName: '',
@@ -112,15 +113,38 @@ const Onboarding = () => {
 
   const handleSubmit = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const { data } = await api.post('/onboarding/clinic', formData);
-      addToast('Clinic created successfully', 'success');
-      setTenant(data.data);
-      // Auth bypass mock
-      setStaff({ name: formData.ownerName, role: 'admin', tenantId: data.data.tenant_id });
-      navigate('/dashboard');
+      const response = await api.post(
+        '/onboarding/clinic',
+        {
+          clinicName: formData.clinicName,
+          ownerName: formData.ownerName,
+          email: formData.email,
+          phone: formData.phone,
+          whatsappNumber: formData.whatsappNumber,
+          plan: formData.plan || 'starter',
+          openingTime: formData.openingTime || '09:00',
+          closingTime: formData.closingTime || '18:00',
+          weeklyOff: formData.weeklyOff || 'sunday',
+          avgConsultationMinutes: formData.avgConsultationMinutes || 15,
+          maxTokens: formData.maxTokens || 50,
+          doctorName: formData.doctorName,
+          doctorSpecialization: formData.doctorSpecialization,
+          doctorQualification: formData.doctorQualification,
+          doctorFee: formData.doctorFee,
+          doctorMaxTokens: formData.doctorMaxTokens || 30
+        }
+      );
+
+      if (response.success) {
+        setStep(6); // success screen
+      } else {
+        setError(response.error || 'Failed to create clinic');
+      }
     } catch (err) {
-      addToast(err.response?.data?.error || 'Failed to create clinic', 'error');
+      setError('Failed to create clinic. Please try again.');
+      console.error('Onboarding error:', err);
     } finally {
       setLoading(false);
     }
@@ -129,12 +153,12 @@ const Onboarding = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
       <div className="absolute top-0 right-0 left-0 bg-white h-2 shadow-sm">
-        <div className="h-full bg-indigo-600 transition-all duration-300" style={{ width: `${(step/5)*100}%`}}></div>
+        <div className="h-full bg-indigo-600 transition-all duration-300" style={{ width: `${(Math.min(step, 5)/5)*100}%`}}></div>
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-2xl text-center mb-8">
         <h2 className="text-4xl font-black text-gray-900 tracking-tight">Setup Your Clinic</h2>
-        <p className="mt-2 text-md text-gray-500 font-medium">Step {step} of 5</p>
+        <p className="mt-2 text-md text-gray-500 font-medium">Step {Math.min(step, 5)} of 5</p>
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-3xl">
@@ -225,6 +249,24 @@ const Onboarding = () => {
 
           {step === 5 && (
             <div className="space-y-6 animate-[fadeIn_0.3s]">
+               <h3 className="text-xl font-bold border-b text-center border-none mb-6">Confirm Setup</h3>
+               <div className="bg-gray-50 rounded-xl p-6 shadow-inner space-y-4 max-w-xl mx-auto">
+                 <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Clinic Name</span><span className="font-bold">{formData.clinicName}</span></div>
+                 <div className="flex justify-between border-b pb-2"><span className="text-gray-500">WhatsApp Number</span><span className="font-bold">+91 {formData.whatsappNumber}</span></div>
+                 <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Selected Plan</span><span className="font-bold capitalize text-indigo-700">{formData.plan}</span></div>
+                 <div className="flex justify-between"><span className="text-gray-500">Hours</span><span className="font-bold">{formData.openingTime} - {formData.closingTime}</span></div>
+               </div>
+               <p className="text-center text-sm text-gray-500 mt-4">By clicking Create, you agree to our Terms of Service.</p>
+               {error && (
+                 <p className="text-red-500 text-sm mt-2 text-center font-medium">
+                   {error}
+                 </p>
+               )}
+            </div>
+          )}
+
+          {step === 6 && (
+            <div className="space-y-6 animate-[fadeIn_0.3s]">
                <div className="flex justify-center mb-4">
                  <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center">
                    <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
@@ -244,14 +286,18 @@ const Onboarding = () => {
           )}
 
           <div className="mt-10 flex flex-col md:flex-row justify-between items-center gap-4">
-             {step > 1 && (
+             {step > 1 && step < 6 && (
                <button type="button" onClick={() => setStep(s=>s-1)} className="px-6 py-2 border rounded-lg hover:bg-gray-50 font-medium order-2 md:order-1 w-full md:w-auto">Back</button>
              )}
              <div className="order-1 md:order-2 ml-auto w-full md:w-auto">
                {step < 5 ? (
                   <Button onClick={handleNext} loading={loading} className="w-full md:w-40" size="lg">Next Step &rarr;</Button>
+               ) : step === 5 ? (
+                  <button onClick={handleSubmit} disabled={loading} className="w-full md:w-48 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-lg shadow disabled:opacity-50 transition">
+                    {loading ? 'Creating...' : 'Create My Clinic'}
+                  </button>
                ) : (
-                  <Button onClick={handleSubmit} loading={loading} className="w-full md:w-48 bg-emerald-600 hover:bg-emerald-700" size="lg">Go to Dashboard</Button>
+                  <Button onClick={() => navigate('/dashboard')} className="w-full md:w-48 bg-emerald-600 hover:bg-emerald-700" size="lg">Go to Dashboard</Button>
                )}
              </div>
           </div>
