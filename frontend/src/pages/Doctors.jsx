@@ -97,6 +97,20 @@ const Doctors = () => {
 
   const toTitleCase = (str) => str.replace(/\b\w/g, c => c.toUpperCase());
 
+  const formatDoctorName = (value) => {
+    const titled = toTitleCase(value);
+    if (!titled) return '';
+    if (
+      titled.startsWith('Dr. ') ||
+      titled.startsWith('Dr ')
+    ) {
+      return titled.startsWith('Dr. ')
+        ? titled
+        : titled.replace('Dr ', 'Dr. ');
+    }
+    return `Dr. ${titled}`;
+  };
+
   const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
   const [doctorToRemove, setDoctorToRemove] = useState(null);
 
@@ -452,7 +466,7 @@ const Doctors = () => {
             <form onSubmit={handleManageSubmit} className="space-y-4" noValidate>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Full Name *</label>
-                <input type="text" value={manageDoctorForm.name} onChange={e => setManageDoctorForm({...manageDoctorForm, name: toTitleCase(e.target.value)})} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.name ? 'border-red-500' : ''}`} />
+                <input type="text" value={manageDoctorForm.name || ''} onChange={e => setManageDoctorForm({...manageDoctorForm, name: formatDoctorName(e.target.value)})} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.name ? 'border-red-500' : ''}`} />
                 {formErrors.name && <p className="mt-1 text-xs text-red-600">{formErrors.name}</p>}
               </div>
               <div className="grid grid-cols-2 gap-4">
