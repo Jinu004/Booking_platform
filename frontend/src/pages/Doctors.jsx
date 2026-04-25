@@ -1,5 +1,86 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getDoctors, createDoctor, updateDoctor, deleteDoctor, updateAvailability, addLeave, getTokenQueue, updateTokenStatus } from '../services/clinic.service';
+
+const SPECIALIZATIONS = [
+  'Ayurveda','Anaesthesiology','Cardiology',
+  'Dentistry','Dermatology','ENT',
+  'Endocrinology','Gastroenterology',
+  'General Medicine','General Surgery',
+  'Gynaecology','Homoeopathy','Nephrology',
+  'Neurology','Oncology','Ophthalmology',
+  'Orthopaedics','Paediatrics','Pathology',
+  'Psychiatry','Pulmonology','Radiology',
+  'Rheumatology','Urology'
+];
+
+const QUALIFICATIONS = [
+  'BAMS','BHMS','BDS','DCH','DGO','DM',
+  'DNB','FRCS','MBBS','MBBS MD','MBBS MS',
+  'MBBS DNB','MCh','MD','MDS','MRCP','MS'
+];
+
+function SearchableSelect({
+  value, onChange, options, placeholder
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState(value || '');
+  const ref = useRef(null);
+
+  useEffect(() => {
+    setSearch(value || '');
+  }, [value]);
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const filtered = search.length > 0
+    ? options.filter(opt => opt.toLowerCase().includes(search.toLowerCase()))
+    : [];
+
+  return (
+    <div ref={ref} className="relative mt-1">
+      <input
+        type="text"
+        value={search}
+        placeholder={placeholder}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          if (search.length > 0) setOpen(true);
+        }}
+        className="block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border text-sm"
+      />
+      {open && search.length > 0 && filtered.length > 0 && (
+        <ul className="absolute z-50 w-full bg-white border rounded-lg shadow-lg mt-1 max-h-44 overflow-y-auto">
+          {filtered.map(opt => (
+            <li
+              key={opt}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(opt);
+                setSearch(opt);
+                setOpen(false);
+              }}
+              className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm border-b last:border-0"
+            >
+              {opt}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const Doctors = () => {
   const [doctors, setDoctors] = useState([]);
@@ -10,8 +91,11 @@ const Doctors = () => {
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [manageMode, setManageMode] = useState('add');
   const [manageDoctorForm, setManageDoctorForm] = useState({
-    id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: 0
+    id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: ''
   });
+  const [formErrors, setFormErrors] = useState({});
+
+  const toTitleCase = (str) => str.replace(/\b\w/g, c => c.toUpperCase());
 
   const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
   const [doctorToRemove, setDoctorToRemove] = useState(null);
@@ -55,7 +139,8 @@ const Doctors = () => {
 
   const openAddDoctor = () => {
     setManageMode('add');
-    setManageDoctorForm({ id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: 0 });
+    setManageDoctorForm({ id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: '' });
+    setFormErrors({});
     setIsManageModalOpen(true);
   };
 
@@ -68,18 +153,40 @@ const Doctors = () => {
       phone: doc.phone || '',
       qualification: doc.qualification || '',
       maxTokensDaily: doc.max_tokens_daily || 30,
-      consultationFee: doc.consultation_fee || 0
+      consultationFee: doc.consultation_fee || ''
     });
+    setFormErrors({});
     setIsManageModalOpen(true);
   };
 
   const handleManageSubmit = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!manageDoctorForm.name || manageDoctorForm.name.length < 2) errors.name = 'Name required (min 2 chars)';
+    if (!manageDoctorForm.specialization) errors.specialization = 'Specialization required';
+    if (!manageDoctorForm.qualification) errors.qualification = 'Qualification required';
+    if (!manageDoctorForm.phone || manageDoctorForm.phone.length !== 10) errors.phone = 'Phone must be exactly 10 digits';
+    const tokens = parseInt(manageDoctorForm.maxTokensDaily);
+    if (isNaN(tokens) || tokens < 1 || tokens > 100) errors.maxTokensDaily = 'Must be a number between 1 and 100';
+    const fee = parseInt(manageDoctorForm.consultationFee);
+    if (isNaN(fee) || fee <= 0) errors.consultationFee = 'Fee must be greater than 0';
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
+
     try {
+      const payload = {
+        ...manageDoctorForm,
+        maxTokensDaily: parseInt(manageDoctorForm.maxTokensDaily),
+        consultationFee: parseInt(manageDoctorForm.consultationFee)
+      };
       if (manageMode === 'add') {
-        await createDoctor(manageDoctorForm);
+        await createDoctor(payload);
       } else {
-        await updateDoctor(manageDoctorForm.id, manageDoctorForm);
+        await updateDoctor(payload.id, payload);
       }
       setIsManageModalOpen(false);
       fetchDoctors();
@@ -340,36 +447,60 @@ const Doctors = () => {
       {/* Manage Doctor Modal */}
       {isManageModalOpen && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl overflow-y-auto max-h-[90vh]">
             <h2 className="text-xl font-bold mb-4">{manageMode === 'add' ? 'Add Doctor' : 'Edit Doctor'}</h2>
-            <form onSubmit={handleManageSubmit} className="space-y-4">
+            <form onSubmit={handleManageSubmit} className="space-y-4" noValidate>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Full Name *</label>
-                <input required type="text" value={manageDoctorForm.name} onChange={e => setManageDoctorForm({...manageDoctorForm, name: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+                <input type="text" value={manageDoctorForm.name} onChange={e => setManageDoctorForm({...manageDoctorForm, name: toTitleCase(e.target.value)})} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.name ? 'border-red-500' : ''}`} />
+                {formErrors.name && <p className="mt-1 text-xs text-red-600">{formErrors.name}</p>}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Specialization *</label>
-                  <input required type="text" value={manageDoctorForm.specialization} onChange={e => setManageDoctorForm({...manageDoctorForm, specialization: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+                  <div className={`${formErrors.specialization ? 'border border-red-500 rounded-md' : ''}`}>
+                    <SearchableSelect
+                      value={manageDoctorForm.specialization || ''}
+                      onChange={(val) => setManageDoctorForm({
+                        ...manageDoctorForm, specialization: val
+                      })}
+                      options={SPECIALIZATIONS}
+                      placeholder="Type to search e.g. General"
+                    />
+                  </div>
+                  {formErrors.specialization && <p className="mt-1 text-xs text-red-600">{formErrors.specialization}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Phone *</label>
-                  <input required type="text" value={manageDoctorForm.phone} onChange={e => setManageDoctorForm({...manageDoctorForm, phone: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+                  <input type="text" value={manageDoctorForm.phone} onChange={e => { const numericOnly = e.target.value.replace(/\D/g, '').slice(0, 10); setManageDoctorForm({...manageDoctorForm, phone: numericOnly}); }} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.phone ? 'border-red-500' : ''}`} />
+                  {formErrors.phone && <p className="mt-1 text-xs text-red-600">{formErrors.phone}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Qualification *</label>
-                  <input required type="text" value={manageDoctorForm.qualification} onChange={e => setManageDoctorForm({...manageDoctorForm, qualification: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+                  <div className={`${formErrors.qualification ? 'border border-red-500 rounded-md' : ''}`}>
+                    <SearchableSelect
+                      value={manageDoctorForm.qualification || ''}
+                      onChange={(val) => setManageDoctorForm({
+                        ...manageDoctorForm, qualification: val
+                      })}
+                      options={QUALIFICATIONS}
+                      placeholder="Type to search e.g. MBBS"
+                    />
+                  </div>
+                  {formErrors.qualification && <p className="mt-1 text-xs text-red-600">{formErrors.qualification}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Daily Token Limit *</label>
-                  <input required type="number" min="0" value={manageDoctorForm.maxTokensDaily} onChange={e => setManageDoctorForm({...manageDoctorForm, maxTokensDaily: parseInt(e.target.value) || 0})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+                  <input type="number" min="1" max="100" value={manageDoctorForm.maxTokensDaily} onChange={e => setManageDoctorForm({...manageDoctorForm, maxTokensDaily: e.target.value})} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.maxTokensDaily ? 'border-red-500' : ''}`} />
+                  {formErrors.maxTokensDaily && <p className="mt-1 text-xs text-red-600">{formErrors.maxTokensDaily}</p>}
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Consultation Fee *</label>
-                <input required type="number" min="0" value={manageDoctorForm.consultationFee} onChange={e => setManageDoctorForm({...manageDoctorForm, consultationFee: parseFloat(e.target.value) || 0})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50" />
+                <input type="text" placeholder="e.g. 300" value={manageDoctorForm.consultationFee} onChange={e => { const numericOnly = e.target.value.replace(/\D/g, ''); setManageDoctorForm({...manageDoctorForm, consultationFee: numericOnly}); }} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.consultationFee ? 'border-red-500' : ''}`} />
+                {formErrors.consultationFee && <p className="mt-1 text-xs text-red-600">{formErrors.consultationFee}</p>}
               </div>
 
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
