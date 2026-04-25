@@ -15,6 +15,7 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Staff from './pages/Staff';
 import Onboarding from './pages/Onboarding';
+import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
 import SuperAdmin from './pages/SuperAdmin';
 
@@ -26,6 +27,7 @@ const App = () => {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route path="/" element={<PrivateRoute />}>
           <Route element={<Layout />}>

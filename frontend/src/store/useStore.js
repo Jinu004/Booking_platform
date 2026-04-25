@@ -1,10 +1,11 @@
 import { create } from 'zustand';
+import { getStoredStaff } from '../services/auth.service';
 
 const useStore = create((set, get) => ({
   // AUTH SLICE
-  staff: null,
+  staff: getStoredStaff() || null,
   tenant: null,
-  isAuthenticated: false,
+  isAuthenticated: !!getStoredStaff(),
   isLoading: false,
   permissions: [],
 
@@ -14,7 +15,13 @@ const useStore = create((set, get) => ({
   setLoading: (isLoading) => set({ isLoading }),
   logout: () => {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('staff_data');
     set({ staff: null, tenant: null, permissions: [], isAuthenticated: false });
+  },
+  clearAuth: () => {
+    set({ staff: null, isAuthenticated: false });
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('staff_data');
   },
   hasPermission: (permission) => {
     const { permissions, staff } = get();

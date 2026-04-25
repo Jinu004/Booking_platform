@@ -17,15 +17,9 @@ api.interceptors.request.use(
       config.headers['x-dev-role'] = 'admin';
       config.headers['x-dev-tenant-id'] = devTenantId;
     } else {
-      if (window.Clerk && window.Clerk.session) {
-        try {
-          const token = await window.Clerk.session.getToken();
-          if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-          }
-        } catch (e) {
-          console.error('Failed to get Clerk token', e);
-        }
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
       }
     }
     
@@ -48,7 +42,10 @@ api.interceptors.response.use(
 
     if (status === 401) {
       localStorage.removeItem('auth_token');
-      useStore.getState().logout();
+      localStorage.removeItem('staff_data');
+      if (useStore.getState().clearAuth) {
+        useStore.getState().clearAuth();
+      }
       window.location.href = '/login';
     } else if (status === 403) {
       useStore.getState().addToast('You do not have permission', 'error');

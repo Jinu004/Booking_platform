@@ -25,7 +25,10 @@ const env = {
   META_PHONE_NUMBER_ID: process.env.META_PHONE_NUMBER_ID,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   WAHA_BASE_URL: process.env.WAHA_BASE_URL,
-  WAHA_API_KEY: process.env.WAHA_API_KEY
+  WAHA_API_KEY: process.env.WAHA_API_KEY,
+  JWT_SECRET: process.env.JWT_SECRET || 'change-this-in-production',
+  RESEND_API_KEY: process.env.RESEND_API_KEY || '',
+  BYPASS_AUTH: process.env.BYPASS_AUTH || 'false'
 };
 
 module.exports = env;

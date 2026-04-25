@@ -2,14 +2,16 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useStore from '../../store/useStore';
 import Badge from './Badge';
+import { getStoredStaff, logout } from '../../services/auth.service';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
-  const { tenant, staff, logout } = useStore();
+  const { tenant } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
+  const staff = getStoredStaff();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -76,14 +78,17 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
         <div className="p-4 border-t border-gray-200 space-y-4 bg-gray-50">
           <div className="flex items-center">
-            <div className="flex-1 min-w-0 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+            <Link to="/staff" className="flex-1 min-w-0 bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:border-indigo-300 transition-colors cursor-pointer block">
               <p className="text-sm font-bold text-gray-900 truncate flex items-center gap-2">
                 <span className="text-xl">👤</span> {staff?.name || 'Guest User'}
               </p>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-1 ml-8">
-                {staff?.role ? staff.role.replace('_', ' ') : ''}
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-1 ml-8 truncate">
+                {staff?.tenantName || tenant?.name || 'Clinic'}
               </p>
-            </div>
+              <div className="mt-2 ml-8">
+                <Badge variant="success" className="capitalize text-[9px]">{staff?.tenantPlan || tenant?.plan || 'Starter'}</Badge>
+              </div>
+            </Link>
           </div>
           <button
             onClick={handleLogout}

@@ -9,18 +9,20 @@
     "seed": "node src/database/seed.js"
   },
   "dependencies": {
-    "@clerk/clerk-sdk-node": "^4.12.0",
     "@google/generative-ai": "^0.24.1",
     "axios": "^1.14.0",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-rate-limit": "^7.5.1",
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
     "node-cron": "^3.0.3",
     "pg": "^8.11.3",
     "redis": "^4.7.1",
+    "resend": "^6.12.2",
     "uuid": "^9.0.0",
     "winston": "^3.11.0"
   },

@@ -8,13 +8,13 @@ const tenantQuery = require('../../utils/tenantQuery')
  * @returns {Promise<object>}
  */
 async function createStaff(pool, tenantId, staffData) {
-  const { name, role, email, phone, clerkUserId } = staffData
+  const { name, role, email, phone, password_hash } = staffData
   const query = `
-    INSERT INTO staff (tenant_id, name, role, email, phone, clerk_user_id, is_active)
+    INSERT INTO staff (tenant_id, name, role, email, phone, password_hash, is_active)
     VALUES ($1, $2, $3, $4, $5, $6, true)
     RETURNING *
   `
-  const params = [name, role, email || null, phone || null, clerkUserId || null]
+  const params = [name, role, email || null, phone || null, password_hash || null]
   const result = await tenantQuery(tenantId, pool, query, params)
   return result.rows[0]
 }

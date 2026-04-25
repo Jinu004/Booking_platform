@@ -3,6 +3,12 @@ const StaffModel = require('./staff.model')
 const pool = require('../../config/database')
 const { successResponse, errorResponse } = require('../../utils/response')
 const logger = require('../../utils/logger')
+const { bcrypt } = require('../../config/auth')
+const { sendWelcomeEmail } = require('../../utils/email')
+
+function generateTempPassword() {
+  return Math.random().toString(36).slice(-8) + 'A1!'
+}
 
 /**
  * GET /staff
@@ -42,8 +48,18 @@ async function inviteStaff(req, res) {
     if (!staffData.name || !staffData.role || !staffData.email) {
       return errorResponse(res, 'Name, role, and email are required', 400)
     }
+
+    const password = req.body.password || generateTempPassword()
+    const password_hash = await bcrypt.hash(password, 12)
+    staffData.password_hash = password_hash
     
     const staff = await StaffService.inviteStaff(req.tenantId, staffData)
+
+    await sendWelcomeEmail({
+      to: staff.email,
+      name: staff.name,
+      clinicName: req.tenant.name || 'Your Clinic'
+    })
     return successResponse(res, { staff }, 201)
   } catch (error) {
     logger.error('Failed to invite staff:', error.message)

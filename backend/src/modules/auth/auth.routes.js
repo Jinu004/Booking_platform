@@ -1,15 +1,18 @@
 const express = require('express')
-const { requireAuth, loadTenant } = require('./auth.middleware')
-const { getMe, verifyToken, getPermissions } = require('./auth.controller')
-
 const router = express.Router()
+const {
+  login, logout, getMe,
+  forgotPassword, resetPassword
+} = require('./auth.controller')
+const { requireAuth } = require('./auth.middleware')
 
-// All routes require auth
-router.use(requireAuth)
-router.use(loadTenant)
+// Public routes — no auth needed
+router.post('/login', login)
+router.post('/forgot-password', forgotPassword)
+router.post('/reset-password', resetPassword)
 
-router.get('/me', getMe)
-router.post('/verify', verifyToken)
-router.get('/permissions', getPermissions)
+// Protected routes — auth required
+router.post('/logout', requireAuth, logout)
+router.get('/me', requireAuth, getMe)
 
 module.exports = router
