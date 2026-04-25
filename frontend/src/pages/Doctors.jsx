@@ -209,14 +209,13 @@ const Doctors = () => {
     }
   };
 
-  const handleRemoveConfirm = async () => {
-    if (!doctorToRemove) return;
+  const handleDeleteDoctor = async (doctorId) => {
     try {
-      await deleteDoctor(doctorToRemove.id);
-      setIsRemoveModalOpen(false);
-      setDoctorToRemove(null);
+      await deleteDoctor(doctorId);
       fetchDoctors();
+      alert('Doctor removed successfully');
     } catch (err) {
+      console.error('Delete failed:', err);
       alert('Failed to remove doctor');
     }
   };
@@ -303,7 +302,7 @@ const Doctors = () => {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
                 <button
-                  onClick={() => { setDoctorToRemove(doc); setIsRemoveModalOpen(true); }}
+                  onClick={() => handleDeleteDoctor(doc.id)}
                   className="text-gray-400 hover:text-red-600 transition"
                   title="Remove Doctor"
                 >
@@ -526,21 +525,7 @@ const Doctors = () => {
         </div>
       )}
 
-      {/* Remove Confirmation Modal */}
-      {isRemoveModalOpen && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Remove Doctor</h3>
-            <p className="text-sm text-gray-500 mb-6">
-              Are you sure you want to remove <strong>{doctorToRemove?.name}</strong>? This will not delete their booking history.
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button onClick={() => { setIsRemoveModalOpen(false); setDoctorToRemove(null); }} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
-              <button onClick={handleRemoveConfirm} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium">Remove</button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };
