@@ -48,7 +48,10 @@ const Dashboard = () => {
       setTokenQueue(tokensArray);
       setRecentConversations(activeConvs.slice(0, 5));
       setRecentBookings(bookingsArray.slice(0, 5));
-      setHasDoctors(docsArray.length > 0);
+      const hasDoctorsCheck = (docsRes?.data?.length > 0)
+        || (Array.isArray(docsRes) && docsRes.length > 0)
+        || (Array.isArray(docsRes?.data) && docsRes.data.length > 0);
+      setHasDoctors(hasDoctorsCheck);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -83,7 +86,7 @@ const Dashboard = () => {
 
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
-      {(!hasDoctors || !tenant?.whatsapp_number) && (
+      {!hasDoctors && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
           <h3 className="font-semibold text-blue-900 mb-3">
             👋 Complete your setup
@@ -120,7 +123,7 @@ const Dashboard = () => {
                   </span>
                 </div>
                 <Link
-                  to="/settings"
+                  to="/settings?tab=whatsapp"
                   className="text-sm text-blue-600 font-medium hover:underline"
                 >
                   Learn How →

@@ -173,8 +173,7 @@ const Onboarding = () => {
           openingTime: formData.openingTime || '09:00',
           closingTime: formData.closingTime || '17:00',
           weeklyOff: formData.weeklyOff || 'Sunday',
-          avgConsultationMinutes: formData.avgConsultationMinutes || 10,
-          maxTokens: 30
+          avgConsultationMinutes: formData.avgConsultationMinutes || 10
         }
       );
 
@@ -192,6 +191,8 @@ const Onboarding = () => {
       setLoading(false);
     }
   };
+
+  console.log('Selected plan:', formData.plan);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
@@ -284,7 +285,7 @@ const Onboarding = () => {
                  {plans.map((plan) => (
                    <div 
                       key={plan.id} 
-                      onClick={() => setFormData(p => ({...p, plan: plan.id}))}
+                      onClick={() => setFormData({ ...formData, plan: plan.id })}
                       className={`relative cursor-pointer border-2 rounded-xl p-5 transition-all duration-200 ${formData.plan === plan.id ? 'border-blue-600 bg-blue-50 shadow-md transform scale-105' : 'border-gray-200 bg-white hover:border-blue-300'}`}
                     >
                      {plan.popular && (
