@@ -17,7 +17,7 @@ async function onboardClinic(req, res) {
       avgConsultationMinutes,
       maxTokens
     } = req.body;
-
+      logger.error('Error during clinic onboarding:', err.message); 
     if (!clinicName || !ownerName || !email || !whatsappNumber) {
       return errorResponse(res, 'Missing required fields', 400);
     }

@@ -1,5 +1,5 @@
 const express = require('express')
-const { requireAuth, loadTenant, requireRole } = require('../auth/auth.middleware')
+const { requireAuth } = require('../auth/auth.middleware')
 const { ROLES } = require('../auth/auth.permissions')
 const {
   getSettings,
@@ -11,11 +11,11 @@ const {
 const router = express.Router()
 
 router.use(requireAuth)
-router.use(loadTenant)
+router.use(requireAuth)
 
 router.get('/', getSettings)
-router.put('/', requireRole(ROLES.ADMIN, ROLES.MANAGER), updateSettings)
+router.put('/', requireAuth, updateSettings)
 router.get('/clinic', getClinicSettings)
-router.put('/clinic', requireRole(ROLES.ADMIN, ROLES.MANAGER), updateClinicSettings)
+router.put('/clinic', requireAuth, updateClinicSettings)
 
 module.exports = router

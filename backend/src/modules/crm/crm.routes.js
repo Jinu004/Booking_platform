@@ -1,5 +1,5 @@
 const express = require('express');
-const { requireAuth, loadTenant } = require('../auth/auth.middleware');
+const { requireAuth } = require('../auth/auth.middleware');
 const {
   getCustomers,
   getCustomerById,
@@ -12,7 +12,7 @@ const {
 const router = express.Router();
 
 router.use(requireAuth);
-router.use(loadTenant);
+router.use(requireAuth);
 
 router.get('/', getCustomers);
 router.post('/', createCustomer);

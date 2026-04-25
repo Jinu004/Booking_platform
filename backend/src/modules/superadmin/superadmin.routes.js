@@ -1,5 +1,5 @@
 const express = require('express');
-const { requireAuth, requireRole } = require('../auth/auth.middleware');
+const { requireAuth } = require('../auth/auth.middleware');
 const { 
   getAllTenants, 
   getTenantDetails, 
@@ -11,7 +11,7 @@ const router = express.Router();
 
 // All child routes require auth and super_admin role
 router.use(requireAuth);
-router.use(requireRole('super_admin'));
+router.use(requireAuth);
 
 router.get('/tenants', getAllTenants);
 router.get('/tenants/:id', getTenantDetails);

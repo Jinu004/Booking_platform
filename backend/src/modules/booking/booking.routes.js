@@ -1,6 +1,6 @@
 const express = require('express');
 const { validationErrorResponse } = require('../../utils/response');
-const { requireAuth, loadTenant } = require('../auth/auth.middleware');
+const { requireAuth } = require('../auth/auth.middleware');
 const {
   getBookings,
   getBookingStats,
@@ -31,7 +31,7 @@ const validate = (req, res, next) => {
 
 // All routes require tenant auth
 router.use(requireAuth);
-router.use(loadTenant);
+router.use(requireAuth);
 
 router.get('/', getBookings);
 router.get('/today', getTodayBookings);

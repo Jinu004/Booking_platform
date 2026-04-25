@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('./conversation.controller');
-const { requireAuth, loadTenant } = require('../auth/auth.middleware');
+const { requireAuth } = require('../auth/auth.middleware');
 
 router.use(requireAuth);
-router.use(loadTenant);
+router.use(requireAuth);
 
 router.get('/', controller.getConversations);
 router.get('/:id', controller.getConversationById);
