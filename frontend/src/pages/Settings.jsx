@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getSettings, updateSettings, getClinicSettings, updateClinicSettings } from '../services/settings.service';
 import useStore from '../store/useStore';
 
 const Settings = () => {
   const { tenant } = useStore();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
 
   const [settings, setSettings] = useState({
     general: {},
@@ -265,23 +272,24 @@ const Settings = () => {
               <div className="flex-1 text-center sm:text-left">
                 <h4 className="text-xl font-bold text-gray-900 mb-2">WhatsApp Offline</h4>
                 <p className="text-gray-500 font-medium leading-relaxed max-w-md">
-                  Your business number <strong className="text-gray-900">{tenant?.whatsapp_number}</strong> is not connected yet. Patients cannot book appointments automatically via WhatsApp.
+                  Your business WhatsApp number is not connected yet. Contact ReceptionAI support to connect your number.
                 </p>
-                <div className="mt-6 flex flex-col sm:flex-row gap-3 items-center justify-center sm:justify-start">
-                   <button className="px-5 py-2.5 bg-green-500 text-white font-bold rounded-lg shadow hover:bg-green-600 transition">
-                     Scan QR Code
-                   </button>
-                   <a href="https://waha.devlike.pro/docs/how-to-start/" target="_blank" rel="noreferrer" className="text-sm font-bold text-gray-400 hover:text-gray-600 underline underline-offset-4">Read WAHA Setup Docs</a>
-                </div>
               </div>
             </div>
 
             <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-               <h5 className="font-bold text-sm tracking-wider uppercase text-gray-500 mb-3">Developer Webhook URL</h5>
-               <code className="block p-4 bg-gray-800 text-green-400 rounded-md font-mono text-sm break-all">
-                 http://140.245.247.48/webhook/whatsapp
+               <h5 className="font-bold text-sm tracking-wider uppercase text-gray-500 mb-3">How to Connect WhatsApp</h5>
+               <ol className="list-decimal list-inside text-gray-700 space-y-2 mb-6 font-medium">
+                 <li>Contact us at <strong>support@receptionai.in</strong></li>
+                 <li>We will set up your WhatsApp Business number with Meta Cloud API</li>
+                 <li>Once connected, patients can book appointments via WhatsApp automatically</li>
+               </ol>
+               
+               <h5 className="font-bold text-sm tracking-wider uppercase text-gray-500 mb-3 border-t border-gray-200 pt-6">Your Webhook URL</h5>
+               <code className="block p-4 bg-gray-800 text-green-400 rounded-md font-mono text-sm break-all mb-3">
+                 https://receptionai.in/webhook/whatsapp
                </code>
-               <p className="text-xs text-gray-500 font-medium mt-3">Configure this inside Meta Developer portal if using Cloud API.</p>
+               <p className="text-xs text-gray-500 font-medium">Share this URL with ReceptionAI team to complete WhatsApp setup</p>
             </div>
           </div>
         )}
