@@ -98,16 +98,20 @@ const Doctors = () => {
   const toTitleCase = (str) => str.replace(/\b\w/g, c => c.toUpperCase());
 
   const formatDoctorName = (value) => {
-    const titled = toTitleCase(value);
-    if (!titled) return '';
-    if (
-      titled.startsWith('Dr. ') ||
-      titled.startsWith('Dr ')
-    ) {
-      return titled.startsWith('Dr. ')
-        ? titled
-        : titled.replace('Dr ', 'Dr. ');
-    }
+    // Remove all Dr. prefixes from start
+    const cleaned = value
+      .replace(/^(Dr\.?\s*)*/i, '')
+      .trim();
+
+    // If nothing left after removing Dr.
+    // return empty string — let user clear field
+    if (!cleaned) return '';
+
+    // Apply title case
+    const titled = cleaned.replace(
+      /\b\w/g, c => c.toUpperCase()
+    );
+
     return `Dr. ${titled}`;
   };
 
