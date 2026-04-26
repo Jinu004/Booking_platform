@@ -45,7 +45,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50">
           <div className="flex-1 min-w-0">
              <h2 className="text-xl font-bold text-gray-900 truncate">
-               {tenant?.name || 'Clinic Platform'}
+               {staff?.tenantName || tenant?.name || 'ReceptionAI'}
              </h2>
              <div className="mt-2">
                <Badge variant="success" className="capitalize">{planLabel}</Badge>
