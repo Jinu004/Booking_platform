@@ -3,6 +3,8 @@ const TenantService = require('../tenant/tenant.service');
 const tenantModel = require('../tenant/tenant.model');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 /**
  * POST /onboarding/clinic
@@ -15,12 +17,19 @@ async function onboardClinic(req, res) {
       whatsappNumber, plan,
       openingTime, closingTime, weeklyOff,
       avgConsultationMinutes,
-      maxTokens
+      maxTokens,
+      password
     } = req.body;
-      logger.error('Error during clinic onboarding:', err.message); 
+
     if (!clinicName || !ownerName || !email || !whatsappNumber) {
       return errorResponse(res, 'Missing required fields', 400);
     }
+    
+    if (!password || password.length < 8) {
+      return errorResponse(res, 'Password must be at least 8 characters', 400);
+    }
+
+    const password_hash = await bcrypt.hash(password, 12);
 
     // 1 & 3: Creates tenant and sets default configs
     const tenant = await TenantService.createTenant({
@@ -44,14 +53,53 @@ async function onboardClinic(req, res) {
       await TenantService.setConfig(tenant.id, 'max_tokens_per_day', String(maxTokens));
     }
 
-    // Optional: add the owner to the staff table for auth bypass to work correctly
-    // or just assume standard flow handles it. We'll add staff entry here to be safe and complete.
     await pool.query(
-      `INSERT INTO staff (tenant_id, name, email, phone, role) VALUES ($1, $2, $3, $4, 'admin')`,
-      [tenant.id, ownerName, email, phone]
+      `INSERT INTO staff 
+       (tenant_id, name, email, phone, role, is_active, password_hash, email_verified) 
+       VALUES ($1, $2, $3, $4, 'admin', true, $5, true)`,
+      [tenant.id, ownerName, email, phone, password_hash]
+    );
+
+    const staffResult = await pool.query(
+      `SELECT s.*, t.name AS tenant_name, t.plan AS tenant_plan
+       FROM staff s
+       JOIN tenants t ON t.id = s.tenant_id
+       WHERE s.email = $1`,
+      [email]
+    );
+    const newStaff = staffResult.rows[0];
+
+    const token = jwt.sign(
+      {
+        staffId: newStaff.id,
+        tenantId: newStaff.tenant_id,
+        role: newStaff.role,
+        email: newStaff.email,
+        name: newStaff.name
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Store session
+    await pool.query(
+      `INSERT INTO auth_sessions
+       (id, staff_id, tenant_id, token, expires_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, NOW() + INTERVAL '7 days')`,
+      [newStaff.id, newStaff.tenant_id, token]
     );
 
     return successResponse(res, {
+      token,
+      staff: {
+        id: newStaff.id,
+        name: newStaff.name,
+        email: newStaff.email,
+        role: newStaff.role,
+        tenantId: newStaff.tenant_id,
+        tenantName: newStaff.tenant_name,
+        tenantPlan: newStaff.tenant_plan
+      },
       tenant_id: tenant.id,
       name: tenant.name,
       whatsapp_number: tenant.whatsapp_number,

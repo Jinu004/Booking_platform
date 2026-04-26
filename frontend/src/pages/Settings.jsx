@@ -2,9 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getSettings, updateSettings, getClinicSettings, updateClinicSettings } from '../services/settings.service';
 import useStore from '../store/useStore';
+import { getStoredStaff } from '../services/auth.service';
 
 const Settings = () => {
-  const { tenant } = useStore();
+  const staff = getStoredStaff();
+  const tenant = {
+    plan: staff?.tenantPlan || 'starter',
+    name: staff?.tenantName || 'My Clinic'
+  };
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(true);

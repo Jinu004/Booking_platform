@@ -161,6 +161,12 @@ export default function Login() {
             </div>
           )}
         </div>
+        <p className="text-center text-sm text-gray-500 mt-4">
+          Don't have an account?{' '}
+          <a href="/onboarding" className="text-blue-600 hover:underline font-medium">
+            Start free trial
+          </a>
+        </p>
         <p className="text-center text-slate-500 text-xs mt-6">Powered by AI</p>
       </div>
     </div>

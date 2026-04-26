@@ -4,6 +4,7 @@ import Input from '../components/shared/Input';
 import Select from '../components/shared/Select';
 import useStore from '../store/useStore';
 import api from '../utils/api';
+import { storeAuthData } from '../services/auth.service';
 
 const toTitleCase = (str) => str.replace(/\b\w/g, c => c.toUpperCase());
 
@@ -16,6 +17,7 @@ const Onboarding = () => {
   const [error, setError] = useState(null);
   const [checkingWhatsapp, setCheckingWhatsapp] = useState(false);
   const [whatsappAvailable, setWhatsappAvailable] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const plans = [
     {
@@ -73,7 +75,9 @@ const Onboarding = () => {
     openingTime: '09:00',
     closingTime: '17:00',
     weeklyOff: 'Sunday',
-    avgConsultationMinutes: 10
+    avgConsultationMinutes: 10,
+    password: '',
+    confirmPassword: ''
   });
 
   const handleChange = (e) => {
@@ -148,15 +152,30 @@ const Onboarding = () => {
     return true;
   };
 
+  const validateStep4 = () => {
+    const newErrors = {};
+    if (!formData.password || formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    } else if (!/\d/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least 1 number';
+    }
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleNext = async () => {
     let isValid = false;
     if (step === 1) isValid = validateStep1();
     if (step === 2) isValid = validateStep2();
+    if (step === 3) isValid = validateStep3();
     if (isValid) setStep(s => s + 1);
   };
 
   const handleSubmit = async () => {
-    if (!validateStep3()) return;
+    if (!validateStep4()) return;
 
     setLoading(true);
     setError(null);
@@ -173,14 +192,15 @@ const Onboarding = () => {
           openingTime: formData.openingTime || '09:00',
           closingTime: formData.closingTime || '17:00',
           weeklyOff: formData.weeklyOff || 'Sunday',
-          avgConsultationMinutes: formData.avgConsultationMinutes || 10
+          avgConsultationMinutes: formData.avgConsultationMinutes || 10,
+          password: formData.password
         }
       );
 
-      if (response.success) {
-        setTenant(response.data);
-        setStaff({ name: formData.ownerName, role: 'admin', tenantId: response.data?.tenant_id });
-        setStep(4); // success screen
+      if (response.success && response.data.token) {
+        storeAuthData(response.data.token, response.data.staff);
+        setStep(5); // success screen
+        setTimeout(() => navigate('/dashboard'), 2000);
       } else {
         setError(response.error || 'Failed to create clinic');
       }
@@ -197,13 +217,13 @@ const Onboarding = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
       <div className="absolute top-0 right-0 left-0 bg-white h-2 shadow-sm">
-        <div className="h-full bg-indigo-600 transition-all duration-300" style={{ width: `${(Math.min(step, 3)/3)*100}%`}}></div>
+        <div className="h-full bg-indigo-600 transition-all duration-300" style={{ width: `${(Math.min(step, 4)/4)*100}%`}}></div>
       </div>
 
-      {step < 4 && (
+      {step < 5 && (
         <div className="sm:mx-auto sm:w-full sm:max-w-2xl text-center mb-8">
           <h2 className="text-4xl font-black text-gray-900 tracking-tight">Setup Your Clinic</h2>
-          <p className="mt-2 text-md text-gray-500 font-medium">Step {Math.min(step, 3)} of 3</p>
+          <p className="mt-2 text-md text-gray-500 font-medium">Step {Math.min(step, 4)} of 4</p>
         </div>
       )}
 
@@ -333,38 +353,40 @@ const Onboarding = () => {
           )}
 
           {step === 4 && (
+            <div className="space-y-6 animate-[fadeIn_0.3s]">
+              <h3 className="text-xl font-bold border-b pb-2">Create Your Password</h3>
+              <p className="text-sm text-gray-500">You will use this to login to your ReceptionAI dashboard.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="relative">
+                  <Input label="Password" name="password" type={showPassword ? 'text' : 'password'} value={formData.password} onChange={handleChange} error={errors.password} required />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-9 text-sm text-gray-500 font-medium">{showPassword ? 'Hide' : 'Show'}</button>
+                </div>
+                <Input label="Confirm Password" name="confirmPassword" type={showPassword ? 'text' : 'password'} value={formData.confirmPassword} onChange={handleChange} error={errors.confirmPassword} required />
+              </div>
+              {error && (
+                <p className="text-red-500 text-sm mt-4 text-center font-medium">
+                  {error}
+                </p>
+              )}
+            </div>
+          )}
+
+          {step === 5 && (
             <div className="space-y-6 animate-[fadeIn_0.3s] text-center max-w-lg mx-auto py-8">
                <div className="text-6xl mb-6">🎉</div>
-               <h3 className="text-3xl font-black text-gray-900 mb-4">Your clinic is ready!</h3>
-               
-               <div className="bg-blue-50 rounded-xl p-6 text-left shadow-sm border border-blue-100 my-8">
-                 <h4 className="font-bold text-blue-900 mb-4 text-lg">Next steps:</h4>
-                 <ul className="space-y-4">
-                   <li className="flex items-start gap-3">
-                     <div className="bg-blue-100 p-1 rounded-full mt-0.5">
-                       <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                     </div>
-                     <span className="text-blue-900">Add your doctors from the Doctors page</span>
-                   </li>
-                   <li className="flex items-start gap-3">
-                     <div className="bg-blue-100 p-1 rounded-full mt-0.5">
-                       <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                     </div>
-                     <span className="text-blue-900">Our team will contact you within 24 hours to complete WhatsApp setup</span>
-                   </li>
-                 </ul>
-               </div>
+               <h3 className="text-3xl font-black text-gray-900 mb-4">Welcome to ReceptionAI!</h3>
+               <p className="text-xl text-gray-500 font-medium">Setting up your dashboard...</p>
             </div>
           )}
 
           <div className="mt-10 flex flex-col md:flex-row justify-between items-center gap-4">
-             {step > 1 && step < 4 && (
+             {step > 1 && step < 5 && (
                <button type="button" onClick={() => setStep(s=>s-1)} className="px-6 py-2 border rounded-lg hover:bg-gray-50 font-medium order-2 md:order-1 w-full md:w-auto text-gray-700">Back</button>
              )}
              <div className="order-1 md:order-2 ml-auto w-full md:w-auto">
-               {step < 3 ? (
+               {step < 4 ? (
                   <button onClick={handleNext} className="w-full md:w-40 bg-gray-900 text-white hover:bg-gray-800 font-medium py-3 rounded-lg shadow transition">Next Step &rarr;</button>
-               ) : step === 3 ? (
+               ) : step === 4 ? (
                   <button onClick={handleSubmit} disabled={loading} className="w-full md:w-56 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg shadow disabled:opacity-50 transition flex items-center justify-center gap-2">
                     {loading ? (
                       <>
@@ -373,9 +395,7 @@ const Onboarding = () => {
                       </>
                     ) : 'Create My Clinic'}
                   </button>
-               ) : (
-                  <button onClick={() => navigate('/dashboard')} className="w-full md:w-56 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-lg shadow transition text-lg">Go to Dashboard</button>
-               )}
+               ) : null}
              </div>
           </div>
         </div>
