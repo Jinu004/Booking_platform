@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { globalSearch } from '../../services/patient.service';
 
@@ -10,6 +10,21 @@ const Layout = () => {
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const getPageTitle = () => {
+    const path = location.pathname;
+    if (path === '/dashboard') return 'Dashboard';
+    if (path.startsWith('/bookings')) return 'Bookings';
+    if (path.startsWith('/patients')) return 'Patients';
+    if (path.startsWith('/doctors')) return 'Doctors';
+    if (path.startsWith('/staff')) return 'Staff';
+    if (path.startsWith('/conversations')) return 'Conversations';
+    if (path.startsWith('/analytics')) return 'Analytics';
+    if (path.startsWith('/settings')) return 'Settings';
+    if (path.startsWith('/superadmin')) return 'Super Admin';
+    return 'ReceptionAI';
+  };
 
   useEffect(() => {
     if (searchQuery.length < 2) {
@@ -66,7 +81,7 @@ const Layout = () => {
               </button>
             )}
             <h2 className={`text-xl font-black text-gray-800 tracking-tight ${searchOpen ? 'hidden md:block' : 'block'}`}>
-              Booking Platform Dashboard
+              {getPageTitle()}
             </h2>
           </div>
 
