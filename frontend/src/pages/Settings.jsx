@@ -323,9 +323,15 @@ const Settings = () => {
              </div>
 
              <div className="pt-8">
-               <button className="bg-white border-2 border-indigo-600 text-indigo-700 font-black px-6 py-3 rounded-xl hover:bg-indigo-50 transition w-full sm:w-auto">
-                 Upgrade to Pro Plan
-               </button>
+               {tenant?.plan === 'pro' ? (
+                 <p className="text-green-600 font-medium">
+                   ✅ You are on our highest plan
+                 </p>
+               ) : (
+                 <button className="bg-white border-2 border-indigo-600 text-indigo-700 font-black px-6 py-3 rounded-xl hover:bg-indigo-50 transition w-full sm:w-auto">
+                   Upgrade to Pro Plan
+                 </button>
+               )}
              </div>
           </div>
         )}

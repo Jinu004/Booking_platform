@@ -30,7 +30,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     links.push({ name: 'Super Admin', path: '/superadmin', icon: '👑' });
   }
 
-  const planName = tenant?.plan || 'Starter';
+  const planLabel = staff?.tenantPlan
+    ? staff.tenantPlan.charAt(0).toUpperCase() + staff.tenantPlan.slice(1) + ' Plan'
+    : 'Starter Plan';
 
   return (
     <>
@@ -46,7 +48,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                {tenant?.name || 'Clinic Platform'}
              </h2>
              <div className="mt-2">
-               <Badge variant="success" className="capitalize">{planName} Plan</Badge>
+               <Badge variant="success" className="capitalize">{planLabel}</Badge>
              </div>
           </div>
           <button className="md:hidden text-gray-400 hover:text-gray-900 font-bold p-1 rounded-full hover:bg-gray-200 transition-colors" onClick={() => setIsOpen(false)}>
