@@ -38,6 +38,8 @@ const Analytics = () => {
         getConversationStats(period).catch(() => ({ data: convData }))
       ]);
 
+      console.log("Analytics Fetched Data: ", { oRes, dRes, docRes, cRes });
+
       setOverview(oRes.data || overview);
       if (period === 'month') {
         const formattedDaily = (dRes.data || []).map(d => ({
