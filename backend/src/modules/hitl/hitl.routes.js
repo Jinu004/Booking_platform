@@ -11,12 +11,13 @@ const sseAuth = (req, res, next) => {
   next();
 };
 
-router.use(requireAuth);
-
-router.get('/conversations', HITLController.getConversations);
-router.get('/conversations/:id/messages', HITLController.getMessages);
-router.post('/conversations/:id/reply', HITLController.reply);
-router.patch('/conversations/:id/mode', HITLController.toggleMode);
+// SSE route uses sseAuth first, then requireAuth
 router.get('/events', sseAuth, requireAuth, HITLController.sseStream);
+
+// All other routes use requireAuth directly
+router.get('/conversations', requireAuth, HITLController.getConversations);
+router.get('/conversations/:id/messages', requireAuth, HITLController.getMessages);
+router.post('/conversations/:id/reply', requireAuth, HITLController.reply);
+router.patch('/conversations/:id/mode', requireAuth, HITLController.toggleMode);
 
 module.exports = router;
