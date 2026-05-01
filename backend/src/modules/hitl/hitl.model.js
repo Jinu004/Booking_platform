@@ -18,12 +18,12 @@ async function setMode(conversationId, tenantId, mode, staffId) {
   const assignedTo = mode === 'human' ? staffId : null;
   const { rows } = await pool.query(
     `UPDATE conversations
-     SET mode = $1,
+     SET mode = $1::varchar,
          mode_changed_at = NOW(),
          mode_changed_by = $2::uuid,
          assigned_to = COALESCE($3::uuid, assigned_to),
          last_message_at = NOW()
-     WHERE id = $4 AND tenant_id = $5
+     WHERE id = $4::uuid AND tenant_id = $5::uuid
      RETURNING id, mode, assigned_to, mode_changed_at`,
     [mode, staffId, assignedTo, conversationId, tenantId]
   );
