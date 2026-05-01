@@ -46,8 +46,8 @@ export default function Conversations() {
     try {
       setLoadingList(true);
       const res = await getHITLConversations();
-      if (res.data?.success) {
-        setConversations(res.data.data || []);
+      if (res.success) {
+        setConversations(res.data || []);
       }
     } catch (err) {
       console.error('Failed to load conversations:', err);
@@ -154,8 +154,8 @@ export default function Conversations() {
       try {
         setLoadingThread(true);
         const res = await getConversationMessages(selectedConversationId);
-        if (res.data?.success) {
-          setMessages(res.data.data.messages || []);
+        if (res.success) {
+          setMessages(res.data.messages || []);
         }
       } catch (err) {
         console.error('Failed to load messages:', err);
