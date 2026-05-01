@@ -76,6 +76,29 @@ router.post('/', async (req, res) => {
 
       logger.info(`Conversation ${context.conversation.id} updated`)
 
+      // ── HITL Mode Check ──────────────────────────────────────────────────────
+      const HITLModel = require('../../hitl/hitl.model');
+      const HITLService = require('../../hitl/hitl.service');
+      
+      const convWithMode = await HITLModel.getConversationWithMode(
+        context.conversation.id,
+        tenant.id
+      );
+      
+      if (convWithMode?.mode === 'human') {
+        // Conversation is in human mode — do NOT call Gemini
+        // Broadcast incoming message to staff dashboard
+        HITLService.broadcastIncomingPatientMessage(
+          tenant.id,
+          context.conversation.id,
+          message.message,
+          context.customer?.name || message.from
+        );
+        logger.info(`Conversation ${context.conversation.id} is in human mode — skipping AI`);
+        return; // Exit early, no AI response
+      }
+      // ── End HITL Check ───────────────────────────────────────────────────────
+
       // Load tenant configs for AI prompt
       const configs = await TenantService.getAllConfigs(tenant.id)
 
@@ -113,6 +136,27 @@ router.post('/', async (req, res) => {
         logger.error(`AI processing crashed for ${message.from}:`, err.message)
         aiResponse = 'Sorry, I am having trouble right now. Please try again in a moment or call us directly.'
       }
+
+      // Check if AI is signalling a handoff request
+      // This is a lightweight string check — no Gemini schema change needed
+      const handoffTriggers = [
+        'connecting you with our staff',
+        'let me connect you',
+        'transferring you to',
+        'handing you over to',
+      ];
+      const isHandoff = handoffTriggers.some(t => aiResponse.toLowerCase().includes(t));
+
+      if (isHandoff) {
+        const HITLService = require('../../hitl/hitl.service');
+        await HITLService.handleAIHandoffRequest(tenant, convWithMode);
+        // Still send the aiResponse text to patient (it's the holding message from AI)
+        const { sendMessage } = require('./whatsapp.adapter');
+        await sendMessage(message.from, aiResponse);
+        await ConversationService.saveOutboundMessage(context.conversation.id, aiResponse, 'assistant');
+        return;
+      }
+
 
       // Save AI response to database
       await ConversationService.saveOutboundMessage(
