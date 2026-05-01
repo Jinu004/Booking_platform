@@ -90,6 +90,10 @@ app.use('/api/v1/analytics', analyticsRoutes);
 const settingsRoutes = require('./modules/settings/settings.routes');
 app.use('/api/v1/settings', settingsRoutes);
 
+// HITL Routes
+const hitlRoutes = require('./modules/hitl/hitl.routes');
+app.use('/api/hitl', hitlRoutes);
+
 // 16. Test AI Endpoint
 app.post('/api/v1/test/ai', async (req, res) => {
   try {
