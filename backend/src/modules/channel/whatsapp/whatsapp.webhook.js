@@ -63,7 +63,7 @@ router.post('/', async (req, res) => {
           return
         }
       } else {
-        tenant = await TenantService.getTenantByWhatsapp(message.from)
+        tenant = await TenantService.getTenantByWhatsapp(message.to)
         if (!tenant) {
           logger.warn(`No tenant found for number: ${message.from}`)
           return

@@ -61,6 +61,7 @@ function parseIncomingMessage(payload) {
 
     return {
       from: phoneNumber,
+      to: `+${value?.metadata?.display_phone_number}`,
       message: message.text?.body || '',
       messageId: message.id,
       timestamp: message.timestamp,
