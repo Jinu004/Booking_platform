@@ -19,8 +19,8 @@ async function setMode(conversationId, tenantId, mode, staffId) {
     `UPDATE conversations
      SET mode = $1,
          mode_changed_at = NOW(),
-         mode_changed_by = $2,
-         assigned_to = CASE WHEN $1 = 'human' THEN $2 ELSE assigned_to END,
+         mode_changed_by = $2::uuid,
+         assigned_to = CASE WHEN $1 = 'human' THEN $2::uuid ELSE assigned_to END,
          last_message_at = NOW()
      WHERE id = $3 AND tenant_id = $4
      RETURNING id, mode, assigned_to, mode_changed_at`,
