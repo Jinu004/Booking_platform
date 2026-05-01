@@ -19,3 +19,17 @@ export async function takeoverConversation(id) {
 export async function sendManualMessage(id, message) {
   return api.post(`/conversations/${id}/message`, { message });
 }
+
+// ── HITL API calls ───────────────────────────────────────────────────────
+
+export const getHITLConversations = () =>
+  api.get('/hitl/conversations');
+
+export const getConversationMessages = (conversationId) =>
+  api.get(`/hitl/conversations/${conversationId}/messages`);
+
+export const sendStaffReply = (conversationId, content) =>
+  api.post(`/hitl/conversations/${conversationId}/reply`, { content });
+
+export const toggleConversationMode = (conversationId) =>
+  api.patch(`/hitl/conversations/${conversationId}/mode`);
