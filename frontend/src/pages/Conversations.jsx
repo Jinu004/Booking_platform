@@ -5,7 +5,8 @@ import {
   sendStaffReply,
   toggleConversationMode
 } from '../services/conversation.service';
-import { Badge, Button, Input, Spinner, PageHeader, Skeleton } from '../components/shared';
+import { Badge, Button, Input, Spinner, PageHeader } from '../components/shared';
+import { CardSkeleton } from '../components/shared/Skeleton';
 
 // Helper to format relative time (e.g. "2m ago")
 function formatRelativeTime(dateString) {
@@ -231,7 +232,7 @@ export default function Conversations() {
           <div className="flex-1 overflow-y-auto">
             {loadingList ? (
               <div className="p-4 space-y-4">
-                {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+                {[1,2,3].map(i => <CardSkeleton key={i} />)}
               </div>
             ) : conversations.length === 0 ? (
               <div className="p-8 text-center text-slate-500">
