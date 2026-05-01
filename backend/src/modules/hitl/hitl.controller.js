@@ -58,12 +58,11 @@ async function toggleMode(req, res) {
     const tenantId = req.tenant.id;
     const staffId = req.staff.id;
     const { id } = req.params;
-
     const updated = await HITLService.toggleMode(id, tenantId, staffId);
     return res.json({ success: true, data: updated, error: null });
   } catch (err) {
-    logger.error('toggleMode error:', err.message);
-    return res.status(500).json({ success: false, data: null, error: err.message });
+    logger.error('toggleMode error: ' + (err.message || JSON.stringify(err)) + ' stack: ' + err.stack);
+    return res.status(500).json({ success: false, data: null, error: err.message || 'Unknown error' });
   }
 }
 
