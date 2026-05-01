@@ -34,6 +34,11 @@ export default function Conversations() {
   const [sending, setSending] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const selectedConversationIdRef = useRef(null);
+
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId;
+  }, [selectedConversationId]);
 
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
 
@@ -87,7 +92,7 @@ export default function Conversations() {
         });
 
         // Update thread if open
-        if (selectedConversationId === data.conversationId) {
+        if (selectedConversationIdRef.current === data.conversationId) {
           setMessages(prev => [...prev, data.message]);
         }
       } catch (err) {
@@ -139,7 +144,7 @@ export default function Conversations() {
     return () => {
       eventSource.close();
     };
-  }, [selectedConversationId]);
+  }, []);
 
   // Fetch messages when selected changes
   useEffect(() => {
