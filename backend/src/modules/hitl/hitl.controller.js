@@ -72,20 +72,16 @@ function sseStream(req, res) {
   const tenantId = req.tenant?.id;
   if (!tenantId) return res.status(401).end();
 
-  // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no'); // Nginx: disable buffering for SSE
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
-  // Send initial heartbeat
   res.write(`event: connected\ndata: ${JSON.stringify({ tenantId })}\n\n`);
 
-  // Register client
   HITLService.addSseClient(tenantId, res);
 
-  // Heartbeat every 30s to keep connection alive through Nginx
   const heartbeat = setInterval(() => {
     try {
       res.write(': heartbeat\n\n');
@@ -94,11 +90,9 @@ function sseStream(req, res) {
     }
   }, 30000);
 
-  // Cleanup on disconnect
   req.on('close', () => {
     clearInterval(heartbeat);
     HITLService.removeSseClient(tenantId, res);
-    logger.info(`SSE client disconnected for tenant ${tenantId}`);
   });
 }
 
