@@ -23,13 +23,13 @@ export async function sendManualMessage(id, message) {
 // ── HITL API calls ───────────────────────────────────────────────────────
 
 export const getHITLConversations = () =>
-  api.get('/hitl/conversations');
+  api.get('/v1/hitl/conversations');
 
 export const getConversationMessages = (conversationId) =>
-  api.get(`/hitl/conversations/${conversationId}/messages`);
+  api.get(`/v1/hitl/conversations/${conversationId}/messages`);
 
 export const sendStaffReply = (conversationId, content) =>
-  api.post(`/hitl/conversations/${conversationId}/reply`, { content });
+  api.post(`/v1/hitl/conversations/${conversationId}/reply`, { content });
 
 export const toggleConversationMode = (conversationId) =>
-  api.patch(`/hitl/conversations/${conversationId}/mode`);
+  api.patch(`/v1/hitl/conversations/${conversationId}/mode`);
