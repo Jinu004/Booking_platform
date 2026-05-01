@@ -15,16 +15,17 @@ async function getConversationWithMode(conversationId, tenantId) {
 
 // Set conversation mode — 'ai' or 'human'
 async function setMode(conversationId, tenantId, mode, staffId) {
+  const assignedTo = mode === 'human' ? staffId : null;
   const { rows } = await pool.query(
     `UPDATE conversations
      SET mode = $1,
          mode_changed_at = NOW(),
          mode_changed_by = $2::uuid,
-         assigned_to = CASE WHEN $1 = 'human' THEN $2::uuid ELSE assigned_to END,
+         assigned_to = COALESCE($3::uuid, assigned_to),
          last_message_at = NOW()
-     WHERE id = $3 AND tenant_id = $4
+     WHERE id = $4 AND tenant_id = $5
      RETURNING id, mode, assigned_to, mode_changed_at`,
-    [mode, staffId, conversationId, tenantId]
+    [mode, staffId, assignedTo, conversationId, tenantId]
   );
   return rows[0] || null;
 }
