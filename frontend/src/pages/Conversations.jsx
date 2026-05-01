@@ -58,7 +58,8 @@ export default function Conversations() {
 
   // Setup SSE
   useEffect(() => {
-    const eventSource = new EventSource('/api/hitl/events', { withCredentials: true });
+    const token = localStorage.getItem('auth_token');
+    const eventSource = new EventSource(`/api/v1/hitl/events?token=${token}`, { withCredentials: true });
 
     eventSource.onmessage = (e) => {
       // Default handler
