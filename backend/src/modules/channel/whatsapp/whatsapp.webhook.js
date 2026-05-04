@@ -117,6 +117,7 @@ router.post('/', async (req, res) => {
       // Process through Gemini AI
       const AIService = require('../../ai-engine/ai.service')
       let aiResponse;
+      let isAIError = false;
       try {
         aiResponse = await AIService.processMessage({
           tenant,
@@ -127,15 +128,17 @@ router.post('/', async (req, res) => {
           configs,
           additionalData
         })
+        isAIError = typeof aiResponse === 'object' && aiResponse.error;
+        if (isAIError) { aiResponse = aiResponse.text; }
         logger.info(`AI response for ${message.from}: ${aiResponse.substring(0, 100)}`)
       } catch (err) {
         logger.error(`AI processing crashed for ${message.from}:`, err.message)
         aiResponse = 'Sorry, I am having trouble right now. Please try again in a moment or call us directly.'
+        isAIError = true;
       }
 
       // Save AI response to database
-      const fallbackPhrases = ['having trouble', 'encountered an issue', 'could not process', 'try again'];
-      if (!fallbackPhrases.some(phrase => aiResponse.toLowerCase().includes(phrase))) {
+      if (!isAIError) {
         await ConversationService.saveOutboundMessage(
           context.conversation.id,
           aiResponse,
