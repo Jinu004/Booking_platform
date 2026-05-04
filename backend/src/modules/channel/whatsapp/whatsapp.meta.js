@@ -54,7 +54,14 @@ function parseIncomingMessage(payload) {
     const message = value?.messages?.[0]
 
     if (!message) return null
-    if (message.type !== 'text') return null
+    if (message.type !== 'text' && message.type !== 'interactive') return null
+
+    let messageText = ''
+    if (message.type === 'text') {
+      messageText = message.text?.body || ''
+    } else if (message.type === 'interactive') {
+      messageText = message.interactive?.button_reply?.title || ''
+    }
 
     const contact = value?.contacts?.[0]
     const phoneNumber = `+${message.from}`
@@ -62,7 +69,7 @@ function parseIncomingMessage(payload) {
     return {
       from: phoneNumber,
       to: `+${value?.metadata?.display_phone_number}`,
-      message: message.text?.body || '',
+      message: messageText,
       messageId: message.id,
       timestamp: message.timestamp,
       type: message.type,
