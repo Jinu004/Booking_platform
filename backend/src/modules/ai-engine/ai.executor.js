@@ -154,6 +154,14 @@ ${remaining} tokens remaining.`
         }
         const tokenNumber = currentCount + 1
 
+        // Update customer name
+        if (customer?.id) {
+          await pool.query(
+            `UPDATE customers SET name = $1 WHERE id = $2 AND tenant_id = $3`,
+            [patient_name, customer.id, tenant.id]
+          )
+        }
+
         // Create booking
         const bookingRes = await pool.query(
           `INSERT INTO bookings
