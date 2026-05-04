@@ -244,9 +244,10 @@ Reply CANCEL to cancel your booking.`
         return `ESCALATE:${reason}`
       }
 
-      default:
-        logger.warn(`Unknown function called by AI: ${name}`)
-        return { error: `Function "${name}" is not implemented.` }
+      default: {
+        logger.warn('Unknown function called by Gemini:', name);
+        return 'Function not available. Please respond with text only.';
+      }
     }
   } catch (err) {
     logger.error(`AI function "${name}" failed:`, err.message)
