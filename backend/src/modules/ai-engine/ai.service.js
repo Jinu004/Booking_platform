@@ -73,11 +73,14 @@ async function processMessage(context) {
             parts: [{ text: msg.content }]
           }))
 
+        const firstUserIndex = history.findIndex(m => m.role === 'user');
+        const cleanHistory = firstUserIndex > 0 ? history.slice(firstUserIndex) : history;
+
         // Get the latest message text to send
         const latestMessage = recentMessages?.[recentMessages.length - 1]?.content || ''
 
         // Start chat session with conversation history
-        const chat = model.startChat({ history })
+        const chat = model.startChat({ history: cleanHistory })
 
         // Send the latest patient message
         let response = await chat.sendMessage(latestMessage)
