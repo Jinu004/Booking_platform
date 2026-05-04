@@ -43,98 +43,112 @@ async function processMessage(context) {
     const systemPrompt = getSystemPrompt(tenant, configs, additionalData)
     const functionDeclarations = getFunctionDefinitions(tenant.industry)
 
-    // Initialize Gemini model with tools
-    const model = client.getGenerativeModel({
-      model: MODEL,
-      systemInstruction: systemPrompt,
-      tools: [{ functionDeclarations }]
-    })
+    let lastError;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        // Initialize Gemini model with tools
+        const model = client.getGenerativeModel({
+          model: MODEL,
+          systemInstruction: systemPrompt,
+          tools: [{ functionDeclarations }]
+        })
 
-    // Build conversation history for Gemini
-    // Gemini uses 'model' not 'assistant' for AI role
-    // Skip the last message — it will be sent fresh
-    const history = (recentMessages || [])
-      .slice(0, -1)
-      .map(msg => ({
-        role: msg.role === 'assistant' || msg.role === 'staff' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
-      }))
+        // Build conversation history for Gemini
+        // Gemini uses 'model' not 'assistant' for AI role
+        // Skip the last message — it will be sent fresh
+        const history = (recentMessages || [])
+          .slice(0, -1)
+          .map(msg => ({
+            role: msg.role === 'assistant' || msg.role === 'staff' ? 'model' : 'user',
+            parts: [{ text: msg.content }]
+          }))
 
-    // Get the latest message text to send
-    const latestMessage = recentMessages?.[recentMessages.length - 1]?.content || ''
+        // Get the latest message text to send
+        const latestMessage = recentMessages?.[recentMessages.length - 1]?.content || ''
 
-    // Start chat session with conversation history
-    const chat = model.startChat({ history })
+        // Start chat session with conversation history
+        const chat = model.startChat({ history })
 
-    // Send the latest patient message
-    let response = await chat.sendMessage(latestMessage)
-    let result = response.response
+        // Send the latest patient message
+        let response = await chat.sendMessage(latestMessage)
+        let result = response.response
 
-    // Function calling loop — Gemini may call multiple functions
-    const maxIterations = 5
-    let iteration = 0
+        // Function calling loop — Gemini may call multiple functions
+        const maxIterations = 5
+        let iteration = 0
 
-    while (iteration < maxIterations) {
-      iteration++
+        while (iteration < maxIterations) {
+          iteration++
 
-      const candidate = result.candidates?.[0]
-      if (!candidate) break
+          const candidate = result.candidates?.[0]
+          if (!candidate) break
 
-      // Collect any function calls in this response
-      const functionCallParts = (candidate.content?.parts || [])
-        .filter(part => part.functionCall)
+          // Collect any function calls in this response
+          const functionCallParts = (candidate.content?.parts || [])
+            .filter(part => part.functionCall)
 
-      // No more function calls — final text response
-      if (!functionCallParts.length) break
+          // No more function calls — final text response
+          if (!functionCallParts.length) break
 
-      // Execute each function call in parallel
-      const functionResponses = []
+          // Execute each function call in parallel
+          const functionResponses = []
 
-      for (const part of functionCallParts) {
-        const { name, args } = part.functionCall
+          for (const part of functionCallParts) {
+            const { name, args } = part.functionCall
 
-        logger.info(`Gemini calling function: ${name}`, JSON.stringify(args))
+            logger.info(`Gemini calling function: ${name}`, JSON.stringify(args))
 
-        const functionResult = await executeFunction(
-          name,
-          args,
-          { tenant, customer, conversation }
-        )
+            const functionResult = await executeFunction(
+              name,
+              args,
+              { tenant, customer, conversation }
+            )
 
-        // Handle escalation signal
-        if (
-          typeof functionResult === 'string' &&
-          functionResult.startsWith('ESCALATE:')
-        ) {
-          return 'I am connecting you with a staff member who can better assist you. Please wait a moment.'
+            // Handle escalation signal
+            if (
+              typeof functionResult === 'string' &&
+              functionResult.startsWith('ESCALATE:')
+            ) {
+              return 'I am connecting you with a staff member who can better assist you. Please wait a moment.'
+            }
+
+            functionResponses.push({
+              functionResponse: {
+                name,
+                response: { result: functionResult }
+              }
+            })
+          }
+
+          // Feed function results back to Gemini
+          response = await chat.sendMessage(functionResponses)
+          result = response.response
         }
 
-        functionResponses.push({
-          functionResponse: {
-            name,
-            response: { result: functionResult }
-          }
-        })
+        // Extract final text response from Gemini
+        let text;
+        try {
+          text = result.text()
+        } catch (textErr) {
+          throw textErr;
+        }
+        if (!text || !text.trim()) {
+          throw new Error('Empty text response from Gemini');
+        }
+
+        return text.trim()
+
+      } catch (err) {
+        lastError = err;
+        if (attempt === 1) {
+          logger.warn(`Gemini attempt 1 failed: ${err.message}. Retrying in 2000ms...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
-
-      // Feed function results back to Gemini
-      response = await chat.sendMessage(functionResponses)
-      result = response.response
     }
-
-    // Extract final text response from Gemini
-    let text;
-    try {
-      text = result.text()
-    } catch (textErr) {
-      logger.error('Gemini text extraction failed:', textErr.message, textErr.name)
-      return { error: true, text: 'I apologize, I could not process your request. Please try again.' }
-    }
-    if (!text || !text.trim()) {
-      return 'I apologize, I could not process your request. Please try again.'
-    }
-
-    return text.trim()
+    
+    // If both attempts fail, throw to the outer catch block
+    throw lastError;
 
   } catch (err) {
     logger.error('Gemini AI error:', err.message || err.name || String(err))
