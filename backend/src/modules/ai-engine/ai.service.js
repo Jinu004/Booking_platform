@@ -76,6 +76,8 @@ async function processMessage(context) {
         // Function calling loop — Gemini may call multiple functions
         const maxIterations = 5
         let iteration = 0
+        let escalated = false;
+        const escalationMessage = 'I am connecting you with a staff member who can better assist you. Please wait a moment.';
 
         while (iteration < maxIterations) {
           iteration++
@@ -109,7 +111,8 @@ async function processMessage(context) {
               typeof functionResult === 'string' &&
               functionResult.startsWith('ESCALATE:')
             ) {
-              return 'I am connecting you with a staff member who can better assist you. Please wait a moment.'
+              escalated = true;
+              break;
             }
 
             functionResponses.push({
@@ -119,10 +122,16 @@ async function processMessage(context) {
               }
             })
           }
+          
+          if (escalated) break;
 
           // Feed function results back to Gemini
           response = await chat.sendMessage(functionResponses)
           result = response.response
+        }
+
+        if (escalated) {
+          return escalationMessage;
         }
 
         // Extract final text response from Gemini
