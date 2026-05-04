@@ -154,20 +154,12 @@ ${remaining} tokens remaining.`
         }
         const tokenNumber = currentCount + 1
 
-        // Update customer name
-        if (customer?.id) {
-          await pool.query(
-            `UPDATE customers SET name = $1 WHERE id = $2 AND tenant_id = $3`,
-            [patient_name, customer.id, tenant.id]
-          )
-        }
-
         // Create booking
         const bookingRes = await pool.query(
           `INSERT INTO bookings
              (tenant_id, customer_id, conversation_id, doctor_id,
-              source, status, booking_date, token_number, notes)
-           VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE, $5, $6)
+              source, status, booking_date, token_number, notes, patient_name)
+           VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE, $5, $6, $7)
            RETURNING id, token_number`,
           [
             tenant.id,
@@ -175,7 +167,8 @@ ${remaining} tokens remaining.`
             conversation?.id || null,
             doctor.id,
             tokenNumber,
-            `Booked via WhatsApp for ${patient_name}`
+            `Booked via WhatsApp for ${patient_name}`,
+            patient_name
           ]
         )
         const booking = bookingRes.rows[0]
