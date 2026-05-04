@@ -123,7 +123,13 @@ async function processMessage(context) {
     }
 
     // Extract final text response from Gemini
-    const text = result.text()
+    let text;
+    try {
+      text = result.text()
+    } catch (textErr) {
+      logger.error('Gemini text extraction failed:', textErr.message, textErr.name)
+      return 'I apologize, I could not process your request. Please try again.'
+    }
     if (!text || !text.trim()) {
       return 'I apologize, I could not process your request. Please try again.'
     }
@@ -131,7 +137,7 @@ async function processMessage(context) {
     return text.trim()
 
   } catch (err) {
-    logger.error('Gemini AI error full:', JSON.stringify(err, Object.getOwnPropertyNames(err)))
+    logger.error('Gemini AI error:', err.message || err.name || String(err))
 
     if (err.message?.includes('API_KEY') || err.message?.includes('API key')) {
       logger.warn('GEMINI_API_KEY invalid or missing')
