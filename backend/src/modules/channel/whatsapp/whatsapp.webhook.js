@@ -134,11 +134,13 @@ router.post('/', async (req, res) => {
       }
 
       // Save AI response to database
-      await ConversationService.saveOutboundMessage(
-        context.conversation.id,
-        aiResponse,
-        'assistant'
-      )
+      if (!aiResponse.includes('having trouble processing') && !aiResponse.includes('having trouble right now')) {
+        await ConversationService.saveOutboundMessage(
+          context.conversation.id,
+          aiResponse,
+          'assistant'
+        )
+      }
 
       // Send via WhatsApp with built-in human-like delay
       const { sendMessage, sendButtons } = require('./whatsapp.adapter')
