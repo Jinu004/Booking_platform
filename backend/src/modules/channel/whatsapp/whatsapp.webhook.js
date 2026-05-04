@@ -84,6 +84,13 @@ router.post('/', async (req, res) => {
         tenant.id
       )
       if (convWithMode?.mode === 'human') {
+        // Save patient message since we are skipping AI processing
+        await ConversationService.saveInboundMessage(
+          context.conversation.id,
+          message.message,
+          message.type || 'text'
+        )
+        
         HITLService.broadcastIncomingPatientMessage(
           tenant.id,
           context.conversation.id,
@@ -137,8 +144,14 @@ router.post('/', async (req, res) => {
         isAIError = true;
       }
 
-      // Save AI response to database
+      // Save messages to database ONLY if AI succeeds
       if (!isAIError) {
+        await ConversationService.saveInboundMessage(
+          context.conversation.id,
+          message.message,
+          message.type || 'text'
+        )
+
         await ConversationService.saveOutboundMessage(
           context.conversation.id,
           aiResponse,

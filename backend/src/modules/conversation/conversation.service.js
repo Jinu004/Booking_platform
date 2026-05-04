@@ -47,7 +47,8 @@ async function handleIncomingMessage(tenant, message) {
   }
 
   // 3. Save message to database
-  await MessageModel.saveMessage(pool, conversation.id, 'user', message.message, message.type);
+  // Deferred to webhook to ensure AI success
+  // await MessageModel.saveMessage(pool, conversation.id, 'user', message.message, message.type);
 
   // 4. Update Redis session
   const session = await getOrCreateSession(tenant.id, message.from);
@@ -60,6 +61,14 @@ async function handleIncomingMessage(tenant, message) {
 
   // 5. Return conversation context for AI engine
   const recentMessages = await MessageModel.getRecentMessages(pool, conversation.id, 10);
+  
+  // Append current message in memory since it's not saved yet
+  recentMessages.push({
+    role: 'user',
+    content: message.message,
+    type: message.type,
+    created_at: new Date().toISOString()
+  });
 
   return { conversation, customer, recentMessages, session: updatedSession };
 }
@@ -74,6 +83,13 @@ async function handleIncomingMessage(tenant, message) {
  */
 async function saveOutboundMessage(conversationId, content, role) {
   return await MessageModel.saveMessage(pool, conversationId, role, content, 'text');
+}
+
+/**
+ * Saves inbound message from patient
+ */
+async function saveInboundMessage(conversationId, content, type = 'text') {
+  return await MessageModel.saveMessage(pool, conversationId, 'user', content, type);
 }
 
 /**
@@ -116,6 +132,7 @@ async function escalateToHuman(tenantId, conversationId, staffId) {
 module.exports = {
   handleIncomingMessage,
   saveOutboundMessage,
+  saveInboundMessage,
   resolveConversation,
   escalateToHuman
 };
