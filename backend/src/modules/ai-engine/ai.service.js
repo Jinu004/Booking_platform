@@ -56,8 +56,18 @@ async function processMessage(context) {
         // Build conversation history for Gemini
         // Gemini uses 'model' not 'assistant' for AI role
         // Skip the last message — it will be sent fresh
+        const errorPhrases = ['having trouble', 'could not process', 'try again'];
+
         const history = (recentMessages || [])
           .slice(0, -1)
+          .filter(msg => {
+            if (msg.role === 'staff') return false;
+            if (msg.role === 'assistant') {
+              const content = msg.content?.toLowerCase() || '';
+              if (errorPhrases.some(phrase => content.includes(phrase))) return false;
+            }
+            return true;
+          })
           .map(msg => ({
             role: msg.role === 'assistant' || msg.role === 'staff' ? 'model' : 'user',
             parts: [{ text: msg.content }]
