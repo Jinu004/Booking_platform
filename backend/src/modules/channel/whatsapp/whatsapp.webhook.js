@@ -134,7 +134,8 @@ router.post('/', async (req, res) => {
       }
 
       // Save AI response to database
-      if (!aiResponse.includes('having trouble processing') && !aiResponse.includes('having trouble right now')) {
+      const fallbackPhrases = ['having trouble', 'encountered an issue', 'could not process', 'try again'];
+      if (!fallbackPhrases.some(phrase => aiResponse.toLowerCase().includes(phrase))) {
         await ConversationService.saveOutboundMessage(
           context.conversation.id,
           aiResponse,
