@@ -127,6 +127,7 @@ ${remaining} tokens remaining.`
 
       case 'create_token_booking': {
         const { doctor_name, patient_name } = args
+        const formattedName = (patient_name || '').replace(/\b\w/g, c => c.toUpperCase())
 
         // Find doctor
         const doctorRes = await pool.query(
@@ -166,8 +167,8 @@ ${remaining} tokens remaining.`
             customer?.id || null,
             conversation?.id || null,
             doctor.id,
-            `Booked via WhatsApp for ${patient_name}`,
-            patient_name
+            `Booked via WhatsApp for ${formattedName}`,
+            formattedName
           ]
         )
         const tokenNumber = bookingRes.rows[0].token_number
