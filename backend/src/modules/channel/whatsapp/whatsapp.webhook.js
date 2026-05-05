@@ -52,7 +52,7 @@ router.post('/', async (req, res) => {
           logger.warn(`Duplicate message detected and skipped: ${message.messageId}`)
           return
         }
-        await redisClient.setex(`msg_dedup:${message.messageId}`, 300, '1')
+        await redisClient.set(`msg_dedup:${message.messageId}`, '1', { EX: 300 })
       }
 
       logger.info(`Incoming ${source} message from ${message.from}`)
