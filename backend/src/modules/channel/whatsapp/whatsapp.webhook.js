@@ -121,6 +121,10 @@ router.post('/', async (req, res) => {
         }
       }
 
+      // Send typing indicator to user
+      const { sendMessage } = require('./whatsapp.adapter')
+      await sendMessage(message.from, '⏳ Please wait a moment...')
+
       // Process through Gemini AI
       const AIService = require('../../ai-engine/ai.service')
       let aiResponse;

@@ -158,7 +158,7 @@ async function processMessage(context) {
         try {
           text = result.text()
         } catch (textErr) {
-          throw textErr;
+          return { error: true, text: 'Sorry, I could not process that. Please type 1 to Book Appointment, 2 to Check My Booking, or 3 to Talk to Staff.' };
         }
         if (!text || !text.trim()) {
           throw new Error('Empty text response from Gemini');
@@ -186,7 +186,7 @@ async function processMessage(context) {
       return { error: true, text: 'Our AI assistant is currently unavailable. Please contact the clinic directly.' }
     }
 
-    return { error: true, text: 'I am having trouble processing your request right now. Please try again in a moment.' }
+    return { error: true, text: 'Sorry, I could not process that. Please type 1 to Book Appointment, 2 to Check My Booking, or 3 to Talk to Staff.' }
   }
 }
 
