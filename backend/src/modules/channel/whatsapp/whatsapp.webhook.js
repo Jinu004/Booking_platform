@@ -44,6 +44,17 @@ router.post('/', async (req, res) => {
       const message = parseIncoming(body, source)
       if (!message) return
 
+      // Deduplication check
+      const redisClient = require('../../../config/redis')
+      if (message.messageId && redisClient) {
+        const isDuplicate = await redisClient.get(`msg_dedup:${message.messageId}`)
+        if (isDuplicate) {
+          logger.warn(`Duplicate message detected and skipped: ${message.messageId}`)
+          return
+        }
+        await redisClient.setex(`msg_dedup:${message.messageId}`, 300, '1')
+      }
+
       logger.info(`Incoming ${source} message from ${message.from}`)
 
       // Identify tenant from WhatsApp number
