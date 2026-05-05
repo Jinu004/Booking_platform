@@ -152,25 +152,25 @@ ${remaining} tokens remaining.`
         if (currentCount >= doctor.max_tokens_daily) {
           return { success: false, message: `Dr. ${doctor.name} is fully booked for today.` }
         }
-        const tokenNumber = currentCount + 1
-
-        // Create booking
+        // Create booking with atomic token generation
         const bookingRes = await pool.query(
           `INSERT INTO bookings
              (tenant_id, customer_id, conversation_id, doctor_id,
               source, status, booking_date, token_number, notes, patient_name)
-           VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE, $5, $6, $7)
+           VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE, 
+             (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled'), 
+             $5, $6)
            RETURNING id, token_number`,
           [
             tenant.id,
             customer?.id || null,
             conversation?.id || null,
             doctor.id,
-            tokenNumber,
             `Booked via WhatsApp for ${patient_name}`,
             patient_name
           ]
         )
+        const tokenNumber = bookingRes.rows[0].token_number
         const booking = bookingRes.rows[0]
         const configResult = await pool.query(
           `SELECT value FROM tenant_configs
