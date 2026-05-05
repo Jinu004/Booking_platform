@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { parseIncoming } = require('./whatsapp.adapter')
+const { parseIncoming, sendMessage, sendButtons } = require('./whatsapp.adapter')
 const { successResponse } = require('../../../utils/response')
 const logger = require('../../../utils/logger')
 
@@ -122,7 +122,6 @@ router.post('/', async (req, res) => {
       }
 
       // Send typing indicator to user
-      const { sendMessage } = require('./whatsapp.adapter')
       await sendMessage(message.from, '⏳ Please wait a moment...')
 
       // Process through Gemini AI
@@ -164,7 +163,6 @@ router.post('/', async (req, res) => {
       }
 
       // Send via WhatsApp with built-in human-like delay
-      const { sendMessage, sendButtons } = require('./whatsapp.adapter')
       
       // Check if this is a greeting response
       // Greeting responses contain the welcome text
@@ -192,7 +190,6 @@ router.post('/', async (req, res) => {
 
     } catch (err) {
       logger.error('Async webhook processing error:', err.message)
-      const { sendMessage } = require('./whatsapp.adapter')
       const fallbackMessage = 'Sorry, I am having trouble right now. Please try again in a moment or call us directly.'
       
       if (req.body?.payload?.from) {
