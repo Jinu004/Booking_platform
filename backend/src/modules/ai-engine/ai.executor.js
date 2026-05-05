@@ -141,6 +141,16 @@ ${remaining} tokens remaining.`
         }
         const doctor = doctorRes.rows[0]
 
+        if (customer?.id) {
+          const activeBookingRes = await pool.query(
+            `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
+            [customer.id, doctor.id]
+          )
+          if (activeBookingRes.rows.length > 0) {
+            return { success: false, message: `You already have an active booking with Dr. ${doctor.name} today. If you need to see a different doctor, please choose another doctor from the list.` }
+          }
+        }
+
         // Get current token count for today
         const tokenRes = await pool.query(
           `SELECT COUNT(*) AS count FROM bookings
