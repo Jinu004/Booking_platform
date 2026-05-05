@@ -130,7 +130,7 @@ ${remaining} tokens remaining.`
 
         // Find doctor
         const doctorRes = await pool.query(
-          `SELECT id, name, max_tokens_daily FROM clinic_doctors
+          `SELECT id, name, specialization, max_tokens_daily FROM clinic_doctors
            WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND available_today = true
            LIMIT 1`,
           [tenant.id, `%${doctor_name}%`]
