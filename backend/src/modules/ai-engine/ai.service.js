@@ -105,11 +105,17 @@ async function processMessage(context) {
           // No more function calls — final text response
           if (!functionCallParts.length) break
 
-          // Execute each function call in parallel
+          // Execute each function call sequentially
           const functionResponses = []
+          const executedFunctions = new Set()
 
           for (const part of functionCallParts) {
             const { name, args } = part.functionCall
+            
+            if (executedFunctions.has(name)) {
+              continue;
+            }
+            executedFunctions.add(name);
 
             logger.info(`Gemini calling function: ${name}`, JSON.stringify(args))
 
