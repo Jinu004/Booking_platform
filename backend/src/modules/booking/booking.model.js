@@ -41,7 +41,7 @@ async function createBooking(pool, tenantId, bookingData) {
  */
 async function getBookingById(pool, tenantId, bookingId) {
   const sql = `
-    SELECT b.*, c.name AS patient_name, c.phone AS patient_phone, cd.name AS doctor_name 
+    SELECT b.*, COALESCE(b.patient_name, c.name) AS patient_name, c.phone AS patient_phone, cd.name AS doctor_name 
     FROM bookings b
     LEFT JOIN customers c ON c.id = b.customer_id
     LEFT JOIN clinic_doctors cd ON cd.id = b.doctor_id
@@ -62,7 +62,7 @@ async function getBookingById(pool, tenantId, bookingId) {
  */
 async function getBookings(pool, tenantId, filters = {}) {
   let sql = `
-    SELECT b.*, c.name AS patient_name, c.phone AS patient_phone, cd.name AS doctor_name
+    SELECT b.*, COALESCE(b.patient_name, c.name) AS patient_name, c.phone AS patient_phone, cd.name AS doctor_name
     FROM bookings b
     LEFT JOIN customers c ON c.id = b.customer_id
     LEFT JOIN clinic_doctors cd ON cd.id = b.doctor_id
@@ -114,7 +114,7 @@ async function getBookings(pool, tenantId, filters = {}) {
  */
 async function getBookingsByDate(pool, tenantId, date) {
   const sql = `
-    SELECT b.*, c.name AS patient_name, c.phone AS patient_phone, cd.name AS doctor_name, cd.specialization 
+    SELECT b.*, COALESCE(b.patient_name, c.name) AS patient_name, c.phone AS patient_phone, cd.name AS doctor_name, cd.specialization 
     FROM bookings b
     LEFT JOIN customers c ON c.id = b.customer_id
     LEFT JOIN clinic_doctors cd ON cd.id = b.doctor_id
