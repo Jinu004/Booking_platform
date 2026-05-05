@@ -46,9 +46,15 @@ async function processMessage(context) {
     let lastError;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
+        let currentModel = MODEL;
+        if (attempt === 2 && lastError && (lastError.message?.includes('503') || lastError.message?.includes('Service Unavailable'))) {
+          logger.warn('Falling back to gemini-2.0-flash-lite due to 503 error');
+          currentModel = 'gemini-2.0-flash-lite';
+        }
+
         // Initialize Gemini model with tools
         const model = client.getGenerativeModel({
-          model: MODEL,
+          model: currentModel,
           systemInstruction: systemPrompt,
           tools: [{ functionDeclarations }]
         })
