@@ -156,7 +156,7 @@ async function processMessage(context) {
         }
 
         if (escalated) {
-          return escalationMessage;
+          return { escalated: true, text: escalationMessage };
         }
 
         // Extract final text response from Gemini

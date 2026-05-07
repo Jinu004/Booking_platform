@@ -150,7 +150,13 @@ router.post('/', async (req, res) => {
           additionalData
         })
         isAIError = typeof aiResponse === 'object' && aiResponse.error;
-        if (isAIError) { aiResponse = aiResponse.text; }
+        if (isAIError) { 
+          aiResponse = aiResponse.text; 
+        } else if (aiResponse?.escalated) {
+          const HITLService = require('../../hitl/hitl.service')
+          await HITLService.handleHandoffRequest(tenant, context.conversation.id, context.customer)
+          aiResponse = aiResponse.text;
+        }
         logger.info(`AI response for ${message.from}: ${aiResponse.substring(0, 100)}`)
       } catch (err) {
         logger.error(`AI processing crashed for ${message.from}:`, err.message)
