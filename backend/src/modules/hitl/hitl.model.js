@@ -32,7 +32,7 @@ async function setMode(conversationId, tenantId, mode, staffId) {
 
 // Get paginated messages for a conversation
 // Messages have no tenant_id — scoped via conversation ownership check above
-async function getMessages(conversationId, limit = 50) {
+async function getMessages(conversationId, limit = 200) {
   const { rows } = await pool.query(
     `SELECT m.id, m.role, m.content, m.type, m.created_at
      FROM messages m
