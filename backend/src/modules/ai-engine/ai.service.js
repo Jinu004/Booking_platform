@@ -185,7 +185,7 @@ async function processMessage(context) {
     throw lastError;
 
   } catch (err) {
-    logger.error('Gemini AI error:', err.message || err.name || String(err))
+    logger.error('Gemini AI error: ' + JSON.stringify(err) + ' ' + err.stack)
 
     if (err.message?.includes('API_KEY') || err.message?.includes('API key')) {
       logger.warn('GEMINI_API_KEY invalid or missing')

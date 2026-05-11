@@ -123,12 +123,17 @@ router.post('/', async (req, res) => {
         isAIError = typeof aiResponse === 'object' && aiResponse.error
         if (isAIError) {
           aiResponse = aiResponse.text
-        } else if (aiResponse?.escalated) {
-          await HITLService.handleHandoffRequest(tenant, context.conversation.id, context.customer)
-          aiResponse = aiResponse.text
-        }
+
+} else if (aiResponse?.escalated) {
+  try {
+    await HITLService.handleAIHandoffRequest(tenant, context.conversation, null)
+  } catch (hitlErr) {
+    logger.error('HITL handoff failed: ' + hitlErr?.message + ' ' + hitlErr?.stack)
+  }
+  aiResponse = aiResponse.text
+}
       } catch (err) {
-        logger.error(`AI processing crashed for ${message.from}:`, err.message)
+logger.error(`AI processing crashed for ${message.from}: ${err?.message} ${err?.stack}`) 
         aiResponse = 'Sorry, I am having trouble right now. Please try again in a moment or call us directly.'
         isAIError = true
       }
