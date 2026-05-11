@@ -226,15 +226,15 @@ export default function Conversations() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
-      <div className="px-6 py-4 bg-white border-b border-slate-200 shrink-0">
+    <div className="flex flex-col h-[calc(100vh-130px)] bg-slate-50 overflow-hidden rounded-xl border border-slate-200">
+      <div className="px-6 py-4 bg-white border-b border-slate-200 flex-shrink-0">
         <PageHeader title="Conversations" subtitle="Manage live patient interactions" />
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden h-full">
         
         {/* Left Panel: Conversation List */}
-        <div className="w-1/3 min-w-[320px] max-w-md border-r border-slate-200 bg-white flex flex-col h-full">
+        <div className="w-1/3 min-w-[320px] max-w-md border-r border-slate-200 bg-white flex flex-col h-full overflow-y-auto flex-shrink-0">
           <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
             <h3 className="font-semibold text-slate-700">Active Chats</h3>
             <Badge variant="neutral">{conversations.length}</Badge>
@@ -293,11 +293,11 @@ export default function Conversations() {
         </div>
 
         {/* Right Panel: Thread */}
-        <div className="flex-1 flex flex-col bg-slate-50 h-full relative">
+        <div className="flex-1 flex flex-col bg-slate-50 h-full overflow-hidden relative">
           {selectedConversation ? (
             <>
               {/* Thread Header */}
-              <div className="h-16 px-6 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm z-10">
+              <div className="h-16 px-6 border-b border-slate-200 bg-white flex items-center justify-between flex-shrink-0 shadow-sm z-10">
                 <div>
                   <h3 className="font-semibold text-slate-900 text-lg">
                     {selectedConversation.customer_name || 'Unknown Patient'}
@@ -367,7 +367,7 @@ export default function Conversations() {
 
               {/* Input Area */}
               {selectedConversation.mode === 'human' ? (
-                <div className="p-4 bg-white border-t border-slate-200 shrink-0">
+                <div className="p-4 bg-white border-t border-slate-200 flex-shrink-0">
                   <div className="flex items-end gap-3 max-w-4xl mx-auto">
                     <div className="flex-1">
                       <textarea
@@ -390,7 +390,7 @@ export default function Conversations() {
                   </div>
                 </div>
               ) : (
-                <div className="h-16 bg-slate-100 border-t border-slate-200 flex items-center justify-center shrink-0">
+                <div className="h-16 bg-slate-100 border-t border-slate-200 flex items-center justify-center flex-shrink-0">
                   <p className="text-slate-400 text-sm font-medium">Input disabled in AI mode</p>
                 </div>
               )}
