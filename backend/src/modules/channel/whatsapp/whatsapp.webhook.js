@@ -108,7 +108,7 @@ router.post('/', async (req, res) => {
       const AIService = require('../../ai-engine/ai.service')
       let aiResponse
       let isAIError = false
-
+      let isEscalated = false
       try {
         aiResponse = await AIService.processMessage({
           tenant,
@@ -120,53 +120,58 @@ router.post('/', async (req, res) => {
           additionalData
         })
 
+
         isAIError = typeof aiResponse === 'object' && aiResponse.error
         if (isAIError) {
           aiResponse = aiResponse.text
-
-} else if (aiResponse?.escalated) {
-  try {
-    await HITLService.handleAIHandoffRequest(tenant, context.conversation, null)
-  } catch (hitlErr) {
-    logger.error('HITL handoff failed: ' + hitlErr?.message + ' ' + hitlErr?.stack)
-  }
-  aiResponse = aiResponse.text
-}
+        } else if (aiResponse?.escalated) {
+          isEscalated = true
+          try {
+          await HITLService.handleAIHandoffRequest(tenant, { ...context.conversation, customer_phone: context.customer?.phone }, null)
+          } catch (hitlErr) {
+            logger.error('HITL handoff failed: ' + hitlErr?.message + ' ' + hitlErr?.stack)
+          }
+          aiResponse = aiResponse.text
+        }
       } catch (err) {
-logger.error(`AI processing crashed for ${message.from}: ${err?.message} ${err?.stack}`) 
+       logger.error(`AI processing crashed for ${message.from}: ${err?.message} ${err?.stack}`) 
         aiResponse = 'Sorry, I am having trouble right now. Please try again in a moment or call us directly.'
         isAIError = true
       }
 
-      if (!isAIError) {
-        await ConversationService.saveInboundMessage(
-          context.conversation.id,
-          message.message,
-          message.type || 'text'
-        )
-        await ConversationService.saveOutboundMessage(
-          context.conversation.id,
-          aiResponse,
-          'assistant'
-        )
-      }
 
-      if (aiResponse.includes('How can I help you today')) {
-        await sendButtons(
-          message.from,
-          aiResponse,
-          [
-            { id: 'book', title: '📅 Book Appointment' },
-            { id: 'check', title: '📋 My Booking' },
-            { id: 'staff', title: '👤 Talk to Staff' }
-          ]
-        )
-      } else {
-        await sendMessage(message.from, aiResponse)
-      }
+if (!isAIError && !isEscalated) {
+  await ConversationService.saveInboundMessage(
+    context.conversation.id,
+    message.message,
+    message.type || 'text'
+  )
+  await ConversationService.saveOutboundMessage(
+    context.conversation.id,
+    aiResponse,
+    'assistant'
+  )
+}
+
+if (!isEscalated) {
+  if (aiResponse.includes('How can I help you today')) {
+    await sendButtons(
+      message.from,
+      aiResponse,
+      [
+        { id: 'book', title: '📅 Book Appointment' },
+        { id: 'check', title: '📋 My Booking' },
+        { id: 'staff', title: '👤 Talk to Staff' }
+      ]
+    )
+  } else {
+    await sendMessage(message.from, aiResponse)
+  }
+}
+
 
     } catch (err) {
-      logger.error('Async webhook processing error:', err.message)
+      logger.error('Async webhook processing error: ' + err?.message + ' ' + err?.stack)
       const fallbackMessage = 'Sorry, I am having trouble right now. Please try again in a moment or call us directly.'
       if (req.body?.payload?.from) {
         try {
