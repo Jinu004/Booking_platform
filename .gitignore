@@ -27,3 +27,4 @@ dev_output.log
 # Editor
 .vscode/
 .idea/
+backend/src/database/migrations/010_booking_patient_name.sql
