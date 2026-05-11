@@ -14,26 +14,31 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const { tenant } = useStore();
   const [hasDoctors, setHasDoctors] = useState(true);
+  const [doctors, setDoctors] = useState([]);
+  const [availableDoctors, setAvailableDoctors] = useState([]);
+  const [activeFilter, setActiveFilter] = useState('all');
 
   useEffect(() => {
     fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 15000); // 15s auto-refresh
+    const interval = setInterval(fetchDashboardData, 15000);
     return () => clearInterval(interval);
   }, []);
 
   const fetchDashboardData = async () => {
     try {
-      const [statsRes, convRes, docsRes, tokensRes, bookingsRes] = await Promise.all([
+      const [statsRes, convRes, docsRes, allDocsRes, tokensRes, bookingsRes] = await Promise.all([
         getBookingStats().catch(() => ({ data: { total: 0 } })),
         getConversations({ status: 'active' }).catch(() => ({ data: { conversations: [] } })),
         getDoctors(true).catch(() => ({ data: [] })),
+        getDoctors().catch(() => ({ data: [] })),
         getTokenQueue().catch(() => ({ data: [] })),
         getBookings({ limit: 5 }).catch(() => ({ data: { bookings: [] } }))
       ]);
 
-      const docsArray = docsRes?.data || [];
+      const docsArray = allDocsRes?.data || [];
+      const availableDocsArray = docsRes?.data || [];
       const tokensArray = tokensRes?.data || [];
-      
+
       let activeConvs = Array.isArray(convRes?.data) ? convRes.data : (convRes?.data?.conversations || []);
       let totalBookings = statsRes?.data?.total || 0;
       let bookingsArray = bookingsRes?.data?.bookings || [];
@@ -41,16 +46,17 @@ const Dashboard = () => {
       setStats({
         bookingsToday: totalBookings,
         activeConversations: activeConvs.length,
-        availableDoctors: docsArray.length,
+        availableDoctors: availableDocsArray.length,
         pendingTokens: tokensArray.filter(t => t.status === 'waiting' || t.status === 'pending').length
       });
 
       setTokenQueue(tokensArray);
       setRecentConversations(activeConvs.slice(0, 5));
       setRecentBookings(bookingsArray.slice(0, 5));
-      const hasDoctorsCheck = (docsRes?.data?.length > 0)
-        || (Array.isArray(docsRes) && docsRes.length > 0)
-        || (Array.isArray(docsRes?.data) && docsRes.data.length > 0);
+      setDoctors(docsArray);
+      setAvailableDoctors(availableDocsArray);
+
+      const hasDoctorsCheck = docsArray.length > 0;
       setHasDoctors(hasDoctorsCheck);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -59,14 +65,26 @@ const Dashboard = () => {
     }
   };
 
-  const statusColors = {
-    waiting: 'bg-yellow-100 text-yellow-800',
-    pending: 'bg-yellow-100 text-yellow-800',
-    in_progress: 'bg-blue-100 text-blue-800',
-    done: 'bg-green-100 text-green-800',
-    completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
-    noshow: 'bg-gray-100 text-gray-800'
+  const filteredTokens = activeFilter === 'all' ? tokenQueue
+    : activeFilter === 'waiting' ? tokenQueue.filter(t => t.status === 'waiting' || t.status === 'pending')
+      : activeFilter === 'in_consult' ? tokenQueue.filter(t => t.status === 'in_progress')
+        : tokenQueue.filter(t => t.status === 'done' || t.status === 'completed');
+
+  const getStatusPill = (status) => {
+    switch (status) {
+      case 'waiting':
+      case 'pending':
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Waiting</span>;
+      case 'in_progress':
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">In Consult</span>;
+      case 'done':
+      case 'completed':
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">Done</span>;
+      case 'cancelled':
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">Cancelled</span>;
+      default:
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">{status}</span>;
+    }
   };
 
   if (loading) {
@@ -85,157 +103,223 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+
+      {/* Setup Banner */}
       {!hasDoctors && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-          <h3 className="font-semibold text-blue-900 mb-3">
-            👋 Complete your setup
-          </h3>
+        <div className="mx-8 mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <h3 className="font-semibold text-blue-900 mb-3">👋 Complete your setup</h3>
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <span className="text-green-500">✅</span>
-              <span className="text-sm text-gray-700">
-                Clinic created
-              </span>
+              <span className="text-sm text-gray-700">Clinic created</span>
             </div>
             {!hasDoctors && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-gray-400">⬜</span>
-                  <span className="text-sm text-gray-700">
-                    Add your first doctor
-                  </span>
+                  <span className="text-sm text-gray-700">Add your first doctor</span>
                 </div>
-                <Link
-                  to="/doctors"
-                  className="text-sm text-blue-600 font-medium hover:underline"
-                >
-                  Add Doctor →
-                </Link>
+                <Link to="/doctors" className="text-sm text-blue-600 font-medium hover:underline">Add Doctor →</Link>
               </div>
             )}
             {!tenant?.whatsapp_number && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-gray-400">⬜</span>
-                  <span className="text-sm text-gray-700">
-                    Connect WhatsApp
-                  </span>
+                  <span className="text-sm text-gray-700">Connect WhatsApp</span>
                 </div>
-                <Link
-                  to="/settings?tab=whatsapp"
-                  className="text-sm text-blue-600 font-medium hover:underline"
-                >
-                  Learn How →
-                </Link>
+                <Link to="/settings?tab=whatsapp" className="text-sm text-blue-600 font-medium hover:underline">Learn How →</Link>
               </div>
             )}
           </div>
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Overview</h1>
-        <div className="flex space-x-3 w-full md:w-auto">
-          <Link to="/bookings" className="flex-1 md:flex-none text-center bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition transform hover:scale-105">
+      {/* Section 1 — Top Bar */}
+      <div className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
+        <div>
+          <p className="text-xl font-bold text-gray-900">{tenant?.name || 'Dashboard'}</p>
+          <p className="text-sm text-gray-500">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/bookings"
+            className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
+          >
             + New Token
-          </Link>
-          <Link to="/analytics" className="flex-1 md:flex-none text-center px-5 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-700 font-bold hover:bg-gray-50 transition">
-            Reports
           </Link>
         </div>
       </div>
-      
-      {/* 4 Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition duration-300 relative overflow-hidden">
-          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Today's Tokens</p>
-          <p className="mt-2 text-4xl font-black text-gray-900">{stats.bookingsToday}</p>
-          <div className="absolute top-0 right-0 p-4 opacity-5 text-indigo-600">
-            <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" /></svg>
+
+      {/* Section 2 — Stat Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-8 py-6">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Today's Tokens</p>
+          <p className="mt-2 text-4xl font-black text-indigo-600">{stats.bookingsToday}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Waiting Now</p>
+          <p className="mt-2 text-4xl font-black text-amber-500">{stats.pendingTokens}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Doctors on Duty</p>
+          <div className="mt-2 flex items-baseline gap-1">
+            <span className="text-4xl font-black text-emerald-600">{availableDoctors.length}</span>
+            <span className="text-xl text-gray-400 font-bold">/ {doctors.length}</span>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition duration-300 relative overflow-hidden">
-          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Waiting Tokens</p>
-          <p className="mt-2 text-4xl font-black text-yellow-600">{stats.pendingTokens}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition duration-300 relative overflow-hidden">
-          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Available Doctors</p>
-          <p className="mt-2 text-4xl font-black text-emerald-600">{stats.availableDoctors}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition duration-300 relative overflow-hidden">
-          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Chats In-progress</p>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Chats</p>
           <p className="mt-2 text-4xl font-black text-blue-600">{stats.activeConversations}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Token Queue */}
-        <div className="lg:col-span-2 space-y-8">
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <h2 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Live Token Queue
-              </h2>
+      {/* Section 3 — Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-8">
+
+        {/* Left — Live Token Queue */}
+        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="font-bold text-gray-900">Live Token Queue</span>
             </div>
-            <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
-              {tokenQueue.length === 0 ? (
-                <div className="p-12 text-center">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-50 text-gray-400 mb-4">
-                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                  </div>
-                  <p className="text-sm text-gray-500 font-medium">No tokens currently in queue</p>
-                </div>
-              ) : tokenQueue.map(t => (
-                <div key={t.id} className="p-4 md:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between hover:bg-gray-50 transition">
-                  <div className="flex items-center space-x-4 mb-3 sm:mb-0">
-                    <div className="flex-shrink-0 w-12 h-12 bg-indigo-50 border-2 border-indigo-100 rounded-full flex justify-center items-center font-black text-lg text-indigo-700">
-                      {t.token_number}
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500 font-bold uppercase tracking-wider mb-0.5">{t.doctor_name}</p>
-                      <p className="text-lg font-bold text-gray-900 leading-tight">{t.patient_name || 'Walkin Patient'}</p>
-                    </div>
-                  </div>
-                  <div className="text-right flex items-center gap-3 w-full sm:w-auto">
-                    <span className={`px-3 py-1 inline-flex text-[11px] uppercase tracking-widest font-black rounded-lg w-full sm:w-auto justify-center ${statusColors[t.status] || 'bg-gray-100 text-gray-800'}`}>
-                      {t.status.replace('_', ' ')}
-                    </span>
-                  </div>
-                </div>
+            <div className="flex gap-1">
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'waiting', label: 'Waiting' },
+                { key: 'in_consult', label: 'In Consult' },
+                { key: 'done', label: 'Done' },
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveFilter(tab.key)}
+                  className={`px-3 py-1.5 rounded-lg text-sm transition ${activeFilter === tab.key
+                    ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                >
+                  {tab.label}
+                </button>
               ))}
             </div>
           </div>
-        </div>
 
-        {/* Right Sidebar - Conversations & Quick Links */}
-        <div className="space-y-8">
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
-              <h2 className="text-lg font-black text-gray-900 tracking-tight">Active Chats</h2>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {recentConversations.length === 0 ? (
-                <p className="p-8 text-sm text-gray-500 text-center font-medium">No active chats</p>
-              ) : recentConversations.map(c => (
-                <div key={c.id} className="p-5 hover:bg-gray-50 transition cursor-pointer">
-                  <div className="flex justify-between items-center mb-1">
-                    <p className="text-sm font-bold text-gray-900">{c.patientPhone}</p>
-                    <p className="text-xs text-gray-400 font-medium tracking-wide">{new Date(c.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+          <div className="divide-y divide-gray-100 max-h-[480px] overflow-y-auto">
+            {filteredTokens.length === 0 ? (
+              <div className="p-12 text-center text-sm text-gray-500">No tokens in queue</div>
+            ) : filteredTokens.map(t => (
+              <div key={t.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center font-black text-gray-700 text-sm flex-shrink-0">
+                    {t.token_number}
                   </div>
-                  <p className="text-sm text-gray-500 truncate leading-relaxed">{c.lastMessage || 'New conversation started'}</p>
+                  <div>
+                    <p className="font-semibold text-gray-900">{t.patient_name || 'Walk-in'}</p>
+                    <p className="text-sm text-gray-500">{t.doctor_name}</p>
+                  </div>
                 </div>
-              ))}
-            </div>
-            <div className="border-t border-gray-100 p-3 bg-gray-50 text-center">
-              <Link to="/conversations" className="text-sm font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">View All Chats &rarr;</Link>
-            </div>
+                {getStatusPill(t.status)}
+              </div>
+            ))}
+          </div>
+
+          <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
+            <p className="text-sm text-gray-500">Showing {filteredTokens.length} of {tokenQueue.length} tokens today</p>
           </div>
         </div>
 
+        {/* Right — Active Chats */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+            <span className="font-bold text-gray-900">Active Chats</span>
+            <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
+              {stats.activeConversations}
+            </span>
+          </div>
+
+          <div className="divide-y divide-gray-100 overflow-y-auto flex-1" style={{ maxHeight: '480px' }}>
+            {recentConversations.length === 0 ? (
+              <p className="p-6 text-sm text-gray-500 text-center">No active chats</p>
+            ) : recentConversations.map(c => (
+              <Link
+                key={c.id}
+                to="/conversations"
+                className="flex items-start gap-3 p-4 hover:bg-gray-50 transition"
+              >
+                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-bold text-indigo-700">
+                    {(c.patientPhone || '?')[0].toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{c.patientPhone}</p>
+                    <p className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                      {new Date(c.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{c.lastMessage || 'New conversation'}</p>
+                  {c.mode === 'human' && (
+                    <span className="text-xs text-orange-600 font-medium">● Handoff requested</span>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <div className="border-t border-gray-100 px-5 py-3 bg-gray-50 flex-shrink-0">
+            <Link to="/conversations" className="text-sm font-semibold text-indigo-600 hover:text-indigo-800">
+              View all chats →
+            </Link>
+          </div>
+        </div>
       </div>
+
+      {/* Section 4 — Doctor Availability Strip */}
+      <div className="px-8 pb-8 mt-6">
+        <div className="flex justify-between items-center mb-4">
+          <span className="font-bold text-gray-900 text-lg">Doctor Availability</span>
+          <Link to="/doctors" className="text-sm text-indigo-600 font-semibold hover:text-indigo-800">Manage →</Link>
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {doctors.length === 0 ? (
+            <p className="text-sm text-gray-500">No doctors added yet</p>
+          ) : doctors.map(d => (
+            <div key={d.id} className="min-w-[160px] bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex-shrink-0">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-3 ${d.available ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                }`}>
+                {(d.name || '?').split(' ').filter(w => w.toLowerCase() !== 'dr.' && w.toLowerCase() !== 'dr')[0]?.[0]?.toUpperCase() || '?'}
+              </div>
+              <p className="font-semibold text-sm text-gray-900 truncate">{d.name}</p>
+              <p className="text-xs text-gray-500 truncate mb-2">{d.specialization}</p>
+              {d.available ? (
+                <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                  Available
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block"></span>
+                  Off Today
+                </span>
+              )}
+              <div className="flex gap-3 mt-2">
+                <span className="text-xs text-gray-500">
+                  Seen: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'done' || t.status === 'completed')).length}
+                </span>
+                <span className="text-xs text-gray-500">
+                  Queue: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'waiting' || t.status === 'in_progress')).length}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
     </div>
   );
 };
