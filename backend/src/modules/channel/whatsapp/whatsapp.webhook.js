@@ -4,47 +4,27 @@ const { parseIncoming, sendMessage, sendButtons } = require('./whatsapp.adapter'
 const { successResponse } = require('../../../utils/response')
 const logger = require('../../../utils/logger')
 
-/**
- * GET /webhook/whatsapp
- * Meta webhook verification endpoint
- */
 router.get('/', (req, res) => {
   const meta = require('./whatsapp.meta')
   const challenge = meta.verifyWebhook(req.query)
-
   if (challenge) {
     logger.info('Meta webhook verified successfully')
     return res.status(200).send(challenge)
   }
-
   logger.warn('Meta webhook verification failed')
   return res.status(403).send('Forbidden')
 })
 
-/**
- * POST /webhook/whatsapp
- * Receives incoming WhatsApp messages
- * Works for both WAHA and Meta payloads
- */
 router.post('/', async (req, res) => {
-  // Always respond 200 immediately — WhatsApp requirements
   res.status(200).json({ success: true, data: { received: true }, error: null })
 
-  // Process asynchronously so response is never delayed
   setImmediate(async () => {
     try {
       const body = req.body
-
-      // Detect provider from payload structure
-      const source = body.object === 'whatsapp_business_account'
-        ? 'meta'
-        : 'waha'
-
-      // Parse incoming message to standard format
+      const source = body.object === 'whatsapp_business_account' ? 'meta' : 'waha'
       const message = parseIncoming(body, source)
       if (!message) return
 
-      // Deduplication check
       const redisClient = require('../../../config/redis')
       if (message.messageId && redisClient) {
         const isDuplicate = await redisClient.get(`msg_dedup:${message.messageId}`)
@@ -57,9 +37,8 @@ router.post('/', async (req, res) => {
 
       logger.info(`Incoming ${source} message from ${message.from}`)
 
-      // Identify tenant from WhatsApp number
       const TenantService = require('../../tenant/tenant.service')
-      let tenant = null;
+      let tenant = null
 
       if (source === 'waha') {
         const tenantId = process.env.WAHA_DEFAULT_TENANT_ID || '262467ed-7cf3-418b-b46c-6038540f9260'
@@ -81,13 +60,10 @@ router.post('/', async (req, res) => {
         }
       }
 
-      // Process through conversation service (saves message, manages session)
       const ConversationService = require('../../conversation/conversation.service')
       const context = await ConversationService.handleIncomingMessage(tenant, message)
-
       logger.info(`Conversation ${context.conversation.id} updated`)
 
-      // ── HITL Mode Check ──────────────────────────────────────────────
       const HITLModel = require('../../hitl/hitl.model')
       const HITLService = require('../../hitl/hitl.service')
       const convWithMode = await HITLModel.getConversationWithMode(
@@ -95,13 +71,11 @@ router.post('/', async (req, res) => {
         tenant.id
       )
       if (convWithMode?.mode === 'human') {
-        // Save patient message since we are skipping AI processing
         await ConversationService.saveInboundMessage(
           context.conversation.id,
           message.message,
           message.type || 'text'
         )
-        
         HITLService.broadcastIncomingPatientMessage(
           tenant.id,
           context.conversation.id,
@@ -111,12 +85,9 @@ router.post('/', async (req, res) => {
         logger.info(`Conversation ${context.conversation.id} is in human mode — skipping AI`)
         return
       }
-      // ── End HITL Check ───────────────────────────────────────────────
 
-      // Load tenant configs for AI prompt
       const configs = await TenantService.getAllConfigs(tenant.id)
 
-      // Load additional data for clinic (available doctors today)
       let additionalData = {}
       if (tenant.industry === 'clinic') {
         try {
@@ -132,13 +103,12 @@ router.post('/', async (req, res) => {
         }
       }
 
-      // Send typing indicator to user
       await sendMessage(message.from, '⏳ Please wait a moment...')
 
-      // Process through Gemini AI
       const AIService = require('../../ai-engine/ai.service')
-      let aiResponse;
-      let isAIError = false;
+      let aiResponse
+      let isAIError = false
+      let isEscalated = false
       try {
         aiResponse = await AIService.processMessage({
           tenant,
@@ -149,74 +119,75 @@ router.post('/', async (req, res) => {
           configs,
           additionalData
         })
-        isAIError = typeof aiResponse === 'object' && aiResponse.error;
-        if (isAIError) { 
-          aiResponse = aiResponse.text; 
+
+
+        isAIError = typeof aiResponse === 'object' && aiResponse.error
+        if (isAIError) {
+          aiResponse = aiResponse.text
         } else if (aiResponse?.escalated) {
-          const HITLService = require('../../hitl/hitl.service')
-          await HITLService.handleHandoffRequest(tenant, context.conversation.id, context.customer)
-          aiResponse = aiResponse.text;
+          isEscalated = true
+          try {
+          await HITLService.handleAIHandoffRequest(tenant, { ...context.conversation, customer_phone: context.customer?.phone }, null)
+          } catch (hitlErr) {
+            logger.error('HITL handoff failed: ' + hitlErr?.message + ' ' + hitlErr?.stack)
+          }
+          aiResponse = aiResponse.text
         }
-        logger.info(`AI response for ${message.from}: ${aiResponse.substring(0, 100)}`)
       } catch (err) {
-        logger.error(`AI processing crashed for ${message.from}:`, err.message)
+       logger.error(`AI processing crashed for ${message.from}: ${err?.message} ${err?.stack}`) 
         aiResponse = 'Sorry, I am having trouble right now. Please try again in a moment or call us directly.'
-        isAIError = true;
+        isAIError = true
       }
 
-      // Save messages to database ONLY if AI succeeds
-      if (!isAIError) {
-        await ConversationService.saveInboundMessage(
-          context.conversation.id,
-          message.message,
-          message.type || 'text'
-        )
 
-        await ConversationService.saveOutboundMessage(
-          context.conversation.id,
-          aiResponse,
-          'assistant'
-        )
-      }
+if (!isAIError && !isEscalated) {
+  await ConversationService.saveInboundMessage(
+    context.conversation.id,
+    message.message,
+    message.type || 'text'
+  )
+  HITLService.broadcastToTenant(tenant.id, 'new_message', {
+    conversationId: context.conversation.id,
+    message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
+  })
+  await ConversationService.saveOutboundMessage(
+    context.conversation.id,
+    aiResponse,
+    'assistant'
+  )
+  HITLService.broadcastToTenant(tenant.id, 'new_message', {
+    conversationId: context.conversation.id,
+    message: { role: 'assistant', content: aiResponse, created_at: new Date().toISOString() }
+  })
+}
 
-      // Send via WhatsApp with built-in human-like delay
-      
-      // Check if this is a greeting response
-      // Greeting responses contain the welcome text
-      if (aiResponse.includes('How can I help you today')) {
-        // Send interactive buttons instead of plain text
-        await sendButtons(
-          message.from,
-          aiResponse,
-          [
-            { id: 'book', title: '📅 Book Appointment' },
-            { id: 'check', title: '📋 My Booking' },
-            { id: 'staff', title: '👤 Talk to Staff' }
-          ]
-        )
-      } else if (aiResponse.includes('Which doctor would you like')) {
-        // Parse doctor list from AI response
-        // Send as list message
-        // For now send as plain text — doctor list
-        // interactive will be added in next sprint
-        await sendMessage(message.from, aiResponse)
-      } else {
-        // Regular text response
-        await sendMessage(message.from, aiResponse)
-      }
+if (!isEscalated) {
+  if (aiResponse.includes('How can I help you today')) {
+    await sendButtons(
+      message.from,
+      aiResponse,
+      [
+        { id: 'book', title: '📅 Book Appointment' },
+        { id: 'check', title: '📋 My Booking' },
+        { id: 'staff', title: '👤 Talk to Staff' }
+      ]
+    )
+  } else {
+    await sendMessage(message.from, aiResponse)
+  }
+}
+
 
     } catch (err) {
-      logger.error('Async webhook processing error:', err.message)
+      logger.error('Async webhook processing error: ' + err?.message + ' ' + err?.stack)
       const fallbackMessage = 'Sorry, I am having trouble right now. Please try again in a moment or call us directly.'
-      
       if (req.body?.payload?.from) {
-        try { 
-           await sendMessage(req.body.payload.from, fallbackMessage) 
-        } catch(e){}
+        try {
+          await sendMessage(req.body.payload.from, fallbackMessage)
+        } catch (e) {}
       }
     }
   })
 })
 
 module.exports = router
-

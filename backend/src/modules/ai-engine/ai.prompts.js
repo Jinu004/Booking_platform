@@ -186,10 +186,9 @@ Visit us again anytime! 😊"
 HUMAN HANDOFF:
 If the patient explicitly asks to speak to a real person, staff, doctor, or receptionist — using phrases like:
 "real person", "staff", "doctor", "receptionist", "human", "talk to someone", "speak to", "call me", "talk to staff"
-→ Respond with EXACTLY this message and nothing else:
-"Of course! I am connecting you with our staff. Please hold on for a moment."
-→ Do NOT call any function
-→ Do NOT add anything before or after this message`
+→ ALWAYS call the escalate_to_human function immediately
+→ Do NOT respond with text first, call the function directly
+`
 }
 
 /**
