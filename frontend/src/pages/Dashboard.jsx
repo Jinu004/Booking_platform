@@ -34,7 +34,7 @@ const Dashboard = () => {
       const docsArray = docsRes?.data || [];
       const tokensArray = tokensRes?.data || [];
       
-      let activeConvs = convRes?.data?.conversations || [];
+      let activeConvs = Array.isArray(convRes?.data) ? convRes.data : (convRes?.data?.conversations || []);
       let totalBookings = statsRes?.data?.total || 0;
       let bookingsArray = bookingsRes?.data?.bookings || [];
 
@@ -222,10 +222,10 @@ const Dashboard = () => {
               ) : recentConversations.map(c => (
                 <div key={c.id} className="p-5 hover:bg-gray-50 transition cursor-pointer">
                   <div className="flex justify-between items-center mb-1">
-                    <p className="text-sm font-bold text-gray-900">{c.customer_phone}</p>
-                    <p className="text-xs text-gray-400 font-medium tracking-wide">{new Date(c.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                    <p className="text-sm font-bold text-gray-900">{c.patientPhone}</p>
+                    <p className="text-xs text-gray-400 font-medium tracking-wide">{new Date(c.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                   </div>
-                  <p className="text-sm text-gray-500 truncate leading-relaxed">{c.last_message || 'New conversation started'}</p>
+                  <p className="text-sm text-gray-500 truncate leading-relaxed">{c.lastMessage || 'New conversation started'}</p>
                 </div>
               ))}
             </div>

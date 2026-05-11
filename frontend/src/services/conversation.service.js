@@ -4,8 +4,8 @@ import api from '../utils/api';
  * Gets all active conversations for tenant
  * @returns {Promise<Array>} Conversations list
  */
-export async function getConversations() {
-  return api.get('/conversations');
+export async function getConversations(params = {}) {
+  return api.get('/conversations', { params });
 }
 
 export async function getConversationById(id) {
