@@ -47,7 +47,11 @@ const useStore = create((set, get) => ({
     toasts: state.toasts.filter(t => t.id !== id)
   })),
 
-  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen }))
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+
+  pendingHandoffs: 0,
+  incrementHandoffs: () => set((state) => ({ pendingHandoffs: state.pendingHandoffs + 1 })),
+  clearHandoffs: () => set({ pendingHandoffs: 0 })
 }));
 
 export default useStore;

@@ -5,7 +5,7 @@ import Badge from './Badge';
 import { getStoredStaff, logout } from '../../services/auth.service';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
-  const { tenant } = useStore();
+  const { tenant, pendingHandoffs, clearHandoffs } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
   const staff = getStoredStaff();
@@ -63,7 +63,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
               <Link
                 key={link.name}
                 to={link.path}
-                onClick={() => setIsOpen && setIsOpen(false)}
+                onClick={() => {
+                  if (setIsOpen) setIsOpen(false);
+                  if (link.name === 'Conversations') clearHandoffs();
+                }}
                 className={`
                   flex items-center px-3 py-2 text-sm font-medium w-full transition-colors rounded-lg
                   ${isActive 
@@ -73,6 +76,11 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
               >
                 <span className="mr-3 text-xl" aria-hidden="true">{link.icon}</span>
                 {link.name}
+                {link.name === 'Conversations' && pendingHandoffs > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {pendingHandoffs > 9 ? '9+' : pendingHandoffs}
+                  </span>
+                )}
               </Link>
             );
           })}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { globalSearch } from '../../services/patient.service';
+import useStore from '../../store/useStore';
 
 const Layout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -63,6 +64,16 @@ const Layout = () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('mousedown', handleClickOutside);
     };
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+    const eventSource = new EventSource(`/api/v1/hitl/events?token=${token}`, { withCredentials: true });
+    eventSource.addEventListener('handoff_requested', () => {
+      useStore.getState().incrementHandoffs();
+    });
+    return () => eventSource.close();
   }, []);
 
   return (

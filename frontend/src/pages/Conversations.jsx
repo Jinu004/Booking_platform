@@ -34,7 +34,7 @@ export default function Conversations() {
   const [sending, setSending] = useState(false);
 
   const messagesEndRef = useRef(null);
-  const selectedConversationIdRef = useRef(null);
+  const selectedConversationIdRef = useRef(selectedConversationId);
 
   useEffect(() => {
     selectedConversationIdRef.current = selectedConversationId;
@@ -93,7 +93,12 @@ export default function Conversations() {
 
         // Update thread if open
         if (selectedConversationIdRef.current === data.conversationId) {
-          setMessages(prev => [...prev, data.message]);
+          setMessages(prev => {
+            if (!data.message?.id) return [...prev, data.message];
+            const exists = prev.find(m => m.id === data.message.id);
+            if (exists) return prev;
+            return [...prev, data.message];
+          });
         }
       } catch (err) {
         console.error('SSE new_message parse error', err);
