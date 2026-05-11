@@ -146,11 +146,19 @@ if (!isAIError && !isEscalated) {
     message.message,
     message.type || 'text'
   )
+  HITLService.broadcastToTenant(tenant.id, 'new_message', {
+    conversationId: context.conversation.id,
+    message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
+  })
   await ConversationService.saveOutboundMessage(
     context.conversation.id,
     aiResponse,
     'assistant'
   )
+  HITLService.broadcastToTenant(tenant.id, 'new_message', {
+    conversationId: context.conversation.id,
+    message: { role: 'assistant', content: aiResponse, created_at: new Date().toISOString() }
+  })
 }
 
 if (!isEscalated) {
