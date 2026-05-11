@@ -67,6 +67,8 @@ const Bookings = () => {
   };
 
   const handleAction = async (id, actionFn) => {
+    if (actionFn === completeBooking && !window.confirm('Are you sure you want to complete this token?')) return;
+    if (actionFn === cancelBooking && !window.confirm('Are you sure you want to cancel this token?')) return;
     try {
       await actionFn(id);
       fetchData();

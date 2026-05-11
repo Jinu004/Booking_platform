@@ -214,6 +214,7 @@ const Doctors = () => {
   };
 
   const handleDeleteDoctor = async (doctorId) => {
+    if (!window.confirm('Are you sure you want to delete this doctor? This cannot be undone.')) return;
     try {
       await deleteDoctor(doctorId);
       fetchDoctors();
