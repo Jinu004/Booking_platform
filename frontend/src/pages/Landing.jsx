@@ -512,7 +512,7 @@ function Hero({ onNavigate }) {
           <div>
             <span className="rai-india-pill"><span className="rai-flag" />Built for clinics · Made in India</span>
             <h1 className="rai-h1" style={{ marginTop: 20 }}>
-              Your front desk <span className="rai-strike">stops</span>{' '}
+              Your front <br />desk <span className="rai-strike">stops</span>{' '}
               <span className="rai-accent-text">never sleeps.</span>
             </h1>
             <p className="rai-lead" style={{ marginTop: 24 }}>
