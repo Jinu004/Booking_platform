@@ -77,7 +77,7 @@ async function getCustomers(pool, tenantId, options) {
     FROM customers c
     WHERE c.tenant_id = $1
   `;
-  const params = [];
+  const params = [tenantId];
   let paramCount = 2;
 
   if (search) {
