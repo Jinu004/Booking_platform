@@ -157,7 +157,8 @@ const { initializeSchedulers } = require('./modules/notification/notification.sc
 initializeSchedulers();
 
 const { startHITLCron } = require('./modules/hitl/hitl.cron');
-startHITLCron();
+const { broadcastToTenant } = require('./modules/hitl/hitl.service');
+startHITLCron(broadcastToTenant);
 
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);

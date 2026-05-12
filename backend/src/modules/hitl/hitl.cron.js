@@ -1,14 +1,10 @@
 const cron = require('node-cron');
 const { pool } = require('../../config/database');
-const HITLModel = require('./hitl.model');
-const { broadcastToTenant } = require('../channel/sse.service');
 const logger = require('../../utils/logger');
 
-function startHITLCron() {
-  // Run every 5 minutes
+function startHITLCron(broadcastToTenant) {
   cron.schedule('*/5 * * * *', async () => {
     try {
-      // Find human mode conversations idle for 30+ minutes
       const result = await pool.query(`
         SELECT id, tenant_id FROM conversations
         WHERE mode = 'human'
