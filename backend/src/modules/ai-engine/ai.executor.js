@@ -184,12 +184,6 @@ ${remaining} tokens remaining.`
         const tokenNumber = bookingRes.rows[0].token_number
 
         const booking = bookingRes.rows[0]
-await pool.query(
-  `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
-   VALUES ($1, $2, $3, $4, 'waiting')`,
-  [tenant.id, booking.id, doctor.id, tokenNumber]
-)
-
         const configResult = await pool.query(
           `SELECT value FROM tenant_configs
            WHERE tenant_id = $1
