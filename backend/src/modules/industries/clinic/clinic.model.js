@@ -103,8 +103,6 @@ SELECT ct.*, b.notes,
     JOIN bookings b ON b.id = ct.booking_id
     LEFT JOIN customers c ON c.id = b.customer_id
     JOIN clinic_doctors cd ON cd.id = ct.doctor_id
-    LEFT JOIN customers c ON c.id = b.customer_id
-    JOIN clinic_doctors cd ON cd.id = ct.doctor_id
     WHERE ct.tenant_id = $1
     AND ct.status != 'cancelled'
     AND ct.issued_at >= CURRENT_DATE
