@@ -216,7 +216,7 @@ const Dashboard = () => {
             ) : filteredTokens.map(t => (
               <div key={t.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center font-black text-gray-700 text-sm flex-shrink-0">
+                  <div className="w-12 h-12 bg-gray-50 rounded-lg flex items-center justify-center font-black text-indigo-600 text-sm flex-shrink-0">
                     {t.token_number}
                   </div>
                   <div>
@@ -292,12 +292,12 @@ const Dashboard = () => {
             <p className="text-sm text-gray-500">No doctors added yet</p>
           ) : doctors.map(d => (
             <div key={d.id} className="min-w-[160px] bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex-shrink-0">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-3 ${d.available ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-3 ${d.available_today ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
                 {(d.name || '?').split(' ').filter(w => w.toLowerCase() !== 'dr.' && w.toLowerCase() !== 'dr')[0]?.[0]?.toUpperCase() || '?'}
               </div>
               <p className="font-semibold text-sm text-gray-900 truncate">{d.name}</p>
               <p className="text-xs text-gray-500 truncate mb-2">{d.specialization}</p>
-              {d.available ? (
+              {d.available_today ? (
                 <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
                   Available
