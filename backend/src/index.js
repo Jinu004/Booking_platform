@@ -156,6 +156,9 @@ const PORT = env.PORT || 3001;
 const { initializeSchedulers } = require('./modules/notification/notification.scheduler');
 initializeSchedulers();
 
+const { startHITLCron } = require('./modules/hitl/hitl.cron');
+startHITLCron();
+
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
 });
