@@ -103,7 +103,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col gap-0">
 
       {/* Setup Banner */}
       {!hasDoctors && (
@@ -155,7 +155,7 @@ const Dashboard = () => {
       </div>
 
       {/* Section 2 — Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-8 py-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-8 py-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Today's Tokens</p>
           <p className="mt-2 text-4xl font-black text-indigo-600">{stats.bookingsToday}</p>
@@ -178,7 +178,7 @@ const Dashboard = () => {
       </div>
 
       {/* Section 3 — Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-8">
 
         {/* Left — Live Token Queue */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -280,7 +280,7 @@ const Dashboard = () => {
       </div>
 
       {/* Section 4 — Doctor Availability Strip */}
-      <div className="px-8 pb-8 mt-6">
+      <div className="px-8 pb-6 mt-4">
         <div className="flex justify-between items-center mb-4">
           <span className="font-bold text-gray-900 text-lg">Doctor Availability</span>
           <Link to="/doctors" className="text-sm text-indigo-600 font-semibold hover:text-indigo-800">Manage →</Link>
