@@ -70,14 +70,16 @@ async function getCustomerById(pool, tenantId, customerId) {
  * @returns {Promise<object>} { customers, total }
  */
 async function getCustomers(pool, tenantId, options) {
-  const { search, page = 1, limit = 10 } = options;
+
+const { search: rawSearch, page = 1, limit = 10 } = options;
+const search = rawSearch && rawSearch.trim() ? rawSearch.trim() : null;
   let sql = `
     SELECT c.*, 
       (SELECT COUNT(*) FROM bookings b WHERE b.customer_id = c.id AND b.status = 'completed') as visits_count
     FROM customers c
     WHERE c.tenant_id = $1
   `;
-  const params = [tenantId];
+  const params = [];
   let paramCount = 2;
 
   if (search) {
