@@ -96,11 +96,13 @@ async function addDoctorLeave(pool, tenantId, doctorId, leaveDate, reason) {
  */
 async function getTokenQueue(pool, tenantId) {
   const sql = `
-    SELECT ct.*, b.notes, 
-           c.name AS patient_name, 
-           cd.name AS doctor_name
+SELECT ct.*, b.notes,
+       COALESCE(b.patient_name, c.name) AS patient_name,
+       cd.name AS doctor_name
     FROM clinic_tokens ct
     JOIN bookings b ON b.id = ct.booking_id
+    LEFT JOIN customers c ON c.id = b.customer_id
+    JOIN clinic_doctors cd ON cd.id = ct.doctor_id
     LEFT JOIN customers c ON c.id = b.customer_id
     JOIN clinic_doctors cd ON cd.id = ct.doctor_id
     WHERE ct.tenant_id = $1
