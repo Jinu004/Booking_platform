@@ -5,6 +5,7 @@ import { getDoctors, getTokenQueue } from '../services/clinic.service';
 import { getConversations } from '../services/conversation.service';
 import { StatCardSkeleton, TableRowSkeleton, CardSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
+import { getStoredStaff } from '../services/auth.service';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({ bookingsToday: 0, activeConversations: 0, availableDoctors: 0, pendingTokens: 0 });
@@ -17,6 +18,7 @@ const Dashboard = () => {
   const [doctors, setDoctors] = useState([]);
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
+  const staff = getStoredStaff();
 
   useEffect(() => {
     fetchDashboardData();
@@ -107,7 +109,7 @@ const Dashboard = () => {
 
       {/* Setup Banner */}
       {!hasDoctors && (
-        <div className="mx-8 mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <div className="mx-6 mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
           <h3 className="font-semibold text-blue-900 mb-3">👋 Complete your setup</h3>
           <div className="space-y-2">
             <div className="flex items-center gap-3">
@@ -137,9 +139,9 @@ const Dashboard = () => {
       )}
 
       {/* Section 1 — Top Bar */}
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center">
         <div>
-          <p className="text-xl font-bold text-gray-900">{tenant?.name || 'Dashboard'}</p>
+          <p className="text-xl font-bold text-gray-900">{tenant?.name || staff?.tenantName || 'Dashboard'}</p>
           <p className="text-sm text-gray-500">
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
@@ -155,7 +157,7 @@ const Dashboard = () => {
       </div>
 
       {/* Section 2 — Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-8 py-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 py-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Today's Tokens</p>
           <p className="mt-2 text-4xl font-black text-indigo-600">{stats.bookingsToday}</p>
@@ -178,7 +180,7 @@ const Dashboard = () => {
       </div>
 
       {/* Section 3 — Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-6">
 
         {/* Left — Live Token Queue */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -280,7 +282,7 @@ const Dashboard = () => {
       </div>
 
       {/* Section 4 — Doctor Availability Strip */}
-      <div className="px-8 pb-6 mt-4">
+      <div className="px-6 pb-6 mt-4">
         <div className="flex justify-between items-center mb-4">
           <span className="font-bold text-gray-900 text-lg">Doctor Availability</span>
           <Link to="/doctors" className="text-sm text-indigo-600 font-semibold hover:text-indigo-800">Manage →</Link>
@@ -290,8 +292,7 @@ const Dashboard = () => {
             <p className="text-sm text-gray-500">No doctors added yet</p>
           ) : doctors.map(d => (
             <div key={d.id} className="min-w-[160px] bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex-shrink-0">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-3 ${d.available ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
-                }`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-3 ${d.available ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
                 {(d.name || '?').split(' ').filter(w => w.toLowerCase() !== 'dr.' && w.toLowerCase() !== 'dr')[0]?.[0]?.toUpperCase() || '?'}
               </div>
               <p className="font-semibold text-sm text-gray-900 truncate">{d.name}</p>
