@@ -123,9 +123,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         {/* Header */}
         <div className="p-5 border-b border-gray-200 flex justify-between items-center">
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-bold text-indigo-600 truncate">
+            <Link to="/dashboard" className="text-base font-bold text-indigo-600 truncate hover:text-indigo-800 transition">
               ReceptionAI
-            </h2>
+            </Link>
             <p className="text-xs text-gray-400 mt-0.5 capitalize">{staff?.tenantPlan || 'Starter'} plan</p>
           </div>
           <button
