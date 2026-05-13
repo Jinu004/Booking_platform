@@ -2,7 +2,7 @@ const HITLModel = require('./hitl.model');
 const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter');
 const ConversationService = require('../conversation/conversation.service');
 const logger = require('../../utils/logger');
-
+const  pool  = require('../../config/database');
 // ─── SSE Registry ────────────────────────────────────────────────────────────
 // In-process store: tenantId → Set of SSE response objects
 // (Works for single-process PM2. If you scale to cluster, replace with Redis pub/sub.)
@@ -96,6 +96,14 @@ async function handleAIHandoffRequest(tenant, conversation, staffId = null) {
     await ConversationService.saveOutboundMessage(conversation.id, settings.handoff_message, 'assistant');
   }
 
+await pool.query(
+    `UPDATE conversations SET needs_attention = true WHERE id = $1`,
+    [conversation.id]
+  );
+
+
+
+
   // Alert all staff dashboards
   broadcastToTenant(tenant.id, 'handoff_requested', {
     conversationId: conversation.id,
@@ -122,6 +130,16 @@ async function staffReply(conversationId, tenantId, staffId, content) {
 
   // Send via WhatsApp
   await sendMessage(conv.customer_phone, content);
+ 
+
+await pool.query(
+    `UPDATE conversations SET needs_attention = false WHERE id = $1`,
+    [conversationId]
+  );
+
+
+
+
 
   // Broadcast to all staff watching this tenant
   broadcastToTenant(tenantId, 'new_message', {
@@ -133,7 +151,6 @@ async function staffReply(conversationId, tenantId, staffId, content) {
       created_at: message.created_at || new Date().toISOString(),
     },
   });
-
   return message;
 }
 
