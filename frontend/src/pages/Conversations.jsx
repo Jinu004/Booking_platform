@@ -7,6 +7,7 @@ import {
 } from '../services/conversation.service';
 import { Badge, Button, Input, Spinner, PageHeader } from '../components/shared';
 import { CardSkeleton } from '../components/shared/Skeleton';
+import useStore from '../store/useStore';
 
 function formatTime(dateString) {
   if (!dateString) return '';
@@ -126,7 +127,9 @@ export default function Conversations() {
       try {
         const data = JSON.parse(e.data);
         setConversations(prev => prev.map(c =>
-          c.id === data.conversationId ? { ...c, mode: data.mode } : c
+          c.id === data.conversationId
+            ? { ...c, mode: data.mode }
+            : c
         ));
       } catch (err) {
         console.error('SSE mode_changed parse error', err);
@@ -200,6 +203,10 @@ export default function Conversations() {
       };
       setMessages(prev => [...prev, optimisticMsg]);
       await sendStaffReply(selectedConversationId, content);
+      setConversations(prev => prev.map(c =>
+        c.id === selectedConversationId ? { ...c, needs_attention: false } : c
+      ));
+      useStore.getState().clearHandoffs();
     } catch (err) {
       console.error('Failed to send reply:', err);
     } finally {
@@ -344,8 +351,8 @@ export default function Conversations() {
                 <button
                   onClick={handleToggleMode}
                   className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-semibold border transition ${selectedConversation.mode === 'human'
-                      ? 'bg-orange-50 text-orange-700 border-orange-300 hover:bg-orange-100'
-                      : 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100'
+                    ? 'bg-orange-50 text-orange-700 border-orange-300 hover:bg-orange-100'
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100'
                     }`}
                 >
                   <span className={`w-2 h-2 rounded-full ${selectedConversation.mode === 'human' ? 'bg-orange-500' : 'bg-indigo-500'}`}></span>
