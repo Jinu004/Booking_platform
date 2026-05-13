@@ -158,8 +158,12 @@ initializeSchedulers();
 
 const { startHITLCron } = require('./modules/hitl/hitl.cron');
 const { broadcastToTenant } = require('./modules/hitl/hitl.service');
-startHITLCron(broadcastToTenant);
+const dbPool = require('./config/database');
 
+setTimeout(() => {
+  console.log('Starting HITL cron...');
+  startHITLCron(dbPool, broadcastToTenant);
+}, 5000);
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
 });
