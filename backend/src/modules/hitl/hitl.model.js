@@ -47,7 +47,7 @@ async function getMessages(conversationId, limit = 200) {
 // Get all conversations for tenant with latest message preview
 async function getConversationList(tenantId, limit = 40) {
   const { rows } = await pool.query(
-    `SELECT c.id, c.mode, c.status, c.last_message_at, c.assigned_to,
+    `SELECT c.id, c.mode, c.status, c.last_message_at,c.needs_attention, c.assigned_to,
             cu.name AS customer_name, cu.phone AS customer_phone,
             (SELECT content FROM messages m
              WHERE m.conversation_id = c.id

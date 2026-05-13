@@ -96,6 +96,12 @@ async function handleAIHandoffRequest(tenant, conversation, staffId = null) {
     await ConversationService.saveOutboundMessage(conversation.id, settings.handoff_message, 'assistant');
   }
 
+await pool.query(
+    `UPDATE conversations SET needs_attention = true WHERE id = $1`,
+    [conversation.id]
+  );
+
+
 
 
   // Alert all staff dashboards
@@ -125,6 +131,15 @@ async function staffReply(conversationId, tenantId, staffId, content) {
   // Send via WhatsApp
   await sendMessage(conv.customer_phone, content);
  
+
+await pool.query(
+    `UPDATE conversations SET needs_attention = false WHERE id = $1`,
+    [conversationId]
+  );
+
+
+
+
 
   // Broadcast to all staff watching this tenant
   broadcastToTenant(tenantId, 'new_message', {
