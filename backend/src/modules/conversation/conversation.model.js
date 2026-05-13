@@ -67,8 +67,9 @@ async function getConversations(pool, tenantId, status) {
     const query = `
       SELECT * FROM conversations
       WHERE tenant_id = $1 AND status = $2
+      AND last_message_at >= CURRENT_DATE
       ORDER BY last_message_at DESC;
-    `
+       `
     const result = await tenantQuery(tenantId, pool, query, [status])
     return result.rows
   } else {
