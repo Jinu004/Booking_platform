@@ -249,7 +249,7 @@ const Dashboard = () => {
             ) : recentConversations.map(c => (
               <Link
                 key={c.id}
-                to="/conversations"
+                to={`/conversations?id=${c.id}`}
                 className="flex items-start gap-3 p-4 hover:bg-gray-50 transition"
               >
                 <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   getHITLConversations,
   getConversationMessages,
@@ -57,6 +58,7 @@ export default function Conversations() {
   const [loadingThread, setLoadingThread] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
+  const [searchParams] = useSearchParams();
 
   const messagesEndRef = useRef(null);
   const selectedConversationIdRef = useRef(selectedConversationId);
@@ -70,7 +72,12 @@ export default function Conversations() {
   useEffect(() => {
     fetchConversations();
   }, []);
-
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (id && conversations.length > 0) {
+      setSelectedConversationId(id);
+    }
+  }, [searchParams, conversations]);
   const fetchConversations = async () => {
     try {
       setLoadingList(true);
@@ -195,13 +202,9 @@ export default function Conversations() {
       setSending(true);
       const content = replyText.trim();
       setReplyText('');
-      const optimisticMsg = {
-        id: Date.now().toString(),
-        role: 'staff',
-        content,
-        created_at: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, optimisticMsg]);
+
+
+
       await sendStaffReply(selectedConversationId, content);
       setConversations(prev => prev.map(c =>
         c.id === selectedConversationId ? { ...c, needs_attention: false } : c
