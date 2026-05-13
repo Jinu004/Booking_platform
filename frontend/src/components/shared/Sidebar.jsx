@@ -90,7 +90,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         to={link.path}
         onClick={() => {
           if (setIsOpen) setIsOpen(false);
-          if (link.name === 'Conversations') clearHandoffs();
+
         }}
         className={`flex items-center px-3 py-2 text-sm font-medium w-full transition-colors rounded-lg gap-3
           ${isActive
