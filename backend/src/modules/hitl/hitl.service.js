@@ -88,8 +88,6 @@ async function handleAIHandoffRequest(tenant, conversation, staffId = null) {
     return { switched: false, reason: 'outside_working_hours' };
   }
 
-  // Within hours — switch to human mode
-  await HITLModel.setMode(conversation.id, tenant.id, 'human', staffId);
 
   // Send holding message to patient
   const customerPhone = conversation.customer_phone;
