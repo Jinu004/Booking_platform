@@ -195,13 +195,9 @@ export default function Conversations() {
       setSending(true);
       const content = replyText.trim();
       setReplyText('');
-      const optimisticMsg = {
-        id: Date.now().toString(),
-        role: 'staff',
-        content,
-        created_at: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, optimisticMsg]);
+
+
+
       await sendStaffReply(selectedConversationId, content);
       setConversations(prev => prev.map(c =>
         c.id === selectedConversationId ? { ...c, needs_attention: false } : c
