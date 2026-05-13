@@ -334,7 +334,7 @@ export default function Conversations() {
         </div>
 
         {/* Right Panel */}
-        <div className="flex-1 flex flex-col bg-gray-50 h-full overflow-hidden">
+        <div className="flex-1 flex flex-col bg-gray-200 h-full overflow-hidden">
           {selectedConversation ? (
             <>
               {/* Thread Header */}
@@ -394,9 +394,9 @@ export default function Conversations() {
                     return (
                       <div key={msg.id || idx} className={`flex flex-col ${isPatient ? 'items-start' : 'items-end'}`}>
                         <div className={`max-w-[72%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed
-                          ${isPatient ? 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm' : ''}
-                          ${isStaff ? 'bg-emerald-500 text-white rounded-br-sm' : ''}
-                          ${isAI ? 'bg-indigo-500 text-white rounded-br-sm' : ''}
+                         ${isPatient ? 'bg-white text-gray-800 rounded-bl-sm shadow-sm' : ''}
+                          ${isStaff ? 'bg-teal-600 text-white rounded-br-sm' : ''}
+                          ${isAI ? 'bg-slate-700 text-white rounded-br-sm' : ''}
                         `}>
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                         </div>
@@ -428,7 +428,7 @@ export default function Conversations() {
                     <button
                       onClick={handleReply}
                       disabled={!replyText.trim() || sending}
-                      className="mb-0.5 px-5 py-3 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      className="mb-0.5 px-5 py-3 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-80 disabled:cursor-not-allowed transition"
                     >
                       {sending ? <Spinner size="sm" /> : 'Send'}
                     </button>
