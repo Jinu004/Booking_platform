@@ -134,7 +134,7 @@ ${remaining} tokens remaining.`
         const HITLModel = require('../hitl/hitl.model')
         const settings = await HITLModel.getTenantSettings(tenant.id)
         const withinHours = settings ? HITLService.isWithinWorkingHours(settings.working_hours) : true
-
+logger.info(`Working hours check: withinHours=${withinHours}, settings=${JSON.stringify(settings?.working_hours)}`)
         // Find doctor
         const doctorRes = await pool.query(
           `SELECT id, name, specialization, max_tokens_daily FROM clinic_doctors
