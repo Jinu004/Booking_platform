@@ -76,12 +76,11 @@ async function executeFunction(name, args, ctx) {
         )
         const openingTime = configResult.rows[0]?.value || '9:00 AM'
 
-        const doctorList = doctorsResult.rows.map(doc => {
-          const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
-          return `🩺 ${doc.name} (${doc.specialization})\n   Session: ${openingTime} | ${remaining} tokens left`
-        }).join('\n\n')
+const doctorList = doctorsResult.rows.map(doc => {
+          return `🩺 ${doc.name} (${doc.specialization})`
+        }).join('\n')
+        return `Which doctor would you like to see?\n\n${doctorList}\n\nReply with the doctor's name.`
 
-        return `Which doctor would you like to see?\n\n${doctorList}\n\nReply with doctor name`
       }
 
       case 'check_doctor_availability': {
