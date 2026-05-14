@@ -449,7 +449,7 @@ Reply CANCEL to cancel your booking.`
           return { bookings: [], message: 'No upcoming bookings found.' }
         }
         const bookings = result.rows.map(b =>
-          `• Token #${b.token_number} with Dr. ${b.doctor_name} on ${new Date(b.booking_date).toLocaleDateString()} (${b.status})`
+          `• Token #${b.token_number} with ${b.doctor_name} on ${new Date(b.booking_date).toLocaleDateString()} (${b.status})`
         )
         return {
           bookings: result.rows,
