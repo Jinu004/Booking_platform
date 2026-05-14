@@ -104,11 +104,11 @@ const doctorList = doctorsResult.rows.map(doc => {
         }
         const doctor = result.rows[0]
         if (!doctor.available_today) {
-          return { available: false, message: `Dr. ${doctor.name} is not available today.` }
+          return { available: false, message: `${doctor.name} is not available today.` }
         }
         const remaining = doctor.max_tokens_daily - parseInt(doctor.booked_count || 0)
         if (remaining <= 0) {
-          return { available: false, message: `Dr. ${doctor.name} is fully booked for today.` }
+          return { available: false, message: `${doctor.name} is fully booked for today.` }
         }
 
         // Get today's day of week (0=Sunday, 1=Monday, etc.)
@@ -149,9 +149,9 @@ const doctorList = doctorsResult.rows.map(doc => {
               return `${h12}:${m} ${ampm}`
             }
             const nextTime = `${fmt(nextDay.start_time)} - ${fmt(nextDay.end_time)}`
-            return { available: false, message: `Dr. ${doctor.name} is not available today. Next available: ${dayNames[nextDay.day_of_week]}, ${nextTime}` }
+            return { available: false, message: `${doctor.name} is not available today. Next available: ${dayNames[nextDay.day_of_week]}, ${nextTime}` }
           }
-          return { available: false, message: `Dr. ${doctor.name} is not available today.` }
+          return { available: false, message: `${doctor.name} is not available today.` }
         }
         const { start_time, end_time } = scheduleRes.rows[0]
         const fmt = (t) => {
@@ -187,16 +187,16 @@ const doctorList = doctorsResult.rows.map(doc => {
           const dayNames2 = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
           if (nextDay2) {
             const nextTime2 = `${fmt(nextDay2.start_time)} - ${fmt(nextDay2.end_time)}`
-            return { available: false, message: `Dr. ${doctor.name}'s session has ended for today. Next available: ${dayNames2[nextDay2.day_of_week]}, ${nextTime2}` }
+            return { available: false, message: `${doctor.name}'s session has ended for today. Next available: ${dayNames2[nextDay2.day_of_week]}, ${nextTime2}` }
           }
-          return { available: false, message: `Dr. ${doctor.name}'s session has ended for today.` }
+          return { available: false, message: `${doctor.name}'s session has ended for today.` }
         }
         if (currentMinutes < startMinutes) {
-          return { available: false, message: `Dr. ${doctor.name}'s session starts at ${fmt(start_time)}. Please book after the session begins.` }
+          return { available: false, message: `${doctor.name}'s session starts at ${fmt(start_time)}. Please book after the session begins.` }
         }
         const sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
 
-        return `Dr. ${doctor.name} (${doctor.specialization})
+        return `${doctor.name} (${doctor.specialization})
 Session: ${sessionTime}
 ${remaining} tokens remaining.
 
@@ -232,7 +232,7 @@ Please reply with your name to confirm booking.`
       [customer.id, doctor.id]
     )
     if (activeBookingRes.rows.length > 0) {
-      return { success: false, message: `You already have an active booking with Dr. ${doctor.name} today. If you need to see a different doctor, please choose another doctor from the list.` }
+      return { success: false, message: `You already have an active booking with ${doctor.name} today. If you need to see a different doctor, please choose another doctor from the list.` }
     }
   }
 
@@ -253,7 +253,7 @@ Please reply with your name to confirm booking.`
         { EX: 3600 }
       )
     }
-    return `Dr. ${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply *TOMORROW* to confirm tomorrow's booking or ignore to cancel.`
+    return `${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply *TOMORROW* to confirm tomorrow's booking or ignore to cancel.`
   }
 
   // Create today's booking
