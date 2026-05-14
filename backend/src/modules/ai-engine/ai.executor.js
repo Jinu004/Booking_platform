@@ -126,83 +126,106 @@ ${remaining} tokens remaining.`
       }
 
       case 'create_token_booking': {
-        const { doctor_name, patient_name } = args
-        const formattedName = (patient_name || '').replace(/\b\w/g, c => c.toUpperCase())
+  const { doctor_name, patient_name } = args
+  const formattedName = (patient_name || '').replace(/\b\w/g, c => c.toUpperCase())
+  
+  // Check working hours
+  const HITLService = require('../hitl/hitl.service')
+  const HITLModel = require('../hitl/hitl.model')
+  const settings = await HITLModel.getTenantSettings(tenant.id)
+  const withinHours = settings ? HITLService.isWithinWorkingHours(settings.working_hours) : true
 
-        // Find doctor
-        const doctorRes = await pool.query(
-          `SELECT id, name, specialization, max_tokens_daily FROM clinic_doctors
-           WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND available_today = true
-           LIMIT 1`,
-          [tenant.id, `%${doctor_name}%`]
-        )
-        if (!doctorRes.rows.length) {
-          return { success: false, message: `Dr. ${doctor_name} is not available today.` }
-        }
-        const doctor = doctorRes.rows[0]
+  // Find doctor
+  const doctorRes = await pool.query(
+    `SELECT id, name, specialization, max_tokens_daily FROM clinic_doctors
+     WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND available_today = true
+     LIMIT 1`,
+    [tenant.id, `%${doctor_name}%`]
+  )
+  if (!doctorRes.rows.length) {
+    return { success: false, message: `Dr. ${doctor_name} is not available today.` }
+  }
+  const doctor = doctorRes.rows[0]
 
-        if (customer?.id) {
-          const activeBookingRes = await pool.query(
-            `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
-            [customer.id, doctor.id]
-          )
-          if (activeBookingRes.rows.length > 0) {
-            return { success: false, message: `You already have an active booking with Dr. ${doctor.name} today. If you need to see a different doctor, please choose another doctor from the list.` }
-          }
-        }
+  // Check duplicate booking for today
+  if (customer?.id) {
+    const activeBookingRes = await pool.query(
+      `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
+      [customer.id, doctor.id]
+    )
+    if (activeBookingRes.rows.length > 0) {
+      return { success: false, message: `You already have an active booking with Dr. ${doctor.name} today. If you need to see a different doctor, please choose another doctor from the list.` }
+    }
+  }
 
-        // Get current token count for today
-        const tokenRes = await pool.query(
-          `SELECT COUNT(*) AS count FROM bookings
-           WHERE doctor_id = $1
-             AND booking_date = CURRENT_DATE
-             AND status != 'cancelled'`,
-          [doctor.id]
-        )
-        const currentCount = parseInt(tokenRes.rows[0].count || 0)
-        if (currentCount >= doctor.max_tokens_daily) {
-          return { success: false, message: `Dr. ${doctor.name} is fully booked for today.` }
-        }
-        // Create booking with atomic token generation
-        const bookingRes = await pool.query(
-          `INSERT INTO bookings
-             (tenant_id, customer_id, conversation_id, doctor_id,
-              source, status, booking_date, token_number, notes, patient_name)
-           VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE, 
-             (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled'), 
-             $5, $6)
-           RETURNING id, token_number`,
-          [
-            tenant.id,
-            customer?.id || null,
-            conversation?.id || null,
-            doctor.id,
-            `Booked via WhatsApp for ${formattedName}`,
-            formattedName
-          ]
-        )
-        const tokenNumber = bookingRes.rows[0].token_number
+  // Check today's token count
+  const tokenRes = await pool.query(
+    `SELECT COUNT(*) AS count FROM bookings
+     WHERE doctor_id = $1 AND booking_date = CURRENT_DATE AND status != 'cancelled'`,
+    [doctor.id]
+  )
+  const currentCount = parseInt(tokenRes.rows[0].count || 0)
+  if (currentCount >= doctor.max_tokens_daily) {
+    // Today fully booked — store pending and offer tomorrow
+    const redisClient = require('../../../config/redis')
+    if (redisClient && conversation?.id) {
+      await redisClient.set(
+        `tomorrow_booking:${conversation.id}`,
+        JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization, patient_name: formattedName }),
+        { EX: 3600 }
+      )
+    }
+    return `Dr. ${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply *TOMORROW* to confirm tomorrow's booking or ignore to cancel.`
+  }
 
-        const booking = bookingRes.rows[0]
-        const configResult = await pool.query(
-          `SELECT value FROM tenant_configs
-           WHERE tenant_id = $1
-           AND key = 'opening_time'`,
-          [tenant.id]
-        )
-        const openingTime = configResult.rows[0]?.value || '9:00 AM'
+  // Create today's booking
+  const bookingRes = await pool.query(
+    `INSERT INTO bookings
+       (tenant_id, customer_id, conversation_id, doctor_id,
+        source, status, booking_date, token_number, notes, patient_name)
+     VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE,
+       (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled'),
+       $5, $6)
+     RETURNING id, token_number`,
+    [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
+     `Booked via WhatsApp for ${formattedName}`, formattedName]
+  )
+  const tokenNumber = bookingRes.rows[0].token_number
+  const booking = bookingRes.rows[0]
 
-        return `Booking confirmed! 🏥
+  // Insert into clinic_tokens
+  await pool.query(
+    `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
+     VALUES ($1, $2, $3, $4, 'waiting')`,
+    [tenant.id, booking.id, doctor.id, tokenNumber]
+  )
 
+  const configResult = await pool.query(
+    `SELECT value FROM tenant_configs WHERE tenant_id = $1 AND key = 'opening_time'`,
+    [tenant.id]
+  )
+  const openingTime = configResult.rows[0]?.value || '9:00 AM'
+
+  // If outside working hours, store tomorrow option
+  if (!withinHours) {
+    const redisClient = require('../../../config/redis')
+    if (redisClient && conversation?.id) {
+      await redisClient.set(
+        `tomorrow_booking:${conversation.id}`,
+        JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization, patient_name: formattedName }),
+        { EX: 3600 }
+      )
+    }
+  }
+
+  return `Booking confirmed! 🏥
 Token Number: ${tokenNumber}
 Doctor: ${doctor.name}
 ${doctor.specialization}
-
 🕘 Consultation starts at ${openingTime}
 Please arrive before session begins.
-
-Reply CANCEL to cancel your booking.`
-      }
+Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if you would like to also book for tomorrow.' : ''}`
+}
 
       case 'cancel_booking': {
         const { booking_id } = args

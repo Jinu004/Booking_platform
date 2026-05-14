@@ -70,6 +70,71 @@ router.post('/', async (req, res) => {
         context.conversation.id,
         tenant.id
       )
+      // Check for TOMORROW booking confirmation
+      const redisClient = require('../../../config/redis')
+      if (message.message?.trim().toUpperCase() === 'TOMORROW' && redisClient) {
+        const pendingKey = `tomorrow_booking:${context.conversation.id}`
+        const pendingData = await redisClient.get(pendingKey)
+        if (pendingData) {
+          const pending = JSON.parse(pendingData)
+          await redisClient.del(pendingKey)
+          const tomorrow = new Date()
+          tomorrow.setDate(tomorrow.getDate() + 1)
+          const tomorrowDate = tomorrow.toISOString().split('T')[0]
+          // Check doctor leave for tomorrow
+          const pool = require('../../../config/database')
+          const leaveCheck = await pool.query(
+            `SELECT id FROM doctor_leaves WHERE doctor_id = $1 AND leave_date = $2 LIMIT 1`,
+            [pending.doctor_id, tomorrowDate]
+          )
+          if (leaveCheck.rows.length > 0) {
+            await sendMessage(message.from, `Sorry, Dr. ${pending.doctor_name} is not available tomorrow. Please contact us during working hours to book with another doctor.`)
+            return
+          }
+          // Check tomorrow token count
+          const tokenCountRes = await pool.query(
+            `SELECT COUNT(*) AS count FROM bookings WHERE doctor_id = $1 AND booking_date = $2 AND status != 'cancelled'`,
+            [pending.doctor_id, tomorrowDate]
+          )
+          const tomorrowCount = parseInt(tokenCountRes.rows[0].count || 0)
+          const doctorRes = await pool.query(`SELECT max_tokens_daily FROM clinic_doctors WHERE id = $1`, [pending.doctor_id])
+          const maxTokens = doctorRes.rows[0]?.max_tokens_daily || 30
+          if (tomorrowCount >= maxTokens) {
+            await sendMessage(message.from, `Sorry, Dr. ${pending.doctor_name} is fully booked for tomorrow as well. Please contact us to explore other options.`)
+            return
+          }
+          // Create tomorrow booking
+          const bookingRes = await pool.query(
+            `INSERT INTO bookings
+               (tenant_id, customer_id, conversation_id, doctor_id,
+                source, status, booking_date, token_number, notes, patient_name)
+             VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', $5,
+               (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
+               $6, $7)
+             RETURNING id, token_number`,
+            [tenant.id, context.customer?.id || null, context.conversation.id, pending.doctor_id,
+             tomorrowDate, `Booked via WhatsApp for ${pending.patient_name}`, pending.patient_name]
+          )
+          const tokenNumber = bookingRes.rows[0].token_number
+          const booking = bookingRes.rows[0]
+          await pool.query(
+            `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
+             VALUES ($1, $2, $3, $4, 'waiting')`,
+            [tenant.id, booking.id, pending.doctor_id, tokenNumber]
+          )
+          const confirmMsg = `Booking confirmed for tomorrow! 🏥
+Token Number: ${tokenNumber}
+Doctor: ${pending.doctor_name}
+${pending.doctor_specialization}
+📅 Date: ${new Date(tomorrowDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+Reply CANCEL to cancel your booking.`
+          await sendMessage(message.from, confirmMsg)
+          await ConversationService.saveInboundMessage(context.conversation.id, message.message, 'text')
+          await ConversationService.saveOutboundMessage(context.conversation.id, confirmMsg, 'assistant')
+          return
+        }
+      }
+
       if (convWithMode?.mode === 'human') {
         await ConversationService.saveInboundMessage(
           context.conversation.id,
