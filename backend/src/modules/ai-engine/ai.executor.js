@@ -111,18 +111,42 @@ async function executeFunction(name, args, ctx) {
         if (remaining <= 0) {
           return { available: false, message: `Dr. ${doctor.name} is fully booked for today.` }
         }
-        const configResult = await pool.query(
-          `SELECT value FROM tenant_configs
-           WHERE tenant_id = $1
-           AND key = 'opening_time'`,
-          [tenant.id]
+
+        // Get today's day of week (0=Sunday, 1=Monday, etc.)
+        const todayDow = new Date().getDay()
+        const scheduleRes = await pool.query(
+          `SELECT start_time, end_time FROM doctor_schedules
+           WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
+           LIMIT 1`,
+          [tenant.id, doctor.id, todayDow]
         )
-        const openingTime = configResult.rows[0]?.value || '9:00 AM'
+
+        let sessionTime = ''
+        if (scheduleRes.rows.length > 0) {
+          const { start_time, end_time } = scheduleRes.rows[0]
+          // Convert 24hr to 12hr format
+          const fmt = (t) => {
+            const [h, m] = t.split(':')
+            const hour = parseInt(h)
+            const ampm = hour >= 12 ? 'PM' : 'AM'
+            const h12 = hour % 12 || 12
+            return `${h12}:${m} ${ampm}`
+          }
+          sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
+        } else {
+          // Fall back to tenant opening time
+          const configResult = await pool.query(
+            `SELECT value FROM tenant_configs WHERE tenant_id = $1 AND key = 'opening_time'`,
+            [tenant.id]
+          )
+          sessionTime = configResult.rows[0]?.value || '9:00 AM'
+        }
 
         return `Dr. ${doctor.name} (${doctor.specialization})
-is available today.
-Session starts: ${openingTime}
-${remaining} tokens remaining.`
+Session: ${sessionTime}
+${remaining} tokens remaining.
+
+Please reply with your name to confirm booking.`
       }
 
       case 'create_token_booking': {
