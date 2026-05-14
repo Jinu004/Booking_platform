@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getDoctors, createDoctor, updateDoctor, deleteDoctor, updateAvailability, addLeave, getTokenQueue, updateTokenStatus } from '../services/clinic.service';
+import { getDoctors, createDoctor, updateDoctor, deleteDoctor, updateAvailability, addLeave, getTokenQueue, updateTokenStatus, getDoctorSchedule, saveDoctorSchedule } from '../services/clinic.service';
 
 const SPECIALIZATIONS = [
   'Ayurveda','Anaesthesiology','Cardiology',
@@ -87,6 +87,27 @@ const Doctors = () => {
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [scheduleModalDoc, setScheduleModalDoc] = useState(null);
+  const [doctorSchedule, setDoctorSchedule] = useState([]);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+
+  const DAYS = [
+    { key: 0, label: 'Sunday' },
+    { key: 1, label: 'Monday' },
+    { key: 2, label: 'Tuesday' },
+    { key: 3, label: 'Wednesday' },
+    { key: 4, label: 'Thursday' },
+    { key: 5, label: 'Friday' },
+    { key: 6, label: 'Saturday' },
+  ];
+
+  const defaultSchedule = DAYS.map(d => ({
+    day_of_week: d.key,
+    is_available: d.key >= 1 && d.key <= 6,
+    start_time: '09:00',
+    end_time: '18:00'
+  }));
+
   // Management state
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [manageMode, setManageMode] = useState('add');
@@ -152,6 +173,39 @@ const Doctors = () => {
       setQueue(result?.data || []);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const openScheduleModal = async (doc) => {
+    setScheduleModalDoc(doc);
+    try {
+      const result = await getDoctorSchedule(doc.id);
+      const existing = result?.data || [];
+      if (existing.length > 0) {
+        const merged = DAYS.map(d => {
+          const found = existing.find(s => s.day_of_week === d.key);
+          return found || { day_of_week: d.key, is_available: false, start_time: '09:00', end_time: '18:00' };
+        });
+        setDoctorSchedule(merged);
+      } else {
+        setDoctorSchedule(defaultSchedule);
+      }
+    } catch (err) {
+      setDoctorSchedule(defaultSchedule);
+    }
+  };
+
+  const handleScheduleSave = async () => {
+    if (!scheduleModalDoc) return;
+    setSavingSchedule(true);
+    try {
+      await saveDoctorSchedule(scheduleModalDoc.id, doctorSchedule);
+      setScheduleModalDoc(null);
+      alert('Schedule saved successfully');
+    } catch (err) {
+      alert('Failed to save schedule');
+    } finally {
+      setSavingSchedule(false);
     }
   };
 
@@ -299,6 +353,15 @@ const Doctors = () => {
               </div>
 
               <div className="pt-4 border-t border-gray-100 flex items-center justify-end space-x-3">
+                <button
+                  onClick={() => openScheduleModal(doc)}
+                  className="text-gray-400 hover:text-indigo-600 transition"
+                  title="Set Schedule"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </button>
                 <button
                   onClick={() => openEditDoctor(doc)}
                   className="text-gray-400 hover:text-blue-600 transition"
@@ -530,6 +593,83 @@ const Doctors = () => {
         </div>
       )}
 
+
+      {/* Schedule Modal */}
+      {scheduleModalDoc && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full shadow-xl overflow-y-auto max-h-[90vh]">
+            <h2 className="text-xl font-bold mb-2">Weekly Schedule</h2>
+            <p className="text-sm text-gray-500 mb-6">{scheduleModalDoc.name}</p>
+            
+            <div className="space-y-3">
+              {DAYS.map((day, idx) => {
+                const s = doctorSchedule[idx];
+                return (
+                  <div key={day.key} className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 w-28">
+                      <input
+                        type="checkbox"
+                        checked={s?.is_available || false}
+                        onChange={e => {
+                          const updated = [...doctorSchedule];
+                          updated[idx] = { ...updated[idx], is_available: e.target.checked };
+                          setDoctorSchedule(updated);
+                        }}
+                        className="rounded"
+                      />
+                      <span className="text-sm font-medium text-gray-700">{day.label}</span>
+                    </label>
+                    {s?.is_available && (
+                      <>
+                        <input
+                          type="time"
+                          value={s.start_time || '09:00'}
+                          onChange={e => {
+                            const updated = [...doctorSchedule];
+                            updated[idx] = { ...updated[idx], start_time: e.target.value };
+                            setDoctorSchedule(updated);
+                          }}
+                          className="border border-gray-300 rounded-md p-1.5 text-sm"
+                        />
+                        <span className="text-gray-400 text-sm">to</span>
+                        <input
+                          type="time"
+                          value={s.end_time || '18:00'}
+                          onChange={e => {
+                            const updated = [...doctorSchedule];
+                            updated[idx] = { ...updated[idx], end_time: e.target.value };
+                            setDoctorSchedule(updated);
+                          }}
+                          className="border border-gray-300 rounded-md p-1.5 text-sm"
+                        />
+                      </>
+                    )}
+                    {!s?.is_available && (
+                      <span className="text-sm text-gray-400 italic">Not working</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+              <button
+                onClick={() => setScheduleModalDoc(null)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleScheduleSave}
+                disabled={savingSchedule}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium disabled:opacity-50"
+              >
+                {savingSchedule ? 'Saving...' : 'Save Schedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

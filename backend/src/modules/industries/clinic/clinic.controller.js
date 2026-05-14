@@ -199,6 +199,29 @@ async function deleteDoctor(req, res, next) {
   }
 }
 
+async function getDoctorSchedule(req, res, next) {
+  try {
+    const tenantId = req.tenantId || req.tenant?.id;
+    const { id } = req.params;
+    const schedule = await ClinicModel.getDoctorSchedule(pool, tenantId, id);
+    return res.json({ success: true, data: schedule, error: null });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function saveDoctorSchedule(req, res, next) {
+  try {
+    const tenantId = req.tenantId || req.tenant?.id;
+    const { id } = req.params;
+    const { schedules } = req.body;
+    const result = await ClinicModel.saveDoctorSchedule(pool, tenantId, id, schedules);
+    return res.json({ success: true, data: result, error: null });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getDoctors,
   getDoctorById,
@@ -208,5 +231,7 @@ module.exports = {
   getTokenQueue,
   updateTokenStatus,
   updateDoctor,
-  deleteDoctor
+  deleteDoctor,
+  getDoctorSchedule,
+  saveDoctorSchedule
 };

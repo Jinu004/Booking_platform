@@ -32,3 +32,11 @@ export async function getTokenQueue() {
 export async function updateTokenStatus(id, status) {
   return api.patch(`/clinic/tokens/${id}/status`, { status });
 }
+
+export async function getDoctorSchedule(doctorId) {
+  return api.get(`/clinic/doctors/${doctorId}/schedule`);
+}
+
+export async function saveDoctorSchedule(doctorId, schedules) {
+  return api.post(`/clinic/doctors/${doctorId}/schedule`, { schedules });
+}

@@ -73,9 +73,28 @@ async function updateDoctorAvailability(pool, tenantId, doctorId, available, lea
  * Returns day_of_week and time slots
  */
 async function getDoctorSchedule(pool, tenantId, doctorId) {
-  const sql = `SELECT * FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 ORDER BY day_of_week`;
+  const sql = `SELECT * FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 ORDER BY day_of_week ASC`;
   const result = await tenantQuery(tenantId, pool, sql, [doctorId]);
   return result.rows;
+}
+
+async function saveDoctorSchedule(pool, tenantId, doctorId, schedules) {
+  // Delete existing schedules for this doctor
+  await tenantQuery(tenantId, pool,
+    `DELETE FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2`,
+    [doctorId]
+  );
+  // Insert new schedules
+  for (const schedule of schedules) {
+    if (schedule.is_available) {
+      await tenantQuery(tenantId, pool,
+        `INSERT INTO doctor_schedules (tenant_id, doctor_id, day_of_week, start_time, end_time, is_available)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [doctorId, schedule.day_of_week, schedule.start_time, schedule.end_time, true]
+      );
+    }
+  }
+  return getDoctorSchedule(pool, tenantId, doctorId);
 }
 
 /**
@@ -132,6 +151,7 @@ module.exports = {
   createDoctor,
   updateDoctorAvailability,
   getDoctorSchedule,
+  saveDoctorSchedule,
   addDoctorLeave,
   getTokenQueue,
   updateTokenStatus
