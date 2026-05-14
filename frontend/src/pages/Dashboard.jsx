@@ -216,12 +216,12 @@ const Dashboard = () => {
             ) : filteredTokens.map(t => (
               <div key={t.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-50 rounded-lg flex items-center justify-center font-black text-indigo-600 text-sm flex-shrink-0">
-                    {t.token_number}
+                  <div className="w-12 h-12 bg-indigo-50 rounded-lg flex items-center justify-center font-black text-indigo-600 text-sm flex-shrink-0">
+                    {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900">{t.patient_name || 'Walk-in'}</p>
-                    <p className="text-sm text-gray-500">{t.doctor_name}</p>
+                    <p className="text-sm font-semibold text-indigo-600">{t.doctor_name}</p>
                   </div>
                 </div>
                 {getStatusPill(t.status)}
