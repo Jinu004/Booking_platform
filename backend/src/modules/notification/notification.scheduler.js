@@ -25,7 +25,7 @@ function schedule24HourReminders() {
          JOIN clinic_doctors cd ON cd.id = b.doctor_id
          JOIN tenants t ON t.id = b.tenant_id
          WHERE b.booking_date = $1
-         AND b.status = 'confirmed'
+         AND b.status IN ('pending', 'confirmed')
          AND NOT EXISTS (
            SELECT 1 FROM notifications n
            WHERE n.booking_id = b.id
@@ -74,34 +74,6 @@ function schedule24HourReminders() {
  * Sets all doctors available_today = true
  * Clears leave_days counter where leave_days = 0
  */
-function scheduleDailyReset() {
-  cron.schedule('0 6 * * *', async () => {
-    logger.info('Running daily doctor availability reset');
-    try {
-      await pool.query(
-        `UPDATE clinic_doctors
-         SET available_today = true
-         WHERE leave_days = 0`
-      );
-
-      await pool.query(
-        `UPDATE clinic_doctors
-         SET leave_days = leave_days - 1
-         WHERE leave_days > 0`
-      );
-
-      await pool.query(
-        `UPDATE clinic_doctors
-         SET available_today = false
-         WHERE leave_days > 0`
-      );
-
-      logger.info('Daily doctor reset complete');
-    } catch (err) {
-      logger.error(`Daily reset failed: ${err.message}`);
-    }
-  });
-}
 
 /**
  * Initializes all scheduled jobs
@@ -109,7 +81,6 @@ function scheduleDailyReset() {
  */
 function initializeSchedulers() {
   schedule24HourReminders();
-  scheduleDailyReset();
   logger.info('Notification schedulers initialized');
 }
 
