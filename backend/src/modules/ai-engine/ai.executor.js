@@ -122,6 +122,36 @@ async function executeFunction(name, args, ctx) {
         )
 
         if (scheduleRes.rows.length === 0) {
+          // Find next working day
+          const nextScheduleRes = await pool.query(
+            `SELECT day_of_week, start_time, end_time FROM doctor_schedules
+             WHERE tenant_id = $1 AND doctor_id = $2 AND is_available = true
+             AND day_of_week > $3
+             ORDER BY day_of_week ASC
+             LIMIT 1`,
+            [tenant.id, doctor.id, todayDow]
+          )
+          // If no day found after today, wrap around to next week
+          const wrapRes = nextScheduleRes.rows.length === 0 ? await pool.query(
+            `SELECT day_of_week, start_time, end_time FROM doctor_schedules
+             WHERE tenant_id = $1 AND doctor_id = $2 AND is_available = true
+             ORDER BY day_of_week ASC
+             LIMIT 1`,
+            [tenant.id, doctor.id]
+          ) : null
+          const nextDay = nextScheduleRes.rows[0] || wrapRes?.rows[0]
+          const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+          if (nextDay) {
+            const fmt = (t) => {
+              const [h, m] = t.split(':')
+              const hour = parseInt(h)
+              const ampm = hour >= 12 ? 'PM' : 'AM'
+              const h12 = hour % 12 || 12
+              return `${h12}:${m} ${ampm}`
+            }
+            const nextTime = `${fmt(nextDay.start_time)} - ${fmt(nextDay.end_time)}`
+            return { available: false, message: `Dr. ${doctor.name} is not available today. Next available: ${dayNames[nextDay.day_of_week]}, ${nextTime}` }
+          }
           return { available: false, message: `Dr. ${doctor.name} is not available today.` }
         }
         const { start_time, end_time } = scheduleRes.rows[0]
