@@ -121,26 +121,18 @@ async function executeFunction(name, args, ctx) {
           [tenant.id, doctor.id, todayDow]
         )
 
-        let sessionTime = ''
-        if (scheduleRes.rows.length > 0) {
-          const { start_time, end_time } = scheduleRes.rows[0]
-          // Convert 24hr to 12hr format
-          const fmt = (t) => {
-            const [h, m] = t.split(':')
-            const hour = parseInt(h)
-            const ampm = hour >= 12 ? 'PM' : 'AM'
-            const h12 = hour % 12 || 12
-            return `${h12}:${m} ${ampm}`
-          }
-          sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
-        } else {
-          // Fall back to tenant opening time
-          const configResult = await pool.query(
-            `SELECT value FROM tenant_configs WHERE tenant_id = $1 AND key = 'opening_time'`,
-            [tenant.id]
-          )
-          sessionTime = configResult.rows[0]?.value || '9:00 AM'
+        if (scheduleRes.rows.length === 0) {
+          return { available: false, message: `Dr. ${doctor.name} is not available today.` }
         }
+        const { start_time, end_time } = scheduleRes.rows[0]
+        const fmt = (t) => {
+          const [h, m] = t.split(':')
+          const hour = parseInt(h)
+          const ampm = hour >= 12 ? 'PM' : 'AM'
+          const h12 = hour % 12 || 12
+          return `${h12}:${m} ${ampm}`
+        }
+        const sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
 
         return `Dr. ${doctor.name} (${doctor.specialization})
 Session: ${sessionTime}
