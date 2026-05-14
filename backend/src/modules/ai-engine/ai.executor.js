@@ -162,6 +162,39 @@ async function executeFunction(name, args, ctx) {
           const h12 = hour % 12 || 12
           return `${h12}:${m} ${ampm}`
         }
+        // Check if current IST time is within doctor's session
+        const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+        const [startH, startM] = start_time.split(':').map(Number)
+        const [endH, endM] = end_time.split(':').map(Number)
+        const currentMinutes = nowIST.getHours() * 60 + nowIST.getMinutes()
+        const startMinutes = startH * 60 + startM
+        const endMinutes = endH * 60 + endM
+        if (currentMinutes > endMinutes) {
+          // Session is over for today, find next available day
+          const nextScheduleRes2 = await pool.query(
+            `SELECT day_of_week, start_time, end_time FROM doctor_schedules
+             WHERE tenant_id = $1 AND doctor_id = $2 AND is_available = true
+             AND day_of_week > $3
+             ORDER BY day_of_week ASC LIMIT 1`,
+            [tenant.id, doctor.id, todayDow]
+          )
+          const wrapRes2 = nextScheduleRes2.rows.length === 0 ? await pool.query(
+            `SELECT day_of_week, start_time, end_time FROM doctor_schedules
+             WHERE tenant_id = $1 AND doctor_id = $2 AND is_available = true
+             ORDER BY day_of_week ASC LIMIT 1`,
+            [tenant.id, doctor.id]
+          ) : null
+          const nextDay2 = nextScheduleRes2.rows[0] || wrapRes2?.rows[0]
+          const dayNames2 = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+          if (nextDay2) {
+            const nextTime2 = `${fmt(nextDay2.start_time)} - ${fmt(nextDay2.end_time)}`
+            return { available: false, message: `Dr. ${doctor.name}'s session has ended for today. Next available: ${dayNames2[nextDay2.day_of_week]}, ${nextTime2}` }
+          }
+          return { available: false, message: `Dr. ${doctor.name}'s session has ended for today.` }
+        }
+        if (currentMinutes < startMinutes) {
+          return { available: false, message: `Dr. ${doctor.name}'s session starts at ${fmt(start_time)}. Please book after the session begins.` }
+        }
         const sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
 
         return `Dr. ${doctor.name} (${doctor.specialization})
