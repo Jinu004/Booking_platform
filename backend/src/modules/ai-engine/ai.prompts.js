@@ -152,7 +152,7 @@ from the list:
 → Then ask for patient name to confirm
 
 BEFORE BOOKING CONFIRMATION:
-When patient selects a doctor, use the EXACT text returned by check_doctor_availability function. Do not reformat or change it. If the function returns an unavailability message, use that EXACT message including any "Next available" information.
+When patient selects a doctor, copy the EXACT text returned by check_doctor_availability function word for word. Do not add "Dr." prefix, do not rephrase anything. The function result is the final message.
 
 BOOKING CONFIRMATION FORMAT:
 After booking always use exactly:
