@@ -58,6 +58,24 @@ function getFunctionDefinitions(industry) {
       }
     },
     {
+      name: 'create_tomorrow_booking',
+      description: 'Creates a booking for tomorrow for a specific doctor. Use this when patient selects option 2 (Book for Tomorrow) and confirms with their name.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          doctor_name: {
+            type: 'STRING',
+            description: 'The name of the doctor to book with'
+          },
+          patient_name: {
+            type: 'STRING',
+            description: 'The name of the patient making the booking'
+          }
+        },
+        required: ['doctor_name', 'patient_name']
+      }
+    },
+    {
       name: 'cancel_booking',
       description: 'Cancel an existing booking for the patient',
       parameters: {

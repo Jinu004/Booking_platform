@@ -305,6 +305,112 @@ Please arrive before session begins.
 Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if you would like to also book for tomorrow.' : ''}`
 }
 
+      case 'create_tomorrow_booking': {
+        const { doctor_name, patient_name } = args
+        const formattedName = (patient_name || '').replace(/\b\w/g, c => c.toUpperCase())
+
+        const tomorrow = new Date()
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        const tomorrowDate = tomorrow.toISOString().split('T')[0]
+        const tomorrowDow = tomorrow.getDay()
+
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+        // Find doctor
+        const doctorRes = await pool.query(
+          `SELECT id, name, specialization, max_tokens_daily FROM clinic_doctors
+           WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2)
+           LIMIT 1`,
+          [tenant.id, `%${doctor_name}%`]
+        )
+        if (!doctorRes.rows.length) {
+          return { success: false, message: `No doctor found matching "${doctor_name}"` }
+        }
+        const doctor = doctorRes.rows[0]
+
+        // Check doctor leave for tomorrow
+        const leaveCheck = await pool.query(
+          `SELECT id FROM doctor_leaves WHERE doctor_id = $1 AND leave_date = $2 LIMIT 1`,
+          [doctor.id, tomorrowDate]
+        )
+        if (leaveCheck.rows.length > 0) {
+          return { success: false, message: `${doctor.name} is on leave tomorrow (${dayNames[tomorrowDow]}). Please choose another doctor.` }
+        }
+
+        // Check doctor schedule for tomorrow
+        const scheduleRes = await pool.query(
+          `SELECT start_time, end_time FROM doctor_schedules
+           WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
+           LIMIT 1`,
+          [tenant.id, doctor.id, tomorrowDow]
+        )
+        if (!scheduleRes.rows.length) {
+          return { success: false, message: `${doctor.name} is not available tomorrow (${dayNames[tomorrowDow]}). Please choose another doctor or a different day.` }
+        }
+
+        const { start_time, end_time } = scheduleRes.rows[0]
+        const fmt = (t) => {
+          const [h, m] = t.split(':')
+          const hour = parseInt(h)
+          const ampm = hour >= 12 ? 'PM' : 'AM'
+          const h12 = hour % 12 || 12
+          return `${h12}:${m} ${ampm}`
+        }
+        const sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
+
+        // Check tomorrow token count
+        const tokenRes = await pool.query(
+          `SELECT COUNT(*) AS count FROM bookings
+           WHERE doctor_id = $1 AND booking_date = $2 AND status != 'cancelled'`,
+          [doctor.id, tomorrowDate]
+        )
+        const currentCount = parseInt(tokenRes.rows[0].count || 0)
+        if (currentCount >= doctor.max_tokens_daily) {
+          return { success: false, message: `${doctor.name} is fully booked for tomorrow. Please choose another doctor.` }
+        }
+
+        // Check duplicate booking for tomorrow
+        if (customer?.id) {
+          const activeBookingRes = await pool.query(
+            `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = $3 AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
+            [customer.id, doctor.id, tomorrowDate]
+          )
+          if (activeBookingRes.rows.length > 0) {
+            return { success: false, message: `You already have a booking with ${doctor.name} tomorrow.` }
+          }
+        }
+
+        // Create tomorrow booking
+        const bookingRes = await pool.query(
+          `INSERT INTO bookings
+             (tenant_id, customer_id, conversation_id, doctor_id,
+              source, status, booking_date, token_number, notes, patient_name)
+           VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', $5,
+             (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
+             $6, $7)
+           RETURNING id, token_number`,
+          [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
+           tomorrowDate, `Booked via WhatsApp for ${formattedName}`, formattedName]
+        )
+        const tokenNumber = bookingRes.rows[0].token_number
+        const booking = bookingRes.rows[0]
+
+        await pool.query(
+          `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
+           VALUES ($1, $2, $3, $4, 'waiting')`,
+          [tenant.id, booking.id, doctor.id, tokenNumber]
+        )
+
+        return `Booking confirmed for tomorrow! 🏥
+Token Number: ${tokenNumber}
+Doctor: ${doctor.name}
+${doctor.specialization}
+📅 ${dayNames[tomorrowDow]}, ${new Date(tomorrowDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
+🕘 Session: ${sessionTime}
+Please arrive before session begins.
+Reply CANCEL to cancel your booking.`
+      }
+
       case 'cancel_booking': {
         const { booking_id } = args
         const result = await pool.query(
