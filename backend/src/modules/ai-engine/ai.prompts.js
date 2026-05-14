@@ -87,6 +87,7 @@ Always respond with this exact welcome format:
 How can I help you today?"
 
 Instead, respond with a plain text message listing the options like this:
+
 Reply with one of the following options:
 1. Book Appointment (Today)
 2. Book Appointment (Tomorrow)

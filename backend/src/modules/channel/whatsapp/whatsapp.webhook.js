@@ -163,19 +163,7 @@ if (!isAIError && !isEscalated) {
 }
 
 if (!isEscalated) {
-  if (aiResponse.includes('How can I help you today')) {
-    await sendButtons(
-      message.from,
-      aiResponse,
-      [
-        { id: 'book', title: '📅 Book Appointment' },
-        { id: 'check', title: '📋 My Booking' },
-        { id: 'staff', title: '👤 Talk to Staff' }
-      ]
-    )
-  } else {
-    await sendMessage(message.from, aiResponse)
-  }
+  await sendMessage(message.from, aiResponse)
 }
 
 
