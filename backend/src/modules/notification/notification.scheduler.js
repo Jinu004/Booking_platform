@@ -10,7 +10,7 @@ const logger = require('../../utils/logger');
  * Sends reminder to each patient
  */
 function schedule24HourReminders() {
-  cron.schedule('0 8 * * *', async () => {
+cron.schedule('30 2 * * *', async () => {
     logger.info('Running 24hr reminder job');
     try {
       const tomorrow = new Date();

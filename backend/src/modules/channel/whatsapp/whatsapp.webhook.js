@@ -136,7 +136,7 @@ router.post('/', async (req, res) => {
         }
       } catch (err) {
        logger.error(`AI processing crashed for ${message.from}: ${err?.message} ${err?.stack}`) 
-        aiResponse = 'Sorry, I could not process that. Reply *1* to Book Appointment or *3* to Talk to Staff.'
+        aiResponse = 'Sorry, I could not process that. Reply 1 to Book Today, 2 to Book Tomorrow, 3 to Talk to Staff, 4 to Check Booking.'
         isAIError = true
       }
 
@@ -169,7 +169,7 @@ if (!isEscalated) {
 
     } catch (err) {
       logger.error('Async webhook processing error: ' + err?.message + ' ' + err?.stack)
-      const fallbackMessage = 'Sorry, I could not process that. Reply *1* to Book Appointment or *3* to Talk to Staff.'
+      const fallbackMessage = 'Sorry, I could not process that. Reply 1 to Book Today, 2 to Book Tomorrow, 3 to Talk to Staff, 4 to Check Booking.'
       if (req.body?.payload?.from) {
         try {
           await sendMessage(req.body.payload.from, fallbackMessage)
