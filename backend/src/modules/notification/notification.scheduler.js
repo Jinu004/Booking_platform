@@ -10,7 +10,7 @@ const logger = require('../../utils/logger');
  * Sends reminder to each patient
  */
 function schedule24HourReminders() {
-  cron.schedule('0 8 * * *', async () => {
+cron.schedule('30 2 * * *', async () => {
     logger.info('Running 24hr reminder job');
     try {
       const tomorrow = new Date();
@@ -38,7 +38,7 @@ function schedule24HourReminders() {
       for (const booking of bookings.rows) {
         const message =
           `Hi ${booking.patient_name}! 🏥\n\n` +
-          `Reminder: You have an appointment tomorrow ` +
+          `Reminder: You have an appointment today ` +
           `with ${booking.doctor_name} at ` +
           `${booking.clinic_name}.\n\n` +
           `Token number: ${booking.token_number}\n\n` +
