@@ -58,10 +58,21 @@ export default function Conversations() {
   const [loadingThread, setLoadingThread] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchParams] = useSearchParams();
+
+  const filteredConversations = searchQuery
+    ? conversations.filter(c => {
+      const q = searchQuery.toLowerCase();
+      return (c.customer_name || '').toLowerCase().includes(q) ||
+        (c.customer_phone || '').toLowerCase().includes(q);
+    })
+    : conversations;
 
   const messagesEndRef = useRef(null);
   const selectedConversationIdRef = useRef(selectedConversationId);
+
+
 
   useEffect(() => {
     selectedConversationIdRef.current = selectedConversationId;
@@ -234,7 +245,7 @@ export default function Conversations() {
   };
 
   // Group conversations by date
-  const groupedConversations = conversations.reduce((groups, conv) => {
+  const groupedConversations = filteredConversations.reduce((groups, conv) => {
     const label = getDateLabel(conv.last_message_at);
     if (!groups[label]) groups[label] = [];
     groups[label].push(conv);
@@ -262,6 +273,15 @@ export default function Conversations() {
             <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
               {conversations.length}
             </span>
+          </div>
+          <div className="px-4 py-2 border-b border-gray-100">
+            <input
+              type="text"
+              placeholder="Search by name or phone..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400"
+            />
           </div>
 
           {/* List */}
