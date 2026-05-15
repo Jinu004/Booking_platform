@@ -149,7 +149,7 @@ const doctorList = doctorsResult.rows.map(doc => {
               return `${h12}:${m} ${ampm}`
             }
             const nextTime = `${fmt(nextDay.start_time)} - ${fmt(nextDay.end_time)}`
-            return { available: false, message: `${doctor.name} is not available today.\nNext available: ${dayNames[nextDay.day_of_week]}, ${nextTime}\n\nType *Hi* to go back to the main menu and select option 2 to book for another day.` }
+            return { available: false, message: `${doctor.name} is not available today.\nNext available: ${dayNames[nextDay.day_of_week]}, ${nextTime}\n\nType *Hi* to go back to the main menu and try booking again on or before the next available day.` }
           }
           return { available: false, message: `${doctor.name} is not available today.` }
         }
@@ -187,7 +187,7 @@ const doctorList = doctorsResult.rows.map(doc => {
           const dayNames2 = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
           if (nextDay2) {
             const nextTime2 = `${fmt(nextDay2.start_time)} - ${fmt(nextDay2.end_time)}`
-            return { available: false, message: `${doctor.name}'s session has ended for today.\nNext available: ${dayNames2[nextDay2.day_of_week]}, ${nextTime2}\n\nType *Hi* to go back to the main menu and select option 2 to book for another day.` }
+            return { available: false, message: `${doctor.name}'s session has ended for today.\nNext available: ${dayNames2[nextDay2.day_of_week]}, ${nextTime2}\n\nType *Hi* to go back to the main menu and try booking again on or before the next available day.` }
           }
           return { available: false, message: `${doctor.name}'s session has ended for today.` }
         }
