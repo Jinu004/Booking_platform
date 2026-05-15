@@ -38,7 +38,7 @@ cron.schedule('30 2 * * *', async () => {
       for (const booking of bookings.rows) {
         const message =
           `Hi ${booking.patient_name}! 🏥\n\n` +
-          `Reminder: You have an appointment tomorrow ` +
+          `Reminder: You have an appointment today ` +
           `with ${booking.doctor_name} at ` +
           `${booking.clinic_name}.\n\n` +
           `Token number: ${booking.token_number}\n\n` +
