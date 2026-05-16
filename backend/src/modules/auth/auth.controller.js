@@ -20,9 +20,10 @@ async function login(req, res) {
 
     // Find staff by email
     const result = await pool.query(
-      `SELECT s.*, t.name AS tenant_name,
+`SELECT s.*, t.name AS tenant_name,
               t.plan AS tenant_plan,
-              t.status AS tenant_status
+              t.status AS tenant_status,
+              t.whatsapp_number AS whatsapp_number
        FROM staff s
        JOIN tenants t ON t.id = s.tenant_id
        WHERE LOWER(s.email) = LOWER($1)
