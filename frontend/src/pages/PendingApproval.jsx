@@ -1,15 +1,15 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { logout } from '../services/auth.service'
+
 
 export default function PendingApproval() {
   const navigate = useNavigate()
 
-  const handleLogout = async () => {
-    await logout()
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('staff_data')
     navigate('/login')
   }
-
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-10 text-center">
