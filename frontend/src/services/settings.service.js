@@ -19,3 +19,13 @@ export async function updateClinicSettings(data) {
   const res = await api.put('/settings/clinic', data);
   return res.data;
 }
+
+export async function getHITLSettings() {
+  const res = await api.get('/settings/hitl');
+  return res.data;
+}
+
+export async function updateHITLSettings(data) {
+  const res = await api.put('/settings/hitl', data);
+  return res.data;
+}
