@@ -26,7 +26,7 @@ const corsOptions = {
       'https://www.receptionai.in',
       ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) : [])
     ];
-    if (!origin || allowed.includes(origin) || /^http://localhost(:d+)?$/.test(origin)) {
+    if (!origin || allowed.includes(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin)) {
       callback(null, true);
     } else {
       callback(new Error(`CORS: origin ${origin} not allowed`));
