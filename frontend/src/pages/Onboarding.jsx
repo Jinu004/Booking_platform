@@ -101,7 +101,13 @@ export default function Onboarding() {
       if (response.success && response.data.token) {
         storeAuthData(response.data.token, response.data.staff);
         setStep(5);
-        setTimeout(() => navigate('/dashboard'), 2000);
+        setTimeout(() => {
+          if (response.data.staff.tenantStatus === 'pending') {
+            navigate('/pending');
+          } else {
+            navigate('/dashboard');
+          }
+        }, 2000);
       } else setError(response.error || 'Failed to create clinic');
     } catch { setError('Failed to create clinic. Please try again.'); }
     finally { setLoading(false); }
