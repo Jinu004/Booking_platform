@@ -1,9 +1,26 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-
 
 export default function PendingApproval() {
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const res = await fetch('/api/v1/auth/me', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
+        })
+        const data = await res.json()
+        if (data?.data?.tenant?.status === 'active') {
+          const staff = JSON.parse(localStorage.getItem('staff_data') || '{}')
+          staff.tenantStatus = 'active'
+          localStorage.setItem('staff_data', JSON.stringify(staff))
+          navigate('/dashboard')
+        }
+      } catch { }
+    }
+    checkStatus()
+  }, [])
 
   const handleLogout = () => {
     localStorage.removeItem('auth_token')
