@@ -55,7 +55,7 @@ async function updateTenantStatus(req, res) {
     const { id } = req.params;
     const { status } = req.body;
     
-    if (!['active', 'suspended'].includes(status)) {
+    if (!['active', 'suspended', 'pending'].includes(status)) {
       return errorResponse(res, 'Invalid status', 400);
     }
     
@@ -121,9 +121,95 @@ async function getPlatformStats(req, res) {
   }
 }
 
+/**
+ * POST /superadmin/tenants
+ * Creates a new tenant and their admin staff account
+ * Body: { clinicName, email, password, plan }
+ */
+async function createTenant(req, res) {
+  const client = await pool.connect();
+  try {
+    const { clinicName, email, password, plan } = req.body;
+
+    if (!clinicName || !email || !password || !plan) {
+      return errorResponse(res, 'All fields required', 400);
+    }
+
+    if (!['starter', 'growth', 'pro'].includes(plan)) {
+      return errorResponse(res, 'Invalid plan', 400);
+    }
+
+    const { bcrypt } = require('../../config/auth');
+    const password_hash = await bcrypt.hash(password, 12);
+
+    await client.query('BEGIN');
+
+    const tenantResult = await client.query(
+      `INSERT INTO tenants (id, name, plan, status, industry, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, 'pending', 'clinic', NOW(), NOW())
+       RETURNING *`,
+      [clinicName, plan]
+    );
+
+    const tenant = tenantResult.rows[0];
+
+    await client.query(
+      `INSERT INTO staff (id, tenant_id, name, email, password_hash, role, is_active, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'admin', true, NOW(), NOW())`,
+      [tenant.id, clinicName, email, password_hash]
+    );
+
+    await client.query('COMMIT');
+    return successResponse(res, tenant, 201);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.code === '23505') {
+      return errorResponse(res, 'Email already exists', 409);
+    }
+    logger.error('Error creating tenant:', err.message);
+    return errorResponse(res, 'Failed to create tenant', 500);
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * PATCH /superadmin/tenants/:id
+ * Edit tenant name, plan, whatsapp_number
+ * Body: { clinicName, plan, whatsappNumber }
+ */
+async function updateTenant(req, res) {
+  try {
+    const { id } = req.params;
+    const { clinicName, plan, whatsappNumber } = req.body;
+
+    const result = await pool.query(
+      `UPDATE tenants
+       SET name = COALESCE($1, name),
+           plan = COALESCE($2, plan),
+           whatsapp_number = COALESCE($3, whatsapp_number),
+           updated_at = NOW()
+       WHERE id = $4
+       RETURNING *`,
+      [clinicName || null, plan || null, whatsappNumber || null, id]
+    );
+
+    if (result.rows.length === 0) {
+      return errorResponse(res, 'Tenant not found', 404);
+    }
+
+    return successResponse(res, result.rows[0]);
+  } catch (err) {
+    logger.error('Error updating tenant:', err.message);
+    return errorResponse(res, 'Failed to update tenant', 500);
+  }
+}
+
 module.exports = {
   getAllTenants,
   getTenantDetails,
   updateTenantStatus,
+  updateTenant,
+  createTenant,
   getPlatformStats
 };
