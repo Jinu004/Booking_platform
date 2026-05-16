@@ -21,7 +21,8 @@ async function getOverview(req, res) {
  */
 async function getDailyBookings(req, res) {
   try {
-    const data = await AnalyticsService.getDailyBookings(req.tenantId)
+    const { period = 'month' } = req.query
+    const data = await AnalyticsService.getDailyBookings(req.tenantId, period)
     return successResponse(res, data)
   } catch (err) {
     logger.error('Failed to get daily bookings:', err.message)
