@@ -11,7 +11,7 @@ async function getAllTenants(req, res) {
     const sql = `
       SELECT t.id, t.name, t.plan, t.status, t.industry, t.whatsapp_number, t.created_at,
              (SELECT COUNT(*) FROM bookings b WHERE b.tenant_id = t.id AND b.created_at >= NOW() - INTERVAL '30 days') AS booking_count,
-             (SELECT COUNT(*) FROM conversations c WHERE c.tenant_id = t.id AND c.created_at >= NOW() - INTERVAL '30 days') AS conversation_count,
+             (SELECT COUNT(*) FROM conversations c WHERE c.tenant_id = t.id AND c.started_at >= NOW() - INTERVAL '30 days') AS conversation_count,
              (SELECT COUNT(*) FROM customers cu WHERE cu.tenant_id = t.id) AS customer_count
       FROM tenants t
       ORDER BY t.created_at DESC
