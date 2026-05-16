@@ -121,4 +121,23 @@ if (staffData.tenant_status === 'pending') {
   }
 }
 
-module.exports = { requireAuth }
+
+/**
+ * requireRole middleware factory
+ * Must be used after requireAuth
+ * Returns 403 if logged-in staff role does not match
+ * @param {...string} roles - allowed roles
+ */
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.staff) {
+      return errorResponse(res, "Authentication required", 401)
+    }
+    if (!roles.includes(req.staff.role)) {
+      return errorResponse(res, "Forbidden: insufficient permissions", 403)
+    }
+    next()
+  }
+}
+
+module.exports = { requireAuth, requireRole }

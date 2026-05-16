@@ -25,6 +25,9 @@ const validate = (req, res, next) => {
   next();
 };
 
+// All tenant routes require authentication
+router.use(requireAuth);
+
 router.post('/', validateCreateTenant, validate, createTenant);
 router.get('/slug/:slug', getTenantBySlug);
 router.get('/:id', getTenantById);

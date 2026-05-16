@@ -129,7 +129,7 @@ async function checkWhatsappAvailable(req, res) {
     // We normalize inside tenant.service technically, but tenantModel might just check exact.
     // TenantService uses normalizeNumber let's assume it checks +91... format. 
     // To be safe we try checking normalized.
-    let cleaned = number.replace(/[^\\d+]/g, '');
+    let cleaned = number.replace(/[^\d+]/g, '');
     if (!cleaned.startsWith('+')) {
       if (cleaned.startsWith('91')) cleaned = '+' + cleaned;
       else if (cleaned.length === 10) cleaned = '+91' + cleaned;

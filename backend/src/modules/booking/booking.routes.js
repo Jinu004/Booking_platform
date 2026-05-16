@@ -1,4 +1,5 @@
 const express = require('express');
+const { validationResult } = require('express-validator');
 const { validationErrorResponse } = require('../../utils/response');
 const { requireAuth } = require('../auth/auth.middleware');
 const {

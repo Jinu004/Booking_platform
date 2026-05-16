@@ -35,7 +35,8 @@ async function getDailyBookings(req, res) {
  */
 async function getDoctorStats(req, res) {
   try {
-    const data = await AnalyticsService.getDoctorStats(req.tenantId)
+    const { period = 'month' } = req.query
+    const data = await AnalyticsService.getDoctorStats(req.tenantId, period)
     return successResponse(res, data)
   } catch (err) {
     logger.error('Failed to get doctor stats:', err.message)

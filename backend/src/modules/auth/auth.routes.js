@@ -5,11 +5,12 @@ const {
   forgotPassword, resetPassword
 } = require('./auth.controller')
 const { requireAuth } = require('./auth.middleware')
+const { authLimiter } = require('../../middleware/rateLimiter')
 
 // Public routes — no auth needed
-router.post('/login', login)
-router.post('/forgot-password', forgotPassword)
-router.post('/reset-password', resetPassword)
+router.post('/login', authLimiter, login)
+router.post('/forgot-password', authLimiter, forgotPassword)
+router.post('/reset-password', authLimiter, resetPassword)
 
 // Protected routes — auth required
 router.post('/logout', requireAuth, logout)

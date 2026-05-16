@@ -100,7 +100,7 @@ async function takeoverConversation(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
-    const staffId = req.user ? req.user.id : null; 
+    const staffId = req.staff ? req.staff.id : null;
 
     // Ensure it exists
     const conversation = await ConversationModel.getConversationById(pool, tenantId, id);

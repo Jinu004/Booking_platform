@@ -1,5 +1,5 @@
 const express = require('express');
-const { requireAuth } = require('../auth/auth.middleware');
+const { requireAuth, requireRole } = require('../auth/auth.middleware');
 const {
   getAllTenants,
   getTenantDetails,
@@ -13,6 +13,7 @@ const {
 const router = express.Router();
 
 router.use(requireAuth);
+router.use(requireRole('super_admin'));
 
 router.get('/tenants', getAllTenants);
 router.post('/tenants', createTenant);

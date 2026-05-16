@@ -94,59 +94,6 @@ app.use('/api/v1/settings', settingsRoutes);
 const hitlRoutes = require('./modules/hitl/hitl.routes');
 app.use('/api/v1/hitl', hitlRoutes);
 
-// 16. Test AI Endpoint
-app.post('/api/v1/test/ai', async (req, res) => {
-  try {
-    const { message, tenantId } = req.body
-
-    if (!message || !tenantId) {
-      return res.json({
-        success: false,
-        error: 'message and tenantId required'
-      })
-    }
-
-    const AIService = require(
-      './modules/ai-engine/ai.service'
-    )
-    const TenantService = require(
-      './modules/tenant/tenant.service'
-    )
-
-    const tenant = await TenantService
-      .getTenantById(tenantId)
-    const configs = await TenantService
-      .getAllConfigs(tenantId)
-
-    const response = await AIService.processMessage({
-      tenant,
-      customer: {
-        id: 'test-customer',
-        name: 'Test Patient',
-        phone: '+919999999999'
-      },
-      conversation: { id: 'test-conversation' },
-      recentMessages: [{
-        role: 'user',
-        content: message
-      }],
-      session: {},
-      configs,
-      additionalData: {}
-    })
-
-    return res.json({
-      success: true,
-      data: { response }
-    })
-  } catch (err) {
-    return res.json({
-      success: false,
-      error: err.message
-    })
-  }
-})
-
 // 17. Global Error Handler must be the last middleware
 app.use(errorHandler);
 
