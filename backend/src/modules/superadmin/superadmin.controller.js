@@ -198,6 +198,11 @@ async function updateTenant(req, res) {
       return errorResponse(res, 'Tenant not found', 404);
     }
 
+    try {
+      const { broadcastToTenant } = require('../hitl/hitl.service');
+      broadcastToTenant(id, 'session_refresh', { reason: 'plan_changed' });
+    } catch (_) {}
+
     return successResponse(res, result.rows[0]);
   } catch (err) {
     logger.error('Error updating tenant:', err.message);

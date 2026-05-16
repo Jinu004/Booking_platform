@@ -3,6 +3,8 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { globalSearch } from '../../services/patient.service';
 import useStore from '../../store/useStore';
+import api from '../../utils/api';
+import { STORAGE_KEYS } from '../../constants';
 
 const Layout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -76,6 +78,17 @@ const Layout = () => {
     const eventSource = new EventSource(`/api/v1/hitl/events?token=${token}`, { withCredentials: true });
     eventSource.addEventListener('handoff_requested', () => {
       useStore.getState().incrementHandoffs();
+    });
+    eventSource.addEventListener('session_refresh', async () => {
+      try {
+        const res = await api.get('/auth/me');
+        if (res.data?.staff) {
+          const current = JSON.parse(localStorage.getItem(STORAGE_KEYS.STAFF_DATA) || '{}');
+          const updated = { ...current, tenantPlan: res.data.tenant?.plan };
+          localStorage.setItem(STORAGE_KEYS.STAFF_DATA, JSON.stringify(updated));
+          window.location.reload();
+        }
+      } catch {}
     });
     return () => eventSource.close();
   }, []);
