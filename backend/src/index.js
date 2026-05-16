@@ -157,12 +157,15 @@ const { initializeSchedulers } = require('./modules/notification/notification.sc
 initializeSchedulers();
 
 const { startHITLCron } = require('./modules/hitl/hitl.cron');
+const { startRetentionCron } = require('./cron/retention.cron');
 const { broadcastToTenant } = require('./modules/hitl/hitl.service');
 const dbPool = require('./config/database');
 
 setTimeout(() => {
   console.log('Starting HITL cron...');
   startHITLCron(dbPool, broadcastToTenant);
+  console.log('Starting Retention cron...');
+  startRetentionCron();
 }, 5000);
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
