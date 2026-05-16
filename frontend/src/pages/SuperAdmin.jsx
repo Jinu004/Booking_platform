@@ -20,6 +20,9 @@ const statusBadge = (status) => {
 
 export default function SuperAdmin() {
   const { staff } = useStore();
+
+
+
   const [stats, setStats] = useState(null);
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -197,8 +200,8 @@ export default function SuperAdmin() {
                       onClick={() => handleStatusChange(t.id, t.status)}
                       className={
                         t.status === 'pending' ? 'text-green-600 hover:text-green-900' :
-                        t.status === 'active' ? 'text-red-600 hover:text-red-900' :
-                        'text-green-600 hover:text-green-900'
+                          t.status === 'active' ? 'text-red-600 hover:text-red-900' :
+                            'text-green-600 hover:text-green-900'
                       }
                     >
                       {t.status === 'pending' ? 'Approve' : t.status === 'active' ? 'Suspend' : 'Reactivate'}
