@@ -88,6 +88,11 @@ async function requireAuth(req, res, next) {
         'Account suspended', 403)
     }
 
+if (staffData.tenant_status === 'pending') {
+      return errorResponse(res,
+        'Account pending approval', 403)
+    }
+
     // Set req.staff and req.tenant
     req.staff = {
       id: staffData.id,
