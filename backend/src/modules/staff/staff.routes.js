@@ -1,6 +1,5 @@
 const express = require('express')
-const { requireAuth } = require('../auth/auth.middleware')
-const { ROLES } = require('../auth/auth.permissions')
+const { requireAuth, requireRole } = require('../auth/auth.middleware')
 const {
   getStaff,
   getStaffById,
@@ -16,8 +15,8 @@ router.use(requireAuth)
 
 router.get('/', getStaff)
 router.get('/:id', getStaffById)
-router.post('/', requireAuth, inviteStaff)
-router.patch('/:id', requireAuth, updateStaff)
-router.delete('/:id', requireAuth, deleteStaff)
+router.post('/', requireRole('admin', 'manager'), inviteStaff)
+router.patch('/:id', requireRole('admin', 'manager'), updateStaff)
+router.delete('/:id', requireRole('admin'), deleteStaff)
 
 module.exports = router

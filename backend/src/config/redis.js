@@ -15,7 +15,7 @@ const client = createClient({
   url: redisUrl,
   socket: isTLS ? {
     tls: true,
-    rejectUnauthorized: false
+    rejectUnauthorized: true
   } : {}
 })
 

@@ -3,19 +3,18 @@ const HITLService = require('./hitl.service');
 const logger = require('../../utils/logger');
 
 // GET /api/hitl/conversations
-async function getConversations(req, res) {
+async function getConversations(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const conversations = await HITLModel.getConversationList(tenantId);
     return res.json({ success: true, data: conversations, error: null });
   } catch (err) {
-    logger.error('getConversations error:', err.message);
-    return res.status(500).json({ success: false, data: null, error: err.message });
+    next(err);
   }
 }
 
 // GET /api/hitl/conversations/:id/messages
-async function getMessages(req, res) {
+async function getMessages(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
@@ -27,13 +26,12 @@ async function getMessages(req, res) {
     const messages = await HITLModel.getMessages(id);
     return res.json({ success: true, data: { conversation: conv, messages }, error: null });
   } catch (err) {
-    logger.error('getMessages error:', err.message);
-    return res.status(500).json({ success: false, data: null, error: err.message });
+    next(err);
   }
 }
 
 // POST /api/hitl/conversations/:id/reply
-async function reply(req, res) {
+async function reply(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const staffId = req.staff.id;
@@ -47,13 +45,12 @@ async function reply(req, res) {
     const message = await HITLService.staffReply(id, tenantId, staffId, content.trim());
     return res.json({ success: true, data: message, error: null });
   } catch (err) {
-    logger.error('reply error:', err.message);
-    return res.status(500).json({ success: false, data: null, error: err.message });
+    next(err);
   }
 }
 
 // PATCH /api/hitl/conversations/:id/mode
-async function toggleMode(req, res) {
+async function toggleMode(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const staffId = req.staff.id;
@@ -61,8 +58,7 @@ async function toggleMode(req, res) {
     const updated = await HITLService.toggleMode(id, tenantId, staffId);
     return res.json({ success: true, data: updated, error: null });
   } catch (err) {
-    logger.error('toggleMode error: ' + (err.message || JSON.stringify(err)) + ' stack: ' + err.stack);
-    return res.status(500).json({ success: false, data: null, error: err.message || 'Unknown error' });
+    next(err);
   }
 }
 

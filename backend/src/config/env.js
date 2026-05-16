@@ -5,6 +5,7 @@ const requiredVariables = [
   'NODE_ENV',
   'DATABASE_URL',
   'REDIS_URL',
+  'JWT_SECRET',
 ];
 
 for (const key of requiredVariables) {
@@ -26,9 +27,10 @@ const env = {
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   WAHA_BASE_URL: process.env.WAHA_BASE_URL,
   WAHA_API_KEY: process.env.WAHA_API_KEY,
-  JWT_SECRET: process.env.JWT_SECRET || 'change-this-in-production',
+  JWT_SECRET: process.env.JWT_SECRET,
   RESEND_API_KEY: process.env.RESEND_API_KEY || '',
-  BYPASS_AUTH: process.env.BYPASS_AUTH || 'false'
+  BYPASS_AUTH: process.env.BYPASS_AUTH || 'false',
+  FRONTEND_URL: process.env.FRONTEND_URL || 'https://receptionai.in',
 };
 
 module.exports = env;

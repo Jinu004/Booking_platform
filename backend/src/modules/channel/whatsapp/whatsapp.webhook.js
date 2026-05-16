@@ -41,7 +41,11 @@ router.post('/', async (req, res) => {
       let tenant = null
 
       if (source === 'waha') {
-        const tenantId = process.env.WAHA_DEFAULT_TENANT_ID || '262467ed-7cf3-418b-b46c-6038540f9260'
+        const tenantId = process.env.WAHA_DEFAULT_TENANT_ID
+        if (!tenantId) {
+          logger.warn('WAHA_DEFAULT_TENANT_ID not set in .env — skipping WAHA message')
+          return
+        }
         try {
           tenant = await TenantService.getTenantById(tenantId)
         } catch (err) {

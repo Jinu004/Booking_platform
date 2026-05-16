@@ -4,7 +4,6 @@ const controller = require('./conversation.controller');
 const { requireAuth } = require('../auth/auth.middleware');
 
 router.use(requireAuth);
-router.use(requireAuth);
 
 router.get('/', controller.getConversations);
 router.get('/:id', controller.getConversationById);

@@ -201,10 +201,11 @@ async function exportBookings(req, res, next) {
     
     const result = await pool.query(sql, params);
     
-    let csv = 'Token,Patient Name,Phone,Doctor,Status,Date\\n';
+    const escCsv = (v) => `"${String(v ?? '').replace(/\"/g, '""')}"`;
+    let csv = '"Token","Patient Name","Phone","Doctor","Status","Date"\n';
     for (const row of result.rows) {
       const d = row.booking_date.toISOString().split('T')[0];
-      csv += `${row.token_number},${row.patient_name || ''},${row.phone},${row.doctor_name || ''},${row.status},${d}\\n`;
+      csv += `${escCsv(row.token_number)},${escCsv(row.patient_name)},${escCsv(row.phone)},${escCsv(row.doctor_name)},${escCsv(row.status)},${escCsv(d)}\n`;
     }
     
     res.setHeader('Content-Type', 'text/csv');

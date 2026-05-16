@@ -19,7 +19,22 @@ app.set('trust proxy', 1)
 
 // 1. Middleware inside app
 app.use(helmet());
-app.use(cors());
+const corsOptions = {
+  origin: (origin, callback) => {
+    const allowed = [
+      'https://receptionai.in',
+      'https://www.receptionai.in',
+      ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) : [])
+    ];
+    if (!origin || allowed.includes(origin) || /^http://localhost(:d+)?$/.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    }
+  },
+  credentials: true
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

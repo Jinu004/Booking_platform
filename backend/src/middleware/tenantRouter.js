@@ -18,7 +18,7 @@ async function tenantRouter(req, res, next) {
   const TenantService = require('../modules/tenant/tenant.service')
 
   // Dev bypass mode
-  if (process.env.BYPASS_AUTH === 'true') {
+  if (process.env.BYPASS_AUTH === 'true' && process.env.NODE_ENV === 'development') {
     const devTenantId = req.headers['x-dev-tenant-id']
     if (devTenantId) {
       try {

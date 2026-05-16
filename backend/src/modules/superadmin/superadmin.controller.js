@@ -1,6 +1,7 @@
 const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
+const { bcrypt } = require('../../config/auth');
 
 /**
  * GET /superadmin/tenants
@@ -139,7 +140,6 @@ async function createTenant(req, res) {
       return errorResponse(res, 'Invalid plan', 400);
     }
 
-    const { bcrypt } = require('../../config/auth');
     const password_hash = await bcrypt.hash(password, 12);
 
     await client.query('BEGIN');

@@ -2,6 +2,10 @@ const ClinicModel = require('./clinic.model');
 const pool = require('../../../config/database');
 const { successResponse, errorResponse } = require('../../../utils/response');
 
+// Sentinel value used to soft-delete doctors from token queues
+// clinic.model.js getDoctors filters out records where leave_days equals this value
+const DOCTOR_DELETED_SENTINEL = 999;
+
 /**
  * GET /clinic/doctors
  * Lists all doctors
@@ -181,10 +185,10 @@ async function deleteDoctor(req, res, next) {
     const result = await pool.query(
       `UPDATE clinic_doctors
        SET available_today = false,
-           leave_days = 999
+           leave_days = $3
        WHERE id = $1 AND tenant_id = $2
        RETURNING *`,
-      [id, tenantId]
+      [id, tenantId, DOCTOR_DELETED_SENTINEL]
     );
 
     if (!result.rows[0]) {

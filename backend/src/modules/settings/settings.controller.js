@@ -1,12 +1,13 @@
 const { successResponse, errorResponse } = require('../../utils/response')
 const TenantService = require('../tenant/tenant.service')
 const logger = require('../../utils/logger')
+const pool = require('../../config/database')
 
 /**
  * GET /settings
  * Gets all tenant configuration settings and groups them
  */
-async function getSettings(req, res) {
+async function getSettings(req, res, next) {
   try {
     const configs = await TenantService
       .getAllConfigs(req.tenantId)
@@ -48,8 +49,7 @@ async function getSettings(req, res) {
 
     return successResponse(res, settings)
   } catch (err) {
-    logger.error('Failed to get settings:', err.message)
-    return errorResponse(res, 'Failed to fetch settings', 500)
+    next(err)
   }
 }
 
@@ -58,7 +58,7 @@ async function getSettings(req, res) {
  * Updates multiple settings at once
  * Body: { "key1": "value1", "key2": "value2" }
  */
-async function updateSettings(req, res) {
+async function updateSettings(req, res, next) {
   try {
     const updates = req.body
     
@@ -69,10 +69,9 @@ async function updateSettings(req, res) {
     }
 
     // Return the updated settings back
-    return getSettings(req, res)
+    return getSettings(req, res, next)
   } catch (err) {
-    logger.error('Failed to update settings:', err.message)
-    return errorResponse(res, 'Failed to update settings', 500)
+    next(err)
   }
 }
 
@@ -80,7 +79,7 @@ async function updateSettings(req, res) {
  * GET /settings/clinic
  * Gets clinic specific profile
  */
-async function getClinicSettings(req, res) {
+async function getClinicSettings(req, res, next) {
   try {
     const configs = await TenantService
       .getAllConfigs(req.tenantId)
@@ -94,19 +93,14 @@ async function getClinicSettings(req, res) {
 
     return successResponse(res, clinicProfile)
   } catch (err) {
-    logger.error(
-      'Failed to get clinic settings:', err.message
-    )
-    return errorResponse(
-      res, 'Failed to fetch clinic settings', 500
-    )
+    next(err)
   }
 }
 
 /**
  * PUT /settings/clinic
  */
-async function updateClinicSettings(req, res) {
+async function updateClinicSettings(req, res, next) {
   try {
     const updates = req.body
     
@@ -114,10 +108,9 @@ async function updateClinicSettings(req, res) {
        await TenantService.setConfig(req.tenantId, `clinic_${key}`, String(value))
     }
 
-    return getClinicSettings(req, res)
+    return getClinicSettings(req, res, next)
   } catch (err) {
-    logger.error('Failed to update clinic settings:', err.message)
-    return errorResponse(res, 'Failed to update clinic settings', 500)
+    next(err)
   }
 }
 
@@ -125,8 +118,7 @@ async function updateClinicSettings(req, res) {
  * GET /settings/hitl
  * Gets tenant_settings (working hours, handoff message, out of hours message)
  */
-async function getHITLSettings(req, res) {
-  const pool = require('../../config/database')
+async function getHITLSettings(req, res, next) {
   try {
     const result = await pool.query(
       'SELECT * FROM tenant_settings WHERE tenant_id = $1',
@@ -137,8 +129,7 @@ async function getHITLSettings(req, res) {
     }
     return successResponse(res, result.rows[0])
   } catch (err) {
-    logger.error('Failed to get HITL settings:', err.message)
-    return errorResponse(res, 'Failed to fetch HITL settings', 500)
+    next(err)
   }
 }
 
@@ -147,8 +138,7 @@ async function getHITLSettings(req, res) {
  * Updates tenant_settings
  * Body: { working_hours, handoff_message, out_of_hours_message }
  */
-async function updateHITLSettings(req, res) {
-  const pool = require('../../config/database')
+async function updateHITLSettings(req, res, next) {
   try {
     const { working_hours, handoff_message, out_of_hours_message } = req.body
     const result = await pool.query(
@@ -171,8 +161,7 @@ async function updateHITLSettings(req, res) {
     }
     return successResponse(res, result.rows[0])
   } catch (err) {
-    logger.error('Failed to update HITL settings:', err.message)
-    return errorResponse(res, 'Failed to update HITL settings', 500)
+    next(err)
   }
 }
 

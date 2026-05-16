@@ -1,4 +1,5 @@
 const { Resend } = require('resend')
+const logger = require('./logger')
 
 const resend = new Resend(
   process.env.RESEND_API_KEY
@@ -45,7 +46,7 @@ async function sendPasswordResetEmail({
       `
     })
   } catch (err) {
-    console.error('Email send failed:', err)
+    logger.error('Email send failed:', err)
     throw err
   }
 }
@@ -84,7 +85,7 @@ async function sendWelcomeEmail({
       `
     })
   } catch (err) {
-    console.error('Welcome email failed:', err)
+    logger.error('Welcome email failed:', err)
     // Don't throw — welcome email failure
     // should not block account creation
   }

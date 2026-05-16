@@ -1,5 +1,6 @@
 const StaffModel = require('./staff.model')
 const pool = require('../../config/database')
+const ClinicModel = require('../industries/clinic/clinic.model');
 
 /**
  * Invites a new staff member
@@ -19,7 +20,6 @@ async function inviteStaff(tenantId, staffData) {
   // If role is doctor and specialized, we might need to sync with clinic doctors table.
   // In a robust implementation, Clinic module would listen to staff creation event or we do it here.
   if (staff.role === 'doctor') {
-    const ClinicModel = require('../industries/clinic/clinic.model');
     await ClinicModel.createDoctor(pool, tenantId, {
       name: staff.name,
       email: staff.email,
@@ -38,12 +38,21 @@ async function inviteStaff(tenantId, staffData) {
  */
 async function getStaffWithStats(tenantId) {
   const staffArray = await StaffModel.getStaff(pool, tenantId)
-  
-  // To keep it simple currently without complex joins, we return staff directly.
-  // A production app would join with bookings or clinic_doctors to get daily stats.
+  // Get today's booking counts per doctor email
+  const bookingRes = await pool.query(`
+    SELECT d.email, COUNT(*) as count
+    FROM bookings b
+    JOIN clinic_doctors d ON d.id = b.doctor_id
+    WHERE b.tenant_id = $1 AND b.booking_date = CURRENT_DATE
+    GROUP BY d.email
+  `, [tenantId])
+  const countByEmail = {}
+  for (const row of bookingRes.rows) {
+    countByEmail[row.email] = parseInt(row.count) || 0
+  }
   return staffArray.map(staff => ({
     ...staff,
-    bookings_count: 0 // Placeholder logic for now, easily expandable
+    bookings_count: countByEmail[staff.email] || 0
   }))
 }
 

@@ -192,8 +192,8 @@ async function forgotPassword(req, res) {
     )
 
     // Send reset email via Resend
-    const resetUrl =
-      `https://receptionai.in/reset-password?token=${resetToken}`
+    const frontendUrl = process.env.FRONTEND_URL || 'https://receptionai.in'
+    const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`
 
     await sendPasswordResetEmail({
       to: email,

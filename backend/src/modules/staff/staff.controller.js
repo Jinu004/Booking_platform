@@ -2,7 +2,6 @@ const StaffService = require('./staff.service')
 const StaffModel = require('./staff.model')
 const pool = require('../../config/database')
 const { successResponse, errorResponse } = require('../../utils/response')
-const logger = require('../../utils/logger')
 const { bcrypt } = require('../../config/auth')
 const { sendWelcomeEmail } = require('../../utils/email')
 
@@ -13,20 +12,19 @@ function generateTempPassword() {
 /**
  * GET /staff
  */
-async function getStaff(req, res) {
+async function getStaff(req, res, next) {
   try {
     const staff = await StaffService.getStaffWithStats(req.tenantId)
     return successResponse(res, { staff })
   } catch (error) {
-    logger.error('Failed to get staff:', error.message)
-    return errorResponse(res, 'Failed to fetch staff', 500)
+    next(error)
   }
 }
 
 /**
  * GET /staff/:id
  */
-async function getStaffById(req, res) {
+async function getStaffById(req, res, next) {
   try {
     const staff = await StaffModel.getStaffById(pool, req.tenantId, req.params.id)
     if (!staff) {
@@ -34,15 +32,14 @@ async function getStaffById(req, res) {
     }
     return successResponse(res, { staff })
   } catch (error) {
-    logger.error('Failed to get staff by ID:', error.message)
-    return errorResponse(res, 'Failed to fetch staff member', 500)
+    next(error)
   }
 }
 
 /**
  * POST /staff
  */
-async function inviteStaff(req, res) {
+async function inviteStaff(req, res, next) {
   try {
     const staffData = req.body
     if (!staffData.name || !staffData.role || !staffData.email) {
@@ -62,15 +59,14 @@ async function inviteStaff(req, res) {
     })
     return successResponse(res, { staff }, 201)
   } catch (error) {
-    logger.error('Failed to invite staff:', error.message)
-    return errorResponse(res, error.message || 'Failed to invite staff member', 500)
+    next(error)
   }
 }
 
 /**
  * PATCH /staff/:id
  */
-async function updateStaff(req, res) {
+async function updateStaff(req, res, next) {
   try {
     const updates = req.body
     let staff;
@@ -86,15 +82,14 @@ async function updateStaff(req, res) {
     }
     return successResponse(res, { staff })
   } catch (error) {
-    logger.error('Failed to update staff:', error.message)
-    return errorResponse(res, error.message || 'Failed to update staff member', 500)
+    next(error)
   }
 }
 
 /**
  * DELETE /staff/:id
  */
-async function deleteStaff(req, res) {
+async function deleteStaff(req, res, next) {
   try {
     const staff = await StaffModel.deleteStaff(pool, req.tenantId, req.params.id)
     if (!staff) {
@@ -102,8 +97,7 @@ async function deleteStaff(req, res) {
     }
     return successResponse(res, { message: 'Staff deactivated successfully' })
   } catch (error) {
-    logger.error('Failed to delete staff:', error.message)
-    return errorResponse(res, 'Failed to deactivate staff member', 500)
+    next(error)
   }
 }
 

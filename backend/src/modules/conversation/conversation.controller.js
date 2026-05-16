@@ -4,6 +4,8 @@ const ConversationService = require('./conversation.service');
 const pool = require('../../config/database');
 const { successResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
+const whatsappAdapter = require('../channel/whatsapp/whatsapp.adapter');
+const { getOrCreateSession, updateSession } = require('./conversation.session');
 
 /**
  * GET /conversations
@@ -155,7 +157,7 @@ async function sendManualMessage(req, res, next) {
     const savedMsg = await ConversationService.saveOutboundMessage(id, message, 'staff');
     
     // Attempt sending via real WhatsApp adapter
-    const adapter = require('../channel/whatsapp/whatsapp.adapter');
+    const adapter = whatsappAdapter;
     let phone = '';
     if (conversation.customer_id) {
         const c = await pool.query('SELECT phone FROM customers WHERE id = $1', [conversation.customer_id]);
@@ -167,7 +169,6 @@ async function sendManualMessage(req, res, next) {
     }
     
     // Update Redis session
-    const { getOrCreateSession, updateSession } = require('./conversation.session');
     if (phone) {
         const session = await getOrCreateSession(tenantId, phone);
         await updateSession(tenantId, phone, {

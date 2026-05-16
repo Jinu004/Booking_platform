@@ -32,7 +32,6 @@ const validate = (req, res, next) => {
 
 // All routes require tenant auth
 router.use(requireAuth);
-router.use(requireAuth);
 
 router.get('/', getBookings);
 router.get('/today', getTodayBookings);

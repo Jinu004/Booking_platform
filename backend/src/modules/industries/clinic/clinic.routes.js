@@ -17,7 +17,6 @@ const {
 const router = express.Router();
 
 router.use(requireAuth);
-router.use(requireAuth);
 
 router.get('/doctors', getDoctors);
 router.get('/doctors/:id', getDoctorById);

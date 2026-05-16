@@ -1,5 +1,7 @@
 const tenantService = require('./tenant.service');
 const { successResponse, errorResponse } = require('../../utils/response');
+const pool = require('../../config/database');
+const tenantModel = require('./tenant.model');
 
 /**
  * POST / — Create new tenant
@@ -36,8 +38,6 @@ const getTenantById = async (req, res) => {
 const getTenantBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
-    const pool = require('../../config/database');
-    const tenantModel = require('./tenant.model');
     const tenant = await tenantModel.getTenantBySlug(pool, slug);
     if (!tenant) throw new Error('Tenant not found');
     return successResponse(res, tenant, 200);

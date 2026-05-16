@@ -100,7 +100,23 @@ async function getDoctorStats(tenantId, period) {
 }
 
 async function getPatientStats(tenantId, period) {
-  return { new: 0, returning: 0 }
+  try {
+    const interval = getInterval(period)
+    const res = await pool.query(`
+      SELECT
+        count(*) FILTER (WHERE created_at >= NOW() - ${interval}) as new_patients,
+        count(*) FILTER (WHERE created_at < NOW() - ${interval}) as returning_patients
+      FROM customers
+      WHERE tenant_id = $1
+    `, [tenantId])
+    return {
+      new: parseInt(res.rows[0].new_patients) || 0,
+      returning: parseInt(res.rows[0].returning_patients) || 0
+    }
+  } catch (error) {
+    logger.error('Error fetching patient stats:', error.message)
+    throw error
+  }
 }
 
 async function getConversationStats(tenantId, period) {

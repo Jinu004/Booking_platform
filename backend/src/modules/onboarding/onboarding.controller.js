@@ -4,7 +4,7 @@ const tenantModel = require('../tenant/tenant.model');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const { generateToken } = require('../../config/auth');
 
 /**
  * POST /onboarding/clinic
@@ -70,17 +70,13 @@ const staffResult = await pool.query(
     );
     const newStaff = staffResult.rows[0];
 
-    const token = jwt.sign(
-      {
-        staffId: newStaff.id,
-        tenantId: newStaff.tenant_id,
-        role: newStaff.role,
-        email: newStaff.email,
-        name: newStaff.name
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = generateToken({
+      staffId: newStaff.id,
+      tenantId: newStaff.tenant_id,
+      role: newStaff.role,
+      email: newStaff.email,
+      name: newStaff.name
+    });
 
     // Store session
     await pool.query(

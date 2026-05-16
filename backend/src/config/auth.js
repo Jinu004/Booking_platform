@@ -1,7 +1,10 @@
 const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
 
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production'
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required')
+}
 const JWT_EXPIRES_IN = '7d'
 
 function generateToken(payload) {
