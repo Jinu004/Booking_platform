@@ -3,6 +3,7 @@ const ConversationModel = require('./conversation.model');
 const MessageModel = require('./message.model');
 const { getOrCreateSession, updateSession, clearSession } = require('./conversation.session');
 const logger = require('../../utils/logger');
+const { broadcastToTenant } = require('../hitl/hitl.service');
 
 /**
  * Handles incoming message from any channel
@@ -42,6 +43,10 @@ async function handleIncomingMessage(tenant, message) {
   
   if (!conversation) {
     conversation = await ConversationModel.createConversation(pool, tenant.id, customer.id, message.provider);
+    broadcastToTenant(tenant.id, 'new_conversation', {
+      conversationId: conversation.id,
+      timestamp: new Date().toISOString()
+    });
   } else {
     await ConversationModel.touchConversation(pool, tenant.id, conversation.id);
   }
