@@ -104,12 +104,12 @@ export default function Patients() {
     );
   }
 
-  const newCount = patients.filter(p => (p.total_visits || 0) === 0).length;
-  const returningCount = patients.filter(p => (p.total_visits || 0) > 0).length;
+  const newCount = patients.filter(p => (parseInt(p.total_visits || 0)) === 0).length;
+  const returningCount = patients.filter(p => (parseInt(p.total_visits || 0)) > 0).length;
 
   const filtered =
-    activeFilter === 'new' ? patients.filter(p => (p.total_visits || 0) === 0)
-    : activeFilter === 'returning' ? patients.filter(p => (p.total_visits || 0) > 0)
+    activeFilter === 'new' ? patients.filter(p => (parseInt(p.total_visits || 0)) === 0)
+    : activeFilter === 'returning' ? patients.filter(p => (parseInt(p.total_visits || 0)) > 0)
     : patients;
 
   return (
@@ -177,7 +177,7 @@ export default function Patients() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(p => {
-                const isNew = (p.total_visits || 0) === 0;
+                const isNew = (parseInt(p.total_visits || 0)) === 0;
                 const bloodGroup = p.profile?.blood_group;
                 const age = calcAge(p.profile?.date_of_birth);
                 const gender = p.profile?.gender;
@@ -207,7 +207,7 @@ export default function Patients() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">{relativeDate(p.last_seen)}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-700">{p.total_visits || 0}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-700">{parseInt(p.total_visits || 0)}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                         isNew ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
