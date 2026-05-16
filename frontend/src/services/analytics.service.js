@@ -5,8 +5,8 @@ export async function getOverview(period) {
   return res;
 }
 
-export async function getDailyBookings() {
-  const res = await api.get('/analytics/bookings/daily');
+export async function getDailyBookings(period = 'month') {
+  const res = await api.get('/analytics/bookings/daily', { params: { period } });
   return res;
 }
 

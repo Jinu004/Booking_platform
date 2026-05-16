@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  getOverview, 
-  getDailyBookings, 
-  getDoctorStats, 
-  getConversationStats 
+import {
+  getOverview,
+  getDailyBookings,
+  getDoctorStats,
+  getConversationStats
 } from '../services/analytics.service';
 // If recharts is not installed, the user might see errors, but per prompt we assume recharts is used.
-import { 
+import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   BarChart, Bar, Legend
 } from 'recharts';
@@ -14,7 +14,7 @@ import {
 const Analytics = () => {
   const [period, setPeriod] = useState('month');
   const [loading, setLoading] = useState(true);
-  
+
   const [overview, setOverview] = useState({
     bookings: { total: 0, completed: 0, cancelled: 0, noshow: 0 },
     patients: { new: 0 },
@@ -33,7 +33,7 @@ const Analytics = () => {
       setLoading(true);
       const [oRes, dRes, docRes, cRes] = await Promise.all([
         getOverview(period).catch(() => ({ data: overview })),
-        getDailyBookings().catch(() => ({ data: [] })),
+        getDailyBookings(period).catch(() => ({ data: [] })),
         getDoctorStats().catch(() => ({ data: [] })),
         getConversationStats(period).catch(() => ({ data: convData }))
       ]);
@@ -50,7 +50,7 @@ const Analytics = () => {
       }
       setDoctorData(docRes.data || []);
       setConvData(cRes.data || convData);
-      
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -72,11 +72,10 @@ const Analytics = () => {
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${
-                period === p 
-                ? 'bg-white shadow text-indigo-600' 
+              className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${period === p
+                ? 'bg-white shadow text-indigo-600'
                 : 'text-gray-500 hover:text-gray-700'
-              }`}
+                }`}
             >
               {p === 'week' ? 'This Week' : p === 'month' ? 'This Month' : 'Today'}
             </button>
@@ -111,8 +110,7 @@ const Analytics = () => {
           {/* Row 2: Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-              <h2 className="text-lg font-bold text-gray-900 mb-6">Daily Bookings (Last 30 Days)</h2>
-              <div className="h-64">
+              <h2 className="text-lg font-bold text-gray-900 mb-6">Daily Bookings ({period === 'today' ? 'Today' : period === 'week' ? 'This Week' : 'This Month'})</h2>              <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={dailyData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -152,25 +150,25 @@ const Analytics = () => {
               <div className="overflow-x-auto">
                 <table className="min-w-[500px] w-full divide-y divide-gray-200">
                   <thead className="bg-white">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Bookings</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {doctorData.map((d, idx) => (
-                    <tr key={idx}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{d.doctorName}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">{d.totalBookings}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">{d.completed}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">₹{d.revenue}</td>
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Bookings</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
                     </tr>
-                  ))}
-                  {doctorData.length === 0 && <tr><td colSpan="4" className="text-center py-4 text-gray-500">No data available</td></tr>}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {doctorData.map((d, idx) => (
+                      <tr key={idx}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{d.doctorName}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">{d.totalBookings}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">{d.completed}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">₹{d.revenue}</td>
+                      </tr>
+                    ))}
+                    {doctorData.length === 0 && <tr><td colSpan="4" className="text-center py-4 text-gray-500">No data available</td></tr>}
+                  </tbody>
+                </table>
               </div>
             </div>
 
