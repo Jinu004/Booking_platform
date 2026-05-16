@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllTenants, getPlatformStats, updateTenantStatus, updateTenant, createTenant } from '../services/superadmin.service';
+import { getAllTenants, getPlatformStats, updateTenantStatus, updateTenant, createTenant, clearTenantConversations } from '../services/superadmin.service';
 import useStore from '../store/useStore';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/shared/Skeleton';
 
@@ -122,6 +122,17 @@ export default function SuperAdmin() {
     }
   };
 
+
+  const handleClearConversations = async (t) => {
+    if (!window.confirm(`Clear all old conversations for ${t.name}? This cannot be undone.`)) return
+    try {
+      const res = await clearTenantConversations(t.id)
+      alert(res.data.message)
+      fetchData()
+    } catch {
+      alert('Failed to clear conversations')
+    }
+  }
   if (loading) {
     return (
       <div className="p-8 space-y-8">
@@ -196,7 +207,7 @@ export default function SuperAdmin() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(t.created_at).toLocaleDateString()}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                     <button onClick={() => openEdit(t)} className="text-blue-600 hover:text-blue-900">Edit</button>
-                    <button
+                    <button onClick={() => handleClearConversations(t)} className="text-orange-600 hover:text-orange-900">Clear Chats</button>                    <button
                       onClick={() => handleStatusChange(t.id, t.status)}
                       className={
                         t.status === 'pending' ? 'text-green-600 hover:text-green-900' :
