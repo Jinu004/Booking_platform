@@ -52,7 +52,7 @@ export default function Settings() {
       .then(res => {
         if (res?.data) setClinic(prev => ({ ...prev, ...res.data }));
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setClinicLoading(false));
 
     getHITLSettings()
@@ -65,7 +65,7 @@ export default function Settings() {
           });
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setHITLLoading(false));
   }, []);
 
@@ -131,11 +131,10 @@ export default function Settings() {
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
-              className={`pb-3 px-1 border-b-2 text-sm font-semibold whitespace-nowrap transition-colors ${
-                activeTab === t.key
-                  ? 'border-teal-600 text-teal-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`pb-3 px-1 border-b-2 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === t.key
+                ? 'border-teal-600 text-teal-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
               {t.label}
             </button>
@@ -289,7 +288,7 @@ export default function Settings() {
             <div className="relative">
               <div className={`w-14 h-14 rounded-full flex items-center justify-center ${whatsappNumber ? 'bg-green-100' : 'bg-gray-100'}`}>
                 <svg className={`w-8 h-8 ${whatsappNumber ? 'text-green-600' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.964 9.964 0 001.333 4.993l-1.331 4.881 4.992-1.31A9.96 9.96 0 0012.012 22C17.525 22 22 17.522 22 12.016 22 6.495 17.525 2 12.012 2zm5.405 14.398c-.227.643-1.31 1.258-1.802 1.341-.492.083-1.127.136-3.411-.81-2.735-1.135-4.512-4.004-4.646-4.184-.134-.18-1.11-1.488-1.11-2.836S7.135 7.64 7.375 7.382c.241-.258.749-.318 1.04-.318.291 0 .584.01.81.01.229 0 .54-.087.848.66.309.747 1.053 2.57 1.144 2.753.091.183.153.398.035.635-.119.238-.18.384-.356.591-.176.208-.372.45-.53.606-.176.177-.361.371-.157.726.205.353.91 1.503 1.948 2.428 1.342 1.196 2.455 1.564 2.815 1.741.36.177.568.148.78-.101.21-.249.91-1.06 1.15-1.424.238-.363.477-.302.802-.186.326.115 2.057.971 2.41 1.148.354.177.591.267.676.417.087.151.087.876-.14 1.519z"/>
+                  <path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.964 9.964 0 001.333 4.993l-1.331 4.881 4.992-1.31A9.96 9.96 0 0012.012 22C17.525 22 22 17.522 22 12.016 22 6.495 17.525 2 12.012 2zm5.405 14.398c-.227.643-1.31 1.258-1.802 1.341-.492.083-1.127.136-3.411-.81-2.735-1.135-4.512-4.004-4.646-4.184-.134-.18-1.11-1.488-1.11-2.836S7.135 7.64 7.375 7.382c.241-.258.749-.318 1.04-.318.291 0 .584.01.81.01.229 0 .54-.087.848.66.309.747 1.053 2.57 1.144 2.753.091.183.153.398.035.635-.119.238-.18.384-.356.591-.176.208-.372.45-.53.606-.176.177-.361.371-.157.726.205.353.91 1.503 1.948 2.428 1.342 1.196 2.455 1.564 2.815 1.741.36.177.568.148.78-.101.21-.249.91-1.06 1.15-1.424.238-.363.477-.302.802-.186.326.115 2.057.971 2.41 1.148.354.177.591.267.676.417.087.151.087.876-.14 1.519z" />
                 </svg>
               </div>
               <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${whatsappNumber ? 'bg-green-500' : 'bg-gray-400'}`}></div>
@@ -303,12 +302,7 @@ export default function Settings() {
               </p>
             </div>
           </div>
-          <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Webhook URL</p>
-            <code className="block p-3 bg-gray-800 text-green-400 rounded-lg font-mono text-sm break-all">
-              https://receptionai.in/webhook/whatsapp
-            </code>
-          </div>
+
         </div>
       )}
 
@@ -329,7 +323,7 @@ export default function Settings() {
             {(PLAN_FEATURES[plan] || PLAN_FEATURES.starter).map(feature => (
               <div key={feature} className="flex items-center gap-2 text-sm text-gray-700">
                 <svg className="w-4 h-4 text-teal-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
                 {feature}
               </div>
