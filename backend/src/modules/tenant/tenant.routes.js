@@ -14,6 +14,7 @@ const {
   validateUpdateTenant,
   validateSetConfig
 } = require('./tenant.validation');
+const { requireAuth } = require('../auth/auth.middleware');
 
 const router = express.Router();
 
