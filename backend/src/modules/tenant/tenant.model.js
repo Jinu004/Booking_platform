@@ -13,7 +13,7 @@ const createTenant = async (pool, tenantData) => {
   const { name, slug, industry, plan, whatsapp_number } = tenantData;
   const sql = `
     INSERT INTO tenants (name, slug, industry, plan, whatsapp_number, status)
-    VALUES ($1, $2, $3, $4, $5, 'active')
+    VALUES ($1, $2, $3, $4, $5, 'pending')
     RETURNING *
   `;
   const result = await pool.query(sql, [name, slug, industry, plan, whatsapp_number]);
