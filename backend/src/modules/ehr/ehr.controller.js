@@ -29,7 +29,7 @@ async function getPatients(req, res, next) {
     }
     query += ` GROUP BY c.id, c.name, c.phone, c.email, c.created_at, pp.age, pp.gender, pp.blood_group ORDER BY last_visit DESC NULLS LAST, c.created_at DESC`;
     const result = await pool.query(query, params);
-    return successResponse(res, result.rows);
+    return successResponse(res, { customers: result.rows, total: result.rows.length });
   } catch (err) {
     next(err);
   }
