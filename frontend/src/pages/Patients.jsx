@@ -1,183 +1,235 @@
 import React, { useState, useEffect } from 'react';
-import { getPatients, getPatientById, updatePatient } from '../services/patient.service';
+import { useNavigate } from 'react-router-dom';
+import { getEHRPatients } from '../services/ehr.service';
+import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import { TableRowSkeleton } from '../components/shared/Skeleton';
 
-const Patients = () => {
+const AVATAR_COLORS = [
+  'bg-indigo-100 text-indigo-700',
+  'bg-teal-100 text-teal-700',
+  'bg-amber-100 text-amber-700',
+  'bg-rose-100 text-rose-700',
+  'bg-violet-100 text-violet-700',
+  'bg-emerald-100 text-emerald-700',
+];
+
+function avatarColor(name) {
+  if (!name) return AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function initials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(' ').filter(Boolean);
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function calcAge(dob) {
+  if (!dob) return null;
+  return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+}
+
+function relativeDate(dateStr) {
+  if (!dateStr) return 'Never';
+  const diffDays = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return `${diffDays}d ago`;
+}
+
+const BLOOD_COLORS = {
+  'O+': 'bg-red-100 text-red-700',
+  'O-': 'bg-red-50 text-red-400',
+  'A+': 'bg-blue-100 text-blue-700',
+  'A-': 'bg-blue-50 text-blue-400',
+  'B+': 'bg-green-100 text-green-700',
+  'B-': 'bg-green-50 text-green-400',
+  'AB+': 'bg-purple-100 text-purple-700',
+  'AB-': 'bg-purple-50 text-purple-400',
+};
+
+export default function Patients() {
+  const navigate = useNavigate();
   const { addToast } = useStore();
+  const staff = getStoredStaff();
+  const isPro = staff?.tenantPlan === 'pro';
+
   const [patients, setPatients] = useState([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  
-  // Modal state
-  const [selectedPatient, setSelectedPatient] = useState(null);
-  const [notes, setNotes] = useState('');
-  const [savingNotes, setSavingNotes] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchPatients();
-    }, 500);
-    return () => clearTimeout(delayDebounceFn);
+    if (!isPro) return;
+    const timer = setTimeout(fetchPatients, 500);
+    return () => clearTimeout(timer);
   }, [search]);
 
   const fetchPatients = async () => {
     try {
       setLoading(true);
-      const result = await getPatients({ search, limit: 20 });
-      setPatients(result?.data?.customers || []);
-      setTotal(result?.data?.total || 0);
-    } catch (err) {
+      const res = await getEHRPatients(search);
+      setPatients(res?.data?.customers || []);
+      setTotal(res?.data?.total || 0);
+    } catch {
       addToast('Failed to load patients', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const openProfile = async (id) => {
-    try {
-      const res = await getPatientById(id);
-      setSelectedPatient(res.data);
-      setNotes(res.data?.notes || '');
-    } catch (err) {
-      addToast('Failed to load profile', 'error');
-    }
-  };
+  if (!isPro) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">EHR is a Pro Feature</h2>
+        <p className="text-gray-500 text-sm max-w-sm">
+          EHR is available on the Pro plan. Contact{' '}
+          <a href="mailto:support@receptionai.in" className="text-teal-600 hover:underline">
+            support@receptionai.in
+          </a>{' '}
+          to upgrade.
+        </p>
+      </div>
+    );
+  }
 
-  const closeProfile = () => {
-    setSelectedPatient(null);
-    setNotes('');
-  };
+  const newCount = patients.filter(p => (p.total_visits || 0) === 0).length;
+  const returningCount = patients.filter(p => (p.total_visits || 0) > 0).length;
 
-  const saveNotes = async () => {
-    if (!selectedPatient) return;
-    setSavingNotes(true);
-    try {
-      await updatePatient(selectedPatient.id, { notes });
-      setSelectedPatient({ ...selectedPatient, notes });
-      fetchPatients();
-    } catch (err) {
-      addToast('Failed to save notes', 'error');
-    } finally {
-      setSavingNotes(false);
-    }
-  };
+  const filtered =
+    activeFilter === 'new' ? patients.filter(p => (p.total_visits || 0) === 0)
+    : activeFilter === 'returning' ? patients.filter(p => (p.total_visits || 0) > 0)
+    : patients;
 
   return (
     <div className="p-8 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Patients ({total})</h1>
-        <div className="w-64">
-          <input
-            type="text"
-            placeholder="Search name or phone..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full border-gray-300 rounded-md shadow-sm p-2"
-          />
-        </div>
-      </div>
-
-      <div className="bg-white shadow overflow-x-auto sm:rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Visit</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Visits</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {loading ? (
-              <tr><td colSpan="5" className="p-0"><TableRowSkeleton rows={5} /></td></tr>
-            ) : patients.length === 0 ? (
-              <tr>
-                <td colSpan="5" className="text-center py-16">
-                  <div className="flex flex-col items-center justify-center space-y-3">
-                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                    <p className="text-gray-500 font-medium text-lg">No patients yet</p>
-                    <p className="text-gray-400 text-sm max-w-sm">Patients are added automatically when they message your WhatsApp number</p>
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              patients.map(p => (
-                <tr key={p.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{p.name || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{p.phone}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {p.last_seen ? new Date(p.last_seen).toLocaleDateString() : 'Never'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{p.visits_count || 0}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => openProfile(p.id)} className="text-indigo-600 hover:text-indigo-900">View Profile</button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {selectedPatient && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">{selectedPatient.name || 'Unknown'}</h2>
-                <p className="text-gray-500">{selectedPatient.phone}</p>
-                {selectedPatient.date_of_birth && <p className="text-sm text-gray-500 mt-1">DOB: {new Date(selectedPatient.date_of_birth).toLocaleDateString()}</p>}
-              </div>
-              <button onClick={closeProfile} className="text-gray-400 hover:text-gray-500 text-xl font-bold">&times;</button>
-            </div>
-
-            <div className="mb-6 border-t border-gray-200 pt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                rows="3"
-                className="w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50"
-              />
-              <button 
-                onClick={saveNotes} 
-                disabled={savingNotes || notes === selectedPatient.notes}
-                className="mt-2 bg-indigo-600 text-white px-3 py-1 rounded shadow text-sm disabled:opacity-50"
-              >
-                {savingNotes ? 'Saving...' : 'Save Notes'}
-              </button>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Visit History</h3>
-              {(!selectedPatient.history || selectedPatient.history.length === 0) ? (
-                <p className="text-sm text-gray-500">No past visits</p>
-              ) : (
-                <ul className="divide-y divide-gray-200">
-                  {selectedPatient.history.map(visit => (
-                    <li key={visit.id} className="py-4">
-                      <div className="flex space-x-3">
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-medium">Dr. {visit.doctor_name || 'Unassigned'}</h3>
-                            <p className="text-sm text-gray-500">{new Date(visit.booking_date).toLocaleDateString()}</p>
-                          </div>
-                          <p className="text-sm text-gray-500">Token #{visit.token_number} - Status: {visit.status}</p>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Patients</h1>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="text-sm text-gray-500">{total} total</span>
+            <span className="w-1 h-1 bg-gray-300 rounded-full" />
+            <span className="text-sm text-green-600 font-medium">{newCount} new</span>
+            <span className="w-1 h-1 bg-gray-300 rounded-full" />
+            <span className="text-sm text-blue-600 font-medium">{returningCount} returning</span>
           </div>
         </div>
-      )}
+        <input
+          type="text"
+          placeholder="Search name or phone..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+        />
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-1 border-b border-gray-200">
+        {[
+          { key: 'all', label: 'All' },
+          { key: 'new', label: 'New' },
+          { key: 'returning', label: 'Returning' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveFilter(tab.key)}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+              activeFilter === tab.key
+                ? 'border-teal-600 text-teal-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {loading ? (
+          <TableRowSkeleton rows={6} />
+        ) : filtered.length === 0 ? (
+          <div className="p-16 text-center text-gray-400 text-sm">No patients found</div>
+        ) : (
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Patient</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Blood Group</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Visit</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Visits</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.map(p => {
+                const isNew = (p.total_visits || 0) === 0;
+                const bloodGroup = p.profile?.blood_group;
+                const age = calcAge(p.profile?.date_of_birth);
+                const gender = p.profile?.gender;
+                return (
+                  <tr key={p.id} className="hover:bg-gray-50 transition">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarColor(p.name)}`}>
+                          {initials(p.name)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{p.name || '—'}</p>
+                          <p className="text-xs text-gray-400">
+                            {[age ? `${age}y` : null, gender].filter(Boolean).join(' · ') || 'No info'}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{p.phone || '—'}</td>
+                    <td className="px-6 py-4">
+                      {bloodGroup ? (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${BLOOD_COLORS[bloodGroup] || 'bg-gray-100 text-gray-600'}`}>
+                          {bloodGroup}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-sm">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{relativeDate(p.last_seen)}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-700">{p.total_visits || 0}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        isNew ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {isNew ? 'New' : 'Returning'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => navigate(`/patients/${p.id}`)}
+                        className="text-sm text-teal-600 font-semibold hover:text-teal-800"
+                      >
+                        View Profile →
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
-};
-
-export default Patients;
+}

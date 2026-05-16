@@ -20,6 +20,7 @@ import NotFound from './pages/NotFound';
 import SuperAdmin from './pages/SuperAdmin';
 import Landing from './pages/Landing';
 import PendingApproval from './pages/PendingApproval';
+import PatientProfile from './pages/PatientProfile';
 
 const App = () => {
   return (
@@ -38,6 +39,7 @@ const App = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/bookings" element={<Bookings />} />
             <Route path="/patients" element={<Patients />} />
+            <Route path="/patients/:customerId" element={<PatientProfile />} />
             <Route path="/doctors" element={<Doctors />} />
             <Route path="/staff" element={<Staff />} />
             <Route path="/conversations" element={<Conversations />} />
