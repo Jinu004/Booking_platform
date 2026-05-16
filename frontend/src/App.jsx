@@ -19,6 +19,7 @@ import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
 import SuperAdmin from './pages/SuperAdmin';
 import Landing from './pages/Landing';
+import PendingApproval from './pages/PendingApproval';
 
 const App = () => {
   return (
@@ -27,6 +28,7 @@ const App = () => {
       
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/pending" element={<PendingApproval />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<Landing />} />

@@ -97,7 +97,8 @@ async function login(req, res) {
         role: staff.role,
         tenantId: staff.tenant_id,
         tenantName: staff.tenant_name,
-        tenantPlan: staff.tenant_plan
+        tenantPlan: staff.tenant_plan,
+        tenantStatus: staff.tenant_status
       }
     })
   } catch (err) {

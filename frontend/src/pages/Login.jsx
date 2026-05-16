@@ -21,7 +21,11 @@ export default function Login() {
       const result = await login(email, password)
       if (result.success) {
         storeAuthData(result.data.token, result.data.staff)
-        navigate('/dashboard')
+        if (result.data.staff.tenantStatus === 'pending') {
+          navigate('/pending')
+        } else {
+          navigate('/dashboard')
+        }
       } else {
         setError(result.error || 'Invalid email or password')
       }
