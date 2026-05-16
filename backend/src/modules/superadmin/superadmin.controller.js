@@ -205,11 +205,35 @@ async function updateTenant(req, res) {
   }
 }
 
+/**
+ * DELETE /superadmin/tenants/:id/conversations
+ * Clears resolved/inactive conversations older than 30 days for a tenant
+ */
+async function clearTenantConversations(req, res) {
+  try {
+    const { id } = req.params
+    const result = await pool.query(`
+      DELETE FROM conversations
+      WHERE tenant_id = $1
+      AND status IN ('resolved', 'inactive')
+      AND started_at < NOW() - INTERVAL '30 days'
+    `, [id])
+    return successResponse(res, {
+      deleted: result.rowCount,
+      message: `Deleted ${result.rowCount} old conversations`
+    })
+  } catch (err) {
+    logger.error('Error clearing tenant conversations:', err.message)
+    return errorResponse(res, 'Failed to clear conversations', 500)
+  }
+}
+
 module.exports = {
   getAllTenants,
   getTenantDetails,
   updateTenantStatus,
   updateTenant,
   createTenant,
-  getPlatformStats
+  getPlatformStats,
+  clearTenantConversations
 };
