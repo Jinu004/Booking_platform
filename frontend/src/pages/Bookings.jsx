@@ -6,9 +6,11 @@ import {
 import { getDoctors } from '../services/clinic.service';
 import api from '../utils/api';
 import TokenReceipt from '../components/shared/TokenReceipt';
+import useStore from '../store/useStore';
 import { TableRowSkeleton, StatCardSkeleton } from '../components/shared/Skeleton';
 
 const Bookings = () => {
+  const { addToast } = useStore();
   const [bookings, setBookings] = useState([]);
   const [stats, setStats] = useState({ total: 0, confirmed: 0, completed: 0, noshow: 0 });
   const [loading, setLoading] = useState(true);
@@ -47,7 +49,7 @@ const Bookings = () => {
       setStats(statsRes?.data || { total: 0, confirmed: 0, completed: 0, noshow: 0 });
       setDoctors(docsRes?.data || []);
     } catch (err) {
-      console.error('Failed to fetch bookings', err);
+      addToast('Failed to load bookings', 'error');
     } finally {
       setLoading(false);
     }
@@ -62,7 +64,7 @@ const Bookings = () => {
       const docRes = await getDoctors(true).catch(() => ({ data: [] }));
       setDoctors(docRes.data || []);
     } catch(err) {
-      console.error(err);
+      addToast('Failed to load form data', 'error');
     }
   };
 

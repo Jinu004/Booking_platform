@@ -13,7 +13,7 @@ const Dashboard = () => {
   const [tokenQueue, setTokenQueue] = useState([]);
   const [recentConversations, setRecentConversations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { tenant } = useStore();
+  const { tenant, addToast } = useStore();
   const [hasDoctors, setHasDoctors] = useState(true);
   const [doctors, setDoctors] = useState([]);
   const [availableDoctors, setAvailableDoctors] = useState([]);
@@ -61,7 +61,7 @@ const Dashboard = () => {
       const hasDoctorsCheck = docsArray.length > 0;
       setHasDoctors(hasDoctorsCheck);
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
+      addToast('Failed to load dashboard data', 'error');
     } finally {
       setLoading(false);
     }

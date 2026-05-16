@@ -1,4 +1,5 @@
 import api from '../utils/api'
+import { STORAGE_KEYS } from '../constants'
 
 export async function login(email, password) {
   return api.post('/auth/login', {
@@ -11,8 +12,8 @@ export async function logout() {
   try {
     await api.post('/auth/logout')
   } finally {
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('staff_data')
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN)
+    localStorage.removeItem(STORAGE_KEYS.STAFF_DATA)
   }
 }
 
@@ -33,21 +34,20 @@ export async function resetPassword(
 }
 
 export function getStoredToken() {
-  return localStorage.getItem('auth_token')
+  return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
 }
 
 export function getStoredStaff() {
-  const data = localStorage.getItem('staff_data')
+  const data = localStorage.getItem(STORAGE_KEYS.STAFF_DATA)
   return data ? JSON.parse(data) : null
 }
 
 export function storeAuthData(token, staff) {
-  localStorage.setItem('auth_token', token)
-  localStorage.setItem(
-    'staff_data', JSON.stringify(staff)
+  localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token)
+  localStorage.setItem(STORAGE_KEYS.STAFF_DATA, JSON.stringify(staff)
   )
 }
 
 export function isAuthenticated() {
-  return !!localStorage.getItem('auth_token')
+  return !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
 }

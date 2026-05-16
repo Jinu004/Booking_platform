@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getPatients, getPatientById, updatePatient } from '../services/patient.service';
 import useStore from '../store/useStore';
+import { TableRowSkeleton } from '../components/shared/Skeleton';
 
 const Patients = () => {
   const { addToast } = useStore();
@@ -28,7 +29,7 @@ const Patients = () => {
       setPatients(result?.data?.customers || []);
       setTotal(result?.data?.total || 0);
     } catch (err) {
-      console.error(err);
+      addToast('Failed to load patients', 'error');
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,7 @@ const Patients = () => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan="5" className="text-center py-4">Loading...</td></tr>
+              <tr><td colSpan="5" className="p-0"><TableRowSkeleton rows={5} /></td></tr>
             ) : patients.length === 0 ? (
               <tr>
                 <td colSpan="5" className="text-center py-16">

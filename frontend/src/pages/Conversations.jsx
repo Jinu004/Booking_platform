@@ -51,6 +51,7 @@ function getAvatarColor(str) {
 }
 
 export default function Conversations() {
+  const { addToast } = useStore();
   const [conversations, setConversations] = useState([]);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -97,7 +98,7 @@ export default function Conversations() {
         setConversations(res.data || []);
       }
     } catch (err) {
-      console.error('Failed to load conversations:', err);
+      addToast('Failed to load conversations', 'error');
     } finally {
       setLoadingList(false);
     }

@@ -5,6 +5,7 @@ import Select from '../components/shared/Select';
 import useStore from '../store/useStore';
 import api from '../utils/api';
 import { storeAuthData } from '../services/auth.service';
+import { PLANS } from '../constants';
 
 
 
@@ -17,11 +18,7 @@ const STEPS = [
   { id: 4, label: 'Password', icon: '🔒' },
 ];
 
-const plans = [
-  { id: 'starter', name: 'Starter', price: '₹2,999', doctors: '1 doctor', conversations: '1,000 conv/mo', features: ['AI WhatsApp booking', 'Token queue management', 'Basic analytics', 'Email support'] },
-  { id: 'growth', name: 'Growth', price: '₹5,999', doctors: 'Up to 5 doctors', conversations: '3,000 conv/mo', features: ['AI WhatsApp booking', 'Token queue management', 'Advanced analytics', 'Priority support'], popular: true },
-  { id: 'pro', name: 'Pro', price: '₹9,999', doctors: 'Up to 10 doctors', conversations: '6,000 conv/mo', features: ['AI WhatsApp booking', 'Token queue management', 'Full analytics & reports', '24/7 support', 'Custom AI responses'] },
-];
+const plans = Object.values(PLANS).map(p => ({ ...p, price: `₹${p.priceDisplay}` }));
 
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'None'];
 

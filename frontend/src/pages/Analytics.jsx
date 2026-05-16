@@ -10,8 +10,11 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   BarChart, Bar, Legend
 } from 'recharts';
+import { StatCardSkeleton, TableRowSkeleton } from '../components/shared/Skeleton';
+import useStore from '../store/useStore';
 
 const Analytics = () => {
+  const { addToast } = useStore();
   const [period, setPeriod] = useState('month');
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +55,7 @@ const Analytics = () => {
       setConvData(cRes.data || convData);
 
     } catch (err) {
-      console.error(err);
+      addToast('Failed to load analytics', 'error');
     } finally {
       setLoading(false);
     }
@@ -84,7 +87,21 @@ const Analytics = () => {
       </div>
 
       {loading ? (
-        <div className="text-center py-20 text-gray-500 font-medium">Loading Analytics...</div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+              <div className="h-5 bg-gray-200 rounded w-1/3 mb-6 animate-pulse"></div>
+              <TableRowSkeleton rows={4} />
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+              <div className="h-5 bg-gray-200 rounded w-1/3 mb-6 animate-pulse"></div>
+              <TableRowSkeleton rows={4} />
+            </div>
+          </div>
+        </>
       ) : (
         <>
           {/* Row 1: Stat Cards */}

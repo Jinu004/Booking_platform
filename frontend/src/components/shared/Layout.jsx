@@ -12,7 +12,7 @@ const Layout = () => {
   const [searching, setSearching] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { tenant } = useStore();
+  const { tenant, addToast } = useStore();
   const staff = (() => { try { return JSON.parse(localStorage.getItem('staff') || '{}'); } catch { return {}; } })();
 
   const isDashboard = location.pathname === '/dashboard';
@@ -42,7 +42,7 @@ const Layout = () => {
         const result = await globalSearch(searchQuery);
         setSearchResults(result.data?.data || result.data);
       } catch (err) {
-        console.error('Search error:', err);
+        addToast('Search failed', 'error');
       } finally {
         setSearching(false);
       }

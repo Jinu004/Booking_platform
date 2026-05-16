@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getDoctors, createDoctor, updateDoctor, deleteDoctor, updateAvailability, addLeave, getTokenQueue, updateTokenStatus, getDoctorSchedule, saveDoctorSchedule } from '../services/clinic.service';
 import useStore from '../store/useStore';
+import { CardSkeleton } from '../components/shared/Skeleton';
 
 const SPECIALIZATIONS = [
   'Ayurveda','Anaesthesiology','Cardiology',
@@ -343,7 +344,11 @@ const Doctors = () => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {loading && doctors.length === 0 ? <p>Loading doctors...</p> : doctors.map(doc => (
+          {loading && doctors.length === 0 ? (
+            <>
+              <CardSkeleton /><CardSkeleton /><CardSkeleton />
+            </>
+          ) : doctors.map(doc => (
             <div key={doc.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col justify-between hover:shadow-md transition">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">{doc.name}</h3>

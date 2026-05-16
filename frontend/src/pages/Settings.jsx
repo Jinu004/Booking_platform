@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getClinicSettings, updateClinicSettings, getHITLSettings, updateHITLSettings } from '../services/settings.service';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
+import { PLANS } from '../constants';
 
 const DAYS = [
   { key: 'mon', label: 'Monday' },
@@ -13,13 +14,7 @@ const DAYS = [
   { key: 'sun', label: 'Sunday' },
 ];
 
-const PLAN_FEATURES = {
-  starter: ['AI WhatsApp Bot', 'Up to 150 Daily Tokens', 'Basic Analytics', 'Email & WhatsApp Support'],
-  growth: ['Everything in Starter', 'Up to 300 Daily Tokens', 'Advanced Analytics', 'Priority Support', 'Multi-doctor Support'],
-  pro: ['Everything in Growth', 'Unlimited Daily Tokens', 'Full Analytics', 'Dedicated Support', 'Custom AI Personality'],
-};
 
-const PLAN_PRICE = { starter: '2,999', growth: '5,999', pro: '9,999' };
 
 export default function Settings() {
   const staff = getStoredStaff();
@@ -306,11 +301,11 @@ export default function Settings() {
             </span>
           </div>
           <div className="flex items-baseline gap-1">
-            <span className="text-4xl font-bold text-gray-900">₹{PLAN_PRICE[plan] || '2,999'}</span>
+            <span className="text-4xl font-bold text-gray-900">₹{PLANS[plan]?.priceDisplay || '2,999'}</span>
             <span className="text-gray-400 text-sm">/month</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {(PLAN_FEATURES[plan] || PLAN_FEATURES.starter).map(feature => (
+            {(PLANS[plan]?.features || PLANS.starter.features).map(feature => (
               <div key={feature} className="flex items-center gap-2 text-sm text-gray-700">
                 <svg className="w-4 h-4 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
