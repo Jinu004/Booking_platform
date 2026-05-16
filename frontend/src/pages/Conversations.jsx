@@ -153,7 +153,9 @@ export default function Conversations() {
         console.error('SSE mode_changed parse error', err);
       }
     });
-
+    eventSource.addEventListener('new_conversation', (e) => {
+      fetchConversations();
+    });
     eventSource.addEventListener('handoff_requested', (e) => {
       try {
         const data = JSON.parse(e.data);
