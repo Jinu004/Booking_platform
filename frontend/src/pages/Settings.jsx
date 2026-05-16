@@ -132,7 +132,7 @@ export default function Settings() {
               key={t.key}
               onClick={() => setActiveTab(t.key)}
               className={`pb-3 px-1 border-b-2 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === t.key
-                ? 'border-teal-600 text-teal-700'
+                ? 'border-indigo-600 text-indigo-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
             >
@@ -157,7 +157,7 @@ export default function Settings() {
                     type="time"
                     value={clinic.opening_time || '09:00'}
                     onChange={e => setClinic(p => ({ ...p, opening_time: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
@@ -166,7 +166,7 @@ export default function Settings() {
                     type="time"
                     value={clinic.closing_time || '18:00'}
                     onChange={e => setClinic(p => ({ ...p, closing_time: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
               </div>
@@ -176,7 +176,7 @@ export default function Settings() {
                   rows={2}
                   value={clinic.address || ''}
                   onChange={e => setClinic(p => ({ ...p, address: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="123 Main Street, Kollam, Kerala"
                 />
               </div>
@@ -184,7 +184,7 @@ export default function Settings() {
                 <button
                   onClick={handleSaveClinic}
                   disabled={saving}
-                  className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                  className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Save Profile'}
                 </button>
@@ -209,7 +209,7 @@ export default function Settings() {
                   rows={2}
                   value={hitl.handoff_message}
                   onChange={e => setHITL(p => ({ ...p, handoff_message: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
@@ -219,7 +219,7 @@ export default function Settings() {
                   rows={2}
                   value={hitl.out_of_hours_message}
                   onChange={e => setHITL(p => ({ ...p, out_of_hours_message: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
@@ -235,7 +235,7 @@ export default function Settings() {
                               type="checkbox"
                               checked={day.enabled}
                               onChange={e => updateDay(key, 'enabled', e.target.checked)}
-                              className="w-4 h-4 accent-teal-600"
+                              className="w-4 h-4 accent-indigo-600"
                             />
                             <span className={`text-sm font-medium ${day.enabled ? 'text-gray-800' : 'text-gray-400'}`}>
                               {label}
@@ -248,14 +248,14 @@ export default function Settings() {
                               type="time"
                               value={day.open}
                               onChange={e => updateDay(key, 'open', e.target.value)}
-                              className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                              className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
                             <span className="text-gray-400 text-sm">to</span>
                             <input
                               type="time"
                               value={day.close}
                               onChange={e => updateDay(key, 'close', e.target.value)}
-                              className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                              className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
                           </div>
                         ) : (
@@ -270,7 +270,7 @@ export default function Settings() {
                 <button
                   onClick={handleSaveHITL}
                   disabled={saving}
-                  className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                  className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Save AI Settings'}
                 </button>
@@ -311,7 +311,7 @@ export default function Settings() {
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Current Plan</h2>
-            <span className="px-3 py-1 bg-teal-100 text-teal-800 text-xs font-bold rounded-full uppercase tracking-wider">
+            <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-full uppercase tracking-wider">
               {plan}
             </span>
           </div>
@@ -322,7 +322,7 @@ export default function Settings() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {(PLAN_FEATURES[plan] || PLAN_FEATURES.starter).map(feature => (
               <div key={feature} className="flex items-center gap-2 text-sm text-gray-700">
-                <svg className="w-4 h-4 text-teal-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
                 {feature}
@@ -330,7 +330,7 @@ export default function Settings() {
             ))}
           </div>
           <div className="pt-2 border-t border-gray-100">
-            <p className="text-sm text-gray-500">To upgrade your plan or make billing changes, contact <a href="mailto:support@receptionai.in" className="text-teal-600 hover:underline">support@receptionai.in</a></p>
+            <p className="text-sm text-gray-500">To upgrade your plan or make billing changes, contact <a href="mailto:support@receptionai.in" className="text-indigo-600 hover:underline">support@receptionai.in</a></p>
           </div>
         </div>
       )}
