@@ -121,9 +121,66 @@ async function updateClinicSettings(req, res) {
   }
 }
 
+/**
+ * GET /settings/hitl
+ * Gets tenant_settings (working hours, handoff message, out of hours message)
+ */
+async function getHITLSettings(req, res) {
+  const pool = require('../../config/database')
+  try {
+    const result = await pool.query(
+      'SELECT * FROM tenant_settings WHERE tenant_id = $1',
+      [req.tenantId]
+    )
+    if (!result.rows.length) {
+      return errorResponse(res, 'HITL settings not found', 404)
+    }
+    return successResponse(res, result.rows[0])
+  } catch (err) {
+    logger.error('Failed to get HITL settings:', err.message)
+    return errorResponse(res, 'Failed to fetch HITL settings', 500)
+  }
+}
+
+/**
+ * PUT /settings/hitl
+ * Updates tenant_settings
+ * Body: { working_hours, handoff_message, out_of_hours_message }
+ */
+async function updateHITLSettings(req, res) {
+  const pool = require('../../config/database')
+  try {
+    const { working_hours, handoff_message, out_of_hours_message } = req.body
+    const result = await pool.query(
+      `UPDATE tenant_settings
+       SET working_hours = COALESCE($1, working_hours),
+           handoff_message = COALESCE($2, handoff_message),
+           out_of_hours_message = COALESCE($3, out_of_hours_message),
+           updated_at = NOW()
+       WHERE tenant_id = $4
+       RETURNING *`,
+      [
+        working_hours ? JSON.stringify(working_hours) : null,
+        handoff_message || null,
+        out_of_hours_message || null,
+        req.tenantId
+      ]
+    )
+    if (!result.rows.length) {
+      return errorResponse(res, 'HITL settings not found', 404)
+    }
+    return successResponse(res, result.rows[0])
+  } catch (err) {
+    logger.error('Failed to update HITL settings:', err.message)
+    return errorResponse(res, 'Failed to update HITL settings', 500)
+  }
+}
+
 module.exports = {
   getSettings,
   updateSettings,
   getClinicSettings,
-  updateClinicSettings
+  updateClinicSettings,
+  getHITLSettings,
+  updateHITLSettings
 }
