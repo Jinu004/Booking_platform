@@ -60,8 +60,9 @@ async function onboardClinic(req, res) {
       [tenant.id, ownerName, email, phone, password_hash]
     );
 
-    const staffResult = await pool.query(
-      `SELECT s.*, t.name AS tenant_name, t.plan AS tenant_plan
+
+const staffResult = await pool.query(
+      `SELECT s.*, t.name AS tenant_name, t.plan AS tenant_plan, t.status AS tenant_status, t.whatsapp_number AS whatsapp_number
        FROM staff s
        JOIN tenants t ON t.id = s.tenant_id
        WHERE s.email = $1`,
@@ -91,14 +92,16 @@ async function onboardClinic(req, res) {
 
     return successResponse(res, {
       token,
-      staff: {
+staff: {
         id: newStaff.id,
         name: newStaff.name,
         email: newStaff.email,
         role: newStaff.role,
         tenantId: newStaff.tenant_id,
         tenantName: newStaff.tenant_name,
-        tenantPlan: newStaff.tenant_plan
+        tenantPlan: newStaff.tenant_plan,
+        tenantStatus: newStaff.tenant_status,
+        tenantWhatsapp: newStaff.whatsapp_number
       },
       tenant_id: tenant.id,
       name: tenant.name,
