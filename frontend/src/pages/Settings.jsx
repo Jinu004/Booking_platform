@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getClinicSettings, updateClinicSettings, getHITLSettings, updateHITLSettings } from '../services/settings.service';
 import { getStoredStaff } from '../services/auth.service';
+import useStore from '../store/useStore';
 
 const DAYS = [
   { key: 'mon', label: 'Monday' },
@@ -24,10 +25,10 @@ export default function Settings() {
   const staff = getStoredStaff();
   const plan = staff?.tenantPlan || 'starter';
   const whatsappNumber = staff?.tenantWhatsapp || null;
+  const { addToast } = useStore();
 
   const [activeTab, setActiveTab] = useState('clinic');
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState('');
 
   const [clinic, setClinic] = useState({ opening_time: '09:00', closing_time: '18:00', address: '' });
   const [hitl, setHITL] = useState({
@@ -69,18 +70,13 @@ export default function Settings() {
       .finally(() => setHITLLoading(false));
   }, []);
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3000);
-  };
-
   const handleSaveClinic = async () => {
     try {
       setSaving(true);
       await updateClinicSettings(clinic);
-      showToast('Clinic profile saved');
+      addToast('Clinic profile saved', 'success');
     } catch {
-      showToast('Failed to save');
+      addToast('Failed to save', 'error');
     } finally {
       setSaving(false);
     }
@@ -90,9 +86,9 @@ export default function Settings() {
     try {
       setSaving(true);
       await updateHITLSettings(hitl);
-      showToast('AI settings saved');
+      addToast('AI settings saved', 'success');
     } catch {
-      showToast('Failed to save');
+      addToast('Failed to save', 'error');
     } finally {
       setSaving(false);
     }
@@ -117,12 +113,6 @@ export default function Settings() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-6">
-      {toast && (
-        <div className="fixed top-6 right-6 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium z-50">
-          {toast}
-        </div>
-      )}
-
       <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
 
       <div className="border-b border-gray-200">

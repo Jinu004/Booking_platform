@@ -17,7 +17,7 @@ const TokenReceipt = ({ booking, onClose }) => {
         {/* Receipt Content */}
         <div className="p-8 text-center print:p-4">
           <h2 className="text-3xl font-extrabold text-gray-900 mb-1">{tenant?.name || 'Clinic Registration'}</h2>
-          <p className="text-[10px] text-gray-400 mb-8 uppercase tracking-[0.2em] font-bold font-mono">BookingAI Platform</p>
+          <p className="text-[10px] text-gray-400 mb-8 uppercase tracking-[0.2em] font-bold font-mono">ReceptionAI</p>
           
           <div className="flex justify-center mb-8">
             <div className="h-40 w-40 rounded-full border-[6px] border-indigo-100 flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50 shadow-inner">

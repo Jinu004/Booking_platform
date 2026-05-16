@@ -11,11 +11,9 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     if (import.meta.env.VITE_BYPASS_AUTH === 'true') {
-      const defaultTenantId = '262467ed-7cf3-418b-b46c-6038540f9260';
-      const devTenantId = localStorage.getItem('dev_tenant_id') || defaultTenantId;
-      
+      const devTenantId = import.meta.env.VITE_DEV_TENANT_ID || localStorage.getItem('dev_tenant_id');
       config.headers['x-dev-role'] = 'admin';
-      config.headers['x-dev-tenant-id'] = devTenantId;
+      if (devTenantId) config.headers['x-dev-tenant-id'] = devTenantId;
     } else {
       const token = localStorage.getItem('auth_token');
       if (token) {

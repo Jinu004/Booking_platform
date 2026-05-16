@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getPatients, getPatientById, updatePatient } from '../services/patient.service';
+import useStore from '../store/useStore';
 
 const Patients = () => {
+  const { addToast } = useStore();
   const [patients, setPatients] = useState([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
@@ -38,7 +40,7 @@ const Patients = () => {
       setSelectedPatient(res.data);
       setNotes(res.data?.notes || '');
     } catch (err) {
-      alert('Failed to load profile');
+      addToast('Failed to load profile', 'error');
     }
   };
 
@@ -53,9 +55,9 @@ const Patients = () => {
     try {
       await updatePatient(selectedPatient.id, { notes });
       setSelectedPatient({ ...selectedPatient, notes });
-      fetchPatients(); // refresh table
+      fetchPatients();
     } catch (err) {
-      alert('Failed to save notes');
+      addToast('Failed to save notes', 'error');
     } finally {
       setSavingNotes(false);
     }

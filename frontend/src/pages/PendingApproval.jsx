@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import api from '../utils/api'
 
 export default function PendingApproval() {
   const navigate = useNavigate()
@@ -7,10 +8,7 @@ export default function PendingApproval() {
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        const res = await fetch('/api/v1/auth/me', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
-        })
-        const data = await res.json()
+        const data = await api.get('/auth/me')
         if (data?.data?.tenant?.status === 'active') {
           const staff = JSON.parse(localStorage.getItem('staff_data') || '{}')
           staff.tenantStatus = 'active'

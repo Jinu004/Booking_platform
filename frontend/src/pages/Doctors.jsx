@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getDoctors, createDoctor, updateDoctor, deleteDoctor, updateAvailability, addLeave, getTokenQueue, updateTokenStatus, getDoctorSchedule, saveDoctorSchedule } from '../services/clinic.service';
+import useStore from '../store/useStore';
 
 const SPECIALIZATIONS = [
   'Ayurveda','Anaesthesiology','Cardiology',
@@ -83,6 +84,7 @@ function SearchableSelect({
 }
 
 const Doctors = () => {
+  const { addToast } = useStore();
   const [doctors, setDoctors] = useState([]);
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -201,9 +203,9 @@ const Doctors = () => {
     try {
       await saveDoctorSchedule(scheduleModalDoc.id, doctorSchedule);
       setScheduleModalDoc(null);
-      alert('Schedule saved successfully');
+      addToast('Schedule saved successfully', 'success');
     } catch (err) {
-      alert('Failed to save schedule');
+      addToast('Failed to save schedule', 'error');
     } finally {
       setSavingSchedule(false);
     }
@@ -263,7 +265,7 @@ const Doctors = () => {
       setIsManageModalOpen(false);
       fetchDoctors();
     } catch (err) {
-      alert(`Failed to ${manageMode} doctor`);
+      addToast(`Failed to ${manageMode} doctor`, 'error');
     }
   };
 
@@ -272,10 +274,10 @@ const Doctors = () => {
     try {
       await deleteDoctor(doctorId);
       fetchDoctors();
-      alert('Doctor removed successfully');
+      addToast('Doctor removed successfully', 'success');
     } catch (err) {
       console.error('Delete failed:', err);
-      alert('Failed to remove doctor');
+      addToast('Failed to remove doctor', 'error');
     }
   };
 
@@ -289,7 +291,7 @@ const Doctors = () => {
         await updateAvailability(doc.id, { available: true, leaveDays: 0 });
         fetchDoctors();
       } catch (err) {
-        alert('Failed to update availability');
+        addToast('Failed to update availability', 'error');
       }
     }
   };
@@ -306,7 +308,7 @@ const Doctors = () => {
       setLeaveModalDoc(null);
       fetchDoctors();
     } catch (err) {
-      alert('Failed to register leave');
+      addToast('Failed to register leave', 'error');
     }
   };
 
@@ -315,7 +317,7 @@ const Doctors = () => {
       await updateTokenStatus(tokenId, status);
       fetchQueue();
     } catch (err) {
-      alert('Failed to update token status');
+      addToast('Failed to update token status', 'error');
     }
   };
 
