@@ -220,6 +220,18 @@ async function saveDoctorSchedule(req, res, next) {
     const { id } = req.params;
     const { schedules } = req.body;
     const result = await ClinicModel.saveDoctorSchedule(pool, tenantId, id, schedules);
+    const today = new Date().getDay();
+    await pool.query('UPDATE clinic_doctors SET available_today = false WHERE id = $1 AND tenant_id = $2 AND leave_days != 999', [id, tenantId]);
+    await pool.query(`
+      UPDATE clinic_doctors cd SET available_today = true
+      FROM doctor_schedules ds
+      WHERE ds.doctor_id = cd.id
+      AND ds.doctor_id = $1
+      AND cd.tenant_id = $2
+      AND ds.day_of_week = $3
+      AND ds.is_available = true
+      AND cd.leave_days != 999
+    `, [id, tenantId, today]);
     return res.json({ success: true, data: result, error: null });
   } catch (err) {
     next(err);
