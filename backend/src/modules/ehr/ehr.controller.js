@@ -2,6 +2,9 @@ const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 
+// UUID v4 format validation helper
+const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 function isPro(req) {
   return req.tenant?.plan === 'pro';
 }
@@ -40,6 +43,7 @@ async function getPatient(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
     const { customerId } = req.params;
+    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
     const [customerRes, profileRes, conditionsRes, visitNotesRes, bookingsRes] = await Promise.all([
       pool.query(`SELECT * FROM customers WHERE id = $1 AND tenant_id = $2`, [customerId, req.tenantId]),
       pool.query(`SELECT * FROM patient_profiles WHERE customer_id = $1 AND tenant_id = $2`, [customerId, req.tenantId]),
@@ -77,6 +81,7 @@ async function upsertProfile(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
     const { customerId } = req.params;
+    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
     const { age, gender, blood_group, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship } = req.body;
     const result = await pool.query(`
       INSERT INTO patient_profiles (tenant_id, customer_id, age, gender, blood_group, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, updated_at)
@@ -102,6 +107,7 @@ async function addCondition(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
     const { customerId } = req.params;
+    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
     const { type, name, notes } = req.body;
     if (!type || !name) return errorResponse(res, 'Type and name are required', 400);
     if (!['condition', 'allergy', 'medication'].includes(type)) return errorResponse(res, 'Invalid type', 400);
@@ -120,6 +126,8 @@ async function deleteCondition(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
     const { customerId, id } = req.params;
+    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
+    if (!isUUID(id)) return errorResponse(res, 'Invalid condition ID', 400);
     await pool.query(`DELETE FROM patient_conditions WHERE id = $1 AND customer_id = $2 AND tenant_id = $3`, [id, customerId, req.tenantId]);
     return successResponse(res, { deleted: true });
   } catch (err) {
@@ -132,6 +140,7 @@ async function addVisitNote(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
     const { customerId } = req.params;
+    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
     const { visit_date, doctor_id, diagnosis, prescription, follow_up_date, notes, booking_id } = req.body;
     if (!visit_date) return errorResponse(res, 'Visit date is required', 400);
     const result = await pool.query(`
@@ -149,6 +158,8 @@ async function updateVisitNote(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
     const { customerId, id } = req.params;
+    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
+    if (!isUUID(id)) return errorResponse(res, 'Invalid visit note ID', 400);
     const { visit_date, doctor_id, diagnosis, prescription, follow_up_date, notes } = req.body;
     const result = await pool.query(`
       UPDATE visit_notes SET

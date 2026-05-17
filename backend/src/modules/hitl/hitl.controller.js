@@ -2,6 +2,9 @@ const HITLModel = require('./hitl.model');
 const HITLService = require('./hitl.service');
 const logger = require('../../utils/logger');
 
+// UUID v4 format validation helper
+const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 // GET /api/hitl/conversations
 async function getConversations(req, res, next) {
   try {
@@ -18,6 +21,7 @@ async function getMessages(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
+    if (!isUUID(id)) return res.status(400).json({ success: false, data: null, error: 'Invalid conversation ID' });
 
     // Verify ownership
     const conv = await HITLModel.getConversationWithMode(id, tenantId);
@@ -36,6 +40,7 @@ async function reply(req, res, next) {
     const tenantId = req.tenant.id;
     const staffId = req.staff.id;
     const { id } = req.params;
+    if (!isUUID(id)) return res.status(400).json({ success: false, data: null, error: 'Invalid conversation ID' });
     const { content } = req.body;
 
     if (!content || !content.trim()) {
@@ -55,6 +60,7 @@ async function toggleMode(req, res, next) {
     const tenantId = req.tenant.id;
     const staffId = req.staff.id;
     const { id } = req.params;
+    if (!isUUID(id)) return res.status(400).json({ success: false, data: null, error: 'Invalid conversation ID' });
     const updated = await HITLService.toggleMode(id, tenantId, staffId);
     return res.json({ success: true, data: updated, error: null });
   } catch (err) {

@@ -3,6 +3,11 @@ const BookingModel = require('./booking.model');
 const { successResponse, errorResponse } = require('../../utils/response');
 const pool = require('../../config/database');
 
+// UUID v4 format validation helper
+const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+// Phone: 7–15 digits optionally prefixed with +
+const isPhone = (str) => /^\+?\d{7,15}$/.test(str);
+
 /**
  * GET /bookings
  * Gets bookings list with filters
@@ -67,6 +72,9 @@ async function createBooking(req, res, next) {
     const result = await BookingService.createBookingWithToken(tenantId, req.body);
     return successResponse(res, result, 201);
   } catch (error) {
+    if (error.statusCode === 429) {
+      return errorResponse(res, error.message, 429);
+    }
     if (error.message.includes('not available') || error.message.includes('fully booked')) {
       return errorResponse(res, error.message, 400);
     }
@@ -229,6 +237,12 @@ async function createManualBooking(req, res, next) {
 
   if (!patientPhone || !doctorId) {
     return errorResponse(res, 'Patient phone and doctor ID are required', 400);
+  }
+  if (!isPhone(patientPhone)) {
+    return errorResponse(res, 'Invalid phone number format', 400);
+  }
+  if (!isUUID(doctorId)) {
+    return errorResponse(res, 'Invalid doctor ID', 400);
   }
 
   const client = await pool.connect();

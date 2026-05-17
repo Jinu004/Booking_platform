@@ -4,6 +4,9 @@ const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 
+// UUID v4 format validation helper
+const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 /**
  * GET /customers
  * Lists all customers with search and pagination
@@ -28,6 +31,7 @@ async function getCustomerById(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid customer ID', 400);
     const profile = await CRMService.getCustomerProfile(tenantId, id);
     return successResponse(res, profile);
   } catch (error) {
@@ -60,6 +64,7 @@ async function updateCustomer(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid customer ID', 400);
     const customer = await CRMModel.updateCustomer(pool, tenantId, id, req.body);
     if (!customer) {
       return errorResponse(res, 'Customer not found', 404);
@@ -78,6 +83,7 @@ async function getCustomerHistory(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid customer ID', 400);
     const history = await CRMModel.getCustomerHistory(pool, tenantId, id);
     return successResponse(res, history);
   } catch (error) {

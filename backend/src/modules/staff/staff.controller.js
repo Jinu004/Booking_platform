@@ -6,7 +6,9 @@ const { bcrypt } = require('../../config/auth')
 const { sendWelcomeEmail } = require('../../utils/email')
 
 function generateTempPassword() {
-  return Math.random().toString(36).slice(-8) + 'A1!'
+  // crypto.randomBytes is cryptographically secure, unlike Math.random()
+  const crypto = require('crypto');
+  return crypto.randomBytes(12).toString('base64url');
 }
 
 /**

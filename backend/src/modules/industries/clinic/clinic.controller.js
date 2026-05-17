@@ -6,6 +6,12 @@ const { successResponse, errorResponse } = require('../../../utils/response');
 // clinic.model.js getDoctors filters out records where leave_days equals this value
 const DOCTOR_DELETED_SENTINEL = 999;
 
+// UUID v4 format validation helper
+const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+// ISO 8601 date (YYYY-MM-DD) validation helper
+const isISODate = (str) => /^\d{4}-\d{2}-\d{2}$/.test(str) && !isNaN(Date.parse(str));
+
 /**
  * GET /clinic/doctors
  * Lists all doctors
@@ -33,6 +39,7 @@ async function getDoctorById(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const doctor = await ClinicModel.getDoctorById(pool, tenantId, id);
     if (!doctor) {
       return errorResponse(res, 'Doctor not found', 404);
@@ -45,11 +52,32 @@ async function getDoctorById(req, res, next) {
 
 /**
  * POST /clinic/doctors
- * Creates new doctor
+ * Creates new doctor — validates required fields, types, and lengths
  */
 async function createDoctor(req, res, next) {
   try {
     const tenantId = req.tenant.id;
+    const { name, specialization, phone, qualification, maxTokensDaily, consultationFee } = req.body;
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return errorResponse(res, 'Doctor name is required', 400);
+    }
+    if (name.length > 255) {
+      return errorResponse(res, 'Doctor name must be 255 characters or fewer', 400);
+    }
+    if (specialization && specialization.length > 255) {
+      return errorResponse(res, 'Specialization must be 255 characters or fewer', 400);
+    }
+    if (maxTokensDaily !== undefined) {
+      const parsed = parseInt(maxTokensDaily);
+      if (isNaN(parsed) || parsed < 1 || parsed > 500) {
+        return errorResponse(res, 'maxTokensDaily must be a number between 1 and 500', 400);
+      }
+    }
+    if (consultationFee !== undefined && isNaN(Number(consultationFee))) {
+      return errorResponse(res, 'consultationFee must be a number', 400);
+    }
+
     const doctor = await ClinicModel.createDoctor(pool, tenantId, req.body);
     return successResponse(res, doctor, 201);
   } catch (error) {
@@ -66,8 +94,9 @@ async function updateAvailability(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const { available, leaveDays } = req.body;
-    
+
     const doctor = await ClinicModel.updateDoctorAvailability(pool, tenantId, id, available, leaveDays);
     if (!doctor) {
       return errorResponse(res, 'Doctor not found', 404);
@@ -87,7 +116,13 @@ async function addLeave(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const { leaveDate, reason } = req.body;
+
+    if (!leaveDate) return errorResponse(res, 'leaveDate is required', 400);
+    if (!isISODate(leaveDate)) {
+      return errorResponse(res, 'leaveDate must be a valid date in YYYY-MM-DD format', 400);
+    }
 
     const leave = await ClinicModel.addDoctorLeave(pool, tenantId, id, leaveDate, reason);
     return successResponse(res, leave, 201);
@@ -120,6 +155,7 @@ async function updateTokenStatus(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid token ID', 400);
     const { status } = req.body;
 
     const token = await ClinicModel.updateTokenStatus(pool, tenantId, id, status);
@@ -139,6 +175,7 @@ async function updateTokenStatus(req, res, next) {
 async function updateDoctor(req, res, next) {
   try {
     const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const tenantId = req.tenant.id;
 
     const result = await pool.query(
@@ -180,6 +217,7 @@ async function updateDoctor(req, res, next) {
 async function deleteDoctor(req, res, next) {
   try {
     const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const tenantId = req.tenant.id;
 
     const result = await pool.query(
@@ -207,6 +245,7 @@ async function getDoctorSchedule(req, res, next) {
   try {
     const tenantId = req.tenantId || req.tenant?.id;
     const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const schedule = await ClinicModel.getDoctorSchedule(pool, tenantId, id);
     return res.json({ success: true, data: schedule, error: null });
   } catch (err) {
@@ -218,6 +257,7 @@ async function saveDoctorSchedule(req, res, next) {
   try {
     const tenantId = req.tenantId || req.tenant?.id;
     const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const { schedules } = req.body;
     const result = await ClinicModel.saveDoctorSchedule(pool, tenantId, id, schedules);
     const today = new Date().getDay();

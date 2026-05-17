@@ -1,12 +1,17 @@
 const pool = require('../../config/database')
 const logger = require('../../utils/logger')
 
+/**
+ * Maps a period string to a PostgreSQL interval duration string.
+ * Returns a plain duration string used as a parameterized $N::interval value —
+ * never interpolated into SQL — eliminating any injection risk.
+ */
 function getInterval(period) {
   switch (period) {
-    case 'today': return "INTERVAL '1 day'"
-    case 'week': return "INTERVAL '7 days'"
+    case 'today': return '1 day'
+    case 'week':  return '7 days'
     case 'month':
-    default: return "INTERVAL '30 days'"
+    default:      return '30 days'
   }
 }
 
@@ -20,14 +25,14 @@ async function getOverviewStats(tenantId, period) {
         sum(case when status = 'cancelled' then 1 else 0 end) as cancelled,
         sum(case when status = 'noshow' then 1 else 0 end) as noshow
       FROM bookings
-      WHERE tenant_id = $1 AND created_at >= NOW() - ${interval}
-    `, [tenantId])
+      WHERE tenant_id = $1 AND created_at >= NOW() - $2::interval
+    `, [tenantId, interval])
 
     const pRes = await pool.query(`
       SELECT count(*) as new_patients
       FROM customers
-      WHERE tenant_id = $1 AND created_at >= NOW() - ${interval}
-    `, [tenantId])
+      WHERE tenant_id = $1 AND created_at >= NOW() - $2::interval
+    `, [tenantId, interval])
 
     const cRes = await pool.query(`
       SELECT
@@ -35,8 +40,8 @@ async function getOverviewStats(tenantId, period) {
         sum(case when mode = 'ai' then 1 else 0 end) as ai_handled,
         sum(case when needs_attention = true then 1 else 0 end) as escalated
       FROM conversations
-      WHERE tenant_id = $1 AND started_at >= NOW() - ${interval}
-    `, [tenantId])
+      WHERE tenant_id = $1 AND started_at >= NOW() - $2::interval
+    `, [tenantId, interval])
 
     const bStats = bRes.rows[0]
     const cStats = cRes.rows[0]
@@ -69,10 +74,10 @@ async function getDailyBookings(tenantId, period) {
   const res = await pool.query(`
     SELECT DATE(created_at) as date, count(*) as count
     FROM bookings
-    WHERE tenant_id = $1 AND created_at >= NOW() - ${interval}
+    WHERE tenant_id = $1 AND created_at >= NOW() - $2::interval
     GROUP BY DATE(created_at)
     ORDER BY DATE(created_at)
-  `, [tenantId])
+  `, [tenantId, interval])
   return res.rows
 }
 
@@ -86,10 +91,10 @@ async function getDoctorStats(tenantId, period) {
            0 as revenue
     FROM clinic_doctors d
     LEFT JOIN clinic_tokens t ON t.doctor_id = d.id
-    LEFT JOIN bookings b ON b.id = t.booking_id AND b.created_at >= NOW() - ${interval}
+    LEFT JOIN bookings b ON b.id = t.booking_id AND b.created_at >= NOW() - $2::interval
     WHERE d.tenant_id = $1
     GROUP BY d.name
-  `, [tenantId])
+  `, [tenantId, interval])
   return res.rows.map(row => ({
     doctorName: row.doctorName,
     totalBookings: parseInt(row.totalBookings) || 0,
@@ -104,11 +109,11 @@ async function getPatientStats(tenantId, period) {
     const interval = getInterval(period)
     const res = await pool.query(`
       SELECT
-        count(*) FILTER (WHERE created_at >= NOW() - ${interval}) as new_patients,
-        count(*) FILTER (WHERE created_at < NOW() - ${interval}) as returning_patients
+        count(*) FILTER (WHERE created_at >= NOW() - $2::interval) as new_patients,
+        count(*) FILTER (WHERE created_at < NOW() - $2::interval) as returning_patients
       FROM customers
       WHERE tenant_id = $1
-    `, [tenantId])
+    `, [tenantId, interval])
     return {
       new: parseInt(res.rows[0].new_patients) || 0,
       returning: parseInt(res.rows[0].returning_patients) || 0
@@ -129,8 +134,8 @@ async function getConversationStats(tenantId, period) {
         sum(case when needs_attention = true then 1 else 0 end) as escalated,
         sum(case when status = 'resolved' then 1 else 0 end) as resolved
       FROM conversations
-      WHERE tenant_id = $1 AND started_at >= NOW() - ${interval}
-    `, [tenantId])
+      WHERE tenant_id = $1 AND started_at >= NOW() - $2::interval
+    `, [tenantId, interval])
     const row = res.rows[0]
     return {
       total: parseInt(row.total) || 0,

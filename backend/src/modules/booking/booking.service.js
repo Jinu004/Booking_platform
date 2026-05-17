@@ -53,8 +53,10 @@ async function createBookingWithToken(tenantId, bookingData) {
     // 2. Acquire slot lock
     lockAcquired = await ConflictEngine.acquireSlotLock(tenantId, doctorId, bookingDate, requestId);
     if (!lockAcquired) {
-      // Failed to acquire lock, someone is booking currently, but failing open
-      logger.warn(`Could not acquire slot lock for doctor ${doctorId}, proceeding anyway`);
+      // Slot is currently being booked by another request — fail closed to prevent duplicates
+      const lockError = new Error('Booking slot is busy, please try again in a moment');
+      lockError.statusCode = 429;
+      throw lockError;
     }
 
     // 3. Get next token number
