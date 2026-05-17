@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getClinicSettings, updateClinicSettings, getHITLSettings, updateHITLSettings } from '../services/settings.service';
+import { getClinicSettings, updateClinicSettings, getHITLSettings, updateHITLSettings, getSettings, updateSettings } from '../services/settings.service';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import { PLANS } from '../constants';
@@ -51,15 +51,16 @@ export default function Settings() {
       .catch(() => { })
       .finally(() => setClinicLoading(false));
 
-    getHITLSettings()
-      .then(res => {
-        if (res?.data) {
-          setHITL({
-            working_hours: res.data.working_hours || hitl.working_hours,
-            handoff_message: res.data.handoff_message || hitl.handoff_message,
-            out_of_hours_message: res.data.out_of_hours_message || hitl.out_of_hours_message,
-          });
-        }
+    Promise.all([getHITLSettings(), getSettings()])
+      .then(([hitlRes, settingsRes]) => {
+        const hitlData = hitlRes?.data || hitlRes;
+        const lang = settingsRes?.data?.language || settingsRes?.language;
+        setHITL(prev => ({
+          working_hours: hitlData?.working_hours || prev.working_hours,
+          handoff_message: hitlData?.handoff_message || prev.handoff_message,
+          out_of_hours_message: hitlData?.out_of_hours_message || prev.out_of_hours_message,
+          language: lang || prev.language || 'english',
+        }));
       })
       .catch(() => { })
       .finally(() => setHITLLoading(false));
@@ -80,7 +81,10 @@ export default function Settings() {
   const handleSaveHITL = async () => {
     try {
       setSaving(true);
-      await updateHITLSettings(hitl);
+      await Promise.all([
+        updateHITLSettings(hitl),
+        updateSettings({ language: hitl.language || 'english' }),
+      ]);
       addToast('AI settings saved', 'success');
     } catch {
       addToast('Failed to save', 'error');
@@ -187,6 +191,19 @@ export default function Settings() {
             <p className="text-sm text-gray-400">Loading...</p>
           ) : (
             <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Response Language</label>
+                <p className="text-xs text-gray-400 mb-2">Language the AI uses when responding to patients</p>
+                <select
+                  value={hitl.language || 'english'}
+                  onChange={e => setHITL(p => ({ ...p, language: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                >
+                  <option value="english">English</option>
+                  <option value="malayalam">Malayalam</option>
+                  <option value="hindi">Hindi</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Handoff Message</label>
                 <p className="text-xs text-gray-400 mb-2">Sent to patient when AI transfers to staff</p>
