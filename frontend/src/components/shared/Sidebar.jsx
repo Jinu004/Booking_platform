@@ -52,25 +52,37 @@ const icons = {
   ),
 };
 
-const mainLinks = [
-  { name: 'Dashboard', path: '/dashboard' },
-  { name: 'Bookings', path: '/bookings' },
-  { name: 'Conversations', path: '/conversations' },
-  { name: 'Patients', path: '/patients' },
-];
-
-const clinicLinks = [
-  { name: 'Doctors', path: '/doctors' },
-  { name: 'Staff', path: '/staff' },
-  { name: 'Analytics', path: '/analytics' },
-  { name: 'Settings', path: '/settings' },
-];
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const { tenant, pendingHandoffs, clearHandoffs } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
   const staff = getStoredStaff();
+  const role = staff?.role || 'receptionist';
+  const can = (...roles) => roles.includes(role) || role === 'super_admin';
+
+  const mainLinks = [
+    { name: 'Dashboard', path: '/dashboard' },
+    { name: 'Bookings', path: '/bookings' },
+    { name: 'Conversations', path: '/conversations' },
+    { name: 'Patients', path: '/patients' },
+  ].filter(link => {
+    if (link.name === 'Conversations') return can('admin', 'manager', 'receptionist', 'doctor');
+    return true;
+  });
+
+  const clinicLinks = [
+    { name: 'Doctors', path: '/doctors' },
+    { name: 'Staff', path: '/staff' },
+    { name: 'Analytics', path: '/analytics' },
+    { name: 'Settings', path: '/settings' },
+  ].filter(link => {
+    if (link.name === 'Doctors') return can('admin', 'manager');
+    if (link.name === 'Staff') return can('admin', 'manager');
+    if (link.name === 'Analytics') return can('admin', 'manager', 'doctor');
+    if (link.name === 'Settings') return can('admin');
+    return true;
+  });
 
   const handleLogout = async () => {
     await logout();
