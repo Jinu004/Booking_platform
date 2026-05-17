@@ -99,6 +99,21 @@ const Layout = () => {
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
 
+        {/* Mobile-only header for dashboard */}
+        {isDashboard && (
+          <header className="md:hidden bg-white border-b border-gray-200 h-16 flex-shrink-0 flex items-center px-4">
+            <button
+              className="text-gray-600 hover:text-gray-900 focus:outline-none"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
+              </svg>
+            </button>
+            <span className="ml-4 text-xl font-black text-gray-800">ReceptionAI</span>
+          </header>
+        )}
+
         {/* Header — hidden on dashboard, dashboard has its own top bar */}
         {!isDashboard && (
           <header className="bg-white border-b border-gray-200 h-16 flex-shrink-0 flex items-center justify-between px-4 md:px-6 relative global-search-container">
