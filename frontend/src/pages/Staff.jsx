@@ -29,7 +29,7 @@ const Staff = () => {
     try {
       setLoading(true);
       const res = await getStaff();
-      setStaffList(res.data?.staff || []);
+      setStaffList(res.data?.staff || res.staff || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -83,7 +83,7 @@ const Staff = () => {
     <div className="p-8 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Staff Management</h1>
-        <button 
+        <button
           onClick={() => setInviteModalOpen(true)}
           className="bg-indigo-600 text-white px-4 py-2 rounded-md shadow hover:bg-indigo-700 font-medium"
         >
@@ -98,7 +98,7 @@ const Staff = () => {
           <div className="text-center py-16 flex flex-col items-center justify-center space-y-3">
             <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
             <p className="text-gray-500 font-medium text-lg">No staff members yet</p>
-            <button 
+            <button
               onClick={() => setInviteModalOpen(true)}
               className="mt-2 text-indigo-600 font-bold hover:text-indigo-800"
             >
@@ -146,7 +146,7 @@ const Staff = () => {
                   <div className="flex flex-col items-center justify-center space-y-3">
                     <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
                     <p className="text-gray-500 font-medium text-lg">No staff members yet</p>
-                    <button 
+                    <button
                       onClick={() => setInviteModalOpen(true)}
                       className="mt-2 text-indigo-600 font-bold hover:text-indigo-800"
                     >
@@ -177,7 +177,7 @@ const Staff = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                   <button onClick={() => setEditRoleModal({ id: s.id, role: s.role })} className="text-indigo-600 hover:text-indigo-900">Edit Role</button>
                   {s.is_active && (
-                     <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:text-red-900">Deactivate</button>
+                    <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:text-red-900">Deactivate</button>
                   )}
                 </td>
               </tr>
@@ -194,19 +194,19 @@ const Staff = () => {
             <form onSubmit={handleInvite} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Name <span className="text-red-500">*</span></label>
-                <input required type="text" value={inviteData.name} onChange={e => setInviteData({...inviteData, name: e.target.value})} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
+                <input required type="text" value={inviteData.name} onChange={e => setInviteData({ ...inviteData, name: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Email <span className="text-red-500">*</span></label>
-                <input required type="email" value={inviteData.email} onChange={e => setInviteData({...inviteData, email: e.target.value})} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
+                <input required type="email" value={inviteData.email} onChange={e => setInviteData({ ...inviteData, email: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Phone</label>
-                <input type="text" value={inviteData.phone} onChange={e => setInviteData({...inviteData, phone: e.target.value})} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
+                <input type="text" value={inviteData.phone} onChange={e => setInviteData({ ...inviteData, phone: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Role</label>
-                <select value={inviteData.role} onChange={e => setInviteData({...inviteData, role: e.target.value})} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border">
+                <select value={inviteData.role} onChange={e => setInviteData({ ...inviteData, role: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border">
                   <option value="admin">Admin</option>
                   <option value="manager">Manager</option>
                   <option value="doctor">Doctor</option>
@@ -216,10 +216,10 @@ const Staff = () => {
               {inviteData.role === 'doctor' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Specialization</label>
-                  <input type="text" value={inviteData.specialization} onChange={e => setInviteData({...inviteData, specialization: e.target.value})} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
+                  <input type="text" value={inviteData.specialization} onChange={e => setInviteData({ ...inviteData, specialization: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
                 </div>
               )}
-              
+
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
                 <button type="button" onClick={() => setInviteModalOpen(false)} className="px-4 py-2 border rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-indigo-600 text-white flex-1 rounded-md hover:bg-indigo-700 font-medium shadow-sm">Send Invite</button>
@@ -237,7 +237,7 @@ const Staff = () => {
             <form onSubmit={handleUpdateRole} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">New Role</label>
-                <select value={editRoleModal.role} onChange={e => setEditRoleModal({...editRoleModal, role: e.target.value})} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border">
+                <select value={editRoleModal.role} onChange={e => setEditRoleModal({ ...editRoleModal, role: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border">
                   <option value="admin">Admin</option>
                   <option value="manager">Manager</option>
                   <option value="doctor">Doctor</option>
