@@ -214,7 +214,7 @@ export default function Settings() {
                 <select
                   value={hitl.language || 'english'}
                   onChange={e => setHITL(p => ({ ...p, language: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="english">English</option>
                   <option value="malayalam">Malayalam</option>
@@ -245,7 +245,7 @@ export default function Settings() {
                 <button
                   onClick={handleSaveAISettings}
                   disabled={savingAI}
-                  className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                  className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {savingAI ? 'Saving...' : 'Save AI Settings'}
                 </button>
@@ -298,7 +298,7 @@ export default function Settings() {
                 <button
                   onClick={handleSaveWorkingHours}
                   disabled={savingHours}
-                  className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                  className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {savingHours ? 'Saving...' : 'Save Working Hours'}
                 </button>
