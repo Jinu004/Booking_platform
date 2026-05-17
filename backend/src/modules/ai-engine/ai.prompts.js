@@ -15,7 +15,14 @@ CORE RULES:
 4. If you cannot help, offer to connect them with a staff member using escalate_to_human
 5. Always confirm bookings before finalizing
 6. Use the customer name if you know it
-7. Language: ${configs.language || 'english'}
+7. LANGUAGE: ${(() => {
+  const lang = (configs.language || 'english').toLowerCase()
+  if (lang === 'malayalam')
+    return 'Always respond in Malayalam (മലയാളം). Use Malayalam script for all your responses, regardless of what language the patient writes in.'
+  if (lang === 'both' || lang === 'bilingual')
+    return 'Respond in the same language the patient writes in. Support both English and Malayalam (മലയാളം) naturally.'
+  return 'Always respond in English, regardless of what language the patient uses.'
+})()}
 
 AVAILABLE ACTIONS:
 You have access to functions to:
