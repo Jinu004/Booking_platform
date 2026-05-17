@@ -250,26 +250,35 @@ async function resetPassword(req, res) {
     const password_hash =
       await bcrypt.hash(password, 12)
 
-    // Update password
-    await pool.query(
-      `UPDATE staff SET password_hash = $1
-       WHERE id = $2`,
-      [password_hash, staff_id]
-    )
+    // All three writes must succeed atomically.
+    // If the process crashes between them the token could otherwise
+    // be replayed to reset the password a second time.
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
 
-    // Mark token as used
-    await pool.query(
-      `UPDATE auth_password_resets
-       SET used = true WHERE token = $1`,
-      [token]
-    )
+      await client.query(
+        `UPDATE staff SET password_hash = $1 WHERE id = $2`,
+        [password_hash, staff_id]
+      )
 
-    // Invalidate all existing sessions
-    await pool.query(
-      `DELETE FROM auth_sessions
-       WHERE staff_id = $1`,
-      [staff_id]
-    )
+      await client.query(
+        `UPDATE auth_password_resets SET used = true WHERE token = $1`,
+        [token]
+      )
+
+      await client.query(
+        `DELETE FROM auth_sessions WHERE staff_id = $1`,
+        [staff_id]
+      )
+
+      await client.query('COMMIT')
+    } catch (txErr) {
+      await client.query('ROLLBACK')
+      throw txErr
+    } finally {
+      client.release()
+    }
 
     return successResponse(res, {
       message: 'Password reset successfully'

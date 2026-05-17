@@ -48,10 +48,14 @@ const getTenantBySlug = async (req, res) => {
 
 /**
  * PUT /:id — Update tenant
+ * Only super_admin may update a different tenant's record.
  */
 const updateTenant = async (req, res) => {
   try {
     const { id } = req.params;
+    if (req.staff?.role !== 'super_admin' && id !== req.tenantId) {
+      return errorResponse(res, 'Forbidden', 403);
+    }
     const updateData = req.body;
     const tenant = await tenantService.updateTenant(id, updateData);
     return successResponse(res, tenant, 200);
@@ -62,10 +66,14 @@ const updateTenant = async (req, res) => {
 
 /**
  * POST /:id/config — Set single config value
+ * Only super_admin may write config for a different tenant.
  */
 const setConfig = async (req, res) => {
   try {
     const { id } = req.params;
+    if (req.staff?.role !== 'super_admin' && id !== req.tenantId) {
+      return errorResponse(res, 'Forbidden', 403);
+    }
     const { key, value } = req.body;
     const config = await tenantService.setConfig(id, key, value);
     return successResponse(res, config, 200);
@@ -76,11 +84,15 @@ const setConfig = async (req, res) => {
 
 /**
  * GET /:id/config — Get all configs as flat object
+ * Only super_admin may read config for a different tenant.
  */
 const getAllConfigs = async (req, res) => {
   try {
     const { id } = req.params;
-    await tenantService.getTenantById(id); // Ensures validation exists
+    if (req.staff?.role !== 'super_admin' && id !== req.tenantId) {
+      return errorResponse(res, 'Forbidden', 403);
+    }
+    await tenantService.getTenantById(id); // Ensures tenant exists
     const configs = await tenantService.getAllConfigs(id);
     return successResponse(res, configs, 200);
   } catch (error) {

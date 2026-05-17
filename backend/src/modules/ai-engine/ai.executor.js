@@ -256,27 +256,42 @@ Please reply with your name to confirm booking.`
     return `${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply *TOMORROW* to confirm tomorrow's booking or ignore to cancel.`
   }
 
-  // Create today's booking
-  const bookingRes = await pool.query(
-    `INSERT INTO bookings
-       (tenant_id, customer_id, conversation_id, doctor_id,
-        source, status, booking_date, token_number, notes, patient_name)
-     VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE,
-       (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled'),
-       $5, $6)
-     RETURNING id, token_number`,
-    [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
-     `Booked via WhatsApp for ${formattedName}`, formattedName]
-  )
-  const tokenNumber = bookingRes.rows[0].token_number
-  const booking = bookingRes.rows[0]
-
-  // Insert into clinic_tokens
-  await pool.query(
-    `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
-     VALUES ($1, $2, $3, $4, 'waiting')`,
-    [tenant.id, booking.id, doctor.id, tokenNumber]
-  )
+  // Create today's booking inside a transaction.
+  // A FOR UPDATE lock on the doctor row serialises concurrent
+  // WhatsApp bookings so the subquery token count is race-free.
+  const bookingClient = await pool.connect()
+  let tokenNumber, booking
+  try {
+    await bookingClient.query('BEGIN')
+    await bookingClient.query(
+      'SELECT id FROM clinic_doctors WHERE id = $1 FOR UPDATE',
+      [doctor.id]
+    )
+    const bookingRes = await bookingClient.query(
+      `INSERT INTO bookings
+         (tenant_id, customer_id, conversation_id, doctor_id,
+          source, status, booking_date, token_number, notes, patient_name)
+       VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE,
+         (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled'),
+         $5, $6)
+       RETURNING id, token_number`,
+      [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
+       `Booked via WhatsApp for ${formattedName}`, formattedName]
+    )
+    tokenNumber = bookingRes.rows[0].token_number
+    booking = bookingRes.rows[0]
+    await bookingClient.query(
+      `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
+       VALUES ($1, $2, $3, $4, 'waiting')`,
+      [tenant.id, booking.id, doctor.id, tokenNumber]
+    )
+    await bookingClient.query('COMMIT')
+  } catch (txErr) {
+    await bookingClient.query('ROLLBACK')
+    throw txErr
+  } finally {
+    bookingClient.release()
+  }
 
   const configResult = await pool.query(
     `SELECT value FROM tenant_configs WHERE tenant_id = $1 AND key = 'opening_time'`,
@@ -380,26 +395,41 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
           }
         }
 
-        // Create tomorrow booking
-        const bookingRes = await pool.query(
-          `INSERT INTO bookings
-             (tenant_id, customer_id, conversation_id, doctor_id,
-              source, status, booking_date, token_number, notes, patient_name)
-           VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', $5,
-             (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
-             $6, $7)
-           RETURNING id, token_number`,
-          [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
-           tomorrowDate, `Booked via WhatsApp for ${formattedName}`, formattedName]
-        )
-        const tokenNumber = bookingRes.rows[0].token_number
-        const booking = bookingRes.rows[0]
-
-        await pool.query(
-          `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
-           VALUES ($1, $2, $3, $4, 'waiting')`,
-          [tenant.id, booking.id, doctor.id, tokenNumber]
-        )
+        // Create tomorrow booking inside a transaction with a FOR UPDATE
+        // lock on the doctor row to prevent duplicate token numbers.
+        const tomorrowClient = await pool.connect()
+        let tokenNumber, booking
+        try {
+          await tomorrowClient.query('BEGIN')
+          await tomorrowClient.query(
+            'SELECT id FROM clinic_doctors WHERE id = $1 FOR UPDATE',
+            [doctor.id]
+          )
+          const bookingRes = await tomorrowClient.query(
+            `INSERT INTO bookings
+               (tenant_id, customer_id, conversation_id, doctor_id,
+                source, status, booking_date, token_number, notes, patient_name)
+             VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', $5,
+               (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
+               $6, $7)
+             RETURNING id, token_number`,
+            [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
+             tomorrowDate, `Booked via WhatsApp for ${formattedName}`, formattedName]
+          )
+          tokenNumber = bookingRes.rows[0].token_number
+          booking = bookingRes.rows[0]
+          await tomorrowClient.query(
+            `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
+             VALUES ($1, $2, $3, $4, 'waiting')`,
+            [tenant.id, booking.id, doctor.id, tokenNumber]
+          )
+          await tomorrowClient.query('COMMIT')
+        } catch (txErr) {
+          await tomorrowClient.query('ROLLBACK')
+          throw txErr
+        } finally {
+          tomorrowClient.release()
+        }
 
         return `Booking confirmed for tomorrow! 🏥
 Token Number: ${tokenNumber}

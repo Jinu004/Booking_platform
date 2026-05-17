@@ -1,5 +1,5 @@
 const express = require('express')
-const { requireAuth } = require('../auth/auth.middleware')
+const { requireAuth, requireRole } = require('../auth/auth.middleware')
 const {
   getOverview,
   getDailyBookings,
@@ -12,6 +12,7 @@ const router = express.Router()
 
 // All paths require auth and admin/manager roles
 router.use(requireAuth)
+router.use(requireRole('admin', 'manager'))
 
 router.get('/overview', getOverview)
 router.get('/bookings/daily', getDailyBookings)

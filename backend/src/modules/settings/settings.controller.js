@@ -4,6 +4,25 @@ const logger = require('../../utils/logger')
 const pool = require('../../config/database')
 
 /**
+ * Permitted keys for PUT /settings.
+ * Prevents injection of arbitrary config keys (e.g. jwt_secret, admin_override)
+ * that could be read by AI prompts or other system components.
+ */
+const ALLOWED_SETTINGS_KEYS = new Set([
+  // AI / conversation
+  'ai_personality', 'ai_language', 'ai_greeting', 'ai_name', 'ai_tone',
+  'ai_escalation_message', 'ai_response_delay',
+  'escalation_threshold', 'escalation_timeout',
+  // Booking / token
+  'booking_advance_days', 'booking_confirmation_msg', 'booking_cancel_msg',
+  'booking_same_day', 'token_prefix', 'token_format',
+  'weekly_off', 'avg_consultation_minutes', 'reset_time', 'max_tokens_per_day',
+  'opening_time', 'closing_time',
+  // Notifications
+  'notification_reminder_hours', 'reminder_enabled', 'notification_channel',
+])
+
+/**
  * GET /settings
  * Gets all tenant configuration settings and groups them
  */
@@ -61,7 +80,12 @@ async function getSettings(req, res, next) {
 async function updateSettings(req, res, next) {
   try {
     const updates = req.body
-    
+
+    const rejectedKeys = Object.keys(updates).filter(k => !ALLOWED_SETTINGS_KEYS.has(k))
+    if (rejectedKeys.length > 0) {
+      return errorResponse(res, `Invalid settings keys: ${rejectedKeys.join(', ')}`, 400)
+    }
+
     for (const [key, value] of Object.entries(updates)) {
       if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
         await TenantService.setConfig(req.tenantId, key, value.toString())

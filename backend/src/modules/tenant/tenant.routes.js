@@ -14,7 +14,7 @@ const {
   validateUpdateTenant,
   validateSetConfig
 } = require('./tenant.validation');
-const { requireAuth } = require('../auth/auth.middleware');
+const { requireAuth, requireRole } = require('../auth/auth.middleware');
 
 const router = express.Router();
 
@@ -29,7 +29,7 @@ const validate = (req, res, next) => {
 // All tenant routes require authentication
 router.use(requireAuth);
 
-router.post('/', validateCreateTenant, validate, createTenant);
+router.post('/', requireRole('super_admin'), validateCreateTenant, validate, createTenant);
 router.get('/slug/:slug', getTenantBySlug);
 router.get('/:id', getTenantById);
 router.put('/:id', validateUpdateTenant, validate, updateTenant);

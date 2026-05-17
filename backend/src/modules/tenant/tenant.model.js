@@ -57,6 +57,15 @@ const getTenantByWhatsapp = async (pool, whatsappNumber) => {
 };
 
 /**
+ * Allowlisted column names for tenant UPDATE.
+ * Any key not in this set is rejected to prevent SQL injection
+ * via dynamic column name interpolation.
+ */
+const ALLOWED_TENANT_UPDATE_FIELDS = new Set([
+  'name', 'slug', 'plan', 'status', 'industry', 'whatsapp_number', 'updated_at'
+]);
+
+/**
  * Updates allowed tenant fields
  * @param {object} pool - PostgreSQL pool
  * @param {string} id - Tenant UUID
@@ -64,9 +73,15 @@ const getTenantByWhatsapp = async (pool, whatsappNumber) => {
  * @returns {Promise<object>} Updated tenant record
  */
 const updateTenant = async (pool, id, updateData) => {
-  const fields = Object.keys(updateData);
-  if (fields.length === 0) return getTenantById(pool, id);
+  const inputKeys = Object.keys(updateData);
+  if (inputKeys.length === 0) return getTenantById(pool, id);
 
+  const rejectedKeys = inputKeys.filter(k => !ALLOWED_TENANT_UPDATE_FIELDS.has(k));
+  if (rejectedKeys.length > 0) {
+    throw new Error(`Invalid update fields: ${rejectedKeys.join(', ')}`);
+  }
+
+  const fields = inputKeys; // all keys are now validated
   const setClause = fields.map((field, i) => `${field} = $${i + 2}`).join(', ');
   const values = fields.map(field => updateData[field]);
 

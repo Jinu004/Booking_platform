@@ -218,69 +218,93 @@ async function exportBookings(req, res, next) {
 
 /**
  * POST /bookings/manual
- * Staff creates booking manually
+ * Staff creates booking manually.
+ * All DB writes are wrapped in a transaction.
+ * A FOR UPDATE lock on the doctor row serialises concurrent
+ * token-number assignments, preventing duplicates.
  */
 async function createManualBooking(req, res, next) {
+  const tenantId = req.tenant.id;
+  const { patientName, patientPhone, doctorId, notes } = req.body;
+
+  if (!patientPhone || !doctorId) {
+    return errorResponse(res, 'Patient phone and doctor ID are required', 400);
+  }
+
+  const client = await pool.connect();
   try {
-    const tenantId = req.tenant.id;
-    const { patientName, patientPhone, doctorId, notes } = req.body;
-    
-    if (!patientPhone || !doctorId) {
-      return errorResponse(res, 'Patient phone and doctor ID are required', 400);
+    await client.query('BEGIN');
+
+    // Lock the doctor row for this transaction to prevent concurrent
+    // bookings from computing the same token number.
+    const doctorCheck = await client.query(
+      'SELECT id FROM clinic_doctors WHERE id = $1 AND tenant_id = $2 FOR UPDATE',
+      [doctorId, tenantId]
+    );
+    if (!doctorCheck.rows.length) {
+      await client.query('ROLLBACK');
+      return errorResponse(res, 'Doctor not found', 404);
     }
 
-    let cusRes = await pool.query('SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1', [tenantId, patientPhone]);
+    // Find or create customer
+    let cusRes = await client.query(
+      'SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1',
+      [tenantId, patientPhone]
+    );
     let customerId;
     if (cusRes.rows.length > 0) {
       customerId = cusRes.rows[0].id;
     } else {
       const pName = patientName || 'Unknown Patient';
-      const insertCus = await pool.query(
+      const insertCus = await client.query(
         'INSERT INTO customers (tenant_id, phone, name) VALUES ($1, $2, $3) RETURNING id',
         [tenantId, patientPhone, pName]
       );
       customerId = insertCus.rows[0].id;
     }
 
-    const tokenCountResult = await pool.query(
-      `SELECT COUNT(*) as count
+    // Count existing tokens inside the locked transaction — no race condition
+    const tokenCountResult = await client.query(
+      `SELECT COUNT(*) AS count
        FROM clinic_tokens
        WHERE doctor_id = $1
        AND issued_at::date = CURRENT_DATE
        AND status != 'cancelled'`,
       [doctorId]
-    )
-    const tokenNumber = parseInt(
-      tokenCountResult.rows[0].count
-    ) + 1
-
-    const bRes = await pool.query(
-      `INSERT INTO bookings (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes)
-       VALUES ($1, $2, $3, 'walkin', 'pending', CURRENT_DATE, $4, $5) RETURNING *`,
-       [tenantId, customerId, doctorId, tokenNumber, notes || '']
     );
+    const tokenNumber = parseInt(tokenCountResult.rows[0].count) + 1;
 
+    // Insert booking
+    const bRes = await client.query(
+      `INSERT INTO bookings
+         (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes)
+       VALUES ($1, $2, $3, 'walkin', 'pending', CURRENT_DATE, $4, $5)
+       RETURNING *`,
+      [tenantId, customerId, doctorId, tokenNumber, notes || '']
+    );
     const booking = bRes.rows[0];
 
-    // Create clinic_token record
-    await pool.query(
-      `INSERT INTO clinic_tokens
-       (tenant_id, booking_id, doctor_id,
-        token_number, status)
+    // Insert clinic_token record
+    await client.query(
+      `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
        VALUES ($1, $2, $3, $4, 'waiting')`,
       [tenantId, booking.id, doctorId, tokenNumber]
     );
 
-    // Return the correctly mapped booking
+    await client.query('COMMIT');
+
+    // Fetch doctor name outside the transaction (read-only, no locking needed)
     const docRes = await pool.query('SELECT name FROM clinic_doctors WHERE id = $1', [doctorId]);
-    
     booking.patient_name = patientName || 'Unknown Patient';
     booking.patient_phone = patientPhone;
     booking.doctor_name = docRes.rows[0]?.name;
 
     return successResponse(res, booking, 201);
   } catch (error) {
+    await client.query('ROLLBACK');
     next(error);
+  } finally {
+    client.release();
   }
 }
 
