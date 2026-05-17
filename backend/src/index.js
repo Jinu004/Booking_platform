@@ -10,7 +10,7 @@ const { apiLimiter, webhookLimiter } = require('./middleware/rateLimiter');
 const channelRouter = require('./modules/channel/channel.router');
 
 // Database initialization
-require('./config/database');
+const pool = require('./config/database');
 require('./config/redis');
 
 const app = express();
@@ -46,12 +46,22 @@ app.use('/api', apiLimiter);
 app.use('/webhook', webhookLimiter);
 
 // 4. Health check route
-app.get('/health', (req, res) => {
-  return successResponse(res, {
-    status: 'ok',
-    timestamp: new Date(),
-    environment: env.NODE_ENV
-  });
+app.get('/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: 'connected'
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'error',
+      database: 'disconnected',
+      error: err.message
+    });
+  }
 });
 
 // 5. /api/v1/tenants routes
@@ -124,11 +134,10 @@ initializeSchedulers();
 const { startHITLCron } = require('./modules/hitl/hitl.cron');
 const { startRetentionCron } = require('./cron/retention.cron');
 const { broadcastToTenant } = require('./modules/hitl/hitl.service');
-const dbPool = require('./config/database');
 
 setTimeout(() => {
   console.log('Starting HITL cron...');
-  startHITLCron(dbPool, broadcastToTenant);
+  startHITLCron(pool, broadcastToTenant);
   console.log('Starting Retention cron...');
   startRetentionCron();
 }, 5000);
