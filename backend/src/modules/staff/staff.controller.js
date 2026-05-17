@@ -75,6 +75,18 @@ async function updateStaff(req, res, next) {
     let staff;
     
     if (updates.role) {
+      if (updates.role !== 'admin') {
+        const targetStaff = await StaffModel.getStaffById(pool, req.tenantId, req.params.id)
+        if (targetStaff?.role === 'admin') {
+          const adminCount = await pool.query(
+            'SELECT COUNT(*) FROM staff WHERE tenant_id = $1 AND role = $2 AND is_active = true',
+            [req.tenantId, 'admin']
+          )
+          if (parseInt(adminCount.rows[0].count) <= 1) {
+            return errorResponse(res, 'Cannot change role of the last admin account', 400)
+          }
+        }
+      }
       staff = await StaffService.updateStaffRole(req.tenantId, req.params.id, updates.role)
     } else {
       staff = await StaffModel.updateStaff(pool, req.tenantId, req.params.id, updates)
