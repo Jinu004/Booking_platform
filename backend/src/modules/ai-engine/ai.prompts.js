@@ -37,7 +37,14 @@ Always use these functions. Never guess availability or make up token numbers.`
  * @returns {string}
  */
 function getClinicPrompt(tenant, configs) {
+  // Inject live IST date/time so the AI can answer time-sensitive questions correctly
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  const todayDate = nowIST.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata' })
+  const currentTime = nowIST.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+
   return `${getBasePrompt(tenant, configs)}
+
+CURRENT DATE & TIME (IST): ${todayDate}, ${currentTime}
 
 CLINIC INFORMATION:
 Name: ${tenant.name}

@@ -261,7 +261,11 @@ Please reply with your name to confirm booking.`
 
       case 'create_token_booking': {
   const { doctor_name, patient_name } = args
-  const formattedName = (patient_name || '').replace(/\b\w/g, c => c.toUpperCase())
+  const formattedName = (patient_name || '')
+    .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')  // allow Latin, Malayalam, spaces, hyphens
+    .trim()
+    .slice(0, 100)
+    .replace(/\b\w/g, c => c.toUpperCase())
   
   // Check working hours
   const HITLService = require('../hitl/hitl.service')
@@ -300,14 +304,18 @@ Please reply with your name to confirm booking.`
   )
   const currentCount = parseInt(tokenRes.rows[0].count || 0)
   if (currentCount >= doctor.max_tokens_daily) {
-    // Today fully booked — store pending and offer tomorrow
-    const redisClient = require('../../../config/redis')
-    if (redisClient && conversation?.id) {
-      await redisClient.set(
-        `tomorrow_booking:${conversation.id}`,
-        JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization, patient_name: formattedName }),
-        { EX: 3600 }
-      )
+    // Today fully booked — store pending intent and offer tomorrow
+    try {
+      const redisClient = require('../../../config/redis')
+      if (redisClient && conversation?.id) {
+        await redisClient.set(
+          `tomorrow_booking:${conversation.id}`,
+          JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization, patient_name: formattedName }),
+          { EX: 3600 }
+        )
+      }
+    } catch (redisErr) {
+      logger.warn('Redis write failed for tomorrow booking intent:', redisErr.message)
     }
     return `${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply *TOMORROW* to confirm tomorrow's booking or ignore to cancel.`
   }
@@ -368,15 +376,19 @@ Please reply with your name to confirm booking.`
     ? fmtTime(sessionRes.rows[0].start_time)
     : '9:00 AM'
 
-  // If outside working hours, store tomorrow option
+  // If outside working hours, store tomorrow option — non-critical, isolated from booking success
   if (!withinHours) {
-    const redisClient = require('../../../config/redis')
-    if (redisClient && conversation?.id) {
-      await redisClient.set(
-        `tomorrow_booking:${conversation.id}`,
-        JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization, patient_name: formattedName }),
-        { EX: 3600 }
-      )
+    try {
+      const redisClient = require('../../../config/redis')
+      if (redisClient && conversation?.id) {
+        await redisClient.set(
+          `tomorrow_booking:${conversation.id}`,
+          JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization, patient_name: formattedName }),
+          { EX: 3600 }
+        )
+      }
+    } catch (redisErr) {
+      logger.warn('Redis write failed for outside-hours tomorrow offer:', redisErr.message)
     }
   }
 
@@ -391,7 +403,11 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
 
       case 'create_tomorrow_booking': {
         const { doctor_name, patient_name } = args
-        const formattedName = (patient_name || '').replace(/\b\w/g, c => c.toUpperCase())
+        const formattedName = (patient_name || '')
+          .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')  // allow Latin, Malayalam, spaces, hyphens
+          .trim()
+          .slice(0, 100)
+          .replace(/\b\w/g, c => c.toUpperCase())
 
         // Compute tomorrow in IST to avoid UTC/IST date boundary errors
         // (server runs UTC; between 12 AM–5:30 AM IST, UTC is still on the previous date)
@@ -561,7 +577,7 @@ Reply CANCEL to cancel your booking.`
       }
 
       case 'escalate_to_human': {
-        const { reason } = args
+        const reason = args.reason || 'Patient requested human assistance'
         logger.info(`Escalation requested for conversation ${conversation?.id}: ${reason}`)
         // Signal to the calling code that escalation is needed
         return `ESCALATE:${reason}`

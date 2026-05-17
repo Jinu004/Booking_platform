@@ -65,7 +65,7 @@ async function processMessage(context) {
         const errorPhrases = ['having trouble', 'could not process', 'try again'];
 
         const history = (recentMessages || [])
-          .slice(0, -1)
+          .slice(-21, -1)
           .filter(msg => {
             if (msg.role === 'staff') return false;
             if (msg.role === 'assistant') {
@@ -84,6 +84,11 @@ async function processMessage(context) {
 
         // Get the latest message text to send
         const latestMessage = recentMessages?.[recentMessages.length - 1]?.content || ''
+
+        // Reject oversized messages to prevent prompt injection and wasted tokens
+        if (latestMessage.length > 1000) {
+          return 'Your message is too long. Please send a shorter message.'
+        }
 
         // Start chat session with conversation history
         const chat = model.startChat({ history: cleanHistory })
