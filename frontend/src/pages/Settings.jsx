@@ -24,6 +24,8 @@ export default function Settings() {
 
   const [activeTab, setActiveTab] = useState('clinic');
   const [saving, setSaving] = useState(false);
+  const [savingAI, setSavingAI] = useState(false);
+  const [savingHours, setSavingHours] = useState(false);
 
   const [clinic, setClinic] = useState({ opening_time: '09:00', closing_time: '18:00', address: '' });
   const [hitl, setHITL] = useState({
@@ -78,18 +80,33 @@ export default function Settings() {
     }
   };
 
-  const handleSaveHITL = async () => {
+  const handleSaveAISettings = async () => {
     try {
-      setSaving(true);
+      setSavingAI(true);
       await Promise.all([
-        updateHITLSettings(hitl),
+        updateHITLSettings({
+          handoff_message: hitl.handoff_message,
+          out_of_hours_message: hitl.out_of_hours_message,
+        }),
         updateSettings({ language: hitl.language || 'english' }),
       ]);
       addToast('AI settings saved', 'success');
     } catch {
-      addToast('Failed to save', 'error');
+      addToast('Failed to save AI settings', 'error');
     } finally {
-      setSaving(false);
+      setSavingAI(false);
+    }
+  };
+
+  const handleSaveWorkingHours = async () => {
+    try {
+      setSavingHours(true);
+      await updateHITLSettings({ working_hours: hitl.working_hours });
+      addToast('Working hours saved', 'success');
+    } catch {
+      addToast('Failed to save working hours', 'error');
+    } finally {
+      setSavingHours(false);
     }
   };
 
@@ -224,7 +241,16 @@ export default function Settings() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
-              <div>
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={handleSaveAISettings}
+                  disabled={savingAI}
+                  className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                >
+                  {savingAI ? 'Saving...' : 'Save AI Settings'}
+                </button>
+              </div>
+              <div className="border-t border-gray-100 pt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-3">Staff Working Hours</label>
                 <div className="space-y-2">
                   {DAYS.map(({ key, label }) => {
@@ -270,11 +296,11 @@ export default function Settings() {
               </div>
               <div className="flex justify-end pt-2">
                 <button
-                  onClick={handleSaveHITL}
-                  disabled={saving}
-                  className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  onClick={handleSaveWorkingHours}
+                  disabled={savingHours}
+                  className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
                 >
-                  {saving ? 'Saving...' : 'Save AI Settings'}
+                  {savingHours ? 'Saving...' : 'Save Working Hours'}
                 </button>
               </div>
             </>
