@@ -103,7 +103,11 @@ async function deleteStaff(pool, tenantId, staffId) {
     UPDATE staff SET is_active = false WHERE tenant_id = $1 AND id = $2 RETURNING *
   `
   const result = await tenantQuery(tenantId, pool, query, [staffId])
-  return result.rows[0]
+await pool.query(
+  'DELETE FROM auth_sessions WHERE staff_id = $1',
+  [staffId]
+);  
+return result.rows[0]
 }
 
 module.exports = {
