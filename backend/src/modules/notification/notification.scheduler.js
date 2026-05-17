@@ -70,10 +70,31 @@ cron.schedule('30 2 * * *', async () => {
 }
 
 /**
- * Resets doctor availability daily at 6:00 AM
- * Sets all doctors available_today = true
- * Clears leave_days counter where leave_days = 0
+ * Resets doctor availability daily at midnight
+ * Sets available_today based on doctor_schedules for the current day
  */
+function resetDoctorAvailability() {
+  cron.schedule('0 0 * * *', async () => {
+    logger.info('Resetting doctor availability based on schedules');
+    try {
+      const today = new Date().getDay();
+      await pool.query('UPDATE clinic_doctors SET available_today = false WHERE leave_days != 999');
+      await pool.query(
+        `UPDATE clinic_doctors cd
+        SET available_today = true
+        FROM doctor_schedules ds
+        WHERE ds.doctor_id = cd.id
+        AND ds.day_of_week = $1
+        AND ds.is_available = true
+        AND cd.leave_days != 999`,
+        [today]
+      );
+      logger.info('Doctor availability reset based on today schedule');
+    } catch (err) {
+      logger.error('Doctor availability reset failed:', err.message);
+    }
+  });
+}
 
 /**
  * Initializes all scheduled jobs
@@ -81,6 +102,7 @@ cron.schedule('30 2 * * *', async () => {
  */
 function initializeSchedulers() {
   schedule24HourReminders();
+  resetDoctorAvailability();
   logger.info('Notification schedulers initialized');
 }
 
