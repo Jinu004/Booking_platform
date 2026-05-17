@@ -96,18 +96,17 @@ async function updateStaffStatus(pool, tenantId, staffId, status) {
 }
 
 /**
- * Deletes staff member (Soft delete)
+ * Deletes staff member (Soft delete) and invalidates all active sessions
  */
 async function deleteStaff(pool, tenantId, staffId) {
   const query = `
     UPDATE staff SET is_active = false WHERE tenant_id = $1 AND id = $2 RETURNING *
   `
   const result = await tenantQuery(tenantId, pool, query, [staffId])
-await pool.query(
-  'DELETE FROM auth_sessions WHERE staff_id = $1',
-  [staffId]
-);  
-return result.rows[0]
+  if (result.rows[0]) {
+    await pool.query('DELETE FROM auth_sessions WHERE staff_id = $1', [staffId])
+  }
+  return result.rows[0]
 }
 
 module.exports = {

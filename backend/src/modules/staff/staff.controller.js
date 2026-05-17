@@ -94,6 +94,21 @@ async function updateStaff(req, res, next) {
  */
 async function deleteStaff(req, res, next) {
   try {
+    if (req.params.id === req.staff.id) {
+      return errorResponse(res, 'You cannot deactivate your own account', 400)
+    }
+
+    const targetStaff = await StaffModel.getStaffById(pool, req.tenantId, req.params.id)
+    if (targetStaff?.role === 'admin') {
+      const adminCount = await pool.query(
+        'SELECT COUNT(*) FROM staff WHERE tenant_id = $1 AND role = $2 AND is_active = true',
+        [req.tenantId, 'admin']
+      )
+      if (parseInt(adminCount.rows[0].count) <= 1) {
+        return errorResponse(res, 'Cannot deactivate the last admin account', 400)
+      }
+    }
+
     const staff = await StaffModel.deleteStaff(pool, req.tenantId, req.params.id)
     if (!staff) {
       return errorResponse(res, 'Staff member not found', 404)
