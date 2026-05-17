@@ -50,52 +50,25 @@ async function getStaffByClerkId(pool, clerkUserId) {
 }
 
 /**
- * Updates staff member
+ * Updates staff member fields.
+ *
+ * tenantQuery prepends tenantId as $1, so the params array starts with
+ * staffId as $2 and each update value follows from $3 onward.
+ * paramNum starts at 3 and is incremented per field — clause is built
+ * before the push so the index is always in sync with the value position.
  */
 async function updateStaff(pool, tenantId, staffId, updates) {
-  const allowedFields = ['name', 'role', 'email', 'phone', 'clerk_user_id']
-  
-  const setClauses = []
-  const params = []
-  let paramIndex = 3 // starts from 3 because $1=tenant_id, $2=staffId
-
-  for (const [key, value] of Object.entries(updates)) {
-    if (allowedFields.includes(key) && value !== undefined) {
-      setClauses.push(`${key} = $${paramIndex}`)
-      params.push(value)
-      paramIndex++
-    }
-  }
-
-  if (setClauses.length === 0) return null
-
-  const query = `
-    UPDATE staff
-    SET ${setClauses.join(', ')}
-    WHERE tenant_id = $1 AND id = $2
-    RETURNING *
-  `
-  const result = await tenantQuery(tenantId, pool, query, params, true) // requires special handling to insert id before params... actually tenantQuery adds tenant_id as $1, but my query starts manual params from $3, wait.
-  // tenantQuery signature: tenantQuery(tenantId, pool, queryText, queryParams)
-  // tenantQuery rewrites `$1` to `$1` (tenantId) and shifts the rest.
-  return result.rows[0]
-}
-
-// Rewriting updateStaff correctly:
-async function updateStaffFixed(pool, tenantId, staffId, updates) {
   const allowedFields = ['name', 'role', 'email', 'phone', 'clerk_user_id', 'is_active']
-  
-  const setClauses = []
-  const params = [staffId] // $2 after tenantQuery injects
-  let paramIndex = 2 // $1 is tenantId, $2 is staffId, so next is 3, but length is 1, so indices in array... wait
 
-  // Since tenantQuery automatically prepends tenantId and we replace $N with $(N+1)
-  // If query is UPDATE staff SET name = $3 WHERE tenant_id = $1 AND id = $2
-  // Then params array passed to tenantQuery should be [staffId, newName]
+  const setClauses = []
+  const params = [staffId]  // becomes $2 after tenantQuery prepends tenantId as $1
+  let paramNum = 3           // first update field uses $3
+
   for (const [key, value] of Object.entries(updates)) {
     if (allowedFields.includes(key) && value !== undefined) {
+      setClauses.push(`${key} = $${paramNum}`)
       params.push(value)
-      setClauses.push(`${key} = $${params.length + 1}`) // index conceptually before shifting 
+      paramNum++
     }
   }
 
@@ -138,7 +111,7 @@ module.exports = {
   getStaff,
   getStaffById,
   getStaffByClerkId,
-  updateStaff: updateStaffFixed,
+  updateStaff,
   updateStaffStatus,
   deleteStaff
 }

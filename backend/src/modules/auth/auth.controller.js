@@ -183,7 +183,14 @@ async function forgotPassword(req, res) {
     const resetToken = require('crypto')
       .randomBytes(32).toString('hex')
 
-    // Store reset token
+    // Invalidate any existing unused tokens for this staff member so only
+    // one active reset token exists at a time (prevents token replay attacks)
+    await pool.query(
+      'UPDATE auth_password_resets SET used = true WHERE staff_id = $1 AND used = false',
+      [staff.id]
+    )
+
+    // Store new reset token
     await pool.query(
       `INSERT INTO auth_password_resets
        (staff_id, token, expires_at)
