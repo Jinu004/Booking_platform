@@ -10,6 +10,7 @@ const pool = require('../../config/database')
  */
 const ALLOWED_SETTINGS_KEYS = new Set([
   // AI / conversation
+  'language',
   'ai_personality', 'ai_language', 'ai_greeting', 'ai_name', 'ai_tone',
   'ai_escalation_message', 'ai_response_delay',
   'escalation_threshold', 'escalation_timeout',
