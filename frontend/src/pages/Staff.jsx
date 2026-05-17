@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { getStaff, inviteStaff, updateStaff, deleteStaff } from '../services/staff.service';
+import useStore from '../store/useStore';
+import { CardSkeleton } from '../components/shared/Skeleton';
 
 const Staff = () => {
+  const { addToast } = useStore();
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +45,7 @@ const Staff = () => {
       setInviteData({ name: '', email: '', phone: '', role: 'receptionist', specialization: '' });
       fetchStaff();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to invite staff');
+      addToast(err?.error || err.response?.data?.error || 'Failed to invite staff', 'error');
     }
   };
 
@@ -54,7 +57,7 @@ const Staff = () => {
       setEditRoleModal(null);
       fetchStaff();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to update role');
+      addToast(err?.error || err.response?.data?.error || 'Failed to update role', 'error');
     }
   };
 
@@ -64,7 +67,7 @@ const Staff = () => {
       await deleteStaff(id);
       fetchStaff();
     } catch (err) {
-      alert('Failed to deactivate staff');
+      addToast('Failed to deactivate staff', 'error');
     }
   };
 
@@ -90,7 +93,7 @@ const Staff = () => {
 
       <div className="md:hidden space-y-3">
         {loading ? (
-          <div className="text-center py-4">Loading...</div>
+          <CardSkeleton />
         ) : staffList.length === 0 ? (
           <div className="text-center py-16 flex flex-col items-center justify-center space-y-3">
             <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
@@ -136,7 +139,7 @@ const Staff = () => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan="5" className="text-center py-4">Loading...</td></tr>
+              <tr><td colSpan="5" className="p-4"><CardSkeleton /></td></tr>
             ) : staffList.length === 0 ? (
               <tr>
                 <td colSpan="5" className="text-center py-16">
