@@ -57,7 +57,8 @@ async function inviteStaff(req, res, next) {
     await sendWelcomeEmail({
       to: staff.email,
       name: staff.name,
-      clinicName: req.tenant.name || 'Your Clinic'
+      clinicName: req.tenant.name || 'Your Clinic',
+      tempPassword: password
     })
     return successResponse(res, { staff }, 201)
   } catch (error) {
