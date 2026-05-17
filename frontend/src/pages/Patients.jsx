@@ -63,12 +63,16 @@ export default function Patients() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     if (!isPro) return;
     const timer = setTimeout(fetchPatients, 500);
     return () => clearTimeout(timer);
   }, [search]);
+
+  useEffect(() => { setCurrentPage(1); }, [search, activeFilter]);
 
   const fetchPatients = async () => {
     try {
@@ -111,6 +115,12 @@ export default function Patients() {
     activeFilter === 'new' ? patients.filter(p => (parseInt(p.total_visits || 0)) === 0)
     : activeFilter === 'returning' ? patients.filter(p => (parseInt(p.total_visits || 0)) > 0)
     : patients;
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginatedPatients = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <div className="p-8 space-y-6">
@@ -176,7 +186,7 @@ export default function Patients() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map(p => {
+              {paginatedPatients.map(p => {
                 const isNew = (parseInt(p.total_visits || 0)) === 0;
                 const bloodGroup = p.profile?.blood_group;
                 const age = calcAge(p.profile?.date_of_birth);
@@ -230,6 +240,40 @@ export default function Patients() {
           </table>
         )}
       </div>
+
+      {/* Pagination */}
+      {!loading && filtered.length > 0 && (
+        <div className="flex items-center justify-between px-1">
+          <p className="text-sm text-gray-500">
+            Showing{' '}
+            <span className="font-medium text-gray-700">
+              {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)}
+            </span>{' '}
+            of{' '}
+            <span className="font-medium text-gray-700">{filtered.length}</span>{' '}
+            patients
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => p - 1)}
+              disabled={currentPage === 1}
+              className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              ← Previous
+            </button>
+            <span className="text-sm font-medium text-gray-600 px-1">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => p + 1)}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 text-sm font-semibold rounded-lg border border-teal-600 bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
