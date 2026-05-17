@@ -26,6 +26,15 @@ function getFunctionDefinitions(industry) {
       }
     },
     {
+      name: 'get_available_doctors_tomorrow',
+      description: 'Gets list of all doctors available tomorrow with their specialization, session times and tokens remaining. Call this when patient selects option 2 (Book for Tomorrow) and you need to show which doctors are available the next day.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {},
+        required: []
+      }
+    },
+    {
       name: 'check_doctor_availability',
       description: 'Check if a specific doctor is available today and how many tokens remain',
       parameters: {

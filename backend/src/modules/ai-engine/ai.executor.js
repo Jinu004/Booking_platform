@@ -83,6 +83,62 @@ const doctorList = doctorsResult.rows.map(doc => {
 
       }
 
+      case 'get_available_doctors_tomorrow': {
+        // Compute tomorrow in IST to avoid UTC date boundary issues
+        const nowIST_td = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+        const tomorrowDt = new Date(nowIST_td)
+        tomorrowDt.setDate(tomorrowDt.getDate() + 1)
+        const tomorrowDateTd = `${tomorrowDt.getFullYear()}-${String(tomorrowDt.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDt.getDate()).padStart(2, '0')}`
+        const tomorrowDowTd = tomorrowDt.getDay()
+        const dayNamesTd = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+        // Join schedules for tomorrow's day_of_week, exclude doctors on leave
+        const doctorsResult = await pool.query(
+          `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+                  ds.start_time, ds.end_time,
+                  COUNT(b.id) AS booked_count
+           FROM clinic_doctors cd
+           JOIN doctor_schedules ds
+             ON ds.doctor_id = cd.id
+             AND ds.tenant_id = cd.tenant_id
+             AND ds.day_of_week = $2
+             AND ds.is_available = true
+           LEFT JOIN bookings b
+             ON b.doctor_id = cd.id
+             AND b.booking_date = $3
+             AND b.status != 'cancelled'
+           LEFT JOIN doctor_leaves dl
+             ON dl.doctor_id = cd.id
+             AND dl.leave_date = $3
+           WHERE cd.tenant_id = $1
+             AND dl.id IS NULL
+           GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+                    ds.start_time, ds.end_time
+           ORDER BY cd.name ASC`,
+          [tenant.id, tomorrowDowTd, tomorrowDateTd]
+        )
+
+        if (!doctorsResult.rows.length) {
+          return `No doctors are available tomorrow (${dayNamesTd[tomorrowDowTd]}). Please call us directly or try booking for another day.`
+        }
+
+        const fmtTd = (t) => {
+          const [h, m] = t.split(':')
+          const hour = parseInt(h)
+          const ampm = hour >= 12 ? 'PM' : 'AM'
+          const h12 = hour % 12 || 12
+          return `${h12}:${m} ${ampm}`
+        }
+
+        const doctorList = doctorsResult.rows.map(doc => {
+          const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
+          const sessionTime = `${fmtTd(doc.start_time)} - ${fmtTd(doc.end_time)}`
+          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime} — ${remaining} tokens available`
+        }).join('\n\n')
+
+        return `Doctors available tomorrow (${dayNamesTd[tomorrowDowTd]}):\n\n${doctorList}\n\nReply with the doctor's name to book.`
+      }
+
       case 'check_doctor_availability': {
         const { doctor_name } = args
         const result = await pool.query(
@@ -293,11 +349,24 @@ Please reply with your name to confirm booking.`
     bookingClient.release()
   }
 
-  const configResult = await pool.query(
-    `SELECT value FROM tenant_configs WHERE tenant_id = $1 AND key = 'opening_time'`,
-    [tenant.id]
+  // Fetch doctor's actual session start time for today (IST day-of-week)
+  const todayDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
+  const sessionRes = await pool.query(
+    `SELECT start_time FROM doctor_schedules
+     WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
+     LIMIT 1`,
+    [tenant.id, doctor.id, todayDow]
   )
-  const openingTime = configResult.rows[0]?.value || '9:00 AM'
+  const fmtTime = (t) => {
+    const [h, m] = t.split(':')
+    const hour = parseInt(h)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const h12 = hour % 12 || 12
+    return `${h12}:${m} ${ampm}`
+  }
+  const sessionStart = sessionRes.rows[0]?.start_time
+    ? fmtTime(sessionRes.rows[0].start_time)
+    : '9:00 AM'
 
   // If outside working hours, store tomorrow option
   if (!withinHours) {
@@ -315,7 +384,7 @@ Please reply with your name to confirm booking.`
 Token Number: ${tokenNumber}
 Doctor: ${doctor.name}
 ${doctor.specialization}
-🕘 Consultation starts at ${openingTime}
+🕘 Consultation starts at ${sessionStart}
 Please arrive before session begins.
 Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if you would like to also book for tomorrow.' : ''}`
 }
@@ -324,9 +393,12 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
         const { doctor_name, patient_name } = args
         const formattedName = (patient_name || '').replace(/\b\w/g, c => c.toUpperCase())
 
-        const tomorrow = new Date()
+        // Compute tomorrow in IST to avoid UTC/IST date boundary errors
+        // (server runs UTC; between 12 AM–5:30 AM IST, UTC is still on the previous date)
+        const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+        const tomorrow = new Date(nowIST)
         tomorrow.setDate(tomorrow.getDate() + 1)
-        const tomorrowDate = tomorrow.toISOString().split('T')[0]
+        const tomorrowDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
         const tomorrowDow = tomorrow.getDay()
 
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -443,12 +515,13 @@ Reply CANCEL to cancel your booking.`
 
       case 'cancel_booking': {
         const { booking_id } = args
+        // customer_id check prevents one patient from cancelling another's booking
         const result = await pool.query(
           `UPDATE bookings
            SET status = 'cancelled', updated_at = NOW()
-           WHERE id = $1 AND tenant_id = $2
+           WHERE id = $1 AND tenant_id = $2 AND customer_id = $3
            RETURNING id, token_number`,
-          [booking_id, tenant.id]
+          [booking_id, tenant.id, customer?.id || null]
         )
         if (!result.rows.length) {
           return { success: false, message: 'Booking not found or already cancelled.' }
