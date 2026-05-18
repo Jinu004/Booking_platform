@@ -18,12 +18,22 @@ const Staff = () => {
     email: '',
     phone: '',
     role: 'receptionist',
-    specialization: ''
+    specialization: '',
+    doctor_id: ''
   });
+  const [doctors, setDoctors] = useState([]);
 
   useEffect(() => {
     fetchStaff();
   }, []);
+
+  useEffect(() => {
+    if (isInviteModalOpen) {
+      import('../services/clinic.service').then(m => {
+        m.getDoctors().then(res => setDoctors(res.data?.doctors || res.data || []));
+      });
+    }
+  }, [isInviteModalOpen]);
 
   const fetchStaff = async () => {
     try {
@@ -42,7 +52,7 @@ const Staff = () => {
     try {
       await inviteStaff(inviteData);
       setInviteModalOpen(false);
-      setInviteData({ name: '', email: '', phone: '', role: 'receptionist', specialization: '' });
+      setInviteData({ name: '', email: '', phone: '', role: 'receptionist', specialization: '', doctor_id: '' });
       fetchStaff();
     } catch (err) {
       addToast(err?.error || err.response?.data?.error || 'Failed to invite staff', 'error');
@@ -214,10 +224,29 @@ const Staff = () => {
                 </select>
               </div>
               {inviteData.role === 'doctor' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Specialization</label>
-                  <input type="text" value={inviteData.specialization} onChange={e => setInviteData({ ...inviteData, specialization: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Link to Doctor Record <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={inviteData.doctor_id || ''}
+                      onChange={e => setInviteData({ ...inviteData, doctor_id: e.target.value })}
+                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border"
+                      required
+                    >
+                      <option value="">Select doctor...</option>
+                      {doctors.map(d => (
+                        <option key={d.id} value={d.id}>{d.name} ({d.specialization})</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">Links this staff login to the doctor's schedule and patients</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Specialization</label>
+                    <input type="text" value={inviteData.specialization} onChange={e => setInviteData({ ...inviteData, specialization: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
+                  </div>
+                </>
               )}
 
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
