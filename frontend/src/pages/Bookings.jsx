@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   getBookings, getBookingStats, 
   completeBooking, cancelBooking, markNoShow, createBooking 
@@ -237,6 +238,11 @@ const Bookings = () => {
                         <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
                       </>
                     )}
+                    {b.customer_id && (
+                      <Link to={`/patients/${b.customer_id}`} className="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                        View Profile
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))
@@ -269,7 +275,7 @@ const Bookings = () => {
                 <input 
                   type="text" 
                   value={newBooking.patientName}
-                  onChange={e => setNewBooking({...newBooking, patientName: e.target.value})}
+                  onChange={e => setNewBooking({...newBooking, patientName: e.target.value.replace(/\b\w/g, c => c.toUpperCase())})}
                   className="block w-full rounded-md border border-gray-300 p-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="New Patient Name (Optional)"
                 />
