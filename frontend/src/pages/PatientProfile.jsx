@@ -278,7 +278,7 @@ export default function PatientProfile() {
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [editingNote, setEditingNote] = useState(null);
   const [noteForm, setNoteForm] = useState({
-    visit_date: '', doctor_id: '', diagnosis: '', prescription: '', follow_up_date: '',
+    visit_date: '', doctor_id: '', diagnosis: '', prescription: '', notes: '', follow_up_date: '',
     _doctor_name: '', _doctor_specialization: '',
   });
   const [doctors, setDoctors] = useState([]);
@@ -397,7 +397,7 @@ export default function PatientProfile() {
     setEditingNote(null);
     setNoteForm({
       visit_date: new Date().toISOString().split('T')[0],
-      doctor_id: defaultDoctorId, diagnosis: '', prescription: '', follow_up_date: '',
+      doctor_id: defaultDoctorId, diagnosis: '', prescription: '', notes: '', follow_up_date: '',
       _doctor_name: '', _doctor_specialization: '',
     });
     setShowNoteForm(true);
@@ -411,6 +411,7 @@ export default function PatientProfile() {
       doctor_id: note.doctor_id || '',
       diagnosis: note.diagnosis || '',
       prescription: note.prescription || '',
+      notes: note.notes || '',
       follow_up_date: note.follow_up_date?.split('T')[0] || '',
       _doctor_name: note.doctor_name || '',
       _doctor_specialization: note.doctor_specialization || '',
@@ -427,6 +428,7 @@ export default function PatientProfile() {
       doctor_specialization: selectedDoc?.specialization || noteForm._doctor_specialization || '',
       diagnosis: noteForm.diagnosis || null,
       prescription: noteForm.prescription || null,
+      notes: noteForm.notes || null,
       follow_up_date: noteForm.follow_up_date || null,
     };
 
@@ -793,87 +795,6 @@ export default function PatientProfile() {
             </button>
           </div>
 
-          {/* Add / Edit form */}
-          {showNoteForm && (
-            <div className="bg-white rounded-xl border border-teal-200 p-6 shadow-sm space-y-4">
-              <h3 className="font-semibold text-gray-900 text-sm">
-                {editingNote ? 'Edit Visit Note' : 'New Visit Note'}
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-500 font-medium mb-1">Visit Date *</label>
-                  <input
-                    type="date"
-                    value={noteForm.visit_date}
-                    onChange={e => setNoteForm(p => ({ ...p, visit_date: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 font-medium mb-1">Doctor</label>
-                  <select
-                    value={noteForm.doctor_id}
-                    onChange={e => setNoteForm(p => ({ ...p, doctor_id: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    <option value="">
-                      {editingNote && noteForm._doctor_name ? noteForm._doctor_name : 'Select doctor'}
-                    </option>
-                    {doctors.map(d => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}{d.specialization ? ` (${d.specialization})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 font-medium mb-1">Diagnosis</label>
-                <textarea
-                  rows={3}
-                  value={noteForm.diagnosis}
-                  onChange={e => setNoteForm(p => ({ ...p, diagnosis: e.target.value }))}
-                  placeholder="Enter diagnosis…"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 font-medium mb-1">Prescription</label>
-                <textarea
-                  rows={3}
-                  value={noteForm.prescription}
-                  onChange={e => setNoteForm(p => ({ ...p, prescription: e.target.value }))}
-                  placeholder="Enter prescription…"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
-              <div className="w-1/2">
-                <label className="block text-xs text-gray-500 font-medium mb-1">Follow-up Date</label>
-                <input
-                  type="date"
-                  value={noteForm.follow_up_date}
-                  onChange={e => setNoteForm(p => ({ ...p, follow_up_date: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={handleSaveNote}
-                  disabled={savingNote || !noteForm.visit_date}
-                  className="px-5 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50"
-                >
-                  {savingNote ? 'Saving…' : 'Save Note'}
-                </button>
-                <button
-                  onClick={() => { setShowNoteForm(false); setEditingNote(null); }}
-                  className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Timeline */}
           {sortedNotes.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
@@ -942,6 +863,117 @@ export default function PatientProfile() {
         </div>
       )}
 
+      {/* ── VISIT NOTE MODAL ── */}
+      {showNoteForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60 px-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+              <h2 className="text-base font-bold text-gray-900">
+                {editingNote ? 'Edit Visit Note' : 'Add Visit Note'}
+              </h2>
+              <button
+                onClick={() => { setShowNoteForm(false); setEditingNote(null); }}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Scrollable body */}
+            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-500 font-medium mb-1">Visit Date *</label>
+                  <input
+                    type="date"
+                    value={noteForm.visit_date}
+                    onChange={e => setNoteForm(p => ({ ...p, visit_date: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 font-medium mb-1">Doctor</label>
+                  <select
+                    value={noteForm.doctor_id}
+                    onChange={e => setNoteForm(p => ({ ...p, doctor_id: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="">
+                      {editingNote && noteForm._doctor_name ? noteForm._doctor_name : 'Select doctor'}
+                    </option>
+                    {doctors.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}{d.specialization ? ` (${d.specialization})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 font-medium mb-1">Diagnosis</label>
+                <textarea
+                  rows={3}
+                  value={noteForm.diagnosis}
+                  onChange={e => setNoteForm(p => ({ ...p, diagnosis: e.target.value }))}
+                  placeholder="Enter diagnosis…"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 font-medium mb-1">Prescription</label>
+                <textarea
+                  rows={3}
+                  value={noteForm.prescription}
+                  onChange={e => setNoteForm(p => ({ ...p, prescription: e.target.value }))}
+                  placeholder="Enter prescription…"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 font-medium mb-1">Notes</label>
+                <textarea
+                  rows={2}
+                  value={noteForm.notes}
+                  onChange={e => setNoteForm(p => ({ ...p, notes: e.target.value }))}
+                  placeholder="Additional notes…"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+              <div className="w-1/2">
+                <label className="block text-xs text-gray-500 font-medium mb-1">Follow-up Date</label>
+                <input
+                  type="date"
+                  value={noteForm.follow_up_date}
+                  onChange={e => setNoteForm(p => ({ ...p, follow_up_date: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+
+            {/* Footer — always visible */}
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => { setShowNoteForm(false); setEditingNote(null); }}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveNote}
+                disabled={savingNote || !noteForm.visit_date}
+                className="px-5 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition"
+              >
+                {savingNote ? 'Saving…' : 'Save Note'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
