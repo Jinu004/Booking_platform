@@ -74,7 +74,7 @@ cron.schedule('30 2 * * *', async () => {
  * Sets available_today based on doctor_schedules for the current day
  */
 function resetDoctorAvailability() {
-  cron.schedule('0 0 * * *', async () => {
+  cron.schedule('30 18 * * *', async () => {
     logger.info('Resetting doctor availability based on schedules');
     try {
       const today = new Date().getDay();
