@@ -421,28 +421,26 @@ export default function PatientProfile() {
     const selectedDoc = doctors.find(d => d.id === noteForm.doctor_id);
     const payload = {
       visit_date: noteForm.visit_date,
+      doctor_id: noteForm.doctor_id || null,
       doctor_name: selectedDoc?.name || noteForm._doctor_name || '',
       doctor_specialization: selectedDoc?.specialization || noteForm._doctor_specialization || '',
-      diagnosis: noteForm.diagnosis,
-      prescription: noteForm.prescription,
+      diagnosis: noteForm.diagnosis || null,
+      prescription: noteForm.prescription || null,
       follow_up_date: noteForm.follow_up_date || null,
     };
 
     setSavingNote(true);
     try {
       if (editingNote) {
-        const res = await updateVisitNote(customerId, editingNote.id, payload);
-        const updated = res?.data || { ...editingNote, ...payload };
-        setVisitNotes(prev => prev.map(n => n.id === editingNote.id ? updated : n));
+        await updateVisitNote(customerId, editingNote.id, payload);
         addToast('Visit note updated', 'success');
       } else {
-        const res = await addVisitNote(customerId, payload);
-        const newNote = res?.data || { id: Date.now().toString(), ...payload };
-        setVisitNotes(prev => [newNote, ...prev]);
+        await addVisitNote(customerId, payload);
         addToast('Visit note added', 'success');
       }
       setShowNoteForm(false);
       setEditingNote(null);
+      await loadData();
     } catch {
       addToast('Failed to save visit note', 'error');
     } finally {
