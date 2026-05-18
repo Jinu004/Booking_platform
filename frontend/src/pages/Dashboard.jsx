@@ -21,7 +21,6 @@ const Dashboard = () => {
   const staff = getStoredStaff();
   const isDoctor = staff?.role === 'doctor';
   const staffDoctorId = isDoctor ? staff?.doctor_id : null;
-
   useEffect(() => {
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 15000);
