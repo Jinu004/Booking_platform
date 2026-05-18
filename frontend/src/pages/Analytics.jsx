@@ -41,8 +41,6 @@ const Analytics = () => {
         getConversationStats(period).catch(() => ({ data: convData }))
       ]);
 
-      console.log("Analytics Fetched Data: ", { oRes, dRes, docRes, cRes });
-
       setOverview(oRes.data || overview);
       if (period === 'month') {
         const formattedDaily = (dRes.data || []).map(d => ({
@@ -88,17 +86,71 @@ const Analytics = () => {
 
       {loading ? (
         <>
+          {/* Row 1: Stat Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
           </div>
+
+          {/* Row 2: Chart Placeholders */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-              <div className="h-5 bg-gray-200 rounded w-1/3 mb-6 animate-pulse"></div>
-              <TableRowSkeleton rows={4} />
+            <div className="bg-white p-6 rounded-lg shadow border border-gray-200 animate-pulse">
+              <div className="h-5 bg-gray-200 rounded w-2/5 mb-6"></div>
+              <div className="h-64 bg-gray-200 rounded-lg"></div>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-              <div className="h-5 bg-gray-200 rounded w-1/3 mb-6 animate-pulse"></div>
-              <TableRowSkeleton rows={4} />
+            <div className="bg-white p-6 rounded-lg shadow border border-gray-200 animate-pulse">
+              <div className="h-5 bg-gray-200 rounded w-1/3 mb-6"></div>
+              <div className="h-64 bg-gray-200 rounded-lg"></div>
+            </div>
+          </div>
+
+          {/* Row 3: Table Placeholders */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Doctor Stats table skeleton */}
+            <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden animate-pulse">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div className="h-5 bg-gray-200 rounded w-1/3"></div>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {/* Column header row */}
+                <div className="px-6 py-3 flex items-center gap-4">
+                  <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                  <div className="ml-auto flex gap-6">
+                    <div className="h-3 bg-gray-200 rounded w-14"></div>
+                    <div className="h-3 bg-gray-200 rounded w-14"></div>
+                    <div className="h-3 bg-gray-200 rounded w-14"></div>
+                  </div>
+                </div>
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="px-6 py-4 flex items-center gap-4">
+                    <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                    <div className="ml-auto flex gap-6">
+                      <div className="h-4 bg-gray-200 rounded w-10"></div>
+                      <div className="h-4 bg-gray-200 rounded w-10"></div>
+                      <div className="h-4 bg-gray-200 rounded w-12"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Conversation Stats table skeleton */}
+            <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden animate-pulse">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div className="h-5 bg-gray-200 rounded w-2/5"></div>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {/* Column header row */}
+                <div className="px-6 py-3 flex items-center justify-between">
+                  <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                  <div className="h-3 bg-gray-200 rounded w-12"></div>
+                </div>
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="px-6 py-4 flex items-center justify-between">
+                    <div className="h-4 bg-gray-200 rounded w-2/5"></div>
+                    <div className="h-4 bg-gray-200 rounded w-10"></div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </>
