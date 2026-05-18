@@ -8,13 +8,13 @@ const tenantQuery = require('../../utils/tenantQuery')
  * @returns {Promise<object>}
  */
 async function createStaff(pool, tenantId, staffData) {
-  const { name, role, email, phone, password_hash } = staffData
+  const { name, role, email, phone, password_hash, doctor_id } = staffData
   const query = `
-    INSERT INTO staff (tenant_id, name, role, email, phone, password_hash, is_active)
-    VALUES ($1, $2, $3, $4, $5, $6, true)
+    INSERT INTO staff (tenant_id, name, role, email, phone, password_hash, is_active, doctor_id)
+    VALUES ($1, $2, $3, $4, $5, $6, true, $7)
     RETURNING *
   `
-  const params = [name, role, email || null, phone || null, password_hash || null]
+  const params = [name, role, email || null, phone || null, password_hash || null, doctor_id || null]
   const result = await tenantQuery(tenantId, pool, query, params)
   return result.rows[0]
 }
@@ -58,7 +58,7 @@ async function getStaffByClerkId(pool, clerkUserId) {
  * before the push so the index is always in sync with the value position.
  */
 async function updateStaff(pool, tenantId, staffId, updates) {
-  const allowedFields = ['name', 'role', 'email', 'phone', 'clerk_user_id', 'is_active']
+  const allowedFields = ['name', 'role', 'email', 'phone', 'clerk_user_id', 'is_active', 'doctor_id']
 
   const setClauses = []
   const params = [staffId]  // becomes $2 after tenantQuery prepends tenantId as $1

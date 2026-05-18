@@ -44,6 +44,9 @@ async function getStaffById(req, res, next) {
 async function inviteStaff(req, res, next) {
   try {
     const staffData = req.body
+    const { doctor_id } = req.body
+    if (doctor_id) staffData.doctor_id = doctor_id
+
     if (!staffData.name || !staffData.role || !staffData.email) {
       return errorResponse(res, 'Name, role, and email are required', 400)
     }
