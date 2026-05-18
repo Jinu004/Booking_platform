@@ -139,7 +139,8 @@ async function onboardClinic(req, res) {
         tenantName: newStaff.tenant_name,
         tenantPlan: newStaff.tenant_plan,
         tenantStatus: newStaff.tenant_status,
-        tenantWhatsapp: newStaff.whatsapp_number
+        tenantWhatsapp: newStaff.whatsapp_number,
+        doctor_id: newStaff.doctor_id || null
       },
       tenant_id: tenant.id,
       name: tenant.name,

@@ -100,7 +100,8 @@ async function login(req, res) {
         tenantName: staff.tenant_name,
         tenantPlan: staff.tenant_plan,
         tenantStatus: staff.tenant_status,
-tenantWhatsapp: staff.whatsapp_number
+tenantWhatsapp: staff.whatsapp_number,
+      doctor_id: staff.doctor_id || null
       }
     })
   } catch (err) {
