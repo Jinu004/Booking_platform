@@ -99,7 +99,8 @@ if (staffData.tenant_status === 'pending') {
       name: staffData.name,
       email: staffData.email,
       role: staffData.role,
-      tenantId: staffData.tenant_id
+      tenantId: staffData.tenant_id,
+      doctor_id: staffData.doctor_id || null
     }
 
     req.tenant = {

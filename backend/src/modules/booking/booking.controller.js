@@ -16,8 +16,14 @@ const isPhone = (str) => /^\+?\d{7,15}$/.test(str);
 async function getBookings(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const { date, status, doctorId, customerId, page, limit } = req.query;
-    
+    const { date, status, customerId, page, limit } = req.query;
+    let { doctorId } = req.query;
+
+    // If logged in as doctor, only show their own bookings
+    if (req.staff.role === 'doctor' && req.staff.doctor_id) {
+      doctorId = req.staff.doctor_id;
+    }
+
     const result = await BookingService.getBookingsDashboard(tenantId, {
       date, status, doctorId, customerId, page, limit
     });
