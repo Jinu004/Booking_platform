@@ -9,6 +9,18 @@ const tenantQuery = require('../../utils/tenantQuery')
  */
 async function createStaff(pool, tenantId, staffData) {
   const { name, role, email, phone, password_hash, doctor_id } = staffData
+
+  // Reject duplicate email within the same tenant before hitting the DB constraint
+  if (email) {
+    const existing = await pool.query(
+      'SELECT id FROM staff WHERE tenant_id = $1 AND LOWER(email) = LOWER($2)',
+      [tenantId, email]
+    )
+    if (existing.rows.length > 0) {
+      throw new Error('A staff member with this email already exists')
+    }
+  }
+
   const query = `
     INSERT INTO staff (tenant_id, name, role, email, phone, password_hash, is_active, doctor_id)
     VALUES ($1, $2, $3, $4, $5, $6, true, $7)

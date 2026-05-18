@@ -134,10 +134,51 @@ async function deleteStaff(req, res, next) {
   }
 }
 
+/**
+ * PATCH /staff/:id/activate
+ */
+async function activateStaff(req, res, next) {
+  try {
+    const staff = await StaffModel.updateStaff(pool, req.tenantId, req.params.id, { is_active: true })
+    if (!staff) return errorResponse(res, 'Staff member not found', 404)
+    return successResponse(res, { staff })
+  } catch (error) {
+    next(error)
+  }
+}
+
+/**
+ * DELETE /staff/:id/permanent
+ */
+async function deleteStaffPermanent(req, res, next) {
+  try {
+    if (req.params.id === req.staff.id) {
+      return errorResponse(res, 'Cannot delete your own account', 400)
+    }
+    const target = await StaffModel.getStaffById(pool, req.tenantId, req.params.id)
+    if (target?.role === 'admin') {
+      const adminCount = await pool.query(
+        'SELECT COUNT(*) FROM staff WHERE tenant_id = $1 AND role = $2 AND is_active = true',
+        [req.tenantId, 'admin']
+      )
+      if (parseInt(adminCount.rows[0].count) <= 1) {
+        return errorResponse(res, 'Cannot delete the last admin account', 400)
+      }
+    }
+    await pool.query('DELETE FROM auth_sessions WHERE staff_id = $1', [req.params.id])
+    await pool.query('DELETE FROM staff WHERE id = $1 AND tenant_id = $2', [req.params.id, req.tenantId])
+    return successResponse(res, { message: 'Staff member permanently deleted' })
+  } catch (error) {
+    next(error)
+  }
+}
+
 module.exports = {
   getStaff,
   getStaffById,
   inviteStaff,
   updateStaff,
-  deleteStaff
+  deleteStaff,
+  activateStaff,
+  deleteStaffPermanent
 }

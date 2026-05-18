@@ -5,7 +5,9 @@ const {
   getStaffById,
   inviteStaff,
   updateStaff,
-  deleteStaff
+  deleteStaff,
+  activateStaff,
+  deleteStaffPermanent
 } = require('./staff.controller')
 
 const router = express.Router()
@@ -17,6 +19,8 @@ router.get('/', getStaff)
 router.get('/:id', getStaffById)
 router.post('/', requireRole('admin', 'manager'), inviteStaff)
 router.patch('/:id', requireRole('admin', 'manager'), updateStaff)
+router.patch('/:id/activate', requireRole('admin', 'manager'), activateStaff)
 router.delete('/:id', requireRole('admin'), deleteStaff)
+router.delete('/:id/permanent', requireRole('admin'), deleteStaffPermanent)
 
 module.exports = router
