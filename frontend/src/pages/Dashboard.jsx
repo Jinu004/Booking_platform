@@ -19,6 +19,8 @@ const Dashboard = () => {
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
   const staff = getStoredStaff();
+  const isDoctor = staff?.role === 'doctor';
+  const doctorName = isDoctor ? staff?.name : null;
 
   useEffect(() => {
     fetchDashboardData();
@@ -45,14 +47,18 @@ const Dashboard = () => {
       let totalBookings = statsRes?.data?.total || 0;
       let bookingsArray = bookingsRes?.data?.bookings || [];
 
+      const filteredByDoctor = isDoctor && doctorName
+        ? tokensArray.filter(t => t.doctor_name === doctorName)
+        : tokensArray;
+
       setStats({
-        bookingsToday: totalBookings,
+        bookingsToday: isDoctor ? filteredByDoctor.length : totalBookings,
         activeConversations: activeConvs.length,
         availableDoctors: availableDocsArray.length,
-        pendingTokens: tokensArray.filter(t => t.status === 'waiting' || t.status === 'pending').length
+        pendingTokens: filteredByDoctor.filter(t => t.status === 'waiting' || t.status === 'pending').length
       });
 
-      setTokenQueue(tokensArray);
+      setTokenQueue(filteredByDoctor);
       setRecentConversations(activeConvs.slice(0, 5));
       setRecentBookings(bookingsArray.slice(0, 5));
       setDoctors(docsArray);
@@ -141,7 +147,7 @@ const Dashboard = () => {
       {/* Section 1 — Top Bar */}
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center">
         <div>
-          <p className="text-xl font-bold text-gray-900">{tenant?.name || staff?.tenantName || 'Dashboard'}</p>
+          <p className="text-xl font-bold text-gray-900">{isDoctor ? 'My Queue' : (tenant?.name || staff?.tenantName || 'Dashboard')}</p>
           <p className="text-sm text-gray-500">
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
@@ -166,13 +172,15 @@ const Dashboard = () => {
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Waiting Now</p>
           <p className="mt-2 text-4xl font-black text-amber-500">{stats.pendingTokens}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Doctors on Duty</p>
-          <div className="mt-2 flex items-baseline gap-1">
-            <span className="text-4xl font-black text-emerald-600">{availableDoctors.length}</span>
-            <span className="text-xl text-gray-400 font-bold">/ {doctors.length}</span>
+        {!isDoctor && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Doctors on Duty</p>
+            <div className="mt-2 flex items-baseline gap-1">
+              <span className="text-4xl font-black text-emerald-600">{availableDoctors.length}</span>
+              <span className="text-xl text-gray-400 font-bold">/ {doctors.length}</span>
+            </div>
           </div>
-        </div>
+        )}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Chats</p>
           <p className="mt-2 text-4xl font-black text-blue-600">{stats.activeConversations}</p>
@@ -282,44 +290,46 @@ const Dashboard = () => {
       </div>
 
       {/* Section 4 — Doctor Availability Strip */}
-      <div className="px-6 pb-6 mt-4">
-        <div className="flex justify-between items-center mb-4">
-          <span className="font-bold text-gray-900 text-lg">Doctor Availability</span>
-          <Link to="/doctors" className="text-sm text-indigo-600 font-semibold hover:text-indigo-800">Manage →</Link>
-        </div>
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {doctors.length === 0 ? (
-            <p className="text-sm text-gray-500">No doctors added yet</p>
-          ) : doctors.map(d => (
-            <div key={d.id} className="min-w-[160px] bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex-shrink-0">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-3 ${d.available_today ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                {(d.name || '?').split(' ').filter(w => w.toLowerCase() !== 'dr.' && w.toLowerCase() !== 'dr')[0]?.[0]?.toUpperCase() || '?'}
+      {!isDoctor && (
+        <div className="px-6 pb-6 mt-4">
+          <div className="flex justify-between items-center mb-4">
+            <span className="font-bold text-gray-900 text-lg">Doctor Availability</span>
+            <Link to="/doctors" className="text-sm text-indigo-600 font-semibold hover:text-indigo-800">Manage →</Link>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {doctors.length === 0 ? (
+              <p className="text-sm text-gray-500">No doctors added yet</p>
+            ) : doctors.map(d => (
+              <div key={d.id} className="min-w-[160px] bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex-shrink-0">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-3 ${d.available_today ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {(d.name || '?').split(' ').filter(w => w.toLowerCase() !== 'dr.' && w.toLowerCase() !== 'dr')[0]?.[0]?.toUpperCase() || '?'}
+                </div>
+                <p className="font-semibold text-sm text-gray-900 truncate">{d.name}</p>
+                <p className="text-xs text-gray-500 truncate mb-2">{d.specialization}</p>
+                {d.available_today ? (
+                  <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                    Available
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block"></span>
+                    Off Today
+                  </span>
+                )}
+                <div className="flex gap-3 mt-2">
+                  <span className="text-xs text-gray-500">
+                    Seen: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'done' || t.status === 'completed')).length}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Queue: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'waiting' || t.status === 'in_progress')).length}
+                  </span>
+                </div>
               </div>
-              <p className="font-semibold text-sm text-gray-900 truncate">{d.name}</p>
-              <p className="text-xs text-gray-500 truncate mb-2">{d.specialization}</p>
-              {d.available_today ? (
-                <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-                  Available
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block"></span>
-                  Off Today
-                </span>
-              )}
-              <div className="flex gap-3 mt-2">
-                <span className="text-xs text-gray-500">
-                  Seen: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'done' || t.status === 'completed')).length}
-                </span>
-                <span className="text-xs text-gray-500">
-                  Queue: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'waiting' || t.status === 'in_progress')).length}
-                </span>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
     </div>
   );
