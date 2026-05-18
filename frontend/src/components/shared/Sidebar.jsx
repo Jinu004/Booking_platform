@@ -85,6 +85,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   });
 
   const handleLogout = async () => {
+    if (!window.confirm('Are you sure you want to log out?')) return;
     await logout();
     navigate('/login');
   };
