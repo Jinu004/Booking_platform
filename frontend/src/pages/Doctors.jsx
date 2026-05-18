@@ -3,6 +3,32 @@ import { getDoctors, createDoctor, updateDoctor, deleteDoctor, updateAvailabilit
 import useStore from '../store/useStore';
 import { CardSkeleton } from '../components/shared/Skeleton';
 
+const AVATAR_COLORS = [
+  'bg-teal-100 text-teal-700',
+  'bg-indigo-100 text-indigo-700',
+  'bg-amber-100 text-amber-700',
+  'bg-rose-100 text-rose-700',
+  'bg-violet-100 text-violet-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-blue-100 text-blue-700',
+  'bg-orange-100 text-orange-700',
+];
+
+function avatarColor(name) {
+  if (!name) return AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function docInitials(name) {
+  if (!name) return '?';
+  const parts = name.replace(/^Dr\.?\s*/i, '').trim().split(' ').filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 const SPECIALIZATIONS = [
   'Ayurveda','Anaesthesiology','Cardiology',
   'Dentistry','Dermatology','ENT',
@@ -148,6 +174,7 @@ const Doctors = () => {
   const [leaveDate, setLeaveDate] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
   const [leaveType, setLeaveType] = useState('days'); // 'days' or 'date'
+  const [availFilter, setAvailFilter] = useState('all');
 
   useEffect(() => {
     fetchData();
@@ -329,148 +356,255 @@ const Doctors = () => {
     cancelled: 'bg-red-100 text-red-800'
   };
 
+  // Derived availability counts
+  const availableCount = doctors.filter(d => d.available_today).length;
+  const onLeaveCount   = doctors.filter(d => !d.available_today && d.leave_days > 0).length;
+  const absentCount    = doctors.filter(d => !d.available_today && !d.leave_days).length;
+
+  const filteredAvail = doctors.filter(doc => {
+    if (availFilter === 'available') return doc.available_today;
+    if (availFilter === 'absent')    return !doc.available_today && !doc.leave_days;
+    if (availFilter === 'leave')     return !doc.available_today && doc.leave_days > 0;
+    return true;
+  });
+
+  const docTodayTokens = (doc) =>
+    queue.filter(t => t.doctor_name === doc.name).length;
+
+  const todayLabel = new Date().toLocaleDateString('en-IN', {
+    weekday: 'long', day: 'numeric', month: 'long'
+  });
+
   return (
-    <div className="p-8 space-y-8">
-      {/* SECTION 1 - Doctor Management */}
+    <div className="p-8 space-y-10">
+
+      {/* ── SECTION 1: Doctor Cards ── */}
       <div>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Doctors</h2>
-          <button 
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Doctors</h2>
+            <p className="text-sm text-gray-400 mt-0.5">{doctors.length} registered</p>
+          </div>
+          <button
             onClick={openAddDoctor}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-sm hover:bg-blue-700 transition"
+            className="bg-teal-600 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-teal-700 transition text-sm"
           >
             + Add Doctor
           </button>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {loading && doctors.length === 0 ? (
-            <>
-              <CardSkeleton /><CardSkeleton /><CardSkeleton />
-            </>
-          ) : doctors.map(doc => (
-            <div key={doc.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col justify-between hover:shadow-md transition">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">{doc.name}</h3>
-                <p className="text-sm text-gray-500 mb-2">{doc.specialization || 'General'}</p>
-                <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded-md mb-4 space-y-1">
-                  <p><span className="font-medium text-gray-500">Qualification:</span> {doc.qualification || 'N/A'}</p>
-                  <p><span className="font-medium text-gray-500">Consultation:</span> ₹{doc.consultation_fee || 0}</p>
+
+        {loading && doctors.length === 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <CardSkeleton /><CardSkeleton /><CardSkeleton />
+          </div>
+        ) : doctors.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
+            <p className="text-gray-400 text-sm">No doctors added yet.</p>
+            <button onClick={openAddDoctor} className="mt-3 text-teal-600 font-semibold text-sm hover:text-teal-800">+ Add your first doctor</button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {doctors.map(doc => (
+              <div key={doc.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition p-6 flex flex-col">
+
+                {/* Avatar + name */}
+                <div className="flex items-center gap-4 mb-5">
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0 ${avatarColor(doc.name)}`}>
+                    {docInitials(doc.name)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-base font-bold text-gray-900 truncate">{doc.name}</p>
+                    <p className="text-sm text-teal-600 font-medium truncate">{doc.specialization || 'General'}</p>
+                  </div>
+                </div>
+
+                {/* Info grid */}
+                <div className="grid grid-cols-2 gap-3 mb-5 flex-1">
+                  <div className="bg-gray-50 rounded-lg px-3 py-2.5">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Qualification</p>
+                    <p className="text-sm font-semibold text-gray-700">{doc.qualification || '—'}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2.5">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Consultation</p>
+                    <p className="text-sm font-semibold text-gray-700">₹{doc.consultation_fee || '—'}</p>
+                  </div>
+                </div>
+
+                {/* Action icons */}
+                <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-4">
+                  <button
+                    onClick={() => openScheduleModal(doc)}
+                    title="Set Schedule"
+                    className="p-2 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => openEditDoctor(doc)}
+                    title="Edit Doctor"
+                    className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteDoctor(doc.id)}
+                    title="Remove Doctor"
+                    className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               </div>
-
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-end space-x-3">
-                <button
-                  onClick={() => openScheduleModal(doc)}
-                  className="text-gray-400 hover:text-indigo-600 transition"
-                  title="Set Schedule"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => openEditDoctor(doc)}
-                  className="text-gray-400 hover:text-blue-600 transition"
-                  title="Edit Doctor"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                </button>
-                <button
-                  onClick={() => handleDeleteDoctor(doc.id)}
-                  className="text-gray-400 hover:text-red-600 transition"
-                  title="Remove Doctor"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* SECTION 2 - Today's Availability */}
-      <div className="pt-8 border-t border-gray-200">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Today's Availability</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {doctors.map(doc => (
-            <div key={doc.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 flex flex-col justify-between">
-              <div>
-                <h3 className="text-md font-bold text-gray-900">{doc.name}</h3>
-                <div className="text-sm text-gray-600 my-3">
-                  {doc.available_today ? (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Available
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      On Leave {doc.leave_days > 0 ? `(${doc.leave_days}d)` : ''}
-                    </span>
-                  )}
+      {/* ── SECTION 2: Today's Availability ── */}
+      <div className="border-t border-gray-200 pt-8">
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Today's Availability</h2>
+            <p className="text-sm text-gray-400 mt-0.5">{todayLabel}</p>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+              <span className="text-gray-600">{availableCount} available</span>
+            </span>
+            <span className="text-gray-300">·</span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+              <span className="text-gray-600">{absentCount} absent</span>
+            </span>
+            <span className="text-gray-300">·</span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-red-400 inline-block"></span>
+              <span className="text-gray-600">{onLeaveCount} on leave</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Filter tabs */}
+        <div className="flex gap-1 border-b border-gray-200 mb-5">
+          {[
+            { key: 'all',       label: 'All',       count: doctors.length },
+            { key: 'available', label: 'Available',  count: availableCount },
+            { key: 'absent',    label: 'Absent',     count: absentCount },
+            { key: 'leave',     label: 'On Leave',   count: onLeaveCount },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setAvailFilter(tab.key)}
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                availFilter === tab.key
+                  ? 'border-teal-600 text-teal-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+              <span className={`ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                availFilter === tab.key ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Availability cards */}
+        {filteredAvail.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
+            No doctors in this category
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {filteredAvail.map(doc => {
+              const isAvailable = doc.available_today;
+              const isOnLeave   = !isAvailable && doc.leave_days > 0;
+              const isAbsent    = !isAvailable && !doc.leave_days;
+              const todayCount  = docTodayTokens(doc);
+              const maxTokens   = doc.max_tokens_daily || 1;
+              const progress    = Math.min((todayCount / maxTokens) * 100, 100);
+
+              return (
+                <div key={doc.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4">
+
+                  {/* Top: avatar + name + badge */}
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarColor(doc.name)}`}>
+                      {docInitials(doc.name)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-900 truncate">{doc.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{doc.specialization || 'General'}</p>
+                    </div>
+                  </div>
+
+                  {/* Status badge */}
+                  <div>
+                    {isAvailable && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Available
+                      </span>
+                    )}
+                    {isAbsent && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Absent
+                      </span>
+                    )}
+                    {isOnLeave && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>On Leave · {doc.leave_days}d left
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Token progress */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-gray-400 font-medium">Today's tokens</span>
+                      <span className="text-xs font-bold text-gray-700">{todayCount} / {maxTokens}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                      <div
+                        className="h-1.5 rounded-full bg-teal-500 transition-all"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Action button */}
+                  <div className="pt-1">
+                    {isAvailable ? (
+                      <button
+                        onClick={() => handleToggleAvailability(doc)}
+                        className="w-full py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition border border-amber-200"
+                      >
+                        Mark Absent
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleToggleAvailability(doc)}
+                        className="w-full py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition border border-emerald-200"
+                      >
+                        Mark Available
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-sm text-gray-500">Max tokens: {doc.max_tokens_daily}</span>
-                <button
-                  onClick={() => handleToggleAvailability(doc)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    doc.available_today 
-                      ? 'bg-red-50 text-red-700 hover:bg-red-100' 
-                      : 'bg-green-50 text-green-700 hover:bg-green-100'
-                  }`}
-                >
-                  {doc.available_today ? 'Mark Absent' : 'Mark Present'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* SECTION 3 - Token Queue */}
-      <div className="pt-8 border-t border-gray-200">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Token Queue (Live)</h2>
-        <div className="bg-white shadow overflow-x-auto sm:rounded-lg">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Token No</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Doctor</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {queue.length === 0 ? (
-                <tr><td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">Queue is empty</td></tr>
-              ) : queue.map((t, idx) => (
-                <tr key={t.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <td className="px-6 py-4 whitespace-nowrap text-lg font-bold text-gray-900">#{t.token_number}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{t.patient_name || 'Unknown'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.doctor_name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${tokenStatusColors[t.status] || 'bg-gray-100 text-gray-800'}`}>
-                      {t.status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                    {t.status === 'waiting' && (
-                      <button onClick={() => handleTokenAction(t.id, 'in_progress')} className="text-blue-600 hover:text-blue-900">Start</button>
-                    )}
-                    {t.status === 'in_progress' && (
-                      <button onClick={() => handleTokenAction(t.id, 'done')} className="text-green-600 hover:text-green-900">Done</button>
-                    )}
-                    {(t.status === 'waiting' || t.status === 'in_progress') && (
-                      <button onClick={() => handleTokenAction(t.id, 'cancelled')} className="text-red-600 hover:text-red-900">Cancel</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Leave Modal */}
