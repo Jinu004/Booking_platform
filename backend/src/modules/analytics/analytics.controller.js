@@ -7,7 +7,8 @@ const { successResponse } = require('../../utils/response')
 async function getOverview(req, res, next) {
   try {
     const { period = 'month' } = req.query
-    const stats = await AnalyticsService.getOverviewStats(req.tenantId, period)
+    const doctorId = req.staff.role === 'doctor' && req.staff.doctor_id ? req.staff.doctor_id : null
+    const stats = await AnalyticsService.getOverviewStats(req.tenantId, period, doctorId)
     return successResponse(res, stats)
   } catch (err) {
     next(err)
@@ -20,7 +21,8 @@ async function getOverview(req, res, next) {
 async function getDailyBookings(req, res, next) {
   try {
     const { period = 'month' } = req.query
-    const data = await AnalyticsService.getDailyBookings(req.tenantId, period)
+    const doctorId = req.staff.role === 'doctor' && req.staff.doctor_id ? req.staff.doctor_id : null
+    const data = await AnalyticsService.getDailyBookings(req.tenantId, period, doctorId)
     return successResponse(res, data)
   } catch (err) {
     next(err)
@@ -33,7 +35,8 @@ async function getDailyBookings(req, res, next) {
 async function getDoctorStats(req, res, next) {
   try {
     const { period = 'month' } = req.query
-    const data = await AnalyticsService.getDoctorStats(req.tenantId, period)
+    const doctorId = req.staff.role === 'doctor' && req.staff.doctor_id ? req.staff.doctor_id : null
+    const data = await AnalyticsService.getDoctorStats(req.tenantId, period, doctorId)
     return successResponse(res, data)
   } catch (err) {
     next(err)
