@@ -15,24 +15,40 @@ function getInterval(period) {
   }
 }
 
-async function getOverviewStats(tenantId, period) {
+async function getOverviewStats(tenantId, period, doctorId = null) {
   try {
     const interval = getInterval(period)
-    const bRes = await pool.query(`
+
+    // Bookings query — optionally scoped to a single doctor
+    const bParams = [tenantId, interval]
+    let bSql = `
       SELECT
         count(*) as total,
         sum(case when status = 'completed' then 1 else 0 end) as completed,
         sum(case when status = 'cancelled' then 1 else 0 end) as cancelled,
         sum(case when status = 'noshow' then 1 else 0 end) as noshow
       FROM bookings
-      WHERE tenant_id = $1 AND created_at >= NOW() - $2::interval
-    `, [tenantId, interval])
+      WHERE tenant_id = $1 AND created_at >= NOW() - $2::interval`
+    if (doctorId) {
+      bParams.push(doctorId)
+      bSql += ` AND doctor_id = $3`
+    }
+    const bRes = await pool.query(bSql, bParams)
 
-    const pRes = await pool.query(`
+    // Patients query — when doctor filter active, count only patients seen by this doctor
+    const pParams = [tenantId, interval]
+    let pSql = `
       SELECT count(*) as new_patients
       FROM customers
-      WHERE tenant_id = $1 AND created_at >= NOW() - $2::interval
-    `, [tenantId, interval])
+      WHERE tenant_id = $1 AND created_at >= NOW() - $2::interval`
+    if (doctorId) {
+      pParams.push(doctorId)
+      pSql += ` AND id IN (
+        SELECT DISTINCT customer_id FROM bookings
+        WHERE tenant_id = $1 AND doctor_id = $3
+      )`
+    }
+    const pRes = await pool.query(pSql, pParams)
 
     const cRes = await pool.query(`
       SELECT
@@ -69,21 +85,26 @@ async function getOverviewStats(tenantId, period) {
   }
 }
 
-async function getDailyBookings(tenantId, period) {
+async function getDailyBookings(tenantId, period, doctorId = null) {
   const interval = getInterval(period)
-  const res = await pool.query(`
+  const params = [tenantId, interval]
+  let sql = `
     SELECT DATE(created_at) as date, count(*) as count
     FROM bookings
-    WHERE tenant_id = $1 AND created_at >= NOW() - $2::interval
-    GROUP BY DATE(created_at)
-    ORDER BY DATE(created_at)
-  `, [tenantId, interval])
+    WHERE tenant_id = $1 AND created_at >= NOW() - $2::interval`
+  if (doctorId) {
+    params.push(doctorId)
+    sql += ` AND doctor_id = $3`
+  }
+  sql += ` GROUP BY DATE(created_at) ORDER BY DATE(created_at)`
+  const res = await pool.query(sql, params)
   return res.rows
 }
 
-async function getDoctorStats(tenantId, period) {
+async function getDoctorStats(tenantId, period, doctorId = null) {
   const interval = getInterval(period)
-  const res = await pool.query(`
+  const params = [tenantId, interval]
+  let sql = `
     SELECT d.name as "doctorName",
            count(b.id) as "totalBookings",
            sum(case when b.status = 'completed' then 1 else 0 end) as completed,
@@ -92,9 +113,13 @@ async function getDoctorStats(tenantId, period) {
     FROM clinic_doctors d
     LEFT JOIN clinic_tokens t ON t.doctor_id = d.id
     LEFT JOIN bookings b ON b.id = t.booking_id AND b.created_at >= NOW() - $2::interval
-    WHERE d.tenant_id = $1
-    GROUP BY d.name
-  `, [tenantId, interval])
+    WHERE d.tenant_id = $1`
+  if (doctorId) {
+    params.push(doctorId)
+    sql += ` AND d.id = $3`
+  }
+  sql += ` GROUP BY d.name`
+  const res = await pool.query(sql, params)
   return res.rows.map(row => ({
     doctorName: row.doctorName,
     totalBookings: parseInt(row.totalBookings) || 0,
