@@ -310,7 +310,7 @@ export default function PatientProfile() {
     if (doctors.length > 0) return;
     try {
       const res = await getDoctors();
-      setDoctors(res?.data || []);
+      setDoctors(res?.data?.doctors || res?.data || []);
     } catch {
       addToast('Failed to load doctors', 'error');
     }
@@ -407,7 +407,7 @@ export default function PatientProfile() {
     setEditingNote(note);
     setNoteForm({
       visit_date: note.visit_date?.split('T')[0] || '',
-      doctor_id: '',
+      doctor_id: note.doctor_id || '',
       diagnosis: note.diagnosis || '',
       prescription: note.prescription || '',
       follow_up_date: note.follow_up_date?.split('T')[0] || '',
