@@ -19,3 +19,13 @@ export async function deleteStaff(id) {
   const res = await api.delete(`/staff/${id}`);
   return res.data;
 }
+
+export async function activateStaff(id) {
+  const res = await api.patch(`/staff/${id}/activate`);
+  return res.data;
+}
+
+export async function deleteStaffPermanently(id) {
+  const res = await api.delete(`/staff/${id}/permanent`);
+  return res.data;
+}

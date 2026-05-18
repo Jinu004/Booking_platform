@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getStaff, inviteStaff, updateStaff, deleteStaff } from '../services/staff.service';
+import { getStaff, inviteStaff, updateStaff, deleteStaff, activateStaff, deleteStaffPermanently } from '../services/staff.service';
 import useStore from '../store/useStore';
 import { CardSkeleton } from '../components/shared/Skeleton';
 
@@ -22,6 +22,7 @@ const Staff = () => {
     doctor_id: ''
   });
   const [doctors, setDoctors] = useState([]);
+  const [inviteError, setInviteError] = useState('');
 
   useEffect(() => {
     fetchStaff();
@@ -49,8 +50,15 @@ const Staff = () => {
 
   const handleInvite = async (e) => {
     e.preventDefault();
+    setInviteError('');
+    const emailExists = staffList.some(s => s.email?.toLowerCase() === inviteData.email.toLowerCase());
+    if (emailExists) {
+      setInviteError('A staff member with this email already exists');
+      return;
+    }
     try {
       await inviteStaff(inviteData);
+      addToast('Staff member invited successfully', 'success');
       setInviteModalOpen(false);
       setInviteData({ name: '', email: '', phone: '', role: 'receptionist', specialization: '', doctor_id: '' });
       fetchStaff();
@@ -78,6 +86,29 @@ const Staff = () => {
       fetchStaff();
     } catch (err) {
       addToast('Failed to deactivate staff', 'error');
+    }
+  };
+
+  const handleActivate = async (id) => {
+    if (!window.confirm('Reactivate this staff member?')) return;
+    try {
+      await activateStaff(id);
+      addToast('Staff member reactivated', 'success');
+      fetchStaff();
+    } catch {
+      addToast('Failed to reactivate staff', 'error');
+    }
+  };
+
+  const handleDeletePermanent = async (id) => {
+    if (!window.confirm('Permanently delete this staff member? This cannot be undone.')) return;
+    try {
+      await deleteStaffPermanently(id);
+      addToast('Staff member deleted', 'success');
+      setEditRoleModal(null);
+      fetchStaff();
+    } catch {
+      addToast('Failed to delete staff', 'error');
     }
   };
 
@@ -189,6 +220,9 @@ const Staff = () => {
                   {s.is_active && (
                     <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:text-red-900">Deactivate</button>
                   )}
+                  {!s.is_active && (
+                    <button onClick={() => handleActivate(s.id)} className="text-green-600 hover:text-green-900">Activate</button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -249,8 +283,11 @@ const Staff = () => {
                 </>
               )}
 
+              {inviteError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{inviteError}</p>
+              )}
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
-                <button type="button" onClick={() => setInviteModalOpen(false)} className="px-4 py-2 border rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
+                <button type="button" onClick={() => { setInviteModalOpen(false); setInviteError(''); }} className="px-4 py-2 border rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-indigo-600 text-white flex-1 rounded-md hover:bg-indigo-700 font-medium shadow-sm">Send Invite</button>
               </div>
             </form>
@@ -273,9 +310,18 @@ const Staff = () => {
                   <option value="receptionist">Receptionist</option>
                 </select>
               </div>
-              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
-                <button type="button" onClick={() => setEditRoleModal(null)} className="px-4 py-2 border rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Save Changes</button>
+              <div className="flex justify-between mt-6 pt-4 border-t">
+                <div>
+                  {editRoleModal && !staffList.find(s => s.id === editRoleModal.id)?.is_active && (
+                    <button type="button" onClick={() => handleDeletePermanent(editRoleModal.id)} className="px-4 py-2 text-red-600 border border-red-200 rounded-md hover:bg-red-50 text-sm font-medium">
+                      Delete Permanently
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setEditRoleModal(null)} className="px-4 py-2 border rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Save Changes</button>
+                </div>
               </div>
             </form>
           </div>
