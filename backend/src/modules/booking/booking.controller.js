@@ -41,7 +41,8 @@ async function getBookings(req, res, next) {
 async function getBookingStats(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const stats = await BookingService.getBookingStats(tenantId);
+    const doctorId = req.staff.role === 'doctor' && req.staff.doctor_id ? req.staff.doctor_id : null;
+    const stats = await BookingService.getBookingStats(tenantId, doctorId);
     return successResponse(res, stats);
   } catch (error) {
     next(error);

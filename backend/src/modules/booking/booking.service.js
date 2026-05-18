@@ -237,14 +237,19 @@ async function markNoShow(tenantId, bookingId) {
  *   cancelled, noshow, pending
  * }
  */
-async function getBookingStats(tenantId) {
-  const sql = `
-    SELECT status, COUNT(*) as count 
-    FROM bookings 
+async function getBookingStats(tenantId, doctorId = null) {
+  const params = [tenantId];
+  let sql = `
+    SELECT status, COUNT(*) as count
+    FROM bookings
     WHERE tenant_id = $1 AND booking_date = CURRENT_DATE
-    GROUP BY status
   `;
-  const result = await pool.query(sql, [tenantId]);
+  if (doctorId) {
+    params.push(doctorId);
+    sql += ` AND doctor_id = $${params.length}`;
+  }
+  sql += ` GROUP BY status`;
+  const result = await pool.query(sql, params);
   
   const stats = {
     total: 0,
