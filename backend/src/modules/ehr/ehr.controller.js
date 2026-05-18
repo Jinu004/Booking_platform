@@ -30,6 +30,15 @@ async function getPatients(req, res, next) {
       query += ` AND (c.name ILIKE $2 OR c.phone ILIKE $2)`;
       params.push(`%${search}%`);
     }
+    // Doctors only see patients who have had a booking with them
+    if (req.staff.role === 'doctor' && req.staff.doctor_id) {
+      const nextParam = params.length + 1;
+      query += ` AND c.id IN (
+        SELECT DISTINCT customer_id FROM bookings
+        WHERE tenant_id = $1 AND doctor_id = $${nextParam}
+      )`;
+      params.push(req.staff.doctor_id);
+    }
     query += ` GROUP BY c.id, c.name, c.phone, c.email, c.created_at, pp.age, pp.gender, pp.blood_group ORDER BY last_visit DESC NULLS LAST, c.created_at DESC`;
     const result = await pool.query(query, params);
     return successResponse(res, { customers: result.rows, total: result.rows.length });
