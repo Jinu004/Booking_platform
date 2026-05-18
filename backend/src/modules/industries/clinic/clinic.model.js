@@ -117,7 +117,8 @@ async function getTokenQueue(pool, tenantId) {
   const sql = `
 SELECT ct.*, b.notes,
        COALESCE(b.patient_name, c.name) AS patient_name,
-       cd.name AS doctor_name
+       cd.name AS doctor_name,
+       ct.doctor_id AS doctor_id
     FROM clinic_tokens ct
     JOIN bookings b ON b.id = ct.booking_id
     LEFT JOIN customers c ON c.id = b.customer_id
