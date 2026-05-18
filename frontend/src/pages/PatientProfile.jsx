@@ -307,10 +307,9 @@ export default function PatientProfile() {
   };
 
   const loadDoctors = async () => {
-    if (doctors.length > 0) return;
     try {
       const res = await getDoctors();
-      setDoctors(res?.data?.doctors || res?.data || []);
+      setDoctors(res?.data?.data || res?.data?.doctors || res?.data || []);
     } catch {
       addToast('Failed to load doctors', 'error');
     }
@@ -392,11 +391,13 @@ export default function PatientProfile() {
   // ── Visit note handlers ────────────────────────────────────────────────────
 
   const openAddNote = async () => {
+    const storedStaff = getStoredStaff();
+    const defaultDoctorId = storedStaff?.role === 'doctor' && storedStaff?.doctor_id ? storedStaff.doctor_id : '';
     await loadDoctors();
     setEditingNote(null);
     setNoteForm({
       visit_date: new Date().toISOString().split('T')[0],
-      doctor_id: '', diagnosis: '', prescription: '', follow_up_date: '',
+      doctor_id: defaultDoctorId, diagnosis: '', prescription: '', follow_up_date: '',
       _doctor_name: '', _doctor_specialization: '',
     });
     setShowNoteForm(true);
@@ -478,7 +479,7 @@ export default function PatientProfile() {
   const bloodGroup = profile?.blood_group;
 
   const sortedNotes = [...visitNotes].sort(
-    (a, b) => new Date(b.visit_date) - new Date(a.visit_date)
+    (a, b) => new Date(b.created_at) - new Date(a.created_at)
   );
 
   const now = new Date();
@@ -580,7 +581,7 @@ export default function PatientProfile() {
           {TABS.map(t => (
             <button
               key={t.key}
-              onClick={() => setActiveTab(t.key)}
+              onClick={() => { setActiveTab(t.key); if (t.key === 'notes') loadDoctors(); }}
               className={`pb-3 px-1 border-b-2 text-sm font-semibold whitespace-nowrap transition-colors ${
                 activeTab === t.key
                   ? 'border-teal-600 text-teal-700'
