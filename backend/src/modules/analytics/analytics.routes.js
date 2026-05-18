@@ -12,7 +12,7 @@ const router = express.Router()
 
 // All paths require auth and admin/manager roles
 router.use(requireAuth)
-router.use(requireRole('admin', 'manager'))
+router.use(requireRole('admin', 'manager', 'doctor'))
 
 router.get('/overview', getOverview)
 router.get('/bookings/daily', getDailyBookings)
