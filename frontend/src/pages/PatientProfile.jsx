@@ -297,7 +297,7 @@ export default function PatientProfile() {
       setCustomer(d.customer || {});
       setProfile(d.profile || {});
       setConditions(d.conditions || []);
-      setVisitNotes(d.visit_notes || []);
+      setVisitNotes(d.visitNotes || d.visit_notes || []);
       setBookings(d.bookings || []);
     } catch {
       addToast('Failed to load patient data', 'error');
