@@ -20,7 +20,7 @@ const Dashboard = () => {
   const [activeFilter, setActiveFilter] = useState('all');
   const staff = getStoredStaff();
   const isDoctor = staff?.role === 'doctor';
-  const doctorName = isDoctor ? staff?.name : null;
+  const staffDoctorId = isDoctor ? staff?.doctor_id : null;
 
   useEffect(() => {
     fetchDashboardData();
@@ -47,8 +47,8 @@ const Dashboard = () => {
       let totalBookings = statsRes?.data?.total || 0;
       let bookingsArray = bookingsRes?.data?.bookings || [];
 
-      const filteredByDoctor = isDoctor && doctorName
-        ? tokensArray.filter(t => t.doctor_name === doctorName)
+      const filteredByDoctor = isDoctor && staffDoctorId
+        ? tokensArray.filter(t => t.doctor_id === staffDoctorId)
         : tokensArray;
 
       setStats({
