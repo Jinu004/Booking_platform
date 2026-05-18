@@ -47,6 +47,7 @@ const Dashboard = () => {
       let totalBookings = statsRes?.data?.total || 0;
       let bookingsArray = bookingsRes?.data?.bookings || [];
 
+      console.log('isDoctor:', isDoctor, 'staffDoctorId:', staffDoctorId, 'tokensArray length:', tokensArray.length);
       const filteredByDoctor = isDoctor && staffDoctorId
         ? tokensArray.filter(t => t.doctor_id === staffDoctorId)
         : tokensArray;
