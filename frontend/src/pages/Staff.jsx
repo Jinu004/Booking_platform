@@ -204,7 +204,7 @@ const Staff = () => {
             <form onSubmit={handleInvite} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Name <span className="text-red-500">*</span></label>
-                <input required type="text" value={inviteData.name} onChange={e => setInviteData({ ...inviteData, name: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
+                <input required type="text" value={inviteData.name} onChange={e => setInviteData({ ...inviteData, name: e.target.value.replace(/\b\w/g, c => c.toUpperCase()) })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Email <span className="text-red-500">*</span></label>
