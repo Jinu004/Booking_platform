@@ -19,7 +19,7 @@ async function inviteStaff(tenantId, staffData) {
 
   // If role is doctor and specialized, we might need to sync with clinic doctors table.
   // In a robust implementation, Clinic module would listen to staff creation event or we do it here.
-  if (staff.role === 'doctor') {
+  if (staff.role === 'doctor' && !staffData.doctor_id) {
     await ClinicModel.createDoctor(pool, tenantId, {
       name: staff.name,
       email: staff.email,
