@@ -37,80 +37,226 @@ async function getPrescriptionData(tenantId, customerId, noteId) {
 
 function generatePDF(data) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
     const buffers = [];
     doc.on('data', chunk => buffers.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(buffers)));
     doc.on('error', reject);
 
-    // Header
-    doc.fontSize(22).font('Helvetica-Bold').fillColor('#0d9488').text(data.clinic_name, { align: 'center' });
+    // ── Palette ──────────────────────────────────────────────────────────────
+    const teal      = '#0d9488';
+    const darkGray  = '#1f2937';
+    const medGray   = '#6b7280';
+    const lightGray = '#f3f4f6';
+    const lightGreen = '#f0fdf4';
+
+    const MARGIN     = 50;
+    const CONTENT_W  = 495; // 50 → 545
+
+    // ── Prescription ID ───────────────────────────────────────────────────────
+    const visitDt = new Date(data.visit_date);
+    const dateStr = `${visitDt.getFullYear()}${String(visitDt.getMonth() + 1).padStart(2, '0')}${String(visitDt.getDate()).padStart(2, '0')}`;
+    const rxId    = `RX-${dateStr}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+    const visitDateStr = visitDt.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    // ── HEADER ────────────────────────────────────────────────────────────────
+    const headerStartY = 50;
+    const leftColX  = MARGIN;
+    const leftColW  = 275;
+    const rightColX = 360;
+    const rightColW = 185;
+
+    // Left side – clinic info
+    doc.fontSize(20).font('Helvetica-Bold').fillColor(teal)
+      .text(data.clinic_name || 'Clinic', leftColX, headerStartY, { width: leftColW });
+    doc.fontSize(8).font('Helvetica').fillColor(medGray)
+      .text('MULTI-SPECIALTY CLINIC & DIAGNOSTICS', leftColX, doc.y, { width: leftColW, characterSpacing: 0.5 });
     if (data.clinic_address) {
-      doc.fontSize(10).font('Helvetica').fillColor('#666').text(data.clinic_address, { align: 'center' });
+      doc.fontSize(9).fillColor(medGray)
+        .text(data.clinic_address, leftColX, doc.y, { width: leftColW });
     }
-    doc.moveDown(0.5);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#0d9488').stroke();
-    doc.moveDown(0.5);
+    const leftEndY = doc.y;
 
-    // Doctor info
-    doc.fontSize(12).font('Helvetica-Bold').fillColor('#111').text(`Dr. ${data.doctor_name || 'Unknown'}`);
-    if (data.specialization) doc.fontSize(10).font('Helvetica').fillColor('#444').text(data.specialization);
-    if (data.qualification) doc.fontSize(10).font('Helvetica').fillColor('#444').text(data.qualification);
-    doc.moveDown(0.5);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#ddd').stroke();
-    doc.moveDown(0.5);
+    // Right side – doctor info
+    let ry = headerStartY;
+    doc.fontSize(13).font('Helvetica-Bold').fillColor(darkGray)
+      .text(`Dr. ${data.doctor_name || 'Doctor'}`, rightColX, ry, { width: rightColW });
+    ry = doc.y;
+    if (data.specialization) {
+      doc.fontSize(10).font('Helvetica').fillColor(teal)
+        .text(data.specialization, rightColX, ry, { width: rightColW });
+      ry = doc.y;
+    }
+    if (data.qualification) {
+      doc.fontSize(9).fillColor(medGray)
+        .text(data.qualification, rightColX, ry, { width: rightColW });
+      ry = doc.y;
+    }
+    if (data.mci_number) {
+      doc.fontSize(8).fillColor(medGray)
+        .text(`MCI Reg: ${data.mci_number}`, rightColX, ry, { width: rightColW });
+      ry = doc.y;
+    }
 
-    // Patient info
-    const visitDate = new Date(data.visit_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-    doc.fontSize(10).font('Helvetica-Bold').fillColor('#111').text('PATIENT DETAILS', { underline: true });
-    doc.moveDown(0.3);
-    doc.fontSize(10).font('Helvetica').fillColor('#333');
-    doc.text(`Name: ${data.patient_name || 'Unknown'}`, { continued: true });
-    doc.text(`   Date: ${visitDate}`, { align: 'right' });
-    if (data.age) doc.text(`Age: ${data.age} years`, { continued: true });
-    if (data.gender) doc.text(`   Gender: ${data.gender}`);
-    if (data.blood_group) doc.text(`Blood Group: ${data.blood_group}`);
-    doc.moveDown(0.5);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#ddd').stroke();
-    doc.moveDown(0.5);
+    // Teal divider
+    const dividerY = Math.max(leftEndY, ry) + 10;
+    doc.moveTo(MARGIN, dividerY).lineTo(545, dividerY)
+      .lineWidth(1.5).strokeColor(teal).stroke();
 
-    // Diagnosis
+    // ── PATIENT BOX ───────────────────────────────────────────────────────────
+    let y = dividerY + 14;
+    const boxH = 78;
+
+    doc.rect(MARGIN, y, CONTENT_W, boxH).fill(lightGray);
+
+    // "Rx" symbol
+    doc.fontSize(28).font('Helvetica-Bold').fillColor(teal)
+      .text('Rx', MARGIN + 8, y + 10, { width: 40, lineBreak: false });
+
+    // Grid columns: 4 across for row 1
+    const gx = MARGIN + 56;
+    const colW = 108;
+    const cols = [gx, gx + colW, gx + colW * 2, gx + colW * 3];
+
+    const r1lY = y + 8;
+    const r1vY = r1lY + 12;
+
+    doc.fontSize(7).font('Helvetica').fillColor(medGray);
+    doc.text('PATIENT NAME', cols[0], r1lY, { width: colW, lineBreak: false });
+    doc.text('AGE',          cols[1], r1lY, { width: colW, lineBreak: false });
+    doc.text('GENDER',       cols[2], r1lY, { width: colW, lineBreak: false });
+    doc.text('BLOOD GROUP',  cols[3], r1lY, { width: colW, lineBreak: false });
+
+    doc.fontSize(10).font('Helvetica-Bold').fillColor(darkGray);
+    doc.text(data.patient_name || '—',           cols[0], r1vY, { width: colW,     lineBreak: false });
+    doc.text(data.age ? `${data.age} yrs` : '—', cols[1], r1vY, { width: colW,     lineBreak: false });
+    doc.text(data.gender || '—',                 cols[2], r1vY, { width: colW,     lineBreak: false });
+    doc.text(data.blood_group || '—',            cols[3], r1vY, { width: colW,     lineBreak: false });
+
+    // Row 2 – date + rx id (span 2 cols each)
+    const r2lY = y + 44;
+    const r2vY = r2lY + 12;
+
+    doc.fontSize(7).font('Helvetica').fillColor(medGray);
+    doc.text('DATE OF VISIT',   cols[0], r2lY, { width: colW * 2, lineBreak: false });
+    doc.text('PRESCRIPTION ID', cols[2], r2lY, { width: colW * 2, lineBreak: false });
+
+    doc.fontSize(10).font('Helvetica-Bold').fillColor(darkGray);
+    doc.text(visitDateStr, cols[0], r2vY, { width: colW * 2, lineBreak: false });
+    doc.text(rxId,         cols[2], r2vY, { width: colW * 2, lineBreak: false });
+
+    y = y + boxH + 18;
+
+    // ── Section helper ────────────────────────────────────────────────────────
+    function sectionHeader(title, curY) {
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(teal)
+        .text(title, MARGIN, curY, { width: CONTENT_W, characterSpacing: 0.8, lineBreak: false });
+      const ly = doc.y + 4;
+      doc.moveTo(MARGIN, ly).lineTo(545, ly)
+        .lineWidth(0.5).strokeColor('#e5e7eb').stroke();
+      return ly + 8;
+    }
+
+    // ── DIAGNOSIS ─────────────────────────────────────────────────────────────
     if (data.diagnosis) {
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#111').text('DIAGNOSIS');
-      doc.moveDown(0.3);
-      doc.fontSize(11).font('Helvetica').fillColor('#333').text(data.diagnosis);
-      doc.moveDown(0.5);
+      y = sectionHeader('DIAGNOSIS', y);
+      doc.fontSize(10).font('Helvetica').fillColor(darkGray)
+        .text(data.diagnosis, MARGIN, y, { width: CONTENT_W });
+      y = doc.y + 16;
     }
 
-    // Prescription
+    // ── PRESCRIPTION / MEDICINES ──────────────────────────────────────────────
     if (data.prescription) {
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#111').text('PRESCRIPTION');
-      doc.moveDown(0.3);
-      doc.fontSize(11).font('Helvetica').fillColor('#333').text(data.prescription);
-      doc.moveDown(0.5);
+      y = sectionHeader('PRESCRIPTION / MEDICINES', y);
+      const medicines = data.prescription.split('\n').filter(l => l.trim());
+      medicines.forEach((line, i) => {
+        const num = String(i + 1).padStart(2, '0');
+        // Number in teal
+        doc.fontSize(10).font('Helvetica-Bold').fillColor(teal)
+          .text(num, MARGIN, y, { width: 24, lineBreak: false });
+        // Medicine text in darkGray
+        doc.fontSize(10).font('Helvetica-Bold').fillColor(darkGray)
+          .text(line.trim(), MARGIN + 28, y, { width: CONTENT_W - 28 });
+        y = doc.y + 4;
+      });
+      y += 12;
     }
 
-    // Follow up
+    // ── FOLLOW-UP ─────────────────────────────────────────────────────────────
     if (data.follow_up_date) {
-      const followUp = new Date(data.follow_up_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#0d9488').text(`Follow-up: ${followUp}`);
-      doc.moveDown(0.5);
+      y = sectionHeader('FOLLOW-UP', y);
+      const followUp = new Date(data.follow_up_date).toLocaleDateString('en-IN', {
+        day: 'numeric', month: 'long', year: 'numeric'
+      });
+      const fbH = 48;
+      doc.rect(MARGIN, y, 220, fbH).fill(lightGreen);
+      doc.fontSize(7).font('Helvetica').fillColor(medGray)
+        .text('NEXT VISIT', MARGIN + 12, y + 9, { width: 196, lineBreak: false });
+      doc.fontSize(13).font('Helvetica-Bold').fillColor(teal)
+        .text(followUp, MARGIN + 12, y + 22, { width: 196, lineBreak: false });
+      y = y + fbH + 16;
     }
 
-    // Notes
+    // ── DOCTOR'S NOTES ────────────────────────────────────────────────────────
     if (data.notes) {
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#111').text('NOTES');
-      doc.moveDown(0.3);
-      doc.fontSize(10).font('Helvetica').fillColor('#333').text(data.notes);
-      doc.moveDown(0.5);
+      y = sectionHeader("DOCTOR'S NOTES", y);
+      const lineCount = Math.ceil(data.notes.length / 85);
+      const nbH = Math.max(48, lineCount * 15 + 24);
+      doc.rect(MARGIN, y, CONTENT_W, nbH).fill(lightGray);
+      doc.fontSize(10).font('Helvetica').fillColor(darkGray)
+        .text(data.notes, MARGIN + 12, y + 12, { width: CONTENT_W - 24 });
+      y = doc.y + 16;
     }
 
-    // Footer
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#ddd').stroke();
-    doc.moveDown(0.5);
-    doc.fontSize(8).font('Helvetica').fillColor('#999')
-      .text('This is a computer-generated prescription. Valid for 30 days from date of issue.', { align: 'center' });
-    doc.fontSize(8).fillColor('#ccc').text('Powered by ReceptionAI', { align: 'center' });
+    // ── FOOTER (pinned to bottom of A4) ───────────────────────────────────────
+    const footerY   = 762;
+    const sigBlockY = footerY + 10;
+
+    // Teal top-of-footer line
+    doc.moveTo(MARGIN, footerY).lineTo(545, footerY)
+      .lineWidth(1.5).strokeColor(teal).stroke();
+
+    // Left: signature area
+    doc.moveTo(MARGIN, sigBlockY + 30).lineTo(MARGIN + 155, sigBlockY + 30)
+      .lineWidth(0.5).strokeColor(darkGray).stroke();
+    doc.fontSize(7).font('Helvetica').fillColor(medGray)
+      .text("DOCTOR'S SIGNATURE", MARGIN, sigBlockY + 33, { width: 155, lineBreak: false });
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(darkGray)
+      .text(`Dr. ${data.doctor_name || ''}`, MARGIN, sigBlockY + 43, { width: 155, lineBreak: false });
+
+    // Center: disclaimer
+    doc.fontSize(7).font('Helvetica').fillColor(medGray)
+      .text(
+        'This is a computer-generated prescription.\nValid for 30 days from date of issue.',
+        192, sigBlockY + 14,
+        { width: 190, align: 'center' }
+      );
+
+    // Right: stamp box (dashed rect)
+    const stampX = 418;
+    const stampW = 120;
+    const stampH = 56;
+    doc.rect(stampX, sigBlockY + 2, stampW, stampH)
+      .dash(3, { space: 3 }).strokeColor(medGray).lineWidth(0.8).stroke();
+    doc.undash();
+    doc.fontSize(7).font('Helvetica').fillColor(medGray)
+      .text("DOCTOR'S STAMP & SEAL", stampX, sigBlockY + stampH + 6, { width: stampW, align: 'center', lineBreak: false });
+
+    // "Powered by ReceptionAI" – bottom-center, mixed colour
+    const pwY = 824;
+    const pwLabel = 'Powered by ';
+    const pwBrand = 'ReceptionAI';
+    // Measure widths at size 8 to centre the combined string
+    doc.fontSize(8).font('Helvetica');
+    const pwLabelW = doc.widthOfString(pwLabel);
+    doc.font('Helvetica-Bold');
+    const pwBrandW = doc.widthOfString(pwBrand);
+    const pwStartX = MARGIN + (CONTENT_W - pwLabelW - pwBrandW) / 2;
+
+    doc.fontSize(8).font('Helvetica').fillColor(medGray)
+      .text(pwLabel, pwStartX, pwY, { continued: true, lineBreak: false });
+    doc.font('Helvetica-Bold').fillColor(teal)
+      .text(pwBrand, { lineBreak: false });
 
     doc.end();
   });
