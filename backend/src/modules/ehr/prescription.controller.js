@@ -47,28 +47,31 @@ function generatePDF(data) {
     doc.on('end', () => resolve(Buffer.concat(buffers)));
     doc.on('error', reject);
 
-    const teal = '#0d9488';
-    const darkGray = '#1f2937';
-    const medGray = '#6b7280';
+    const teal      = '#0d9488';
+    const darkGray  = '#1f2937';
+    const medGray   = '#6b7280';
     const lightGray = '#f3f4f6';
     const pageWidth = 515;
 
-    // Helper to position without triggering new page
-    const pin = (y) => { doc.y = y; return y; };
+    // pin(y): always set doc.y = y BEFORE any positioned call so PDFKit
+    // never sees y < doc.y and adds a spurious page.
+    const pin = (y) => { doc.y = y; };
 
-    // ── HEADER ──────────────────────────────────────────
-    // Left: Clinic
+    // ── HEADER ────────────────────────────────────────────────────────────────
+    const doctorName = data.doctor_name ? `Dr. ${data.doctor_name}` : '';
+
+    pin(40);
     doc.fontSize(22).font('Helvetica-Bold').fillColor(teal)
       .text(data.clinic_name || 'Clinic', 40, 40, { width: 300, lineBreak: false });
+
     pin(40);
-    // Right: Doctor
-    const doctorName = data.doctor_name ? `Dr. ${data.doctor_name}` : '';
     doc.fontSize(14).font('Helvetica-Bold').fillColor(darkGray)
       .text(doctorName, 340, 40, { width: 215, align: 'right', lineBreak: false });
 
     pin(65);
     doc.fontSize(7).font('Helvetica-Bold').fillColor(medGray)
       .text('MULTI-SPECIALTY CLINIC & DIAGNOSTICS', 40, 65, { width: 300, lineBreak: false, characterSpacing: 0.3 });
+
     pin(65);
     if (data.specialization) {
       doc.fontSize(9).font('Helvetica-Bold').fillColor(teal)
@@ -80,6 +83,7 @@ function generatePDF(data) {
       doc.fontSize(8).font('Helvetica').fillColor(darkGray)
         .text(data.clinic_address, 40, 78, { width: 300, lineBreak: false });
     }
+
     pin(78);
     if (data.qualification) {
       doc.fontSize(8).font('Helvetica').fillColor(medGray)
@@ -87,16 +91,19 @@ function generatePDF(data) {
     }
 
     // Teal divider
+    pin(100);
     doc.moveTo(40, 100).lineTo(555, 100).lineWidth(1.5).strokeColor(teal).stroke();
 
-    // ── PATIENT BOX ─────────────────────────────────────
-    doc.rect(40, 110, pageWidth, 72).fillColor(lightGray).fill();
+    // ── PATIENT BOX ───────────────────────────────────────────────────────────
     pin(110);
+    doc.rect(40, 110, pageWidth, 72).fillColor(lightGray).fill();
+
+    pin(120);
     doc.fontSize(34).font('Helvetica-Bold').fillColor(teal)
       .text('Rx', 45, 120, { width: 50, lineBreak: false });
 
     // Row 1 labels
-    const cols = [105, 230, 330, 435];
+    const cols    = [105, 230, 330, 435];
     const labels1 = ['PATIENT NAME', 'AGE', 'GENDER', 'BLOOD GROUP'];
     labels1.forEach((label, i) => {
       pin(113);
@@ -135,13 +142,15 @@ function generatePDF(data) {
     doc.fontSize(10).font('Helvetica').fillColor(darkGray)
       .text(rxId, cols[1], 157, { width: 200, lineBreak: false });
 
-    // ── SECTIONS ─────────────────────────────────────────
+    // ── SECTIONS ─────────────────────────────────────────────────────────────
     let y = 192;
 
     const sectionHeader = (title) => {
       pin(y);
       doc.fontSize(7.5).font('Helvetica-Bold').fillColor(teal)
         .text(title, 40, y, { width: pageWidth, lineBreak: false, characterSpacing: 0.5 });
+      // pin before moveTo so the divider line is also safely positioned
+      pin(y + 13);
       doc.moveTo(40, y + 13).lineTo(555, y + 13).lineWidth(0.5).strokeColor('#e5e7eb').stroke();
       y += 20;
     };
@@ -152,10 +161,11 @@ function generatePDF(data) {
       pin(y);
       doc.fontSize(10).font('Helvetica').fillColor(darkGray)
         .text(data.diagnosis, 40, y, { width: pageWidth });
+      // heightOfString called after doc.text so font state is correct (Helvetica 10pt)
       y += doc.heightOfString(data.diagnosis, { width: pageWidth }) + 14;
     }
 
-    // PRESCRIPTION
+    // PRESCRIPTION / MEDICINES
     if (data.prescription) {
       sectionHeader('PRESCRIPTION / MEDICINES');
       const lines = data.prescription.split('\n').filter(l => l.trim());
@@ -166,6 +176,7 @@ function generatePDF(data) {
         pin(y);
         doc.fontSize(10).font('Helvetica-Bold').fillColor(darkGray)
           .text(line.trim(), 68, y, { width: pageWidth - 28 });
+        // heightOfString called after text; font = Helvetica-Bold 10pt ✓
         y += doc.heightOfString(line.trim(), { width: pageWidth - 28 }) + 8;
       });
       y += 4;
@@ -174,6 +185,7 @@ function generatePDF(data) {
     // FOLLOW-UP
     if (data.follow_up_date) {
       sectionHeader('FOLLOW-UP');
+      pin(y);
       doc.rect(40, y, pageWidth, 38).fillColor('#f0fdf4').fill();
       pin(y + 5);
       doc.fontSize(6.5).font('Helvetica-Bold').fillColor(medGray)
@@ -185,27 +197,33 @@ function generatePDF(data) {
       y += 48;
     }
 
-    // NOTES
+    // DOCTOR'S NOTES
     if (data.notes) {
       sectionHeader("DOCTOR'S NOTES");
+      // Set correct font BEFORE measuring so heightOfString matches rendered height
+      doc.fontSize(9).font('Helvetica');
       const notesH = doc.heightOfString(data.notes, { width: pageWidth - 24 }) + 20;
+      pin(y);
       doc.rect(40, y, pageWidth, notesH).fillColor(lightGray).fill();
       pin(y + 10);
-      doc.fontSize(9).font('Helvetica').fillColor(darkGray)
+      doc.fillColor(darkGray)
         .text(data.notes, 52, y + 10, { width: pageWidth - 24 });
       y += notesH + 10;
     }
 
-    // ── FOOTER ────────────────────────────────────────────
+    // ── FOOTER (always pinned to footerY regardless of content above) ─────────
     const footerY = 748;
+
     pin(footerY);
     doc.moveTo(40, footerY).lineTo(555, footerY).lineWidth(1).strokeColor(teal).stroke();
 
-    pin(footerY + 10);
+    pin(footerY + 42);
     doc.moveTo(40, footerY + 42).lineTo(200, footerY + 42).lineWidth(0.5).strokeColor(darkGray).stroke();
+
     pin(footerY + 44);
     doc.fontSize(7).font('Helvetica-Bold').fillColor(medGray)
       .text("DOCTOR'S SIGNATURE", 40, footerY + 44, { lineBreak: false });
+
     pin(footerY + 54);
     doc.fontSize(8).font('Helvetica').fillColor(darkGray)
       .text(doctorName, 40, footerY + 54, { lineBreak: false });
@@ -213,12 +231,15 @@ function generatePDF(data) {
     pin(footerY + 20);
     doc.fontSize(7.5).font('Helvetica').fillColor(medGray)
       .text('This is a computer-generated prescription.', 210, footerY + 20, { width: 170, align: 'center', lineBreak: false });
+
     pin(footerY + 31);
     doc.fontSize(7.5).font('Helvetica-Bold').fillColor(darkGray)
       .text('Valid for 30 days from date of issue.', 210, footerY + 31, { width: 170, align: 'center', lineBreak: false });
 
     pin(footerY + 8);
     doc.rect(420, footerY + 8, 120, 48).dash(3, { space: 3 }).strokeColor(medGray).lineWidth(0.5).stroke();
+    doc.undash();
+
     pin(footerY + 60);
     doc.fontSize(7).font('Helvetica-Bold').fillColor(medGray)
       .text("DOCTOR'S STAMP & SEAL", 420, footerY + 60, { width: 120, align: 'center', lineBreak: false });
