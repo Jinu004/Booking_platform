@@ -37,26 +37,38 @@ async function getPrescriptionData(tenantId, customerId, noteId) {
 
 function generatePDF(data) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
+    // bottom: 5 lets footer content reach y≈836 without triggering auto-pagination
+    const doc = new PDFDocument({
+      margins: { top: 50, bottom: 5, left: 50, right: 50 },
+      size: 'A4',
+      bufferPages: true
+    });
     const buffers = [];
     doc.on('data', chunk => buffers.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(buffers)));
     doc.on('error', reject);
 
     // ── Palette ──────────────────────────────────────────────────────────────
-    const teal      = '#0d9488';
-    const darkGray  = '#1f2937';
-    const medGray   = '#6b7280';
-    const lightGray = '#f3f4f6';
+    const teal       = '#0d9488';
+    const darkGray   = '#1f2937';
+    const medGray    = '#6b7280';
+    const lightGray  = '#f3f4f6';
     const lightGreen = '#f0fdf4';
 
-    const MARGIN     = 50;
-    const CONTENT_W  = 495; // 50 → 545
+    const MARGIN    = 50;
+    const CONTENT_W = 495; // 50 → 545
+    // Content sections must stop before the footer zone
+    const CONTENT_LIMIT = 680;
+    const FOOTER_Y      = 748;
+
+    // ── Key fix: PDFKit adds a new page whenever doc.text(str, x, y) is called
+    // with y < doc.y.  pin(y) resets doc.y = y first so the check never fires.
+    function pin(y) { if (y < doc.y) doc.y = y; }
 
     // ── Prescription ID ───────────────────────────────────────────────────────
     const visitDt = new Date(data.visit_date);
     const dateStr = `${visitDt.getFullYear()}${String(visitDt.getMonth() + 1).padStart(2, '0')}${String(visitDt.getDate()).padStart(2, '0')}`;
-    const rxId    = `RX-${dateStr}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+    const rxId         = `RX-${dateStr}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
     const visitDateStr = visitDt.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
     // ── HEADER ────────────────────────────────────────────────────────────────
@@ -66,7 +78,7 @@ function generatePDF(data) {
     const rightColX = 360;
     const rightColW = 185;
 
-    // Left side – clinic info
+    // Left side – clinic info (renders first; advances doc.y)
     doc.fontSize(20).font('Helvetica-Bold').fillColor(teal)
       .text(data.clinic_name || 'Clinic', leftColX, headerStartY, { width: leftColW });
     doc.fontSize(8).font('Helvetica').fillColor(medGray)
@@ -77,28 +89,32 @@ function generatePDF(data) {
     }
     const leftEndY = doc.y;
 
-    // Right side – doctor info
+    // Right side – pin back to headerStartY so we don't trigger a page break
     let ry = headerStartY;
+    pin(ry);
     doc.fontSize(13).font('Helvetica-Bold').fillColor(darkGray)
       .text(`Dr. ${data.doctor_name || 'Doctor'}`, rightColX, ry, { width: rightColW });
     ry = doc.y;
     if (data.specialization) {
+      pin(ry);
       doc.fontSize(10).font('Helvetica').fillColor(teal)
         .text(data.specialization, rightColX, ry, { width: rightColW });
       ry = doc.y;
     }
     if (data.qualification) {
+      pin(ry);
       doc.fontSize(9).fillColor(medGray)
         .text(data.qualification, rightColX, ry, { width: rightColW });
       ry = doc.y;
     }
     if (data.mci_number) {
+      pin(ry);
       doc.fontSize(8).fillColor(medGray)
         .text(`MCI Reg: ${data.mci_number}`, rightColX, ry, { width: rightColW });
       ry = doc.y;
     }
 
-    // Teal divider
+    // Teal divider after the taller of the two columns
     const dividerY = Math.max(leftEndY, ry) + 10;
     doc.moveTo(MARGIN, dividerY).lineTo(545, dividerY)
       .lineWidth(1.5).strokeColor(teal).stroke();
@@ -110,121 +126,134 @@ function generatePDF(data) {
     doc.rect(MARGIN, y, CONTENT_W, boxH).fill(lightGray);
 
     // "Rx" symbol
+    pin(y + 10);
     doc.fontSize(28).font('Helvetica-Bold').fillColor(teal)
       .text('Rx', MARGIN + 8, y + 10, { width: 40, lineBreak: false });
 
-    // Grid columns: 4 across for row 1
-    const gx = MARGIN + 56;
+    // Grid columns: 4 across
+    const gx   = MARGIN + 56;
     const colW = 108;
     const cols = [gx, gx + colW, gx + colW * 2, gx + colW * 3];
 
     const r1lY = y + 8;
     const r1vY = r1lY + 12;
 
+    // Row 1 labels – pin before each cell to avoid backward-y page breaks
     doc.fontSize(7).font('Helvetica').fillColor(medGray);
-    doc.text('PATIENT NAME', cols[0], r1lY, { width: colW, lineBreak: false });
-    doc.text('AGE',          cols[1], r1lY, { width: colW, lineBreak: false });
-    doc.text('GENDER',       cols[2], r1lY, { width: colW, lineBreak: false });
-    doc.text('BLOOD GROUP',  cols[3], r1lY, { width: colW, lineBreak: false });
+    pin(r1lY); doc.text('PATIENT NAME', cols[0], r1lY, { width: colW,     lineBreak: false });
+    pin(r1lY); doc.text('AGE',          cols[1], r1lY, { width: colW,     lineBreak: false });
+    pin(r1lY); doc.text('GENDER',       cols[2], r1lY, { width: colW,     lineBreak: false });
+    pin(r1lY); doc.text('BLOOD GROUP',  cols[3], r1lY, { width: colW,     lineBreak: false });
 
+    // Row 1 values
     doc.fontSize(10).font('Helvetica-Bold').fillColor(darkGray);
-    doc.text(data.patient_name || '—',           cols[0], r1vY, { width: colW,     lineBreak: false });
-    doc.text(data.age ? `${data.age} yrs` : '—', cols[1], r1vY, { width: colW,     lineBreak: false });
-    doc.text(data.gender || '—',                 cols[2], r1vY, { width: colW,     lineBreak: false });
-    doc.text(data.blood_group || '—',            cols[3], r1vY, { width: colW,     lineBreak: false });
+    pin(r1vY); doc.text(data.patient_name || '—',           cols[0], r1vY, { width: colW, lineBreak: false });
+    pin(r1vY); doc.text(data.age ? `${data.age} yrs` : '—', cols[1], r1vY, { width: colW, lineBreak: false });
+    pin(r1vY); doc.text(data.gender || '—',                 cols[2], r1vY, { width: colW, lineBreak: false });
+    pin(r1vY); doc.text(data.blood_group || '—',            cols[3], r1vY, { width: colW, lineBreak: false });
 
-    // Row 2 – date + rx id (span 2 cols each)
+    // Row 2 – date + rx id
     const r2lY = y + 44;
     const r2vY = r2lY + 12;
 
     doc.fontSize(7).font('Helvetica').fillColor(medGray);
-    doc.text('DATE OF VISIT',   cols[0], r2lY, { width: colW * 2, lineBreak: false });
-    doc.text('PRESCRIPTION ID', cols[2], r2lY, { width: colW * 2, lineBreak: false });
+    pin(r2lY); doc.text('DATE OF VISIT',   cols[0], r2lY, { width: colW * 2, lineBreak: false });
+    pin(r2lY); doc.text('PRESCRIPTION ID', cols[2], r2lY, { width: colW * 2, lineBreak: false });
 
     doc.fontSize(10).font('Helvetica-Bold').fillColor(darkGray);
-    doc.text(visitDateStr, cols[0], r2vY, { width: colW * 2, lineBreak: false });
-    doc.text(rxId,         cols[2], r2vY, { width: colW * 2, lineBreak: false });
+    pin(r2vY); doc.text(visitDateStr, cols[0], r2vY, { width: colW * 2, lineBreak: false });
+    pin(r2vY); doc.text(rxId,         cols[2], r2vY, { width: colW * 2, lineBreak: false });
 
     y = y + boxH + 18;
 
     // ── Section helper ────────────────────────────────────────────────────────
     function sectionHeader(title, curY) {
+      pin(curY);
       doc.fontSize(9).font('Helvetica-Bold').fillColor(teal)
-        .text(title, MARGIN, curY, { width: CONTENT_W, characterSpacing: 0.8, lineBreak: false });
-      const ly = doc.y + 4;
+        .text(title, MARGIN, curY, { width: CONTENT_W, characterSpacing: 0.8 });
+      const ly = doc.y + 2;
       doc.moveTo(MARGIN, ly).lineTo(545, ly)
         .lineWidth(0.5).strokeColor('#e5e7eb').stroke();
-      return ly + 8;
+      return ly + 7;
     }
 
     // ── DIAGNOSIS ─────────────────────────────────────────────────────────────
-    if (data.diagnosis) {
+    if (data.diagnosis && y < CONTENT_LIMIT) {
       y = sectionHeader('DIAGNOSIS', y);
+      pin(y);
       doc.fontSize(10).font('Helvetica').fillColor(darkGray)
         .text(data.diagnosis, MARGIN, y, { width: CONTENT_W });
-      y = doc.y + 16;
+      y = doc.y + 14;
     }
 
     // ── PRESCRIPTION / MEDICINES ──────────────────────────────────────────────
-    if (data.prescription) {
+    if (data.prescription && y < CONTENT_LIMIT) {
       y = sectionHeader('PRESCRIPTION / MEDICINES', y);
       const medicines = data.prescription.split('\n').filter(l => l.trim());
-      medicines.forEach((line, i) => {
+      for (const [i, line] of medicines.entries()) {
+        if (y >= CONTENT_LIMIT) break;
         const num = String(i + 1).padStart(2, '0');
-        // Number in teal
+        pin(y);
         doc.fontSize(10).font('Helvetica-Bold').fillColor(teal)
           .text(num, MARGIN, y, { width: 24, lineBreak: false });
-        // Medicine text in darkGray
+        pin(y);
         doc.fontSize(10).font('Helvetica-Bold').fillColor(darkGray)
           .text(line.trim(), MARGIN + 28, y, { width: CONTENT_W - 28 });
         y = doc.y + 4;
-      });
-      y += 12;
+      }
+      y += 10;
     }
 
     // ── FOLLOW-UP ─────────────────────────────────────────────────────────────
-    if (data.follow_up_date) {
+    if (data.follow_up_date && y < CONTENT_LIMIT) {
       y = sectionHeader('FOLLOW-UP', y);
       const followUp = new Date(data.follow_up_date).toLocaleDateString('en-IN', {
         day: 'numeric', month: 'long', year: 'numeric'
       });
       const fbH = 48;
       doc.rect(MARGIN, y, 220, fbH).fill(lightGreen);
+      pin(y + 9);
       doc.fontSize(7).font('Helvetica').fillColor(medGray)
         .text('NEXT VISIT', MARGIN + 12, y + 9, { width: 196, lineBreak: false });
+      pin(y + 22);
       doc.fontSize(13).font('Helvetica-Bold').fillColor(teal)
         .text(followUp, MARGIN + 12, y + 22, { width: 196, lineBreak: false });
-      y = y + fbH + 16;
+      y = y + fbH + 14;
     }
 
     // ── DOCTOR'S NOTES ────────────────────────────────────────────────────────
-    if (data.notes) {
+    if (data.notes && y < CONTENT_LIMIT) {
       y = sectionHeader("DOCTOR'S NOTES", y);
       const lineCount = Math.ceil(data.notes.length / 85);
-      const nbH = Math.max(48, lineCount * 15 + 24);
-      doc.rect(MARGIN, y, CONTENT_W, nbH).fill(lightGray);
+      const nbH = Math.max(44, lineCount * 15 + 20);
+      // Cap notes box so it doesn't push into footer zone
+      const cappedH = Math.min(nbH, CONTENT_LIMIT - y - 4);
+      doc.rect(MARGIN, y, CONTENT_W, cappedH).fill(lightGray);
+      pin(y + 10);
       doc.fontSize(10).font('Helvetica').fillColor(darkGray)
-        .text(data.notes, MARGIN + 12, y + 12, { width: CONTENT_W - 24 });
-      y = doc.y + 16;
+        .text(data.notes, MARGIN + 12, y + 10, { width: CONTENT_W - 24, height: cappedH - 16, ellipsis: true });
+      y = doc.y + 12;
     }
 
-    // ── FOOTER (pinned to bottom of A4) ───────────────────────────────────────
-    const footerY   = 762;
-    const sigBlockY = footerY + 10;
+    // ── FOOTER (pinned to FOOTER_Y regardless of content above) ──────────────
+    const sigBlockY = FOOTER_Y + 10;
 
     // Teal top-of-footer line
-    doc.moveTo(MARGIN, footerY).lineTo(545, footerY)
+    doc.moveTo(MARGIN, FOOTER_Y).lineTo(545, FOOTER_Y)
       .lineWidth(1.5).strokeColor(teal).stroke();
 
     // Left: signature area
     doc.moveTo(MARGIN, sigBlockY + 30).lineTo(MARGIN + 155, sigBlockY + 30)
       .lineWidth(0.5).strokeColor(darkGray).stroke();
+    pin(sigBlockY + 33);
     doc.fontSize(7).font('Helvetica').fillColor(medGray)
       .text("DOCTOR'S SIGNATURE", MARGIN, sigBlockY + 33, { width: 155, lineBreak: false });
+    pin(sigBlockY + 43);
     doc.fontSize(9).font('Helvetica-Bold').fillColor(darkGray)
       .text(`Dr. ${data.doctor_name || ''}`, MARGIN, sigBlockY + 43, { width: 155, lineBreak: false });
 
     // Center: disclaimer
+    pin(sigBlockY + 14);
     doc.fontSize(7).font('Helvetica').fillColor(medGray)
       .text(
         'This is a computer-generated prescription.\nValid for 30 days from date of issue.',
@@ -235,28 +264,27 @@ function generatePDF(data) {
     // Right: stamp box (dashed rect)
     const stampX = 418;
     const stampW = 120;
-    const stampH = 56;
+    const stampH = 52;
     doc.rect(stampX, sigBlockY + 2, stampW, stampH)
       .dash(3, { space: 3 }).strokeColor(medGray).lineWidth(0.8).stroke();
     doc.undash();
+    pin(sigBlockY + stampH + 6);
     doc.fontSize(7).font('Helvetica').fillColor(medGray)
       .text("DOCTOR'S STAMP & SEAL", stampX, sigBlockY + stampH + 6, { width: stampW, align: 'center', lineBreak: false });
 
-    // "Powered by ReceptionAI" – bottom-center, mixed colour
-    const pwY = 824;
-    const pwLabel = 'Powered by ';
-    const pwBrand = 'ReceptionAI';
-    // Measure widths at size 8 to centre the combined string
+    // "Powered by ReceptionAI" – bottom-centre, mixed colour
+    const pwY = 820;
     doc.fontSize(8).font('Helvetica');
-    const pwLabelW = doc.widthOfString(pwLabel);
+    const pwLabelW = doc.widthOfString('Powered by ');
     doc.font('Helvetica-Bold');
-    const pwBrandW = doc.widthOfString(pwBrand);
+    const pwBrandW = doc.widthOfString('ReceptionAI');
     const pwStartX = MARGIN + (CONTENT_W - pwLabelW - pwBrandW) / 2;
 
+    pin(pwY);
     doc.fontSize(8).font('Helvetica').fillColor(medGray)
-      .text(pwLabel, pwStartX, pwY, { continued: true, lineBreak: false });
+      .text('Powered by ', pwStartX, pwY, { continued: true, lineBreak: false });
     doc.font('Helvetica-Bold').fillColor(teal)
-      .text(pwBrand, { lineBreak: false });
+      .text('ReceptionAI', { lineBreak: false });
 
     doc.end();
   });
