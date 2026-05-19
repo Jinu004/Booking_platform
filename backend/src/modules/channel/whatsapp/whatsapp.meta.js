@@ -206,10 +206,67 @@ async function sendListMessage(to, bodyText, buttonText, items) {
   }
 }
 
+
+async function uploadMedia(fileBuffer, mimeType, filename) {
+  try {
+    const FormData = require('form-data');
+    const form = new FormData();
+    form.append('file', fileBuffer, { filename, contentType: mimeType });
+    form.append('messaging_product', 'whatsapp');
+    const response = await axios.post(
+      `${META_API_URL}/${META_PHONE_ID}/media`,
+      form,
+      {
+        headers: {
+          Authorization: `Bearer ${META_TOKEN}`,
+          ...form.getHeaders()
+        }
+      }
+    );
+    logger.info('Media uploaded to Meta:', response.data.id);
+    return response.data.id;
+  } catch (err) {
+    logger.error('Meta media upload failed:', err.message);
+    throw err;
+  }
+}
+
+async function sendDocument(to, mediaId, filename, caption) {
+  try {
+    const response = await axios.post(
+      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace('+', ''),
+        type: 'document',
+        document: {
+          id: mediaId,
+          filename: filename,
+          caption: caption || ''
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${META_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    logger.info(`Meta document sent to ${to}`);
+    return response.data;
+  } catch (err) {
+    logger.error('Meta document send failed:', err.message);
+    throw err;
+  }
+}
+
 module.exports = {
   sendTextMessage,
   sendInteractiveButtons,
   sendListMessage,
   parseIncomingMessage,
-  verifyWebhook
+  verifyWebhook,
+  uploadMedia,
+  sendDocument
 }

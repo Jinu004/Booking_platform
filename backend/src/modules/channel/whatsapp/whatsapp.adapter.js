@@ -105,10 +105,22 @@ async function sendDoctorList(to, bodyText, items) {
   return waha.sendTextMessage(to, listText)
 }
 
+
+async function sendDocument(to, fileBuffer, filename, caption) {
+  const provider = getProvider();
+  if (provider === 'meta') {
+    const mediaId = await meta.uploadMedia(fileBuffer, 'application/pdf', filename);
+    return meta.sendDocument(to, mediaId, filename, caption);
+  }
+  logger.warn('Document sending not supported in WAHA dev mode');
+  return { success: false, reason: 'not_supported_in_dev' };
+}
+
 module.exports = {
   sendMessage,
   sendButtons,
   sendDoctorList,
+  sendDocument,
   parseIncoming,
   getProvider
 }
