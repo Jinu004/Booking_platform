@@ -183,7 +183,7 @@ function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, savi
 
 // ── Visit Note Card ───────────────────────────────────────────────────────────
 
-function VisitNoteCard({ note, isLatest, onEdit }) {
+function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend }) {
   return (
     <div className="flex-1 bg-white border border-gray-100 rounded-xl p-5 shadow-sm">
       <div className="flex items-start justify-between mb-4">
@@ -239,6 +239,21 @@ function VisitNoteCard({ note, isLatest, onEdit }) {
           Follow-up: {fmtDate(note.follow_up_date)}
         </div>
       )}
+
+      <div className="flex gap-2 mt-3">
+        <button
+          onClick={() => onDownload(note.id)}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-teal-700 border border-teal-300 rounded-lg hover:bg-teal-50 transition"
+        >
+          ↓ Download PDF
+        </button>
+        <button
+          onClick={() => onSend(note.id)}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-lg hover:bg-green-50 transition"
+        >
+          Send to WhatsApp
+        </button>
+      </div>
     </div>
   );
 }
@@ -448,6 +463,39 @@ export default function PatientProfile() {
       addToast('Failed to save visit note', 'error');
     } finally {
       setSavingNote(false);
+    }
+  };
+
+  // ── Prescription handlers ──────────────────────────────────────────────────
+
+  const handleDownloadPrescription = async (noteId) => {
+    try {
+      const res = await fetch(`/api/v1/ehr/patients/${customerId}/visit-notes/${noteId}/prescription`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
+      });
+      if (!res.ok) throw new Error('Failed to generate prescription');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `prescription-${noteId.slice(0, 8)}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      addToast('Failed to download prescription', 'error');
+    }
+  };
+
+  const handleSendPrescription = async (noteId) => {
+    if (!window.confirm('Send prescription to patient WhatsApp?')) return;
+    try {
+      await fetch(`/api/v1/ehr/patients/${customerId}/visit-notes/${noteId}/prescription/send`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
+      });
+      addToast('Prescription sent to patient WhatsApp', 'success');
+    } catch {
+      addToast('Failed to send prescription', 'error');
     }
   };
 
@@ -814,6 +862,8 @@ export default function PatientProfile() {
                     note={note}
                     isLatest={idx === 0}
                     onEdit={openEditNote}
+                    onDownload={handleDownloadPrescription}
+                    onSend={handleSendPrescription}
                   />
                 </div>
               ))}
