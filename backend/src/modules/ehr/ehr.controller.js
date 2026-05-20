@@ -152,10 +152,15 @@ async function addVisitNote(req, res, next) {
     if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
     const { visit_date, doctor_id, diagnosis, prescription, follow_up_date, notes, booking_id } = req.body;
     if (!visit_date) return errorResponse(res, 'Visit date is required', 400);
+    const capitalizeFirst = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
+    const body = {};
+    if (diagnosis) body.diagnosis = capitalizeFirst(diagnosis);
+    if (prescription) body.prescription = capitalizeFirst(prescription);
+    if (notes) body.notes = capitalizeFirst(notes);
     const result = await pool.query(`
       INSERT INTO visit_notes (tenant_id, customer_id, booking_id, doctor_id, visit_date, diagnosis, prescription, follow_up_date, notes, created_by)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *
-    `, [req.tenantId, customerId, booking_id || null, doctor_id || null, visit_date, diagnosis || null, prescription || null, follow_up_date || null, notes || null, req.staff.id]);
+    `, [req.tenantId, customerId, booking_id || null, doctor_id || null, visit_date, body.diagnosis || null, body.prescription || null, follow_up_date || null, body.notes || null, req.staff.id]);
     return successResponse(res, result.rows[0]);
   } catch (err) {
     next(err);
@@ -170,6 +175,11 @@ async function updateVisitNote(req, res, next) {
     if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
     if (!isUUID(id)) return errorResponse(res, 'Invalid visit note ID', 400);
     const { visit_date, doctor_id, diagnosis, prescription, follow_up_date, notes } = req.body;
+    const capitalizeFirst = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
+    const body = {};
+    if (diagnosis) body.diagnosis = capitalizeFirst(diagnosis);
+    if (prescription) body.prescription = capitalizeFirst(prescription);
+    if (notes) body.notes = capitalizeFirst(notes);
     const result = await pool.query(`
       UPDATE visit_notes SET
         visit_date = COALESCE($1, visit_date),
@@ -181,7 +191,7 @@ async function updateVisitNote(req, res, next) {
         updated_at = NOW()
       WHERE id = $7 AND customer_id = $8 AND tenant_id = $9
       RETURNING *
-    `, [visit_date || null, doctor_id || null, diagnosis || null, prescription || null, follow_up_date || null, notes || null, id, customerId, req.tenantId]);
+    `, [visit_date || null, doctor_id || null, body.diagnosis || null, body.prescription || null, follow_up_date || null, body.notes || null, id, customerId, req.tenantId]);
     if (!result.rows.length) return errorResponse(res, 'Visit note not found', 404);
     return successResponse(res, result.rows[0]);
   } catch (err) {
