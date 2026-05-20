@@ -30,21 +30,21 @@ function docInitials(name) {
 }
 
 const SPECIALIZATIONS = [
-  'Ayurveda','Anaesthesiology','Cardiology',
-  'Dentistry','Dermatology','ENT',
-  'Endocrinology','Gastroenterology',
-  'General Medicine','General Surgery',
-  'Gynaecology','Homoeopathy','Nephrology',
-  'Neurology','Oncology','Ophthalmology',
-  'Orthopaedics','Paediatrics','Pathology',
-  'Psychiatry','Pulmonology','Radiology',
-  'Rheumatology','Urology'
+  'Ayurveda', 'Anaesthesiology', 'Cardiology',
+  'Dentistry', 'Dermatology', 'ENT',
+  'Endocrinology', 'Gastroenterology',
+  'General Medicine', 'General Surgery',
+  'Gynaecology', 'Homoeopathy', 'Nephrology',
+  'Neurology', 'Oncology', 'Ophthalmology',
+  'Orthopaedics', 'Paediatrics', 'Pathology',
+  'Psychiatry', 'Pulmonology', 'Radiology',
+  'Rheumatology', 'Urology'
 ];
 
 const QUALIFICATIONS = [
-  'BAMS','BHMS','BDS','DCH','DGO','DM',
-  'DNB','FRCS','MBBS','MBBS MD','MBBS MS',
-  'MBBS DNB','MCh','MD','MDS','MRCP','MS'
+  'BAMS', 'BHMS', 'BDS', 'DCH', 'DGO', 'DM',
+  'DNB', 'FRCS', 'MBBS', 'MBBS MD', 'MBBS MS',
+  'MBBS DNB', 'MCh', 'MD', 'MDS', 'MRCP', 'MS'
 ];
 
 function SearchableSelect({
@@ -358,13 +358,13 @@ const Doctors = () => {
 
   // Derived availability counts
   const availableCount = doctors.filter(d => d.available_today).length;
-  const onLeaveCount   = doctors.filter(d => !d.available_today && d.leave_days > 0).length;
-  const absentCount    = doctors.filter(d => !d.available_today && !d.leave_days).length;
+  const onLeaveCount = doctors.filter(d => !d.available_today && d.leave_days > 0).length;
+  const absentCount = doctors.filter(d => !d.available_today && !d.leave_days).length;
 
   const filteredAvail = doctors.filter(doc => {
     if (availFilter === 'available') return doc.available_today;
-    if (availFilter === 'absent')    return !doc.available_today && !doc.leave_days;
-    if (availFilter === 'leave')     return !doc.available_today && doc.leave_days > 0;
+    if (availFilter === 'absent') return !doc.available_today && !doc.leave_days;
+    if (availFilter === 'leave') return !doc.available_today && doc.leave_days > 0;
     return true;
   });
 
@@ -496,24 +496,22 @@ const Doctors = () => {
         {/* Filter tabs */}
         <div className="flex gap-1 border-b border-gray-200 mb-5">
           {[
-            { key: 'all',       label: 'All',       count: doctors.length },
-            { key: 'available', label: 'Available',  count: availableCount },
-            { key: 'absent',    label: 'Absent',     count: absentCount },
-            { key: 'leave',     label: 'On Leave',   count: onLeaveCount },
+            { key: 'all', label: 'All', count: doctors.length },
+            { key: 'available', label: 'Available', count: availableCount },
+            { key: 'absent', label: 'Absent', count: absentCount },
+            { key: 'leave', label: 'On Leave', count: onLeaveCount },
           ].map(tab => (
             <button
               key={tab.key}
               onClick={() => setAvailFilter(tab.key)}
-              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                availFilter === tab.key
-                  ? 'border-teal-600 text-teal-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${availFilter === tab.key
+                ? 'border-teal-600 text-teal-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
               {tab.label}
-              <span className={`ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                availFilter === tab.key ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'
-              }`}>
+              <span className={`ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${availFilter === tab.key ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'
+                }`}>
                 {tab.count}
               </span>
             </button>
@@ -529,16 +527,15 @@ const Doctors = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {filteredAvail.map(doc => {
               const isAvailable = doc.available_today;
-              const isOnLeave   = !isAvailable && doc.leave_days > 0;
-              const isAbsent    = !isAvailable && !doc.leave_days;
-              const todayCount  = docTodayTokens(doc);
-              const maxTokens   = doc.max_tokens_daily || 1;
-              const progress    = Math.min((todayCount / maxTokens) * 100, 100);
+              const isOnLeave = !isAvailable && doc.leave_days > 0;
+              const isAbsent = !isAvailable && !doc.leave_days;
+              const todayCount = docTodayTokens(doc);
+              const maxTokens = doc.max_tokens_daily || 1;
+              const progress = Math.min((todayCount / maxTokens) * 100, 100);
 
               return (
-                <div key={doc.id} className={`bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4 border-l-4 ${
-                  isAvailable ? 'border-l-green-500' : isOnLeave ? 'border-l-red-500' : 'border-l-amber-500'
-                }`}>
+                <div key={doc.id} className={`bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4 border-l-4 ${isAvailable ? 'border-l-green-500' : isOnLeave ? 'border-l-red-500' : 'border-l-red-500'
+                  }`}>
 
                   {/* Top: avatar + name + badge */}
                   <div className="flex items-start gap-3">
@@ -589,7 +586,7 @@ const Doctors = () => {
                     {isAvailable ? (
                       <button
                         onClick={() => handleToggleAvailability(doc)}
-                        className="w-full py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition border border-amber-200"
+                        className="w-full py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition border border-red-200"
                       >
                         Mark Absent
                       </button>
@@ -629,7 +626,7 @@ const Doctors = () => {
               {leaveType === 'days' ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Number of Days</label>
-                  <input 
+                  <input
                     type="number" min="1" required
                     value={leaveDays}
                     onChange={e => setLeaveDays(parseInt(e.target.value))}
@@ -640,7 +637,7 @@ const Doctors = () => {
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Leave Date</label>
-                    <input 
+                    <input
                       type="date" required
                       value={leaveDate}
                       onChange={e => setLeaveDate(e.target.value)}
@@ -649,7 +646,7 @@ const Doctors = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Reason</label>
-                    <input 
+                    <input
                       type="text"
                       value={leaveReason}
                       onChange={e => setLeaveReason(e.target.value)}
@@ -676,7 +673,7 @@ const Doctors = () => {
             <form onSubmit={handleManageSubmit} className="space-y-4" noValidate>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Full Name *</label>
-                <input type="text" value={manageDoctorForm.name || ''} onChange={e => setManageDoctorForm({...manageDoctorForm, name: formatDoctorName(e.target.value)})} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.name ? 'border-red-500' : ''}`} />
+                <input type="text" value={manageDoctorForm.name || ''} onChange={e => setManageDoctorForm({ ...manageDoctorForm, name: formatDoctorName(e.target.value) })} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.name ? 'border-red-500' : ''}`} />
                 {formErrors.name && <p className="mt-1 text-xs text-red-600">{formErrors.name}</p>}
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -696,7 +693,7 @@ const Doctors = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Phone *</label>
-                  <input type="text" value={manageDoctorForm.phone} onChange={e => { const numericOnly = e.target.value.replace(/\D/g, '').slice(0, 10); setManageDoctorForm({...manageDoctorForm, phone: numericOnly}); }} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.phone ? 'border-red-500' : ''}`} />
+                  <input type="text" value={manageDoctorForm.phone} onChange={e => { const numericOnly = e.target.value.replace(/\D/g, '').slice(0, 10); setManageDoctorForm({ ...manageDoctorForm, phone: numericOnly }); }} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.phone ? 'border-red-500' : ''}`} />
                   {formErrors.phone && <p className="mt-1 text-xs text-red-600">{formErrors.phone}</p>}
                 </div>
               </div>
@@ -717,13 +714,13 @@ const Doctors = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Daily Token Limit *</label>
-                  <input type="number" min="1" max="100" value={manageDoctorForm.maxTokensDaily} onChange={e => setManageDoctorForm({...manageDoctorForm, maxTokensDaily: e.target.value})} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.maxTokensDaily ? 'border-red-500' : ''}`} />
+                  <input type="number" min="1" max="100" value={manageDoctorForm.maxTokensDaily} onChange={e => setManageDoctorForm({ ...manageDoctorForm, maxTokensDaily: e.target.value })} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.maxTokensDaily ? 'border-red-500' : ''}`} />
                   {formErrors.maxTokensDaily && <p className="mt-1 text-xs text-red-600">{formErrors.maxTokensDaily}</p>}
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Consultation Fee *</label>
-                <input type="text" placeholder="e.g. 300" value={manageDoctorForm.consultationFee} onChange={e => { const numericOnly = e.target.value.replace(/\D/g, ''); setManageDoctorForm({...manageDoctorForm, consultationFee: numericOnly}); }} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.consultationFee ? 'border-red-500' : ''}`} />
+                <input type="text" placeholder="e.g. 300" value={manageDoctorForm.consultationFee} onChange={e => { const numericOnly = e.target.value.replace(/\D/g, ''); setManageDoctorForm({ ...manageDoctorForm, consultationFee: numericOnly }); }} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.consultationFee ? 'border-red-500' : ''}`} />
                 {formErrors.consultationFee && <p className="mt-1 text-xs text-red-600">{formErrors.consultationFee}</p>}
               </div>
 
@@ -743,7 +740,7 @@ const Doctors = () => {
           <div className="bg-white rounded-lg p-6 max-w-lg w-full shadow-xl overflow-y-auto max-h-[90vh]">
             <h2 className="text-xl font-bold mb-2">Weekly Schedule</h2>
             <p className="text-sm text-gray-500 mb-6">{scheduleModalDoc.name}</p>
-            
+
             <div className="space-y-3">
               {DAYS.map((day, idx) => {
                 const s = doctorSchedule[idx];
