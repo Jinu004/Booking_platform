@@ -177,7 +177,7 @@ const Staff = () => {
         {[
           { label: 'Total Staff', value: staffList.length, color: 'text-gray-900' },
           { label: 'Doctors', value: staffList.filter(s => s.role === 'doctor').length, color: 'text-teal-600' },
-          { label: 'Active Today', value: staffList.filter(s => s.is_active).length, color: 'text-green-600' },
+          { label: 'Active ', value: staffList.filter(s => s.is_active).length, color: 'text-green-600' },
           { label: 'Inactive', value: staffList.filter(s => !s.is_active).length, color: 'text-red-500' },
         ].map(card => (
           <div key={card.label} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
@@ -198,11 +198,10 @@ const Staff = () => {
               <button
                 key={tab.key}
                 onClick={() => setFilterTab(tab.key)}
-                className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition ${
-                  filterTab === tab.key
+                className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition ${filterTab === tab.key
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {tab.label}
                 <span className={`ml-1.5 text-xs font-semibold ${filterTab === tab.key ? 'text-indigo-200' : 'text-gray-400'}`}>
