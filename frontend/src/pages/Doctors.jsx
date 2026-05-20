@@ -536,11 +536,13 @@ const Doctors = () => {
               const progress    = Math.min((todayCount / maxTokens) * 100, 100);
 
               return (
-                <div key={doc.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4">
+                <div key={doc.id} className={`bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4 border-l-4 ${
+                  isAvailable ? 'border-l-green-500' : isOnLeave ? 'border-l-red-500' : 'border-l-amber-500'
+                }`}>
 
                   {/* Top: avatar + name + badge */}
                   <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarColor(doc.name)}`}>
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 bg-slate-100 text-slate-600">
                       {docInitials(doc.name)}
                     </div>
                     <div className="flex-1 min-w-0">
