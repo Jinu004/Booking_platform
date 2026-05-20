@@ -413,7 +413,7 @@ const Doctors = () => {
                     {docInitials(doc.name)}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-base font-bold text-gray-900 truncate">{doc.name}</p>
+                    <p className="text-lg font-bold text-gray-900 truncate">{doc.name}</p>
                     <p className="text-sm text-teal-600 font-medium truncate">{doc.specialization || 'General'}</p>
                   </div>
                 </div>
@@ -543,8 +543,8 @@ const Doctors = () => {
                       {docInitials(doc.name)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-900 truncate">{doc.name}</p>
-                      <p className="text-xs text-gray-400 truncate">{doc.specialization || 'General'}</p>
+                      <p className="text-base font-bold text-gray-900 truncate">{doc.name}</p>
+                      <p className="text-sm text-gray-400 truncate">{doc.specialization || 'General'}</p>
                     </div>
                   </div>
 
