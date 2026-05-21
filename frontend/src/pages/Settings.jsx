@@ -48,7 +48,8 @@ export default function Settings() {
   useEffect(() => {
     getClinicSettings()
       .then(res => {
-        if (res?.data) setClinic(prev => ({ ...prev, ...res.data }));
+        const d = res?.data || res;
+        if (d) setClinic(prev => ({ ...prev, ...d }));
       })
       .catch(() => { })
       .finally(() => setClinicLoading(false));
