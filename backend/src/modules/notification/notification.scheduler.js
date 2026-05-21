@@ -77,7 +77,8 @@ function resetDoctorAvailability() {
   cron.schedule('30 18 * * *', async () => {
     logger.info('Resetting doctor availability based on schedules');
     try {
-      const today = new Date().getDay();
+      const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const today = nowIST.getDay();
       await pool.query('UPDATE clinic_doctors SET available_today = false WHERE leave_days != 999');
       await pool.query(
         `UPDATE clinic_doctors cd
