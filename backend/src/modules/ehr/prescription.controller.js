@@ -71,6 +71,13 @@ function generatePDF(data) {
     const rxId         = `RX-${dateStr}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
     const visitDateStr = visitDt.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
+    // ── Doctor name (avoid double Dr. prefix) ──────────────────────────────────
+    const doctorName = data.doctor_name
+      ? (data.doctor_name.startsWith('Dr.') || data.doctor_name.startsWith('dr.')
+        ? data.doctor_name
+        : `Dr. ${data.doctor_name}`)
+      : '';
+
     // ── HEADER ────────────────────────────────────────────────────────────────
     const headerStartY = 50;
     const leftColX  = MARGIN;
@@ -93,7 +100,7 @@ function generatePDF(data) {
     let ry = headerStartY;
     pin(ry);
     doc.fontSize(13).font('Helvetica-Bold').fillColor(darkGray)
-      .text(`Dr. ${data.doctor_name || 'Doctor'}`, rightColX, ry, { width: rightColW });
+      .text(`${doctorName || 'Doctor'}`, rightColX, ry, { width: rightColW });
     ry = doc.y;
     if (data.specialization) {
       pin(ry);
@@ -250,7 +257,7 @@ function generatePDF(data) {
       .text("DOCTOR'S SIGNATURE", MARGIN, sigBlockY + 33, { width: 155, lineBreak: false });
     pin(sigBlockY + 43);
     doc.fontSize(9).font('Helvetica-Bold').fillColor(darkGray)
-      .text(`Dr. ${data.doctor_name || ''}`, MARGIN, sigBlockY + 43, { width: 155, lineBreak: false });
+      .text(doctorName, MARGIN, sigBlockY + 43, { width: 155, lineBreak: false });
 
     // Center: disclaimer
     pin(sigBlockY + 14);
