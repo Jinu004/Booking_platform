@@ -62,17 +62,19 @@ const normalizeNumber = (num) => {
 /**
  * Creates a new tenant with default configs
  */
-const createTenant = async ({ name, industry, whatsappNumber, plan }) => {
-  const normalizedNumber = normalizeNumber(whatsappNumber);
-  
-  const exists = await tenantModel.whatsappNumberExists(pool, normalizedNumber);
-  if (exists) {
-    throw new Error('WhatsApp number is already registered');
+const createTenant = async (tenantData) => {
+  const { clinicName, email, password, industry: rawIndustry, whatsappNumber, plan } = tenantData;
+  const name = clinicName || tenantData.name;
+  const industry = rawIndustry || 'clinic';
+  const normalizedNumber = whatsappNumber ? normalizeNumber(whatsappNumber) : null;
+  if (normalizedNumber) {
+    const exists = await tenantModel.whatsappNumberExists(pool, normalizedNumber);
+    if (exists) throw new Error('WhatsApp number is already registered');
   }
 
   let baseSlug = name.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, '-');
   let slug = baseSlug;
-  
+
   while (await tenantModel.slugExists(pool, slug)) {
     const random4 = Math.floor(1000 + Math.random() * 9000);
     slug = `${baseSlug}-${random4}`;
@@ -85,10 +87,20 @@ const createTenant = async ({ name, industry, whatsappNumber, plan }) => {
     slug,
     industry,
     plan: finalPlan,
-    whatsapp_number: normalizedNumber
+    whatsapp_number: normalizedNumber || null
   });
 
   await setDefaultConfigs(tenant.id, industry);
+
+  if (email && password) {
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await pool.query(
+      `INSERT INTO staff (tenant_id, name, email, password_hash, role, is_active)
+       VALUES ($1, $2, $3, $4, 'admin', true)`,
+      [tenant.id, name, email, hashedPassword]
+    );
+  }
 
   const configs = await getAllConfigs(tenant.id);
   return { ...tenant, configs };
@@ -167,7 +179,7 @@ const setDefaultConfigs = async (tenantId, industry) => {
     logger.warn(`Unknown industry '${industry}' provided for tenant ${tenantId}. No default configs set.`);
     return;
   }
-  
+
   for (const [key, value] of Object.entries(defaults)) {
     await setConfig(tenantId, key, value);
   }
