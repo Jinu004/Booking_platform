@@ -168,7 +168,7 @@ const doctorList = doctorsResult.rows.map(doc => {
         }
 
         // Get today's day of week (0=Sunday, 1=Monday, etc.)
-        const todayDow = new Date().getDay()
+        const todayDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
         const scheduleRes = await pool.query(
           `SELECT start_time, end_time FROM doctor_schedules
            WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
