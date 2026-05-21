@@ -152,30 +152,10 @@ export default function Settings() {
       {activeTab === 'clinic' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
           <h2 className="text-lg font-semibold text-gray-900">Clinic Profile</h2>
-          {clinicLoading ? (
+          {clinicLoading || hitlLoading ? (
             <p className="text-sm text-gray-400">Loading...</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Opening Time</label>
-                  <input
-                    type="time"
-                    value={clinic.opening_time || '09:00'}
-                    onChange={e => setClinic(p => ({ ...p, opening_time: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Closing Time</label>
-                  <input
-                    type="time"
-                    value={clinic.closing_time || '18:00'}
-                    onChange={e => setClinic(p => ({ ...p, closing_time: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Address</label>
                 <textarea
@@ -194,6 +174,60 @@ export default function Settings() {
                 >
                   {saving ? 'Saving...' : 'Save Profile'}
                 </button>
+              </div>
+
+              <div className="border-t border-gray-100 pt-5">
+                <label className="block text-sm font-medium text-gray-700 mb-3">Working Hours</label>
+                <div className="space-y-2">
+                  {DAYS.map(({ key, label }) => {
+                    const day = hitl.working_hours[key] || { enabled: false, open: '09:00', close: '18:00' };
+                    return (
+                      <div key={key} className="flex items-center gap-4">
+                        <div className="w-28">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={day.enabled}
+                              onChange={e => updateDay(key, 'enabled', e.target.checked)}
+                              className="w-4 h-4 accent-indigo-600"
+                            />
+                            <span className={`text-sm font-medium ${day.enabled ? 'text-gray-800' : 'text-gray-400'}`}>
+                              {label}
+                            </span>
+                          </label>
+                        </div>
+                        {day.enabled ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="time"
+                              value={day.open}
+                              onChange={e => updateDay(key, 'open', e.target.value)}
+                              className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <span className="text-gray-400 text-sm">to</span>
+                            <input
+                              type="time"
+                              value={day.close}
+                              onChange={e => updateDay(key, 'close', e.target.value)}
+                              className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">Closed</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-end pt-4">
+                  <button
+                    onClick={handleSaveWorkingHours}
+                    disabled={savingHours}
+                    className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {savingHours ? 'Saving...' : 'Save Working Hours'}
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -248,59 +282,6 @@ export default function Settings() {
                   className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {savingAI ? 'Saving...' : 'Save AI Settings'}
-                </button>
-              </div>
-              <div className="border-t border-gray-100 pt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-3">Staff Working Hours</label>
-                <div className="space-y-2">
-                  {DAYS.map(({ key, label }) => {
-                    const day = hitl.working_hours[key] || { enabled: false, open: '09:00', close: '18:00' };
-                    return (
-                      <div key={key} className="flex items-center gap-4">
-                        <div className="w-28">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={day.enabled}
-                              onChange={e => updateDay(key, 'enabled', e.target.checked)}
-                              className="w-4 h-4 accent-indigo-600"
-                            />
-                            <span className={`text-sm font-medium ${day.enabled ? 'text-gray-800' : 'text-gray-400'}`}>
-                              {label}
-                            </span>
-                          </label>
-                        </div>
-                        {day.enabled ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="time"
-                              value={day.open}
-                              onChange={e => updateDay(key, 'open', e.target.value)}
-                              className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                            <span className="text-gray-400 text-sm">to</span>
-                            <input
-                              type="time"
-                              value={day.close}
-                              onChange={e => updateDay(key, 'close', e.target.value)}
-                              className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">Closed</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="flex justify-end pt-2">
-                <button
-                  onClick={handleSaveWorkingHours}
-                  disabled={savingHours}
-                  className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {savingHours ? 'Saving...' : 'Save Working Hours'}
                 </button>
               </div>
             </>
