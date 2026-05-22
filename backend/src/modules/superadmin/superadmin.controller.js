@@ -34,11 +34,11 @@ async function getTenantDetails(req, res) {
     const { id } = req.params;
     const sql = `SELECT * FROM tenants WHERE id = $1`;
     const result = await pool.query(sql, [id]);
-    
+
     if (result.rows.length === 0) {
       return errorResponse(res, 'Tenant not found', 404);
     }
-    
+
     return successResponse(res, result.rows[0]);
   } catch (err) {
     logger.error('Error fetching tenant details:', err.message);
@@ -55,18 +55,18 @@ async function updateTenantStatus(req, res) {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    
+
     if (!['active', 'suspended', 'pending'].includes(status)) {
       return errorResponse(res, 'Invalid status', 400);
     }
-    
+
     const sql = `UPDATE tenants SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`;
     const result = await pool.query(sql, [status, id]);
-    
+
     if (result.rows.length === 0) {
       return errorResponse(res, 'Tenant not found', 404);
     }
-    
+
     return successResponse(res, result.rows[0]);
   } catch (err) {
     logger.error('Error updating tenant status:', err.message);
@@ -82,14 +82,14 @@ async function getPlatformStats(req, res) {
   try {
     // Basic general stats
     const tenantStats = await pool.query(`
-      SELECT 
-        COUNT(*) as total_tenants, 
+      SELECT
+        COUNT(*) as total_tenants,
         COUNT(CASE WHEN status = 'active' THEN 1 END) as active_tenants
       FROM tenants
     `);
-    
+
     const activityStats = await pool.query(`
-      SELECT 
+      SELECT
         (SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = CURRENT_DATE) as total_bookings_today,
         (SELECT COUNT(*) FROM conversations WHERE DATE(started_at) = CURRENT_DATE) as total_conversations_today
     `);
@@ -97,11 +97,11 @@ async function getPlatformStats(req, res) {
     // Basic revenue logic counting based on active plan counts just as an approximation
     const revenueStats = await pool.query(`
       SELECT SUM(
-        CASE plan 
-          WHEN 'starter' THEN 2999 
-          WHEN 'growth' THEN 5999 
-          WHEN 'pro' THEN 9999 
-          ELSE 0 
+        CASE plan
+          WHEN 'starter' THEN 2999
+          WHEN 'growth' THEN 5999
+          WHEN 'pro' THEN 9999
+          ELSE 0
         END
       ) as total_revenue_this_month
       FROM tenants WHERE status = 'active'
@@ -144,11 +144,19 @@ async function createTenant(req, res) {
 
     await client.query('BEGIN');
 
+    const baseSlug = clinicName.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, '-');
+    let slug = baseSlug;
+    let slugExists = await client.query('SELECT id FROM tenants WHERE slug = $1', [slug]);
+    while (slugExists.rows.length > 0) {
+      const random4 = Math.floor(1000 + Math.random() * 9000);
+      slug = `${baseSlug}-${random4}`;
+      slugExists = await client.query('SELECT id FROM tenants WHERE slug = $1', [slug]);
+    }
     const tenantResult = await client.query(
-      `INSERT INTO tenants (id, name, plan, status, industry, created_at, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, 'pending', 'clinic', NOW(), NOW())
+      `INSERT INTO tenants (id, name, slug, plan, status, industry, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, 'pending', 'clinic', NOW(), NOW())
        RETURNING *`,
-      [clinicName, plan]
+      [clinicName, slug, plan]
     );
 
     const tenant = tenantResult.rows[0];
