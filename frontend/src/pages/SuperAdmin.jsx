@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getAllTenants, getPlatformStats, updateTenantStatus, updateTenant, createTenant, clearTenantConversations } from '../services/superadmin.service';
 import useStore from '../store/useStore';
+import api from '../utils/api';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/shared/Skeleton';
 
 const PLANS = ['starter', 'growth', 'pro'];
@@ -19,7 +20,7 @@ const statusBadge = (status) => {
 };
 
 export default function SuperAdmin() {
-  const { staff } = useStore();
+  const { staff, addToast } = useStore();
 
 
 
@@ -123,6 +124,21 @@ export default function SuperAdmin() {
   };
 
 
+  const handleDeleteClinic = async (tenantId, clinicName) => {
+    const confirmed = window.prompt(`Type "${clinicName}" to confirm permanent deletion:`);
+    if (confirmed !== clinicName) {
+      if (confirmed !== null) addToast('Clinic name did not match', 'error');
+      return;
+    }
+    try {
+      await api.delete(`/superadmin/tenants/${tenantId}`);
+      addToast('Clinic deleted permanently', 'success');
+      fetchData();
+    } catch {
+      addToast('Failed to delete clinic', 'error');
+    }
+  };
+
   const handleClearConversations = async (t) => {
     if (!window.confirm(`Clear all old conversations for ${t.name}? This cannot be undone.`)) return
     try {
@@ -217,6 +233,14 @@ export default function SuperAdmin() {
                     >
                       {t.status === 'pending' ? 'Approve' : t.status === 'active' ? 'Suspend' : 'Reactivate'}
                     </button>
+                    {t.status === 'suspended' && (
+                      <button
+                        onClick={() => handleDeleteClinic(t.id, t.name)}
+                        className="text-red-600 hover:text-red-900 text-sm font-medium"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
