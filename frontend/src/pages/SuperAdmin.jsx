@@ -221,7 +221,7 @@ export default function SuperAdmin() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.whatsapp_number || <span className="text-gray-300">—</span>}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.booking_count}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.conversation_count}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(t.created_at).toLocaleDateString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                     <button onClick={() => openEdit(t)} className="text-blue-600 hover:text-blue-900">Edit</button>
                     <button onClick={() => handleClearConversations(t)} className="text-orange-600 hover:text-orange-900">Clear Chats</button>                    <button

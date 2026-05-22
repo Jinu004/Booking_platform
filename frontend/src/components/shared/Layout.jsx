@@ -207,7 +207,7 @@ const Layout = () => {
                             <div className="font-bold text-gray-900">Token {b.token_number || '-'} — {b.patient_name || 'Unknown'}</div>
                             <div className="text-sm font-medium text-gray-700">Dr. {b.doctor_name}</div>
                             <div className="text-sm text-gray-500">
-                              {new Date(b.booking_date).toLocaleDateString() === new Date().toLocaleDateString() ? 'Today' : new Date(b.booking_date).toLocaleDateString()} — <span className="uppercase text-xs font-bold">{b.status}</span>
+                              {new Date(b.booking_date).toLocaleDateString('en-IN') === new Date().toLocaleDateString('en-IN') ? 'Today' : new Date(b.booking_date).toLocaleDateString('en-IN')} — <span className="uppercase text-xs font-bold">{b.status}</span>
                             </div>
                           </div>
                         ))}

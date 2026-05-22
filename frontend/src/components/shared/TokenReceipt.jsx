@@ -42,7 +42,7 @@ const TokenReceipt = ({ booking, onClose }) => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider mb-1">Date</p>
-                <p className="text-sm font-semibold text-gray-800">{new Date().toLocaleDateString()}</p>
+                <p className="text-sm font-semibold text-gray-800">{new Date().toLocaleDateString('en-IN')}</p>
               </div>
               <div className="text-right">
                 <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider mb-1">Status</p>

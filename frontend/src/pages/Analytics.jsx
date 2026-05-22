@@ -44,7 +44,7 @@ const Analytics = () => {
       setOverview(oRes.data || overview);
       if (period === 'month') {
         const formattedDaily = (dRes.data || []).map(d => ({
-          date: new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+          date: new Date(d.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
           bookings: d.count
         }));
         setDailyData(formattedDaily);
