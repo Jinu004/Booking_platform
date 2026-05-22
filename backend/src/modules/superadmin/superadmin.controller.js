@@ -174,8 +174,8 @@ async function createTenant(req, res) {
     if (err.code === '23505') {
       return errorResponse(res, 'Email already exists', 409);
     }
-    logger.error('Error creating tenant:', err.message);
-    return errorResponse(res, 'Failed to create tenant', 500);
+    logger.error('Error creating tenant:', err.message, err.stack, err.code, err.detail);
+    return errorResponse(res, err.message || 'Failed to create tenant', 500);
   } finally {
     client.release();
   }
