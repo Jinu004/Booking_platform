@@ -79,6 +79,19 @@ function resetDoctorAvailability() {
     try {
       const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
       const today = nowIST.getDay();
+      // Decrement leave days for doctors currently on leave
+      await pool.query(`
+        UPDATE clinic_doctors 
+        SET leave_days = leave_days - 1 
+        WHERE leave_days > 0 AND leave_days != 999
+      `);
+
+      // Clear leave flag for doctors whose leave has ended
+      await pool.query(`
+        UPDATE clinic_doctors 
+        SET leave_days = 0 
+        WHERE leave_days < 0
+      `);
       await pool.query('UPDATE clinic_doctors SET available_today = false WHERE leave_days != 999');
       await pool.query(
         `UPDATE clinic_doctors cd
