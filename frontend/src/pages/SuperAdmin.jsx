@@ -233,14 +233,6 @@ export default function SuperAdmin() {
                     >
                       {t.status === 'pending' ? 'Approve' : t.status === 'active' ? 'Suspend' : 'Reactivate'}
                     </button>
-                    {t.status === 'suspended' && (
-                      <button
-                        onClick={() => handleDeleteClinic(t.id, t.name)}
-                        className="text-red-600 hover:text-red-900 text-sm font-medium"
-                      >
-                        Delete
-                      </button>
-                    )}
                   </td>
                 </tr>
               ))}
@@ -349,20 +341,33 @@ export default function SuperAdmin() {
                 placeholder="+919876543210"
               />
             </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setEditTenant(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleEdit}
-                disabled={editLoading}
-                className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
-              >
-                {editLoading ? 'Saving...' : 'Save Changes'}
-              </button>
+            <div className="flex items-center justify-between pt-2">
+              <div>
+                {editTenant?.status === 'suspended' && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteClinic(editTenant.id, editTenant.name)}
+                    className="px-4 py-2 text-red-600 border border-red-200 rounded-md hover:bg-red-50 text-sm font-medium"
+                  >
+                    Delete Permanently
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setEditTenant(null)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEdit}
+                  disabled={editLoading}
+                  className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                >
+                  {editLoading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
