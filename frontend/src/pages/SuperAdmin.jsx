@@ -133,6 +133,7 @@ export default function SuperAdmin() {
     try {
       await api.delete(`/superadmin/tenants/${tenantId}`);
       addToast('Clinic deleted permanently', 'success');
+      setEditTenant(null);
       fetchData();
     } catch {
       addToast('Failed to delete clinic', 'error');
