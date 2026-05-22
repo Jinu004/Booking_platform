@@ -7,7 +7,8 @@ const {
   updateTenant,
   createTenant,
   getPlatformStats,
-  clearTenantConversations
+  clearTenantConversations,
+  deleteTenant
 } = require('./superadmin.controller');
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.post('/tenants', createTenant);
 router.get('/tenants/:id', getTenantDetails);
 router.patch('/tenants/:id/status', updateTenantStatus);
 router.patch('/tenants/:id', updateTenant);
+router.delete('/tenants/:id', deleteTenant);
 router.get('/stats', getPlatformStats);
 router.delete('/tenants/:id/conversations', clearTenantConversations);
 

@@ -222,6 +222,20 @@ async function updateTenant(req, res) {
  * DELETE /superadmin/tenants/:id/conversations
  * Clears resolved/inactive conversations older than 30 days for a tenant
  */
+async function deleteTenant(req, res) {
+  try {
+    const { id } = req.params;
+    const tenant = await pool.query('SELECT * FROM tenants WHERE id = $1', [id]);
+    if (!tenant.rows.length) return errorResponse(res, 'Clinic not found', 404);
+    if (tenant.rows[0].status !== 'suspended') return errorResponse(res, 'Clinic must be suspended before deletion', 400);
+    await pool.query('DELETE FROM tenants WHERE id = $1', [id]);
+    return successResponse(res, { message: 'Clinic deleted permanently' });
+  } catch (err) {
+    logger.error('Error deleting tenant:', err.message);
+    return errorResponse(res, 'Failed to delete clinic', 500);
+  }
+}
+
 async function clearTenantConversations(req, res) {
   try {
     const { id } = req.params
@@ -248,5 +262,6 @@ module.exports = {
   updateTenant,
   createTenant,
   getPlatformStats,
-  clearTenantConversations
+  clearTenantConversations,
+  deleteTenant
 };
