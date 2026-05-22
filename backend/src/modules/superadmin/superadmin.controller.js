@@ -162,8 +162,8 @@ async function createTenant(req, res) {
     const tenant = tenantResult.rows[0];
 
     await client.query(
-      `INSERT INTO staff (id, tenant_id, name, email, password_hash, role, is_active, created_at, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'admin', true, NOW(), NOW())`,
+      `INSERT INTO staff (id, tenant_id, name, email, password_hash, role, is_active, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'admin', true, NOW())`,
       [tenant.id, clinicName, email, password_hash]
     );
 
