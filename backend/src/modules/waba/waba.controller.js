@@ -23,6 +23,7 @@ async function initiateRegistration(req, res) {
       number = number.slice(2);
     }
 
+    logger.info('Sending to Meta:', { cc, phone_number: number, WABA_ID });
     const response = await axios.post(
       `${META_API_URL}/${WABA_ID}/phone_numbers`,
       {
