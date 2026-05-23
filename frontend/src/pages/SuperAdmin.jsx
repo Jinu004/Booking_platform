@@ -132,7 +132,7 @@ export default function SuperAdmin() {
 
 
   const closeEditModal = () => {
-    closeEditModal();
+    setEditTenant(null);
     setWabaStep('idle');
     setWabaPhone('');
     setWabaOtp('');
