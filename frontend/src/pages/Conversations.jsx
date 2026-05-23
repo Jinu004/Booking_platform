@@ -464,13 +464,80 @@ export default function Conversations() {
               )}
             </>
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-500 flex-col gap-4">
-              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
-                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
+            <div className="flex-1 flex flex-col bg-gray-50 p-8 overflow-y-auto">
+
+              {/* Header */}
+              <div className="mb-6">
+                <h2 className="text-2xl font-black text-gray-900">Your inbox, on autopilot.</h2>
+                <p className="text-sm text-gray-500 mt-1">AI is handling new bookings and patient questions in real time. Pick a conversation to review or take over.</p>
               </div>
-              <p className="font-medium text-lg">Select a conversation</p>
+
+              {/* Stats row */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Today's Chats</p>
+                  <p className="text-3xl font-black text-indigo-600 mt-2">{conversations.filter(c => new Date(c.updatedAt).toDateString() === new Date().toDateString()).length}</p>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">AI Handled</p>
+                  <p className="text-3xl font-black text-green-600 mt-2">{conversations.filter(c => c.mode === 'ai' && new Date(c.updatedAt).toDateString() === new Date().toDateString()).length}</p>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Needs Reply</p>
+                  <p className="text-3xl font-black text-amber-500 mt-2">{conversations.filter(c => c.mode === 'human').length}</p>
+                </div>
+              </div>
+
+              {/* Recent Activity */}
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h3 className="font-bold text-gray-900">Recent Conversations</h3>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {conversations.slice(0, 6).map(c => (
+                    <div
+                      key={c.id}
+                      onClick={() => setSelectedConversationId(c.id)}
+                      className="px-6 py-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between transition"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-bold text-indigo-700">
+                            {(c.patientPhone || c.customer_phone || '?')[0].toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{c.customer_name || c.patientPhone || c.customer_phone || 'Unknown'}</p>
+                          <p className="text-xs text-gray-500 truncate max-w-xs">{c.lastMessage || c.last_message || 'New conversation'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                          c.mode === 'human' ? 'bg-amber-100 text-amber-700' :
+                          c.status === 'resolved' ? 'bg-green-100 text-green-700' :
+                          'bg-indigo-100 text-indigo-700'
+                        }`}>
+                          {c.mode === 'human' ? 'Needs Reply' : c.status === 'resolved' ? 'Resolved' : 'AI'}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(c.updatedAt || c.updated_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {conversations.length === 0 && (
+                    <div className="px-6 py-12 text-center text-gray-400 text-sm">
+                      No conversations yet. Patients will appear here when they message your clinic.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Tip */}
+              <p className="text-xs text-gray-400 mt-4 text-center">
+                💡 You'll be notified when a patient needs your help. Look for the <span className="font-semibold text-amber-600">Needs Reply</span> tag.
+              </p>
+
             </div>
           )}
         </div>
