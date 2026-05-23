@@ -476,11 +476,11 @@ export default function Conversations() {
               <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Today's Chats</p>
-                  <p className="text-3xl font-black text-indigo-600 mt-2">{conversations.filter(c => new Date(c.updatedAt).toDateString() === new Date().toDateString()).length}</p>
+                  <p className="text-3xl font-black text-indigo-600 mt-2">{conversations.filter(c => new Date(c.updatedAt || c.updated_at).toDateString() === new Date().toDateString()).length}</p>
                 </div>
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">AI Handled</p>
-                  <p className="text-3xl font-black text-green-600 mt-2">{conversations.filter(c => c.mode === 'ai' && new Date(c.updatedAt).toDateString() === new Date().toDateString()).length}</p>
+                  <p className="text-3xl font-black text-green-600 mt-2">{conversations.filter(c => c.mode === 'ai' && new Date(c.updatedAt || c.updated_at).toDateString() === new Date().toDateString()).length}</p>
                 </div>
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Needs Reply</p>
@@ -520,7 +520,7 @@ export default function Conversations() {
                           {c.mode === 'human' ? 'Needs Reply' : c.status === 'resolved' ? 'Resolved' : 'AI'}
                         </span>
                         <span className="text-xs text-gray-400">
-                          {new Date(c.updatedAt || c.updated_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                          {(() => { const d = c.updatedAt || c.updated_at; return d ? new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''; })()}
                         </span>
                       </div>
                     </div>
