@@ -145,14 +145,17 @@ export default function Conversations() {
     eventSource.addEventListener('mode_changed', (e) => {
       try {
         const data = JSON.parse(e.data);
-        setConversations(prev => prev.map(c =>
-          c.id === data.conversationId
-            ? { ...c, mode: data.mode }
-            : c
-        ));
-      } catch (err) {
-        console.error('SSE mode_changed parse error', err);
-      }
+        if (data.conversationId) {
+          // Update the conversation mode in the conversations list
+          setConversations(prev => prev.map(c =>
+            c.id === data.conversationId ? { ...c, mode: data.mode } : c
+          ));
+          // If this is the currently selected conversation, update it too
+          setSelectedConversation(prev =>
+            prev?.id === data.conversationId ? { ...prev, mode: data.mode } : prev
+          );
+        }
+      } catch {}
     });
     eventSource.addEventListener('new_conversation', (e) => {
       fetchConversations();
@@ -360,50 +363,64 @@ export default function Conversations() {
         <div className="flex-1 flex flex-col bg-gray-200 h-full overflow-hidden">
           {selectedConversation ? (
             <>
-              {/* Thread Header */}
-              <div className="px-6 py-3 border-b border-gray-200 bg-white flex items-center justify-between flex-shrink-0">
+              {/* ── Header ── */}
+              <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between flex-shrink-0">
+                {/* Left: avatar + name + phone */}
                 <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${getAvatarColor(selectedConversation.customer_name || selectedConversation.customer_phone)}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${getAvatarColor(selectedConversation.customer_name || selectedConversation.customer_phone)}`}>
                     {getInitials(selectedConversation.customer_name, selectedConversation.customer_phone)}
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900">
+                    <p className="font-bold text-gray-900 text-base leading-tight">
                       {selectedConversation.customer_name || 'Unknown Patient'}
                     </p>
-                    <p className="text-xs text-gray-500">{selectedConversation.customer_phone}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{selectedConversation.customer_phone}</p>
                   </div>
                 </div>
 
-                <button
-                  onClick={handleToggleMode}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-semibold border transition ${selectedConversation.mode === 'human'
-                    ? 'bg-orange-50 text-orange-700 border-orange-300 hover:bg-orange-100'
-                    : 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100'
+                {/* Right: status badge + action button */}
+                <div className="flex items-center gap-3">
+                  {selectedConversation.mode === 'human' ? (
+                    <span className="flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                      Human Mode
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 px-3 py-1 bg-teal-50 text-teal-700 rounded-full text-xs font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                      AI Mode
+                    </span>
+                  )}
+                  <button
+                    onClick={handleToggleMode}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold border transition ${
+                      selectedConversation.mode === 'human'
+                        ? 'text-gray-600 border-gray-300 hover:bg-gray-50'
+                        : 'text-teal-700 border-teal-300 hover:bg-teal-50'
                     }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${selectedConversation.mode === 'human' ? 'bg-orange-500' : 'bg-indigo-500'}`}></span>
-                  {selectedConversation.mode === 'human' ? 'Human Mode' : 'AI Mode'}
-                  <span className="text-xs opacity-60">· switch</span>
-                </button>
+                  >
+                    {selectedConversation.mode === 'human' ? 'Hand back to AI' : 'Take Over'}
+                  </button>
+                </div>
               </div>
 
-              {/* AI Banner */}
+              {/* ── AI Status Bar ── */}
               {selectedConversation.mode === 'ai' && (
-                <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-2 flex items-center justify-between flex-shrink-0">
-                  <p className="text-sm text-indigo-700 font-medium">
-                    AI is handling this conversation. Replies sent automatically.
+                <div className="bg-teal-50 border-b border-teal-100 px-6 py-2 flex items-center justify-between flex-shrink-0">
+                  <p className="text-sm text-teal-700 font-medium">
+                    🤖 AI is handling this conversation. Replies sent automatically.
                   </p>
                   <button
                     onClick={handleToggleMode}
-                    className="text-xs font-semibold text-indigo-600 border border-indigo-300 px-3 py-1 rounded-lg hover:bg-indigo-100 transition"
+                    className="text-xs font-semibold text-teal-700 hover:text-teal-900 underline underline-offset-2 transition"
                   >
-                    Take over
+                    Take Over
                   </button>
                 </div>
               )}
 
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+              {/* ── Messages ── */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4" style={{ background: '#f8fafc' }}>
                 {loadingThread ? (
                   <div className="flex items-center justify-center h-full">
                     <Spinner size="lg" />
@@ -411,23 +428,31 @@ export default function Conversations() {
                 ) : (
                   messages.map((msg, idx) => {
                     const isPatient = msg.role === 'user';
-                    const isStaff = msg.role === 'staff';
-                    const isAI = msg.role === 'assistant';
+                    const isStaff   = msg.role === 'staff';
+                    const isAI      = msg.role === 'assistant';
 
                     return (
                       <div key={msg.id || idx} className={`flex flex-col ${isPatient ? 'items-start' : 'items-end'}`}>
-                        <div className={`max-w-[72%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed
-                         ${isPatient ? 'bg-white text-gray-800 rounded-bl-sm shadow-sm' : ''}
-                          ${isStaff ? 'bg-teal-600 text-white rounded-br-sm' : ''}
-                          ${isAI ? 'bg-slate-700 text-white rounded-br-sm' : ''}
-                        `}>
+                        {/* Sender label */}
+                        <p className={`text-[11px] font-semibold mb-1 px-1 ${
+                          isPatient ? 'text-gray-400' : 'text-teal-600'
+                        }`}>
+                          {isPatient
+                            ? (selectedConversation.customer_name || selectedConversation.customer_phone || 'Patient')
+                            : isAI ? 'AI' : 'Staff'}
+                        </p>
+                        {/* Bubble */}
+                        <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                          isPatient
+                            ? 'bg-white text-gray-800 rounded-tl-sm shadow-sm border border-gray-100'
+                            : 'bg-teal-600 text-white rounded-tr-sm'
+                        }`}>
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                         </div>
-                        <div className="flex items-center gap-1.5 mt-1 mx-1 text-[10px] text-gray-400 font-medium">
-                          {isAI && <span className="text-indigo-400">AI</span>}
-                          {isStaff && <span className="text-emerald-500">Staff</span>}
-                          <span>{formatTime(msg.created_at)}</span>
-                        </div>
+                        {/* Timestamp */}
+                        <p className="text-[10px] text-gray-400 mt-1 px-1">
+                          {formatTime(msg.created_at)}
+                        </p>
                       </div>
                     );
                   })
@@ -435,31 +460,37 @@ export default function Conversations() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Input */}
+              {/* ── Input ── */}
               {selectedConversation.mode === 'human' ? (
-                <div className="p-4 bg-white border-t border-gray-200 flex-shrink-0">
+                <div className="px-4 py-3 bg-white border-t border-gray-200 flex-shrink-0">
                   <div className="flex items-end gap-3">
                     <textarea
                       value={replyText}
-                      onChange={(e) => setReplyText(e.target.value)}
+                      onChange={e => setReplyText(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
-                      className="flex-1 resize-none rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none min-h-[48px] max-h-32 px-4 py-3 text-sm"
+                      placeholder="Type a reply..."
+                      className="flex-1 resize-none rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 outline-none min-h-[48px] max-h-32 px-4 py-3 text-sm"
                       rows={1}
                       disabled={sending}
                     />
                     <button
                       onClick={handleReply}
                       disabled={!replyText.trim() || sending}
-                      className="mb-0.5 px-5 py-3 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-80 disabled:cursor-not-allowed transition"
+                      className="mb-0.5 px-5 py-3 bg-teal-600 text-white rounded-xl font-semibold text-sm hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                     >
                       {sending ? <Spinner size="sm" /> : 'Send'}
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="h-16 bg-gray-100 border-t border-gray-200 flex items-center justify-center flex-shrink-0">
-                  <p className="text-gray-400 text-sm">Input disabled in AI mode</p>
+                <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-center justify-between flex-shrink-0">
+                  <p className="text-sm text-gray-400">Switch to Human mode to reply</p>
+                  <button
+                    onClick={handleToggleMode}
+                    className="px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition"
+                  >
+                    Take Over
+                  </button>
                 </div>
               )}
             </>
