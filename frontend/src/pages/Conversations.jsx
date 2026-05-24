@@ -134,21 +134,19 @@ export default function Conversations() {
         if (selectedConversationIdRef.current === data.conversationId) {
           setMessages(prev => {
             if (!data.message?.id) return [...prev, data.message];
-            // Don't add if real message already in list (SSE dedup)
-            const exists = prev.find(m => m.id === data.message.id);
-            if (exists) return prev;
-            // Replace matching optimistic temp message instead of appending
-            const tempIdx = prev.findIndex(m =>
-              m.id?.startsWith('temp-') &&
-              m.content === data.message.content &&
-              m.role === data.message.role
-            );
-            if (tempIdx > -1) {
-              const updated = [...prev];
-              // Carry status:'sent' so the tick stays visible even if
-              // api.post's .then() can't find tempId anymore
-              updated[tempIdx] = { ...data.message, status: 'sent' };
-              return updated;
+            // Skip if real message id is already in list
+            if (prev.find(m => m.id === data.message.id)) return prev;
+            // Staff SSE echo — replace the first pending optimistic message.
+            // Use _isTemp flag rather than content matching so server-side
+            // trimming/normalisation can't break the dedup.
+            if (data.message.role === 'staff') {
+              const tempIdx = prev.findIndex(m => m._isTemp === true && m.role === 'staff');
+              if (tempIdx > -1) {
+                const updated = [...prev];
+                // Merge status:'sent' — visible tick even if api.post already resolved
+                updated[tempIdx] = { ...data.message, status: 'sent' };
+                return updated;
+              }
             }
             return [...prev, data.message];
           });
@@ -232,33 +230,31 @@ export default function Conversations() {
   const handleReply = async () => {
     if (!replyText.trim() || sending) return;
     const tempId = `temp-${Date.now()}`;
+    const content = replyText.trim(); // trim once, use everywhere
     const tempMessage = {
       id: tempId,
-      content: replyText,
+      content,
       role: 'staff',
       created_at: new Date().toISOString(),
-      status: 'sending'
+      _isTemp: true,   // marker for SSE dedup — immune to server content normalisation
+      status: 'sending',
     };
-    const originalText = replyText;
 
     setMessages(prev => [...prev, tempMessage]);
     setReplyText('');
     setSending(true);
 
     try {
-      await api.post(`/conversations/${selectedConversation.id}/message`, {
-        content: originalText
-      });
-      // Update status to sent
+      await api.post(`/conversations/${selectedConversation.id}/message`, { content });
+      // If SSE already replaced the temp, this is a harmless no-op
       setMessages(prev => prev.map(m =>
         m.id === tempId ? { ...m, status: 'sent' } : m
       ));
     } catch (err) {
-      // Mark as failed
       setMessages(prev => prev.map(m =>
         m.id === tempId ? { ...m, status: 'failed' } : m
       ));
-      setReplyText(originalText);
+      setReplyText(content);
       addToast('Failed to send message', 'error');
     } finally {
       setSending(false);
@@ -499,17 +495,15 @@ export default function Conversations() {
                         }`}>
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                         </div>
-                        {/* Timestamp + tick */}
-                        <div className="flex items-center mt-1 px-1">
-                          <p className="text-[10px] text-gray-400">
-                            {formatTime(msg.created_at)}
-                          </p>
+                        {/* Timestamp + tick (rendered below bubble on light bg) */}
+                        <div className="flex items-center gap-1 mt-1 px-1">
+                          <span className="text-[10px] text-gray-400">{formatTime(msg.created_at)}</span>
                           {isStaff && msg.status && (
-                            <span className="ml-1 text-[10px]">
-                              {msg.status === 'sending' && <span className="text-gray-400">⏱</span>}
-                              {msg.status === 'sent' && <span className="text-white opacity-80">✓</span>}
-                              {msg.status === 'failed' && <span className="text-red-300">⚠</span>}
-                            </span>
+                            <>
+                              {msg.status === 'sending' && <span className="text-[11px] text-gray-400" title="Sending">⏱</span>}
+                              {msg.status === 'sent'    && <span className="text-[11px] text-teal-500" title="Sent">✓</span>}
+                              {msg.status === 'failed'  && <span className="text-[11px] text-red-500" title="Failed to send">⚠</span>}
+                            </>
                           )}
                         </div>
                       </div>
