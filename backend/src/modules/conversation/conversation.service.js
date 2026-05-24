@@ -3,7 +3,7 @@ const ConversationModel = require('./conversation.model');
 const MessageModel = require('./message.model');
 const { getOrCreateSession, updateSession, clearSession } = require('./conversation.session');
 const logger = require('../../utils/logger');
-const { broadcastToTenant } = require('../hitl/hitl.service');
+const { broadcastToTenant } = require('../hitl/sse');
 
 /**
  * Handles incoming message from any channel

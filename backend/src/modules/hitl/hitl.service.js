@@ -2,46 +2,9 @@ const HITLModel = require('./hitl.model');
 const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter');
 const ConversationService = require('../conversation/conversation.service');
 const logger = require('../../utils/logger');
-const  pool  = require('../../config/database');
+const pool = require('../../config/database');
 const { sendPushToTenant } = require('../push/push.service');
-// ─── SSE Registry ────────────────────────────────────────────────────────────
-// In-process store: tenantId → Set of SSE response objects
-// (Works for single-process PM2. If you scale to cluster, replace with Redis pub/sub.)
-const sseClients = new Map();
-
-function getSseKey(tenantId) {
-  return `tenant:${tenantId}`;
-}
-
-function addSseClient(tenantId, res) {
-  const key = getSseKey(tenantId);
-  if (!sseClients.has(key)) sseClients.set(key, new Set());
-  sseClients.get(key).add(res);
-}
-
-function removeSseClient(tenantId, res) {
-  const key = getSseKey(tenantId);
-  const set = sseClients.get(key);
-  if (set) {
-    set.delete(res);
-    if (set.size === 0) sseClients.delete(key);
-  }
-}
-
-function broadcastToTenant(tenantId, event, data) {
-  const key = getSseKey(tenantId);
-  const set = sseClients.get(key);
-  if (!set || set.size === 0) return;
-  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const res of set) {
-    try {
-      res.write(payload);
-    } catch (err) {
-      set.delete(res);
-    }
-  }
-}
-// ─────────────────────────────────────────────────────────────────────────────
+const { addSseClient, removeSseClient, broadcastToTenant } = require('./sse');
 
 /**
  * Checks if current IST time is within tenant working hours.
@@ -89,7 +52,6 @@ async function handleAIHandoffRequest(tenant, conversation, staffId = null) {
     return { switched: false, reason: 'outside_working_hours' };
   }
 
-
   // Send holding message to patient
   const customerPhone = conversation.customer_phone;
   if (customerPhone) {
@@ -97,13 +59,10 @@ async function handleAIHandoffRequest(tenant, conversation, staffId = null) {
     await ConversationService.saveOutboundMessage(conversation.id, settings.handoff_message, 'assistant');
   }
 
-await pool.query(
+  await pool.query(
     `UPDATE conversations SET needs_attention = true WHERE id = $1`,
     [conversation.id]
   );
-
-
-
 
   // Alert all staff dashboards
   broadcastToTenant(tenant.id, 'handoff_requested', {
@@ -136,16 +95,11 @@ async function staffReply(conversationId, tenantId, staffId, content) {
 
   // Send via WhatsApp
   await sendMessage(conv.customer_phone, content);
- 
 
-await pool.query(
+  await pool.query(
     `UPDATE conversations SET needs_attention = false WHERE id = $1`,
     [conversationId]
   );
-
-
-
-
 
   // Broadcast to all staff watching this tenant
   broadcastToTenant(tenantId, 'new_message', {
