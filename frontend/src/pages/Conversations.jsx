@@ -525,7 +525,10 @@ export default function Conversations() {
                   <h3 className="font-bold text-gray-900">Recent Conversations</h3>
                 </div>
                 <div className="divide-y divide-gray-50">
-                  {conversations.slice(0, 6).map(c => (
+                  {conversations.filter(c => {
+                    const d = c.last_message_at;
+                    return d && new Date(d).toDateString() === new Date().toDateString();
+                  }).slice(0, 6).map(c => (
                     <div
                       key={c.id}
                       onClick={() => setSelectedConversationId(c.id)}
@@ -556,9 +559,12 @@ export default function Conversations() {
                       </div>
                     </div>
                   ))}
-                  {conversations.length === 0 && (
+                  {conversations.filter(c => {
+                    const d = c.last_message_at;
+                    return d && new Date(d).toDateString() === new Date().toDateString();
+                  }).length === 0 && (
                     <div className="px-6 py-12 text-center text-gray-400 text-sm">
-                      No conversations yet. Patients will appear here when they message your clinic.
+                      No conversations today.
                     </div>
                   )}
                 </div>
