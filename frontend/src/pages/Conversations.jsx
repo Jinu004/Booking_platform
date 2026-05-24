@@ -385,25 +385,31 @@ export default function Conversations() {
                       {selectedConversation.customer_name || 'Unknown Patient'}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">{selectedConversation.customer_phone}</p>
+                    <p className="text-xs mt-0.5 md:hidden">
+                      {selectedConversation.mode === 'human'
+                        ? <span className="text-orange-500 font-semibold">● Human Mode</span>
+                        : <span className="text-teal-600 font-semibold">● AI Mode</span>
+                      }
+                    </p>
                   </div>
                 </div>
 
                 {/* Right: status badge + action button */}
                 <div className="flex items-center gap-3">
                   {selectedConversation.mode === 'human' ? (
-                    <span className="flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
+                    <span className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
                       <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
                       Human Mode
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1.5 px-3 py-1 bg-teal-50 text-teal-700 rounded-full text-xs font-semibold">
+                    <span className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-teal-50 text-teal-700 rounded-full text-xs font-semibold">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
                       AI Mode
                     </span>
                   )}
                   <button
                     onClick={handleToggleMode}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold border transition ${
+                    className={`hidden md:block px-4 py-1.5 rounded-lg text-sm font-semibold border transition ${
                       selectedConversation.mode === 'human'
                         ? 'text-gray-600 border-gray-300 hover:bg-gray-50'
                         : 'text-teal-700 border-teal-300 hover:bg-teal-50'
