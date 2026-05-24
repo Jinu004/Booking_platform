@@ -3,6 +3,7 @@ const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter');
 const ConversationService = require('../conversation/conversation.service');
 const logger = require('../../utils/logger');
 const  pool  = require('../../config/database');
+const { sendPushToTenant } = require('../push/push.service');
 // ─── SSE Registry ────────────────────────────────────────────────────────────
 // In-process store: tenantId → Set of SSE response objects
 // (Works for single-process PM2. If you scale to cluster, replace with Redis pub/sub.)
@@ -110,6 +111,11 @@ await pool.query(
     customerName: conversation.customer_name,
     customerPhone: conversation.customer_phone,
     timestamp: new Date().toISOString(),
+  });
+  sendPushToTenant(tenant.id, {
+    title: 'Patient needs attention',
+    body: `${conversation.customer_name || conversation.customer_phone} has requested human support`,
+    data: { conversationId: conversation.id, type: 'handoff_requested' }
   });
 
   return { switched: true };
