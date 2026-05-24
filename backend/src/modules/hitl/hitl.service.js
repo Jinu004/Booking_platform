@@ -93,9 +93,12 @@ async function staffReply(conversationId, tenantId, staffId, content) {
   // Save to DB (fast — must complete before we return)
   const message = await ConversationService.saveOutboundMessage(conversationId, content, 'staff');
 
-  // Return immediately — WhatsApp send, DB update, and SSE broadcast run in background
+  // Broadcast SSE immediately so message appears in dashboard instantly
   const phone = conv.customer_phone;
   const msgSnapshot = { id: message.id, role: 'staff', content, created_at: message.created_at || new Date().toISOString() };
+  broadcastToTenant(tenantId, 'new_message', { conversationId, message: msgSnapshot });
+
+  // WhatsApp send and DB update run in background (non-blocking)
   setImmediate(async () => {
     try {
       if (phone) await sendMessage(phone, content);
@@ -107,9 +110,8 @@ async function staffReply(conversationId, tenantId, staffId, content) {
         `UPDATE conversations SET needs_attention = false WHERE id = $1`,
         [conversationId]
       );
-      broadcastToTenant(tenantId, 'new_message', { conversationId, message: msgSnapshot });
     } catch (err) {
-      logger.error('Background DB/SSE update failed:', err.message);
+      logger.error('Background DB update failed:', err.message);
     }
   });
 
