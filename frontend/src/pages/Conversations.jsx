@@ -60,6 +60,7 @@ export default function Conversations() {
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showChat, setShowChat] = useState(false);
   const [searchParams] = useSearchParams();
 
   const filteredConversations = searchQuery
@@ -272,7 +273,7 @@ export default function Conversations() {
       <div className="flex flex-1 overflow-hidden h-full">
 
         {/* Left Panel */}
-        <div className="w-80 border-r border-gray-200 bg-white flex flex-col h-full flex-shrink-0">
+        <div className={`${showChat && selectedConversation ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 border-r border-gray-200 bg-white h-full md:flex-shrink-0`}>
           {/* Header */}
           <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
             <h3 className="font-bold text-gray-900">Conversations</h3>
@@ -313,7 +314,7 @@ export default function Conversations() {
                     return (
                       <div
                         key={conv.id}
-                        onClick={() => setSelectedConversationId(conv.id)}
+                        onClick={() => { setSelectedConversationId(conv.id); setShowChat(true); }}
                         className={`px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors flex items-start gap-3
                           ${isSelected ? 'bg-indigo-50 border-l-2 border-l-indigo-500' : 'border-l-2 border-l-transparent'}
                           ${conv.mode === 'human' && !isSelected ? 'border-l-2 border-l-orange-400' : ''}`}
@@ -360,13 +361,22 @@ export default function Conversations() {
         </div>
 
         {/* Right Panel */}
-        <div className="flex-1 flex flex-col bg-gray-200 h-full overflow-hidden">
+        <div className={`${showChat && selectedConversation ? 'flex' : 'hidden md:flex'} flex-1 flex-col bg-gray-200 h-full overflow-hidden`}>
           {selectedConversation ? (
             <>
               {/* ── Header ── */}
               <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between flex-shrink-0">
-                {/* Left: avatar + name + phone */}
+                {/* Left: back button (mobile) + avatar + name + phone */}
                 <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowChat(false)}
+                    className="md:hidden p-1.5 -ml-1 rounded-full hover:bg-gray-100 text-gray-500 transition flex-shrink-0"
+                    aria-label="Back to conversations"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${getAvatarColor(selectedConversation.customer_name || selectedConversation.customer_phone)}`}>
                     {getInitials(selectedConversation.customer_name, selectedConversation.customer_phone)}
                   </div>
@@ -499,7 +509,7 @@ export default function Conversations() {
               )}
             </>
           ) : (
-            <div className="flex-1 flex flex-col bg-gray-50 p-8 overflow-y-auto">
+            <div className="hidden md:flex flex-1 flex-col bg-gray-50 p-8 overflow-y-auto">
 
               {/* Header */}
               <div className="mb-6">
@@ -535,7 +545,7 @@ export default function Conversations() {
                   }).slice(0, 6).map(c => (
                     <div
                       key={c.id}
-                      onClick={() => setSelectedConversationId(c.id)}
+                      onClick={() => { setSelectedConversationId(c.id); setShowChat(true); }}
                       className="px-6 py-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between transition"
                     >
                       <div className="flex items-center gap-3">
