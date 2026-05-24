@@ -26,6 +26,7 @@
     "redis": "^4.7.1",
     "resend": "^6.12.2",
     "uuid": "^9.0.0",
+    "web-push": "^3.6.7",
     "winston": "^3.11.0"
   },
   "devDependencies": {

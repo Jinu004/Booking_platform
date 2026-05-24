@@ -125,6 +125,9 @@ app.use('/api/v1/ehr', ehrRoutes);
 const wabaRoutes = require('./modules/waba/waba.routes');
 app.use('/api/v1/admin/waba', wabaRoutes);
 
+const pushRoutes = require('./modules/push/push.routes');
+app.use('/api/v1/push', pushRoutes);
+
 // 17. Global Error Handler must be the last middleware
 app.use(errorHandler);
 
