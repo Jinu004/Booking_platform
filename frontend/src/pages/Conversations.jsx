@@ -9,6 +9,7 @@ import {
 import { Badge, Button, Input, Spinner, PageHeader } from '../components/shared';
 import { CardSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
+import api from '../utils/api';
 
 function formatTime(dateString) {
   if (!dateString) return '';
@@ -215,21 +216,36 @@ export default function Conversations() {
   }, [messages]);
 
   const handleReply = async () => {
-    if (!replyText.trim() || !selectedConversationId) return;
+    if (!replyText.trim() || sending) return;
+    const tempId = `temp-${Date.now()}`;
+    const tempMessage = {
+      id: tempId,
+      content: replyText,
+      role: 'staff',
+      created_at: new Date().toISOString(),
+      status: 'sending'
+    };
+    const originalText = replyText;
+
+    setMessages(prev => [...prev, tempMessage]);
+    setReplyText('');
+    setSending(true);
+
     try {
-      setSending(true);
-      const content = replyText.trim();
-      setReplyText('');
-
-
-
-      await sendStaffReply(selectedConversationId, content);
-      setConversations(prev => prev.map(c =>
-        c.id === selectedConversationId ? { ...c, needs_attention: false } : c
+      await api.post(`/conversations/${selectedConversation.id}/reply`, {
+        content: originalText
+      });
+      // Update status to sent
+      setMessages(prev => prev.map(m =>
+        m.id === tempId ? { ...m, status: 'sent' } : m
       ));
-      useStore.getState().clearHandoffs();
     } catch (err) {
-      console.error('Failed to send reply:', err);
+      // Mark as failed
+      setMessages(prev => prev.map(m =>
+        m.id === tempId ? { ...m, status: 'failed' } : m
+      ));
+      setReplyText(originalText);
+      addToast('Failed to send message', 'error');
     } finally {
       setSending(false);
     }
@@ -469,10 +485,19 @@ export default function Conversations() {
                         }`}>
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                         </div>
-                        {/* Timestamp */}
-                        <p className="text-[10px] text-gray-400 mt-1 px-1">
-                          {formatTime(msg.created_at)}
-                        </p>
+                        {/* Timestamp + tick */}
+                        <div className="flex items-center mt-1 px-1">
+                          <p className="text-[10px] text-gray-400">
+                            {formatTime(msg.created_at)}
+                          </p>
+                          {isStaff && msg.status && (
+                            <span className="ml-1 text-[10px]">
+                              {msg.status === 'sending' && <span className="text-gray-400">⏱</span>}
+                              {msg.status === 'sent' && <span className="text-teal-100">✓</span>}
+                              {msg.status === 'failed' && <span className="text-red-300">⚠</span>}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })
