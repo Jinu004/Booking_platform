@@ -244,7 +244,7 @@ export default function Conversations() {
     setSending(true);
 
     try {
-      await api.post(`/conversations/${selectedConversation.id}/reply`, {
+      await api.post(`/conversations/${selectedConversation.id}/message`, {
         content: originalText
       });
       // Update status to sent
