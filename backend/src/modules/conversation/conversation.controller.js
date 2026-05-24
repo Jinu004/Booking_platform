@@ -148,40 +148,40 @@ async function sendManualMessage(req, res, next) {
     const tenantId = req.tenant.id;
     const { id } = req.params;
     const { message } = req.body;
-
     const conversation = await ConversationModel.getConversationById(pool, tenantId, id);
     if (!conversation) {
       return res.status(404).json({ success: false, error: 'Conversation not found' });
     }
 
+    // Save message to DB first (fast)
     const savedMsg = await ConversationService.saveOutboundMessage(id, message, 'staff');
-    
-    // Attempt sending via real WhatsApp adapter
-    const adapter = whatsappAdapter;
-    let phone = '';
-    if (conversation.customer_id) {
-        const c = await pool.query('SELECT phone FROM customers WHERE id = $1', [conversation.customer_id]);
-        if (c.rows.length > 0) phone = c.rows[0].phone;
-    }
 
-    if (phone) {
-        await adapter.sendMessage(phone, message);
-    }
-    
-    // Update Redis session
-    if (phone) {
-        const session = await getOrCreateSession(tenantId, phone);
-        await updateSession(tenantId, phone, {
-          messageCount: (session.messageCount || 0) + 1,
-          lastMessage: message,
-          lastMessageAt: new Date().toISOString()
-        });
-    }
+    // Respond to frontend immediately
+    res.locals.savedMsg = savedMsg;
+    successResponse(res, savedMsg);
 
-    // Touch conversation to signify recent activity
-    await ConversationModel.touchConversation(pool, tenantId, id);
-
-    return successResponse(res, savedMsg);
+    // Send to WhatsApp in background (non-blocking)
+    (async () => {
+      try {
+        let phone = '';
+        if (conversation.customer_id) {
+          const c = await pool.query('SELECT phone FROM customers WHERE id = $1', [conversation.customer_id]);
+          if (c.rows.length > 0) phone = c.rows[0].phone;
+        }
+        if (phone) {
+          await whatsappAdapter.sendMessage(phone, message);
+          const session = await getOrCreateSession(tenantId, phone);
+          await updateSession(tenantId, phone, {
+            messageCount: (session.messageCount || 0) + 1,
+            lastMessage: message,
+            lastMessageAt: new Date().toISOString()
+          });
+        }
+        await ConversationModel.touchConversation(pool, tenantId, id);
+      } catch (err) {
+        logger.error('Background WhatsApp send failed:', err.message);
+      }
+    })();
   } catch (err) {
     next(err);
   }
