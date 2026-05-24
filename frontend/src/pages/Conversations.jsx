@@ -420,7 +420,11 @@ export default function Conversations() {
               )}
 
               {/* ── Messages ── */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4" style={{ background: '#f8fafc' }}>
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4" style={{
+  backgroundColor: '#f8fafc',
+  backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)',
+  backgroundSize: '20px 20px'
+}}>
                 {loadingThread ? (
                   <div className="flex items-center justify-center h-full">
                     <Spinner size="lg" />
