@@ -145,7 +145,9 @@ export default function Conversations() {
             );
             if (tempIdx > -1) {
               const updated = [...prev];
-              updated[tempIdx] = data.message;
+              // Carry status:'sent' so the tick stays visible even if
+              // api.post's .then() can't find tempId anymore
+              updated[tempIdx] = { ...data.message, status: 'sent' };
               return updated;
             }
             return [...prev, data.message];
@@ -505,7 +507,7 @@ export default function Conversations() {
                           {isStaff && msg.status && (
                             <span className="ml-1 text-[10px]">
                               {msg.status === 'sending' && <span className="text-gray-400">⏱</span>}
-                              {msg.status === 'sent' && <span className="text-teal-100">✓</span>}
+                              {msg.status === 'sent' && <span className="text-white opacity-80">✓</span>}
                               {msg.status === 'failed' && <span className="text-red-300">⚠</span>}
                             </span>
                           )}
