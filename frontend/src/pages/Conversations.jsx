@@ -134,8 +134,20 @@ export default function Conversations() {
         if (selectedConversationIdRef.current === data.conversationId) {
           setMessages(prev => {
             if (!data.message?.id) return [...prev, data.message];
+            // Don't add if real message already in list (SSE dedup)
             const exists = prev.find(m => m.id === data.message.id);
             if (exists) return prev;
+            // Replace matching optimistic temp message instead of appending
+            const tempIdx = prev.findIndex(m =>
+              m.id?.startsWith('temp-') &&
+              m.content === data.message.content &&
+              m.role === data.message.role
+            );
+            if (tempIdx > -1) {
+              const updated = [...prev];
+              updated[tempIdx] = data.message;
+              return updated;
+            }
             return [...prev, data.message];
           });
         }
