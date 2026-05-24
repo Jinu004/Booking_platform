@@ -90,27 +90,29 @@ async function staffReply(conversationId, tenantId, staffId, content) {
   if (!conv) throw new Error('Conversation not found');
   if (conv.mode !== 'human') throw new Error('Conversation is not in human mode');
 
-  // Save to DB
+  // Save to DB (fast — must complete before we return)
   const message = await ConversationService.saveOutboundMessage(conversationId, content, 'staff');
 
-  // Send via WhatsApp
-  await sendMessage(conv.customer_phone, content);
-
-  await pool.query(
-    `UPDATE conversations SET needs_attention = false WHERE id = $1`,
-    [conversationId]
-  );
-
-  // Broadcast to all staff watching this tenant
-  broadcastToTenant(tenantId, 'new_message', {
-    conversationId,
-    message: {
-      id: message.id,
-      role: 'staff',
-      content,
-      created_at: message.created_at || new Date().toISOString(),
-    },
+  // Return immediately — WhatsApp send, DB update, and SSE broadcast run in background
+  const phone = conv.customer_phone;
+  const msgSnapshot = { id: message.id, role: 'staff', content, created_at: message.created_at || new Date().toISOString() };
+  setImmediate(async () => {
+    try {
+      if (phone) await sendMessage(phone, content);
+    } catch (err) {
+      logger.error('Background WhatsApp send failed:', err.message);
+    }
+    try {
+      await pool.query(
+        `UPDATE conversations SET needs_attention = false WHERE id = $1`,
+        [conversationId]
+      );
+      broadcastToTenant(tenantId, 'new_message', { conversationId, message: msgSnapshot });
+    } catch (err) {
+      logger.error('Background DB/SSE update failed:', err.message);
+    }
   });
+
   return message;
 }
 
