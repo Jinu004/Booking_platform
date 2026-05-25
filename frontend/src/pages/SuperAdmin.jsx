@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllTenants, getPlatformStats, updateTenantStatus, updateTenant, createTenant, clearTenantConversations } from '../services/superadmin.service';
+import { getAllTenants, getPlatformStats, updateTenantStatus, updateTenant, createTenant, clearTenantConversations, getPlatformConfig, updatePlatformConfig } from '../services/superadmin.service';
 import useStore from '../store/useStore';
 import api from '../utils/api';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/shared/Skeleton';
@@ -47,11 +47,17 @@ export default function SuperAdmin() {
   const [wabaStep, setWabaStep] = useState('idle'); // idle | sending | otp_sent | verifying | done
   const [wabaError, setWabaError] = useState('');
 
+  // Platform cost config
+  const [platformConfig, setPlatformConfig] = useState({});
+  const [configLoading, setConfigLoading] = useState(false);
+  const [configSaving, setConfigSaving] = useState('');
+  const [configValues, setConfigValues] = useState({});
+
   if (staff?.role !== 'super_admin') {
     return <div className="p-8 text-red-600 font-medium">Access Denied. Super Admin only.</div>;
   }
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); fetchPlatformConfig(); }, []);
 
   const fetchData = async () => {
     try {
@@ -203,6 +209,34 @@ export default function SuperAdmin() {
       alert('Failed to clear conversations')
     }
   }
+
+  const fetchPlatformConfig = async () => {
+    setConfigLoading(true);
+    try {
+      const res = await getPlatformConfig();
+      setPlatformConfig(res.data || {});
+      const vals = {};
+      for (const [k, v] of Object.entries(res.data || {})) vals[k] = String(v.value);
+      setConfigValues(vals);
+    } catch (err) {
+      console.error('Failed to load platform config:', err);
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
+  const handleConfigSave = async (key) => {
+    setConfigSaving(key);
+    try {
+      const res = await updatePlatformConfig(key, parseFloat(configValues[key]));
+      setPlatformConfig(prev => ({ ...prev, [key]: res.data }));
+    } catch (err) {
+      alert(err?.response?.data?.error || 'Failed to save config');
+    } finally {
+      setConfigSaving('');
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 space-y-8">
@@ -481,6 +515,51 @@ export default function SuperAdmin() {
           </div>
         </div>
       )}
+    </div>
+
+      {/* Platform Cost Configuration */}
+      <div className="bg-white shadow rounded-lg border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-medium text-gray-900">Platform Cost Configuration</h2>
+          <p className="text-sm text-gray-500 mt-1">Adjust API cost rates used for the pricing calculator</p>
+        </div>
+        <div className="p-6">
+          {configLoading ? (
+            <p className="text-sm text-gray-400">Loading config...</p>
+          ) : Object.keys(platformConfig).length === 0 ? (
+            <p className="text-sm text-gray-400">No config entries found. Run the platform_config migration first.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(platformConfig).map(([key, entry]) => (
+                <div key={key} className="border border-gray-200 rounded-lg p-4 space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">{entry.label || key}</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="number"
+                      step="any"
+                      value={configValues[key] ?? ''}
+                      onChange={e => setConfigValues(v => ({ ...v, [key]: e.target.value }))}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
+                    <button
+                      onClick={() => handleConfigSave(key)}
+                      disabled={configSaving === key}
+                      className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {configSaving === key ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                  {entry.updated_at && (
+                    <p className="text-xs text-gray-400">
+                      Last updated: {new Date(entry.updated_at).toLocaleString('en-IN')}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
