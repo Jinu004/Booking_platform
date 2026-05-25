@@ -43,11 +43,35 @@ Always use these functions. Never guess availability or make up token numbers.`
  * @param {object} configs
  * @returns {string}
  */
-function getClinicPrompt(tenant, configs) {
+function getClinicPrompt(tenant, configs, additionalData = {}) {
   // Inject live IST date/time so the AI can answer time-sensitive questions correctly
   const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
   const todayDate = nowIST.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata' })
   const currentTime = nowIST.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+
+  // Build Pro plan doctor schedule block
+  let doctorBlock = '';
+  if (additionalData.doctorSchedules && additionalData.doctorSchedules.length > 0) {
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const byDoctor = {};
+    for (const row of additionalData.doctorSchedules) {
+      const key = row.name;
+      if (!byDoctor[key]) byDoctor[key] = { name: row.name, spec: row.specialization, slots: [] };
+      if (row.is_available && row.day_of_week !== null && row.start_time && row.end_time) {
+        byDoctor[key].slots.push(`${dayNames[row.day_of_week]} ${row.start_time.slice(0,5)}-${row.end_time.slice(0,5)}`);
+      }
+    }
+    const lines = Object.values(byDoctor)
+      .filter(d => d.slots.length > 0)
+      .map(d => `- ${d.name}${d.spec ? ` (${d.spec})` : ''}: ${d.slots.join(', ')}`);
+    if (lines.length > 0) {
+      doctorBlock = '\nDOCTOR WEEKLY SCHEDULES:\n' + lines.join('\n');
+    }
+    if (additionalData.onDutyDoctors && additionalData.onDutyDoctors.length > 0) {
+      doctorBlock += '\n\nDoctors on duty today: ' + additionalData.onDutyDoctors.join(', ');
+    }
+    doctorBlock += '\n';
+  }
 
   return `${getBasePrompt(tenant, configs)}
 
@@ -59,7 +83,7 @@ Booking mode: ${configs.booking_mode || 'token'}
 Weekly off: ${configs.weekly_off || 'sunday'}
 Average consultation: ${configs.avg_consultation_minutes || 10} minutes
 Max tokens per doctor: ${configs.max_tokens_per_day || 50}
-
+${doctorBlock}
 COMMON PATIENT REQUESTS:
 1. "I want to book" / "appointment" / "token"
    → Ask which doctor
@@ -224,7 +248,8 @@ function getSystemPrompt(tenant, configs, additionalData = {}) {
     case 'clinic':
       return getClinicPrompt(
         tenant,
-        configs
+        configs,
+        additionalData
       )
     default:
       return getBasePrompt(tenant, configs)

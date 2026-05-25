@@ -3,6 +3,7 @@ const { getSystemPrompt } = require('./ai.prompts')
 const { getFunctionDefinitions } = require('./ai.functions')
 const { executeFunction } = require('./ai.executor')
 const logger = require('../../utils/logger')
+const pool = require('../../config/database')
 
 const client = new GoogleGenerativeAI(
   process.env.GEMINI_API_KEY || ''
@@ -38,6 +39,36 @@ async function processMessage(context) {
     if (!process.env.GEMINI_API_KEY) {
       logger.warn('GEMINI_API_KEY not set — AI features disabled')
       return 'Our AI assistant is currently being set up. Please call the clinic directly for assistance.'
+    }
+
+    // Inject doctor schedules for Pro plan clinics
+    if (tenant.plan === 'pro' && tenant.industry === 'clinic') {
+      try {
+        const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+        const todayDow = nowIST.getDay()
+        const schedResult = await pool.query(
+          `SELECT d.name, d.specialization, ds.day_of_week, ds.start_time, ds.end_time, ds.is_available
+           FROM clinic_doctors d
+           LEFT JOIN doctor_schedules ds ON d.id = ds.doctor_id
+           WHERE d.tenant_id = $1 AND d.is_active = true
+           ORDER BY d.name, ds.day_of_week`,
+          [tenant.id]
+        )
+        additionalData.doctorSchedules = schedResult.rows
+        const onDutyResult = await pool.query(
+          `SELECT DISTINCT d.name FROM clinic_doctors d
+           JOIN doctor_schedules ds ON d.id = ds.doctor_id
+           WHERE d.tenant_id = $1
+             AND d.is_active = true
+             AND ds.day_of_week = $2
+             AND ds.is_available = true
+             AND d.leave_days = 0`,
+          [tenant.id, todayDow]
+        )
+        additionalData.onDutyDoctors = onDutyResult.rows.map(r => r.name)
+      } catch (err) {
+        logger.warn('Failed to fetch doctor schedules for prompt:', err.message)
+      }
     }
 
     const systemPrompt = getSystemPrompt(tenant, configs, additionalData)
