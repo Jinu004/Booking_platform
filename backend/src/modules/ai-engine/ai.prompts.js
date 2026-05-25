@@ -73,6 +73,12 @@ function getClinicPrompt(tenant, configs, additionalData = {}) {
     doctorBlock += '\n';
   }
 
+  // Build Growth/Pro knowledge base block
+  let knowledgeBlock = '';
+  if (additionalData.knowledgeBase) {
+    knowledgeBlock = '\nCLINIC FAQ & ADDITIONAL INFORMATION:\n' + additionalData.knowledgeBase + '\n';
+  }
+
   return `${getBasePrompt(tenant, configs)}
 
 CURRENT DATE & TIME (IST): ${todayDate}, ${currentTime}
@@ -83,7 +89,7 @@ Booking mode: ${configs.booking_mode || 'token'}
 Weekly off: ${configs.weekly_off || 'sunday'}
 Average consultation: ${configs.avg_consultation_minutes || 10} minutes
 Max tokens per doctor: ${configs.max_tokens_per_day || 50}
-${doctorBlock}
+${doctorBlock}${knowledgeBlock}
 COMMON PATIENT REQUESTS:
 1. "I want to book" / "appointment" / "token"
    → Ask which doctor

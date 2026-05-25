@@ -26,6 +26,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [savingAI, setSavingAI] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
+  const [savingKB, setSavingKB] = useState(false);
 
   const [clinic, setClinic] = useState({ opening_time: '09:00', closing_time: '18:00', address: '' });
   const [hitl, setHITL] = useState({
@@ -41,9 +42,12 @@ export default function Settings() {
     handoff_message: 'Please hold on, I am connecting you with our staff.',
     out_of_hours_message: 'Our clinic is currently closed. We will get back to you during working hours.',
   });
+  const [knowledgeBase, setKnowledgeBase] = useState('');
 
   const [clinicLoading, setClinicLoading] = useState(true);
   const [hitlLoading, setHITLLoading] = useState(true);
+
+  const kbUnlocked = plan === 'growth' || plan === 'pro';
 
   useEffect(() => {
     getClinicSettings()
@@ -64,6 +68,9 @@ export default function Settings() {
           out_of_hours_message: hitlData?.out_of_hours_message || prev.out_of_hours_message,
           language: lang || prev.language || 'english',
         }));
+        if (hitlData?.ai_knowledge_base) {
+          setKnowledgeBase(hitlData.ai_knowledge_base);
+        }
       })
       .catch(() => { })
       .finally(() => setHITLLoading(false));
@@ -108,6 +115,18 @@ export default function Settings() {
       addToast('Failed to save working hours', 'error');
     } finally {
       setSavingHours(false);
+    }
+  };
+
+  const handleSaveKnowledgeBase = async () => {
+    try {
+      setSavingKB(true);
+      await updateHITLSettings({ ai_knowledge_base: knowledgeBase });
+      addToast('Knowledge base saved', 'success');
+    } catch {
+      addToast('Failed to save knowledge base', 'error');
+    } finally {
+      setSavingKB(false);
     }
   };
 
@@ -237,57 +256,109 @@ export default function Settings() {
 
       {/* AI & HITL */}
       {activeTab === 'ai' && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
-          <h2 className="text-lg font-semibold text-gray-900">AI & Staff Handoff Settings</h2>
-          {hitlLoading ? (
-            <p className="text-sm text-gray-400">Loading...</p>
-          ) : (
-            <>
+        <>
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-gray-900">AI & Staff Handoff Settings</h2>
+            {hitlLoading ? (
+              <p className="text-sm text-gray-400">Loading...</p>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Response Language</label>
+                  <p className="text-xs text-gray-400 mb-2">Language the AI uses when responding to patients</p>
+                  <select
+                    value={hitl.language || 'english'}
+                    onChange={e => setHITL(p => ({ ...p, language: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="english">English</option>
+                    <option value="malayalam">Malayalam</option>
+                    <option value="hindi">Hindi</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Handoff Message</label>
+                  <p className="text-xs text-gray-400 mb-2">Sent to patient when AI transfers to staff</p>
+                  <textarea
+                    rows={2}
+                    value={hitl.handoff_message}
+                    onChange={e => setHITL(p => ({ ...p, handoff_message: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Out of Hours Message</label>
+                  <p className="text-xs text-gray-400 mb-2">Sent to patient when they message outside working hours</p>
+                  <textarea
+                    rows={2}
+                    value={hitl.out_of_hours_message}
+                    onChange={e => setHITL(p => ({ ...p, out_of_hours_message: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={handleSaveAISettings}
+                    disabled={savingAI}
+                    className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {savingAI ? 'Saving...' : 'Save AI Settings'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* AI KNOWLEDGE BASE */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+            <div className="flex items-start justify-between">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Response Language</label>
-                <p className="text-xs text-gray-400 mb-2">Language the AI uses when responding to patients</p>
-                <select
-                  value={hitl.language || 'english'}
-                  onChange={e => setHITL(p => ({ ...p, language: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="english">English</option>
-                  <option value="malayalam">Malayalam</option>
-                  <option value="hindi">Hindi</option>
-                </select>
+                <h2 className="text-lg font-semibold text-gray-900">AI Knowledge Base</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Add information about your clinic that the AI will use to answer patient questions.
+                  Include fees, facilities, parking, special instructions, FAQs etc.
+                </p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Handoff Message</label>
-                <p className="text-xs text-gray-400 mb-2">Sent to patient when AI transfers to staff</p>
+              {!kbUnlocked && (
+                <span className="ml-4 flex-shrink-0 px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
+                  Growth+
+                </span>
+              )}
+            </div>
+
+            {!kbUnlocked ? (
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 border border-gray-200">
+                <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <p className="text-sm text-gray-500">
+                  Available on <span className="font-semibold text-gray-700">Growth and Pro plans</span>.
+                  {' '}Upgrade to let the AI answer custom FAQs about your clinic.
+                </p>
+              </div>
+            ) : (
+              <>
                 <textarea
-                  rows={2}
-                  value={hitl.handoff_message}
-                  onChange={e => setHITL(p => ({ ...p, handoff_message: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  rows={6}
+                  value={knowledgeBase}
+                  onChange={e => setKnowledgeBase(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+                  placeholder="Example: Consultation fee is ₹300. We have X-ray and ECG facilities. Free parking available. Patients should bring previous reports for follow-up visits."
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Out of Hours Message</label>
-                <p className="text-xs text-gray-400 mb-2">Sent to patient when they message outside working hours</p>
-                <textarea
-                  rows={2}
-                  value={hitl.out_of_hours_message}
-                  onChange={e => setHITL(p => ({ ...p, out_of_hours_message: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div className="flex justify-end pt-2">
-                <button
-                  onClick={handleSaveAISettings}
-                  disabled={savingAI}
-                  className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {savingAI ? 'Saving...' : 'Save AI Settings'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">{knowledgeBase.length} characters</span>
+                  <button
+                    onClick={handleSaveKnowledgeBase}
+                    disabled={savingKB}
+                    className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {savingKB ? 'Saving...' : 'Save Knowledge Base'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </>
       )}
 
       {/* WHATSAPP */}

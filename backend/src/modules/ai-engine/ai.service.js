@@ -71,6 +71,22 @@ async function processMessage(context) {
       }
     }
 
+    // Inject knowledge base for Growth and Pro plan clinics
+    if ((tenant.plan === 'growth' || tenant.plan === 'pro') && tenant.industry === 'clinic') {
+      try {
+        const kbResult = await pool.query(
+          'SELECT ai_knowledge_base FROM tenant_settings WHERE tenant_id = $1',
+          [tenant.id]
+        )
+        const kb = kbResult.rows[0]?.ai_knowledge_base
+        if (kb && kb.trim()) {
+          additionalData.knowledgeBase = kb.trim()
+        }
+      } catch (err) {
+        logger.warn('Failed to fetch knowledge base for prompt:', err.message)
+      }
+    }
+
     const systemPrompt = getSystemPrompt(tenant, configs, additionalData)
     const functionDeclarations = getFunctionDefinitions(tenant.industry)
 
