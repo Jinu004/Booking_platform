@@ -10,6 +10,7 @@ const {
   clearTenantConversations,
   deleteTenant
 } = require('./superadmin.controller');
+const { getConfig, updateConfig } = require('./platform-config.controller');
 
 const router = express.Router();
 
@@ -24,5 +25,7 @@ router.patch('/tenants/:id', updateTenant);
 router.delete('/tenants/:id', deleteTenant);
 router.get('/stats', getPlatformStats);
 router.delete('/tenants/:id/conversations', clearTenantConversations);
+router.get('/platform-config', getConfig);
+router.put('/platform-config', updateConfig);
 
 module.exports = router;
