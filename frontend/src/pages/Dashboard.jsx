@@ -191,30 +191,36 @@ const Dashboard = () => {
 
         {/* Left — Live Token Queue */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          {/* Card header — matches Active Chats pattern */}
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-bold text-gray-900">Live Token Queue</span>
+              <span className="font-semibold text-gray-800">Live Token Queue</span>
             </div>
-            <div className="flex gap-1">
-              {[
-                { key: 'all', label: 'All' },
-                { key: 'waiting', label: 'Waiting' },
-                { key: 'in_consult', label: 'In Consult' },
-                { key: 'done', label: 'Done' },
-              ].map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveFilter(tab.key)}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition ${activeFilter === tab.key
-                    ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
+              {tokenQueue.length}
+            </span>
+          </div>
+          {/* Filter tabs — full width, evenly spaced */}
+          <div className="px-4 py-2 flex gap-1 border-b border-gray-100">
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'waiting', label: 'Waiting' },
+              { key: 'in_consult', label: 'In Consult' },
+              { key: 'done', label: 'Done' },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveFilter(tab.key)}
+                className={`flex-1 text-sm transition rounded-md px-3 py-1 ${
+                  activeFilter === tab.key
+                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           <div className="divide-y divide-gray-100 max-h-[480px] overflow-y-auto">
