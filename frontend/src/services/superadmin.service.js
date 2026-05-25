@@ -6,5 +6,3 @@ export const updateTenantStatus = (id, status) => api.patch(`/superadmin/tenants
 export const updateTenant = (id, data) => api.patch(`/superadmin/tenants/${id}`, data);
 export const createTenant = (data) => api.post('/superadmin/tenants', data);
 export const clearTenantConversations = (id) => api.delete(`/superadmin/tenants/${id}/conversations`);
-export const getPlatformConfig = () => api.get('/superadmin/platform-config');
-export const updatePlatformConfig = (key, value) => api.put('/superadmin/platform-config', { key, value });
