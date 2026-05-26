@@ -17,7 +17,8 @@ const Staff          = React.lazy(() => import('./pages/Staff'));
 const Onboarding     = React.lazy(() => import('./pages/Onboarding'));
 const ResetPassword  = React.lazy(() => import('./pages/ResetPassword'));
 const NotFound       = React.lazy(() => import('./pages/NotFound'));
-const SuperAdmin     = React.lazy(() => import('./pages/SuperAdmin'));
+const SuperAdmin          = React.lazy(() => import('./pages/SuperAdmin'));
+const PricingCalculator   = React.lazy(() => import('./pages/superadmin/PricingCalculator'));
 const Landing        = React.lazy(() => import('./pages/Landing'));
 const PendingApproval = React.lazy(() => import('./pages/PendingApproval'));
 const PatientProfile = React.lazy(() => import('./pages/PatientProfile'));
@@ -52,6 +53,7 @@ const App = () => {
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/superadmin" element={<SuperAdmin />} />
+              <Route path="/superadmin/pricing-calculator" element={<PricingCalculator />} />
             </Route>
           </Route>
 

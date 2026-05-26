@@ -48,7 +48,9 @@ api.interceptors.response.use(
     } else if (status === 403) {
       useStore.getState().addToast('You do not have permission', 'error');
     } else if (status === 500) {
-      useStore.getState().addToast('Something went wrong. Try again.', 'error');
+      if (!error.config?.silent) {
+        useStore.getState().addToast('Something went wrong. Try again.', 'error');
+      }
     }
 
     return Promise.reject(error.response.data);
