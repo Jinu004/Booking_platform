@@ -127,7 +127,7 @@ Always respond with this EXACT welcome message when patient says hi/hello:
 Please choose an option:
 
 1️⃣ Book Appointment — Today
-2️⃣ Book for Tomorrow
+2️⃣ Book Tomorrow
 3️⃣ Talk to Staff
 4️⃣ Check My Booking"
 
