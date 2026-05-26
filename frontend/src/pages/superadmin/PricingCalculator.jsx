@@ -1,28 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import api from '../../utils/api';
-import useStore from '../../store/useStore';
+import React, { useState } from 'react';
 import { getStoredStaff } from '../../services/auth.service';
 
-const DEFAULT_CONFIG = {
-  meta_utility_rate: 0.35,
-  meta_marketing_rate: 0.85,
-  gemini_input_rate: 0.075,
-  gemini_output_rate: 0.30,
-  usd_inr_rate: 84.5,
+const PLATFORM_CONFIG = {
+  meta_utility_rate: 0.13,
+  meta_marketing_rate: 0.87,
+  gemini_input_rate: 0.30,
+  gemini_output_rate: 2.50,
+  usd_inr_rate: 95,
 };
 
 const PLAN_PRICES = [
   { label: '₹2,499/mo', price: 2499 },
   { label: '₹4,999/mo', price: 4999 },
   { label: '₹8,999/mo', price: 8999 },
-];
-
-const CONFIG_FIELDS = [
-  { key: 'meta_utility_rate',   label: 'Meta Utility Message Rate',   unit: '₹/msg',    step: '0.0001' },
-  { key: 'meta_marketing_rate', label: 'Meta Marketing Message Rate', unit: '₹/msg',    step: '0.0001' },
-  { key: 'gemini_input_rate',   label: 'Gemini Input Rate',           unit: '$/1M tok', step: '0.0001' },
-  { key: 'gemini_output_rate',  label: 'Gemini Output Rate',          unit: '$/1M tok', step: '0.0001' },
-  { key: 'usd_inr_rate',        label: 'USD to INR Rate',             unit: '₹',        step: '0.01'   },
 ];
 
 function fmtINR(n) {
@@ -36,53 +26,12 @@ function fmt(n, d = 2) {
 }
 
 export default function PricingCalculator() {
-  const { addToast } = useStore();
   const staff = getStoredStaff();
 
   if (staff?.role !== 'super_admin') {
     return <div className="p-8 text-red-600 font-medium">Access Denied. Super Admin only.</div>;
   }
 
-  // ── Section 1: Platform config state ────────────────────────
-  const [config, setConfig] = useState(DEFAULT_CONFIG);
-  const [savedConfig, setSavedConfig] = useState(DEFAULT_CONFIG);
-  const [configLoading, setConfigLoading] = useState(true);
-  const [configSaving, setConfigSaving] = useState(false);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        // Interceptor returns response.data, so res = { success, data: {...} }
-        const res = await api.get('/superadmin/platform-config');
-        const payload = res?.data;
-        if (payload && typeof payload === 'object') {
-          const merged = { ...DEFAULT_CONFIG, ...payload };
-          setConfig(merged);
-          setSavedConfig(merged);
-        }
-      } catch {
-        // backend not ready yet — silently use defaults
-      } finally {
-        setConfigLoading(false);
-      }
-    };
-    load();
-  }, []);
-
-  const handleSaveConfig = async () => {
-    setConfigSaving(true);
-    try {
-      await api.put('/superadmin/platform-config', config);
-      setSavedConfig({ ...config });
-      addToast('Platform configuration saved', 'success');
-    } catch {
-      addToast('Failed to save configuration', 'error');
-    } finally {
-      setConfigSaving(false);
-    }
-  };
-
-  // ── Section 2: Calculator inputs ────────────────────────────
   const [inputs, setInputs] = useState({
     patientsPerDay: '',
     doctors: '',
@@ -93,7 +42,6 @@ export default function PricingCalculator() {
   const setInput = (key, val) =>
     setInputs(prev => ({ ...prev, [key]: val === '' ? '' : Number(val) }));
 
-  // ── Live calculations ────────────────────────────────────────
   const calc = (() => {
     const ppd    = Number(inputs.patientsPerDay) || 0;
     const docs   = Number(inputs.doctors) || 1;
@@ -104,15 +52,15 @@ export default function PricingCalculator() {
     const totalMessages      = conversations * avg;
     const outbound           = Math.round(totalMessages * 0.5);
     const chargeableOutbound = Math.max(0, outbound - 1000);
-    const metaCost           = chargeableOutbound * (config.meta_utility_rate || 0);
+    const metaCost           = chargeableOutbound * PLATFORM_CONFIG.meta_utility_rate;
 
     const systemPromptTokens = 800 + docs * 150;
     const exchanges          = Math.floor(avg / 2) || 0;
     const inputTokens        = conversations * exchanges * (systemPromptTokens + 300);
     const outputTokens       = conversations * exchanges * 200;
-    const geminiCostUSD      = (inputTokens  / 1_000_000) * (config.gemini_input_rate  || 0)
-                             + (outputTokens / 1_000_000) * (config.gemini_output_rate || 0);
-    const geminiCostINR      = geminiCostUSD * (config.usd_inr_rate || 1);
+    const geminiCostUSD      = (inputTokens  / 1_000_000) * PLATFORM_CONFIG.gemini_input_rate
+                             + (outputTokens / 1_000_000) * PLATFORM_CONFIG.gemini_output_rate;
+    const geminiCostINR      = geminiCostUSD * PLATFORM_CONFIG.usd_inr_rate;
 
     const totalCost      = metaCost + geminiCostINR;
     const suggestedPrice = margin < 100 ? totalCost / (1 - margin / 100) : Infinity;
@@ -133,63 +81,10 @@ export default function PricingCalculator() {
       {/* Page heading */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Pricing Calculator</h1>
-        <p className="text-sm text-gray-500 mt-1">Configure platform costs and calculate enterprise pricing.</p>
+        <p className="text-sm text-gray-500 mt-1">Calculate enterprise pricing before a sales call.</p>
       </div>
 
-      {/* ── SECTION 1: Platform Cost Configuration ── */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="px-6 py-5 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">Platform Cost Configuration</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Update these when vendor prices change. Used across all calculations.</p>
-        </div>
-
-        <div className="px-6 py-5">
-          {configLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {CONFIG_FIELDS.map(f => (
-                <div key={f.key} className="animate-pulse">
-                  <div className="h-3 bg-gray-200 rounded w-2/3 mb-2"></div>
-                  <div className="h-9 bg-gray-100 rounded-lg"></div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {CONFIG_FIELDS.map(f => (
-                <div key={f.key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {f.label}
-                    <span className="ml-1 text-xs font-normal text-gray-400">({f.unit})</span>
-                  </label>
-                  <input
-                    type="number"
-                    step={f.step}
-                    min="0"
-                    value={config[f.key]}
-                    onChange={e => setConfig(prev => ({ ...prev, [f.key]: parseFloat(e.target.value) || 0 }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-5 flex items-center gap-3">
-            <button
-              onClick={handleSaveConfig}
-              disabled={configSaving || configLoading}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              {configSaving ? 'Saving…' : 'Save Configuration'}
-            </button>
-            {JSON.stringify(config) !== JSON.stringify(savedConfig) && (
-              <span className="text-xs text-amber-600 font-medium">Unsaved changes</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ── SECTION 2: Enterprise Pricing Calculator ── */}
+      {/* ── Enterprise Pricing Calculator ── */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
         <div className="px-6 py-5 border-b border-gray-100">
           <h2 className="text-base font-semibold text-gray-900">Enterprise Pricing Calculator</h2>
