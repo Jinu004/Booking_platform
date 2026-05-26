@@ -92,6 +92,12 @@ const createTenant = async (tenantData) => {
 
   await setDefaultConfigs(tenant.id, industry);
 
+  // Auto-insert default row for tenant_settings
+  await pool.query(
+    'INSERT INTO tenant_settings (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING',
+    [tenant.id]
+  );
+
   if (email && password) {
     const bcrypt = require('bcryptjs');
     const hashedPassword = await bcrypt.hash(password, 10);
