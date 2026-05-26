@@ -14,7 +14,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');
-      console.log('SW registered');
 
       // Request push permission after login
       if ('PushManager' in window) {
