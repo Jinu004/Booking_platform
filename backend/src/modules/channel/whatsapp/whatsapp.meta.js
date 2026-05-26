@@ -261,6 +261,39 @@ async function sendDocument(to, mediaId, filename, caption) {
   }
 }
 
+async function sendContact(to, clinicName, phoneNumber, wabaId, accessToken) {
+  const waId = phoneNumber.replace(/\D/g, '');
+  const url = `https://graph.facebook.com/v18.0/${wabaId}/messages`;
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: to,
+    type: 'contacts',
+    contacts: [{
+      name: {
+        formatted_name: clinicName,
+        first_name: clinicName
+      },
+      phones: [{
+        phone: phoneNumber,
+        type: 'CELL',
+        wa_id: waId
+      }]
+    }]
+  };
+  try {
+    await axios.post(url, payload, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    logger.info(`Contact card sent to ${to}`);
+  } catch (err) {
+    logger.error('sendContact failed:', err.message);
+  }
+}
+
 module.exports = {
   sendTextMessage,
   sendInteractiveButtons,
@@ -268,5 +301,6 @@ module.exports = {
   parseIncomingMessage,
   verifyWebhook,
   uploadMedia,
-  sendDocument
+  sendDocument,
+  sendContact
 }
