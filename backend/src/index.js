@@ -128,6 +128,13 @@ app.use('/api/v1/admin/waba', wabaRoutes);
 const pushRoutes = require('./modules/push/push.routes');
 app.use('/api/v1/push', pushRoutes);
 
+// Enquiry vertical routes
+const catalogueRoutes = require('./modules/catalogue/catalogue.routes');
+app.use('/api/v1/catalogue', catalogueRoutes);
+
+const leadsRoutes = require('./modules/leads/leads.routes');
+app.use('/api/v1/leads', leadsRoutes);
+
 // 17. Global Error Handler must be the last middleware
 app.use(errorHandler);
 
