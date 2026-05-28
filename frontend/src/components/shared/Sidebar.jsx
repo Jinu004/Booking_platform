@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useStore from '../../store/useStore';
 import Badge from './Badge';
 import { getStoredStaff, logout } from '../../services/auth.service';
+import { useIndustry } from '../../hooks/useIndustry';
 
 const icons = {
   Dashboard: (
@@ -55,6 +56,16 @@ const icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-2M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01" />
     </svg>
   ),
+  Catalogue: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+    </svg>
+  ),
+  Leads: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+    </svg>
+  ),
 };
 
 
@@ -65,6 +76,24 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   const staff = getStoredStaff();
   const role = staff?.role || 'receptionist';
   const can = (...roles) => roles.includes(role) || role === 'super_admin';
+  const { industry } = useIndustry();
+
+  // ── Enquiry-industry nav (additive — does not touch clinic link definitions) ──
+  const enquiryMainLinks = [
+    { name: 'Dashboard', path: '/dashboard' },
+    { name: 'Catalogue', path: '/catalogue' },
+    { name: 'Leads',     path: '/leads' },
+    { name: 'Conversations', path: '/conversations' },
+  ];
+
+  const enquirySecondaryLinks = [
+    { name: 'Analytics', path: '/analytics' },
+    { name: 'Settings',  path: '/settings' },
+  ];
+
+  const allEnquirySecondaryLinks = staff?.role === 'super_admin'
+    ? [...enquirySecondaryLinks, { name: 'Super Admin', path: '/superadmin' }, { name: 'Pricing Calculator', path: '/superadmin/pricing-calculator' }]
+    : enquirySecondaryLinks;
 
   const mainLinks = [
     { name: 'Dashboard', path: '/dashboard' },
@@ -158,12 +187,23 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {mainLinks.map(renderLink)}
-
-          <div className="pt-4 pb-1">
-            <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Clinic</p>
-          </div>
-          {allClinicLinks.map(renderLink)}
+          {industry === 'enquiry' ? (
+            <>
+              {enquiryMainLinks.map(renderLink)}
+              <div className="pt-4 pb-1">
+                <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Business</p>
+              </div>
+              {allEnquirySecondaryLinks.map(renderLink)}
+            </>
+          ) : (
+            <>
+              {mainLinks.map(renderLink)}
+              <div className="pt-4 pb-1">
+                <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Clinic</p>
+              </div>
+              {allClinicLinks.map(renderLink)}
+            </>
+          )}
         </nav>
 
         {/* Bottom */}

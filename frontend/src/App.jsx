@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Toast from './components/shared/Toast';
 import Layout from './components/shared/Layout';
 import PrivateRoute from './components/shared/PrivateRoute';
+import { useIndustry } from './hooks/useIndustry';
 
 const Dashboard      = React.lazy(() => import('./pages/Dashboard'));
 const Bookings       = React.lazy(() => import('./pages/Bookings'));
@@ -19,6 +20,9 @@ const ResetPassword  = React.lazy(() => import('./pages/ResetPassword'));
 const NotFound       = React.lazy(() => import('./pages/NotFound'));
 const SuperAdmin          = React.lazy(() => import('./pages/SuperAdmin'));
 const PricingCalculator   = React.lazy(() => import('./pages/superadmin/PricingCalculator'));
+const EnquiryDashboard    = React.lazy(() => import('./pages/enquiry/EnquiryDashboard'));
+const Catalogue           = React.lazy(() => import('./pages/enquiry/Catalogue'));
+const Leads               = React.lazy(() => import('./pages/enquiry/Leads'));
 const Landing        = React.lazy(() => import('./pages/Landing'));
 const PendingApproval = React.lazy(() => import('./pages/PendingApproval'));
 const PatientProfile = React.lazy(() => import('./pages/PatientProfile'));
@@ -28,6 +32,12 @@ const PageLoader = (
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
   </div>
 );
+
+// Picks clinic or enquiry dashboard based on tenant industry
+function DashboardWrapper() {
+  const { industry } = useIndustry();
+  return industry === 'enquiry' ? <EnquiryDashboard /> : <Dashboard />;
+}
 
 const App = () => {
   return (
@@ -43,7 +53,7 @@ const App = () => {
 
           <Route element={<PrivateRoute />}>
             <Route element={<Layout />}>
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard" element={<DashboardWrapper />} />
               <Route path="/bookings" element={<Bookings />} />
               <Route path="/patients" element={<Patients />} />
               <Route path="/patients/:customerId" element={<PatientProfile />} />
@@ -52,6 +62,8 @@ const App = () => {
               <Route path="/conversations" element={<Conversations />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/catalogue" element={<Catalogue />} />
+              <Route path="/leads" element={<Leads />} />
               <Route path="/superadmin" element={<SuperAdmin />} />
               <Route path="/superadmin/pricing-calculator" element={<PricingCalculator />} />
             </Route>
