@@ -23,6 +23,7 @@ async function login(req, res) {
 `SELECT s.*, t.name AS tenant_name,
               t.plan AS tenant_plan,
               t.status AS tenant_status,
+              t.industry AS tenant_industry,
               t.whatsapp_number AS whatsapp_number
        FROM staff s
        JOIN tenants t ON t.id = s.tenant_id
@@ -100,6 +101,7 @@ async function login(req, res) {
         tenantName: staff.tenant_name,
         tenantPlan: staff.tenant_plan,
         tenantStatus: staff.tenant_status,
+        tenantIndustry: staff.tenant_industry,
 tenantWhatsapp: staff.whatsapp_number,
       doctor_id: staff.doctor_id || null
       }

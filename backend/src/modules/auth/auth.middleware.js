@@ -65,6 +65,7 @@ async function requireAuth(req, res, next) {
       `SELECT s.*, t.name AS tenant_name,
               t.plan AS tenant_plan,
               t.status AS tenant_status,
+              t.industry AS tenant_industry,
               t.whatsapp_number
        FROM auth_sessions ses
        JOIN staff s ON s.id = ses.staff_id
@@ -108,7 +109,8 @@ if (staffData.tenant_status === 'pending') {
       name: staffData.tenant_name,
       plan: staffData.tenant_plan,
       status: staffData.tenant_status,
-      whatsapp_number: staffData.whatsapp_number
+      whatsapp_number: staffData.whatsapp_number,
+      industry: staffData.tenant_industry
     }
 
     req.tenantId = staffData.tenant_id
