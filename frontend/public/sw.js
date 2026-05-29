@@ -1,4 +1,4 @@
-const CACHE_NAME = 'receptionai-v1';
+const CACHE_NAME = 'receptionai-v2';
 const urlsToCache = ['/', '/dashboard', '/conversations'];
 
 self.addEventListener('install', event => {
