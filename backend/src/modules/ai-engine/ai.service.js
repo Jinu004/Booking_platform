@@ -72,7 +72,7 @@ async function processMessage(context) {
     }
 
     // Inject knowledge base for Growth and Pro plan clinics
-    if ((tenant.plan === 'growth' || tenant.plan === 'pro') && tenant.industry === 'clinic') {
+    if ((tenant.plan === 'growth' || tenant.plan === 'pro') && (tenant.industry === 'clinic' || tenant.industry === 'enquiry')) {
       try {
         const kbResult = await pool.query(
           'SELECT ai_knowledge_base FROM tenant_settings WHERE tenant_id = $1',
