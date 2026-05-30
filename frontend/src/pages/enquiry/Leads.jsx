@@ -116,7 +116,12 @@ export default function Leads() {
                 {/* Desktop row */}
                 <div className="hidden md:grid grid-cols-[1.5fr_1fr_2fr_0.5fr_2fr_1.2fr_1fr] gap-4 items-center">
                   <p className="text-sm font-semibold text-gray-900 truncate">{lead.customer_name || '—'}</p>
-                  <p className="text-sm text-gray-600 truncate">{lead.phone || '—'}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-600 truncate">{lead.phone || '—'}</p>
+                    {lead.alt_phone && (
+                      <p className="text-xs text-gray-400 truncate">Alt: {lead.alt_phone}</p>
+                    )}
+                  </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{lead.product_name || '—'}</p>
                     {lead.product_id && (
@@ -146,6 +151,9 @@ export default function Leads() {
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{lead.customer_name || '—'}</p>
                       <p className="text-xs text-gray-500">{lead.phone || '—'}</p>
+                      {lead.alt_phone && (
+                        <p className="text-xs text-gray-400">Alt: {lead.alt_phone}</p>
+                      )}
                     </div>
                     <StatusBadge status={lead.status || 'new'} />
                   </div>
