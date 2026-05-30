@@ -5,44 +5,27 @@ import { getLeads, updateLeadStatus, updateOrderPayment, updateOrderNotes, updat
 import { getHITLSettings } from '../../services/settings.service';
 
 // ── Status pipeline ──────────────────────────────────────────────────────────
-const STATUS_OPTIONS = [
-  { value: 'new',        label: 'New' },
-  { value: 'confirmed',  label: 'Confirmed' },
-  { value: 'printing',   label: 'Printing' },
-  { value: 'ready',      label: 'Ready' },
-  { value: 'shipped',    label: 'Shipped' },
-  { value: 'delivered',  label: 'Delivered' },
-  { value: 'cancelled',  label: 'Cancelled' },
+const PIPELINE_STAGES = [
+  { value: 'new',         label: 'New' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'shipped',     label: 'Shipped' },
+  { value: 'delivered',   label: 'Delivered' },
 ];
 
 const STATUS_BADGE = {
-  new:       'bg-gray-100 text-gray-600',
-  confirmed: 'bg-blue-100 text-blue-700',
-  printing:  'bg-purple-100 text-purple-700',
-  ready:     'bg-amber-100 text-amber-700',
-  shipped:   'bg-orange-100 text-orange-700',
-  delivered: 'bg-green-100 text-green-700',
-  cancelled: 'bg-red-100 text-red-600',
+  new:         'bg-gray-100 text-gray-600',
+  in_progress: 'bg-blue-100 text-blue-700',
+  shipped:     'bg-orange-100 text-orange-700',
+  delivered:   'bg-green-100 text-green-700',
+  cancelled:   'bg-red-100 text-red-600',
 };
 
-const STATUS_PANEL_ACTIVE = {
-  new:       'bg-gray-600 text-white border-gray-600',
-  confirmed: 'bg-blue-600 text-white border-blue-600',
-  printing:  'bg-purple-600 text-white border-purple-600',
-  ready:     'bg-amber-500 text-white border-amber-500',
-  shipped:   'bg-orange-500 text-white border-orange-500',
-  delivered: 'bg-green-600 text-white border-green-600',
-  cancelled: 'bg-red-600 text-white border-red-600',
-};
-
-const STATUS_PANEL_IDLE = {
-  new:       'bg-white text-gray-600 border-gray-200 hover:bg-gray-50',
-  confirmed: 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50',
-  printing:  'bg-white text-purple-600 border-purple-200 hover:bg-purple-50',
-  ready:     'bg-white text-amber-600 border-amber-200 hover:bg-amber-50',
-  shipped:   'bg-white text-orange-600 border-orange-200 hover:bg-orange-50',
-  delivered: 'bg-white text-green-600 border-green-200 hover:bg-green-50',
-  cancelled: 'bg-white text-red-600 border-red-200 hover:bg-red-50',
+const STATUS_LABEL = {
+  new:         'New',
+  in_progress: 'In Progress',
+  shipped:     'Shipped',
+  delivered:   'Delivered',
+  cancelled:   'Cancelled',
 };
 
 // ── Print helpers ────────────────────────────────────────────────────────────
@@ -127,7 +110,7 @@ ${lead.payment_status ? `<div class="row"><span class="label">Payment</span><spa
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
-  const label = STATUS_OPTIONS.find(s => s.value === status)?.label || status;
+  const label = STATUS_LABEL[status] || status;
   return (
     <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[status] || 'bg-gray-100 text-gray-600'}`}>
       {label}
@@ -381,7 +364,7 @@ export default function Leads() {
       )}
 
       {/* ── Side Panel ── */}
-      <div className={`fixed top-0 right-0 h-full w-full md:w-[420px] bg-white shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out ${selectedLead ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed top-0 right-0 h-screen w-full md:w-[420px] bg-white shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out ${selectedLead ? 'translate-x-0' : 'translate-x-full'}`}>
         {selectedLead && (
           <>
             {/* Panel header */}
@@ -537,22 +520,81 @@ export default function Leads() {
 
               {/* 5. Order Status Pipeline */}
               <section>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Order Status</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {STATUS_OPTIONS.map(opt => {
-                    const isActive = (selectedLead.status || 'new') === opt.value;
-                    return (
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-4">Order Status</p>
+
+                {selectedLead.status === 'cancelled' ? (
+                  <div className="flex items-center justify-center py-3">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold bg-red-100 text-red-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      Cancelled
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Horizontal pipeline */}
+                    <div className="flex items-start justify-between gap-1">
+                      {PIPELINE_STAGES.map((stage, idx) => {
+                        const currentIdx = PIPELINE_STAGES.findIndex(s => s.value === (selectedLead.status || 'new'));
+                        const isPast    = idx < currentIdx;
+                        const isCurrent = idx === currentIdx;
+                        const isFuture  = idx > currentIdx;
+                        const isLast    = idx === PIPELINE_STAGES.length - 1;
+
+                        return (
+                          <React.Fragment key={stage.value}>
+                            {/* Stage node */}
+                            <button
+                              disabled={updatingId === selectedLead.id}
+                              onClick={() => handleStatusChange(selectedLead, stage.value)}
+                              className="flex flex-col items-center gap-1.5 flex-1 min-w-0 group disabled:opacity-60"
+                            >
+                              {/* Circle */}
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition
+                                ${isCurrent ? 'bg-indigo-600 border-indigo-600' : ''}
+                                ${isPast    ? 'bg-gray-400 border-gray-400' : ''}
+                                ${isFuture  ? 'bg-white border-gray-300 group-hover:border-indigo-400' : ''}
+                              `}>
+                                {(isCurrent || isPast) && (
+                                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                              {/* Label */}
+                              <span className={`text-[10px] font-semibold text-center leading-tight
+                                ${isCurrent ? 'text-indigo-700' : ''}
+                                ${isPast    ? 'text-gray-500'   : ''}
+                                ${isFuture  ? 'text-gray-300'   : ''}
+                              `}>
+                                {stage.label}
+                              </span>
+                            </button>
+
+                            {/* Connector line */}
+                            {!isLast && (
+                              <div className={`flex-1 h-0.5 mt-4 rounded-full
+                                ${idx < currentIdx ? 'bg-gray-400' : 'bg-gray-200'}
+                              `} />
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+
+                    {/* Cancel link */}
+                    <div className="mt-4 text-center">
                       <button
-                        key={opt.value}
                         disabled={updatingId === selectedLead.id}
-                        onClick={() => handleStatusChange(selectedLead, opt.value)}
-                        className={`py-2 rounded-lg text-xs font-semibold border transition disabled:opacity-50 ${isActive ? STATUS_PANEL_ACTIVE[opt.value] : STATUS_PANEL_IDLE[opt.value]}`}
+                        onClick={() => handleStatusChange(selectedLead, 'cancelled')}
+                        className="text-xs font-medium text-red-500 hover:text-red-700 disabled:opacity-40 transition"
                       >
-                        {opt.label}
+                        Cancel Order
                       </button>
-                    );
-                  })}
-                </div>
+                    </div>
+                  </>
+                )}
               </section>
 
               {/* 6. Payment */}
@@ -560,11 +602,11 @@ export default function Leads() {
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Payment</p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { value: 'pending', label: 'Pending', active: 'bg-gray-600 text-white border-gray-600', idle: 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50' },
+                    { value: 'unpaid',  label: 'Pending', active: 'bg-gray-600 text-white border-gray-600', idle: 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50' },
                     { value: 'cod',     label: 'COD',     active: 'bg-amber-500 text-white border-amber-500', idle: 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50' },
                     { value: 'paid',    label: 'Paid',    active: 'bg-green-600 text-white border-green-600', idle: 'bg-white text-green-600 border-green-200 hover:bg-green-50' },
                   ].map(opt => {
-                    const isCurrent = (selectedLead.payment_status || 'pending') === opt.value;
+                    const isCurrent = (selectedLead.payment_status || 'unpaid') === opt.value;
                     return (
                       <button
                         key={opt.value}
