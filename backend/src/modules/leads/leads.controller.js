@@ -39,7 +39,7 @@ async function updateLeadStatus(req, res, next) {
     if (!status) {
       return errorResponse(res, 'status is required', 400)
     }
-    const allowed = ['new', 'confirmed', 'printing', 'ready', 'shipped', 'delivered', 'cancelled']
+    const allowed = ['new', 'in_progress', 'shipped', 'delivered', 'cancelled']
     if (!allowed.includes(status)) {
       return errorResponse(res, 'Invalid status', 400)
     }
