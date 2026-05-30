@@ -138,7 +138,7 @@ export default function Catalogue() {
         </div>
         <button
           onClick={openAdd}
-          className="flex-shrink-0 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition shadow-sm"
+          className="flex-shrink-0 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-700 transition shadow-sm"
         >
           + Add Product
         </button>
@@ -162,7 +162,7 @@ export default function Catalogue() {
           <p className="text-gray-400 text-sm">No products yet.</p>
           <button
             onClick={openAdd}
-            className="mt-3 text-indigo-600 font-semibold text-sm hover:text-indigo-800"
+            className="mt-3 text-amber-600 font-semibold text-sm hover:text-amber-800"
           >
             Add your first product to get started.
           </button>
@@ -205,7 +205,7 @@ export default function Catalogue() {
                   <button
                     onClick={() => openEdit(item)}
                     title="Edit"
-                    className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                    className="p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -251,7 +251,7 @@ export default function Catalogue() {
                     placeholder="e.g. SKU-001"
                     value={form.product_id}
                     onChange={e => setField('product_id', e.target.value)}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent ${errors.product_id ? 'border-red-400' : 'border-gray-200'}`}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent ${errors.product_id ? 'border-red-400' : 'border-gray-200'}`}
                   />
                   {errors.product_id && <p className="mt-1 text-xs text-red-600">{errors.product_id}</p>}
                 </div>
@@ -266,7 +266,7 @@ export default function Catalogue() {
                     placeholder="e.g. Premium Wireless Headphones"
                     value={form.name}
                     onChange={e => setField('name', e.target.value)}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent ${errors.name ? 'border-red-400' : 'border-gray-200'}`}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent ${errors.name ? 'border-red-400' : 'border-gray-200'}`}
                   />
                   {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
                 </div>
@@ -282,7 +282,7 @@ export default function Catalogue() {
                     placeholder="e.g. 2499"
                     value={form.price}
                     onChange={e => setField('price', e.target.value)}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent ${errors.price ? 'border-red-400' : 'border-gray-200'}`}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent ${errors.price ? 'border-red-400' : 'border-gray-200'}`}
                   />
                   {errors.price && <p className="mt-1 text-xs text-red-600">{errors.price}</p>}
                 </div>
@@ -295,7 +295,7 @@ export default function Catalogue() {
                     placeholder="Brief product description the AI can use to answer customer questions…"
                     value={form.description}
                     onChange={e => setField('description', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent resize-none"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none"
                   />
                 </div>
 
@@ -308,7 +308,7 @@ export default function Catalogue() {
                   <button
                     type="button"
                     onClick={() => setField('in_stock', !form.in_stock)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${form.in_stock ? 'bg-indigo-600' : 'bg-gray-200'}`}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${form.in_stock ? 'bg-amber-600' : 'bg-gray-200'}`}
                   >
                     <span
                       className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${form.in_stock ? 'translate-x-6' : 'translate-x-1'}`}
@@ -329,7 +329,7 @@ export default function Catalogue() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
                   {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Product'}
                 </button>

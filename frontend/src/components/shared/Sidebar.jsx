@@ -78,6 +78,14 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   const can = (...roles) => roles.includes(role) || role === 'super_admin';
   const { industry } = useIndustry();
 
+  const activeBg    = industry === 'enquiry' ? 'bg-amber-50'   : 'bg-indigo-50';
+  const activeText  = industry === 'enquiry' ? 'text-amber-700' : 'text-indigo-700';
+  const activeIcon  = industry === 'enquiry' ? 'text-amber-600' : 'text-indigo-600';
+  const activeHover = industry === 'enquiry' ? 'text-amber-800' : 'text-indigo-800';
+  const avatarBg    = industry === 'enquiry' ? 'bg-amber-100'  : 'bg-indigo-100';
+  const brandColor  = industry === 'enquiry' ? 'text-amber-600' : 'text-indigo-600';
+  const brandHover  = industry === 'enquiry' ? 'hover:text-amber-800' : 'hover:text-indigo-800';
+
   // ── Enquiry-industry nav (additive — does not touch clinic link definitions) ──
   const enquiryMainLinks = [
     { name: 'Dashboard', path: '/dashboard' },
@@ -141,11 +149,11 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         }}
         className={`flex items-center px-3 py-2 text-sm font-medium w-full transition-colors rounded-lg gap-3
           ${isActive
-            ? 'bg-indigo-50 text-indigo-700'
+            ? `${activeBg} ${activeText}`
             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
           }`}
       >
-        <span className={isActive ? 'text-indigo-600' : 'text-gray-400'}>
+        <span className={isActive ? activeIcon : 'text-gray-400'}>
           {icons[iconKey] || icons.Dashboard}
         </span>
         {link.name}
@@ -170,7 +178,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         {/* Header */}
         <div className="p-5 border-b border-gray-200 flex justify-between items-center">
           <div className="flex-1 min-w-0">
-            <Link to="/dashboard" className="text-base font-bold text-indigo-600 truncate hover:text-indigo-800 transition">
+            <Link to="/dashboard" className={`text-base font-bold ${brandColor} truncate ${brandHover} transition`}>
               ReceptionAI
             </Link>
             <p className="text-xs text-gray-400 mt-0.5 capitalize">{staff?.tenantPlan || 'Starter'} plan</p>
@@ -209,8 +217,8 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         {/* Bottom */}
         <div className="p-4 border-t border-gray-200">
           <div className="flex items-center gap-2 mb-3 px-1">
-            <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-bold text-indigo-700">
+            <div className={`w-7 h-7 rounded-full ${avatarBg} flex items-center justify-center flex-shrink-0`}>
+              <span className={`text-xs font-bold ${activeText}`}>
                 {(staff?.tenantName || tenant?.name || 'R')[0].toUpperCase()}
               </span>
             </div>

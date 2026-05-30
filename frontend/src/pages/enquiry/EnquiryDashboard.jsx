@@ -96,7 +96,7 @@ export default function EnquiryDashboard() {
         </div>
         <Link
           to="/catalogue"
-          className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
+          className="px-4 py-2 text-sm bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 transition"
         >
           + Add Product
         </Link>
@@ -106,7 +106,7 @@ export default function EnquiryDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 py-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Leads</p>
-          <p className="mt-2 text-4xl font-black text-indigo-600">{totalLeads}</p>
+          <p className="mt-2 text-4xl font-black text-amber-600">{totalLeads}</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">New Leads</p>
@@ -127,7 +127,7 @@ export default function EnquiryDashboard() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <p className="font-semibold text-gray-800">Recent Leads</p>
-            <Link to="/leads" className="text-sm text-indigo-600 font-medium hover:text-indigo-800 transition">
+            <Link to="/leads" className="text-sm text-amber-600 font-medium hover:text-amber-800 transition">
               View all →
             </Link>
           </div>

@@ -297,7 +297,7 @@ export default function Leads() {
             {leads.map(lead => (
               <div
                 key={lead.id}
-                className="px-6 py-4 hover:bg-indigo-50 transition cursor-pointer"
+                className="px-6 py-4 hover:bg-amber-50 transition cursor-pointer"
                 onClick={() => setSelectedLead(lead)}
               >
                 {/* Desktop row */}
@@ -400,7 +400,7 @@ export default function Leads() {
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-gray-900">{selectedLead.customer_name || '—'}</p>
                     {selectedLead.order_count > 1 && (
-                      <span className="text-xs bg-indigo-100 text-indigo-700 rounded-full px-2 py-0.5 font-semibold">
+                      <span className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 font-semibold">
                         Repeat customer
                       </span>
                     )}
@@ -456,12 +456,12 @@ export default function Leads() {
                         value={trackingValue}
                         onChange={e => setTrackingValue(e.target.value)}
                         placeholder="Enter tracking ID…"
-                        className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                        className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
                       />
                       <button
                         onClick={handleSaveTracking}
                         disabled={savingTracking || trackingValue === (selectedLead.tracking_id || '')}
-                        className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition"
+                        className="px-3 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-40 transition"
                       >
                         {savingTracking ? 'Saving…' : 'Save'}
                       </button>
@@ -477,7 +477,7 @@ export default function Leads() {
                   {!editingNotes && (
                     <button
                       onClick={() => setEditingNotes(true)}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                      className="text-xs text-amber-600 hover:text-amber-800 font-medium"
                     >
                       {selectedLead.internal_notes ? 'Edit' : '+ Add'}
                     </button>
@@ -490,13 +490,13 @@ export default function Leads() {
                       onChange={e => setNotesValue(e.target.value)}
                       rows={3}
                       placeholder="Add internal notes visible only to your team…"
-                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
                     />
                     <div className="flex gap-2">
                       <button
                         onClick={handleSaveNotes}
                         disabled={savingNotes}
-                        className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition"
+                        className="px-3 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-40 transition"
                       >
                         {savingNotes ? 'Saving…' : 'Save'}
                       </button>
@@ -552,9 +552,9 @@ export default function Leads() {
                             >
                               {/* Circle */}
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition
-                                ${isCurrent ? 'bg-indigo-600 border-indigo-600' : ''}
+                                ${isCurrent ? 'bg-amber-600 border-amber-600' : ''}
                                 ${isPast    ? 'bg-gray-400 border-gray-400' : ''}
-                                ${isFuture  ? 'bg-white border-gray-300 group-hover:border-indigo-400' : ''}
+                                ${isFuture  ? 'bg-white border-gray-300 group-hover:border-amber-400' : ''}
                               `}>
                                 {(isCurrent || isPast) && (
                                   <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -564,7 +564,7 @@ export default function Leads() {
                               </div>
                               {/* Label */}
                               <span className={`text-[10px] font-semibold text-center leading-tight
-                                ${isCurrent ? 'text-indigo-700' : ''}
+                                ${isCurrent ? 'text-amber-700' : ''}
                                 ${isPast    ? 'text-gray-500'   : ''}
                                 ${isFuture  ? 'text-gray-300'   : ''}
                               `}>
@@ -650,7 +650,7 @@ export default function Leads() {
               <Link
                 to="/conversations"
                 onClick={handleClosePanel}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition"
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 transition"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
