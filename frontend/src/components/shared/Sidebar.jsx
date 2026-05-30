@@ -78,15 +78,17 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   const can = (...roles) => roles.includes(role) || role === 'super_admin';
   const { industry } = useIndustry();
 
-  const activeBg    = industry === 'enquiry' ? 'bg-amber-50'   : 'bg-indigo-50';
-  const activeText  = industry === 'enquiry' ? 'text-amber-700' : 'text-indigo-700';
-  const activeIcon  = industry === 'enquiry' ? 'text-amber-600' : 'text-indigo-600';
-  const activeHover = industry === 'enquiry' ? 'text-amber-800' : 'text-indigo-800';
-  const avatarBg    = industry === 'enquiry' ? 'bg-amber-100'  : 'bg-indigo-100';
-  const brandColor    = industry === 'enquiry' ? 'text-amber-600' : 'text-indigo-600';
-  const brandHover    = industry === 'enquiry' ? 'hover:text-amber-800' : 'hover:text-indigo-800';
-  const sidebarBg     = industry === 'enquiry' ? 'bg-[#FDF3E7] border-amber-100' : 'bg-white border-gray-200';
-  const sidebarDivider = industry === 'enquiry' ? 'border-amber-100' : 'border-gray-200';
+  const sidebarBg      = industry === 'enquiry' ? 'bg-[#1E2E45] border-[#2A3F5F]'  : 'bg-white border-gray-200';
+  const sidebarDivider = industry === 'enquiry' ? 'border-[#2A3F5F]'               : 'border-gray-200';
+  const activeBg       = industry === 'enquiry' ? 'bg-white/10'                    : 'bg-indigo-50';
+  const activeText     = industry === 'enquiry' ? 'text-white'                     : 'text-indigo-700';
+  const activeIcon     = industry === 'enquiry' ? 'text-white'                     : 'text-indigo-600';
+  const inactiveText   = industry === 'enquiry' ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50';
+  const brandColor     = industry === 'enquiry' ? 'text-white'                     : 'text-indigo-600';
+  const brandHover     = industry === 'enquiry' ? 'hover:text-white/80'            : 'hover:text-indigo-800';
+  const avatarBg       = industry === 'enquiry' ? 'bg-white/20'                   : 'bg-indigo-100';
+  const avatarText     = industry === 'enquiry' ? 'text-white'                     : 'text-indigo-700';
+  const sectionLabel   = industry === 'enquiry' ? 'text-white/40'                  : 'text-gray-400';
 
   // ── Enquiry-industry nav (additive — does not touch clinic link definitions) ──
   const enquiryMainLinks = [
@@ -152,10 +154,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         className={`flex items-center px-3 py-2 text-sm font-medium w-full transition-colors rounded-lg gap-3
           ${isActive
             ? `${activeBg} ${activeText}`
-            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            : inactiveText
           }`}
       >
-        <span className={isActive ? activeIcon : 'text-gray-400'}>
+        <span className={isActive ? activeIcon : (industry === 'enquiry' ? 'text-white/50' : 'text-gray-400')}>
           {icons[iconKey] || icons.Dashboard}
         </span>
         {link.name}
@@ -183,10 +185,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             <Link to="/dashboard" className={`text-base font-bold ${brandColor} truncate ${brandHover} transition`}>
               ReceptionAI
             </Link>
-            <p className="text-xs text-gray-400 mt-0.5 capitalize">{staff?.tenantPlan || 'Starter'} plan</p>
+            <p className={`text-xs mt-0.5 capitalize ${sectionLabel}`}>{staff?.tenantPlan || 'Starter'} plan</p>
           </div>
           <button
-            className="md:hidden text-gray-400 hover:text-gray-900 p-1 rounded-full hover:bg-gray-100 transition-colors"
+            className={`md:hidden p-1 rounded-full transition-colors ${industry === 'enquiry' ? 'text-white/50 hover:text-white hover:bg-white/10' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-100'}`}
             onClick={() => setIsOpen(false)}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -201,7 +203,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             <>
               {enquiryMainLinks.map(renderLink)}
               <div className="pt-4 pb-1">
-                <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Business</p>
+                <p className={`px-3 text-[10px] font-bold uppercase tracking-widest ${sectionLabel}`}>Business</p>
               </div>
               {allEnquirySecondaryLinks.map(renderLink)}
             </>
@@ -209,7 +211,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             <>
               {mainLinks.map(renderLink)}
               <div className="pt-4 pb-1">
-                <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Clinic</p>
+                <p className={`px-3 text-[10px] font-bold uppercase tracking-widest ${sectionLabel}`}>Clinic</p>
               </div>
               {allClinicLinks.map(renderLink)}
             </>
@@ -220,18 +222,18 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         <div className={`p-4 border-t ${sidebarDivider}`}>
           <div className="flex items-center gap-2 mb-3 px-1">
             <div className={`w-7 h-7 rounded-full ${avatarBg} flex items-center justify-center flex-shrink-0`}>
-              <span className={`text-xs font-bold ${activeText}`}>
+              <span className={`text-xs font-bold ${avatarText}`}>
                 {(staff?.tenantName || tenant?.name || 'R')[0].toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate">{staff?.tenantName || tenant?.name || 'Clinic'}</p>
-              <p className="text-xs text-gray-400 capitalize">{staff?.role || 'admin'}</p>
+              <p className={`text-sm font-semibold truncate ${industry === 'enquiry' ? 'text-white' : 'text-gray-900'}`}>{staff?.tenantName || tenant?.name || 'Clinic'}</p>
+              <p className={`text-xs capitalize ${sectionLabel}`}>{staff?.role || 'admin'}</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center px-4 py-2 text-sm font-semibold text-red-600 bg-white border border-red-200 hover:bg-red-50 rounded-lg transition-colors"
+            className={`w-full flex items-center justify-center px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${industry === 'enquiry' ? 'text-red-300 bg-white/10 border border-white/20 hover:bg-white/20' : 'text-red-600 bg-white border border-red-200 hover:bg-red-50'}`}
           >
             Log out
           </button>

@@ -297,7 +297,7 @@ export default function Leads() {
             {leads.map(lead => (
               <div
                 key={lead.id}
-                className="px-6 py-4 hover:bg-amber-50 transition cursor-pointer"
+                className="px-6 py-4 hover:bg-[#EBF3FA] transition cursor-pointer"
                 onClick={() => setSelectedLead(lead)}
               >
                 {/* Desktop row */}
@@ -400,7 +400,7 @@ export default function Leads() {
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-gray-900">{selectedLead.customer_name || '—'}</p>
                     {selectedLead.order_count > 1 && (
-                      <span className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 font-semibold">
+                      <span className="text-xs bg-[#D0DCE8] text-[#1E2E45] rounded-full px-2 py-0.5 font-semibold">
                         Repeat customer
                       </span>
                     )}
@@ -456,12 +456,12 @@ export default function Leads() {
                         value={trackingValue}
                         onChange={e => setTrackingValue(e.target.value)}
                         placeholder="Enter tracking ID…"
-                        className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                        className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#7BAFD4] bg-white"
                       />
                       <button
                         onClick={handleSaveTracking}
                         disabled={savingTracking || trackingValue === (selectedLead.tracking_id || '')}
-                        className="px-3 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-40 transition"
+                        className="px-3 py-1.5 text-xs font-semibold bg-[#4A91C4] text-white rounded-lg hover:bg-[#3A7BAE] disabled:opacity-40 transition"
                       >
                         {savingTracking ? 'Saving…' : 'Save'}
                       </button>
@@ -477,7 +477,7 @@ export default function Leads() {
                   {!editingNotes && (
                     <button
                       onClick={() => setEditingNotes(true)}
-                      className="text-xs text-amber-600 hover:text-amber-800 font-medium"
+                      className="text-xs text-[#4A91C4] hover:text-[#1E2E45] font-medium"
                     >
                       {selectedLead.internal_notes ? 'Edit' : '+ Add'}
                     </button>
@@ -490,13 +490,13 @@ export default function Leads() {
                       onChange={e => setNotesValue(e.target.value)}
                       rows={3}
                       placeholder="Add internal notes visible only to your team…"
-                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#7BAFD4] resize-none"
                     />
                     <div className="flex gap-2">
                       <button
                         onClick={handleSaveNotes}
                         disabled={savingNotes}
-                        className="px-3 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-40 transition"
+                        className="px-3 py-1.5 text-xs font-semibold bg-[#4A91C4] text-white rounded-lg hover:bg-[#3A7BAE] disabled:opacity-40 transition"
                       >
                         {savingNotes ? 'Saving…' : 'Save'}
                       </button>
@@ -552,9 +552,9 @@ export default function Leads() {
                             >
                               {/* Circle */}
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition
-                                ${isCurrent ? 'bg-amber-600 border-amber-600' : ''}
+                                ${isCurrent ? 'bg-[#4A91C4] border-[#4A91C4]' : ''}
                                 ${isPast    ? 'bg-gray-400 border-gray-400' : ''}
-                                ${isFuture  ? 'bg-white border-gray-300 group-hover:border-amber-400' : ''}
+                                ${isFuture  ? 'bg-white border-gray-300 group-hover:border-[#7BAFD4]' : ''}
                               `}>
                                 {(isCurrent || isPast) && (
                                   <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -564,7 +564,7 @@ export default function Leads() {
                               </div>
                               {/* Label */}
                               <span className={`text-[10px] font-semibold text-center leading-tight
-                                ${isCurrent ? 'text-amber-700' : ''}
+                                ${isCurrent ? 'text-[#1E2E45]' : ''}
                                 ${isPast    ? 'text-gray-500'   : ''}
                                 ${isFuture  ? 'text-gray-300'   : ''}
                               `}>
@@ -603,7 +603,7 @@ export default function Leads() {
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { value: 'unpaid',  label: 'Pending', active: 'bg-gray-600 text-white border-gray-600', idle: 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50' },
-                    { value: 'cod',     label: 'COD',     active: 'bg-amber-500 text-white border-amber-500', idle: 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50' },
+                    { value: 'cod',     label: 'COD',     active: 'bg-[#EBF3FA]0 text-white border-amber-500', idle: 'bg-white text-[#4A91C4] border-amber-200 hover:bg-[#EBF3FA]' },
                     { value: 'paid',    label: 'Paid',    active: 'bg-green-600 text-white border-green-600', idle: 'bg-white text-green-600 border-green-200 hover:bg-green-50' },
                   ].map(opt => {
                     const isCurrent = (selectedLead.payment_status || 'unpaid') === opt.value;
@@ -650,7 +650,7 @@ export default function Leads() {
               <Link
                 to="/conversations"
                 onClick={handleClosePanel}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 transition"
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#4A91C4] text-white rounded-lg text-sm font-semibold hover:bg-[#3A7BAE] transition"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />

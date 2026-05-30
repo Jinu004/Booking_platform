@@ -97,7 +97,7 @@ const Layout = () => {
   }, []);
 
   return (
-    <div className={`flex h-screen w-full overflow-hidden relative ${isEnquiry ? 'bg-[#FFF8F0] text-[#3D2B1F]' : 'bg-gray-50 text-gray-900'}`}>
+    <div className={`flex h-screen w-full overflow-hidden relative ${isEnquiry ? 'bg-[#F0F4F8] text-[#1E2E45]' : 'bg-gray-50 text-gray-900'}`}>
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
