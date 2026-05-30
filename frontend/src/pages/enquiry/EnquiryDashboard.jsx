@@ -66,14 +66,14 @@ export default function EnquiryDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#FFF8F0]">
         <div className="bg-white border-b border-gray-200 px-6 py-3">
           <div className="h-5 bg-gray-200 rounded w-40 animate-pulse"></div>
           <div className="h-3 bg-gray-100 rounded w-28 mt-1.5 animate-pulse"></div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 py-4">
           {[1,2,3,4].map(i => (
-            <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 animate-pulse">
+            <div key={i} className="bg-white rounded-xl border border-amber-100 shadow-sm p-6 animate-pulse">
               <div className="h-3 bg-gray-200 rounded w-2/3 mb-3"></div>
               <div className="h-8 bg-gray-100 rounded w-12"></div>
             </div>
@@ -84,7 +84,7 @@ export default function EnquiryDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-[#FFF8F0] flex flex-col">
 
       {/* Top bar */}
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center">
@@ -104,19 +104,19 @@ export default function EnquiryDashboard() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 py-4">
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-white rounded-xl border border-amber-100 shadow-sm p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Leads</p>
           <p className="mt-2 text-4xl font-black text-amber-600">{totalLeads}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-white rounded-xl border border-amber-100 shadow-sm p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">New Leads</p>
           <p className="mt-2 text-4xl font-black text-blue-500">{newLeads}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-white rounded-xl border border-amber-100 shadow-sm p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Catalogue Items</p>
           <p className="mt-2 text-4xl font-black text-emerald-600">{catalogueCount}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-white rounded-xl border border-amber-100 shadow-sm p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Chats</p>
           <p className="mt-2 text-4xl font-black text-amber-500">{activeChats}</p>
         </div>
@@ -124,7 +124,7 @@ export default function EnquiryDashboard() {
 
       {/* Recent leads */}
       <div className="px-6 pb-8">
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-amber-100 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <p className="font-semibold text-gray-800">Recent Leads</p>
             <Link to="/leads" className="text-sm text-amber-600 font-medium hover:text-amber-800 transition">

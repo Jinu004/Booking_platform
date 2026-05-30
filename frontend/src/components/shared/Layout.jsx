@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import { useIndustry } from '../../hooks/useIndustry';
 import { globalSearch } from '../../services/patient.service';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
@@ -15,6 +16,8 @@ const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { tenant, addToast } = useStore();
+  const { industry } = useIndustry();
+  const isEnquiry = industry === 'enquiry';
   const staff = (() => { try { return JSON.parse(localStorage.getItem('staff') || '{}'); } catch { return {}; } })();
 
   const isDashboard = location.pathname === '/dashboard';
@@ -94,7 +97,7 @@ const Layout = () => {
   }, []);
 
   return (
-    <div className="flex h-screen w-full bg-gray-50 overflow-hidden text-gray-900 relative">
+    <div className={`flex h-screen w-full overflow-hidden relative ${isEnquiry ? 'bg-[#FFF8F0] text-[#3D2B1F]' : 'bg-gray-50 text-gray-900'}`}>
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">

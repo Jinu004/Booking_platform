@@ -83,8 +83,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   const activeIcon  = industry === 'enquiry' ? 'text-amber-600' : 'text-indigo-600';
   const activeHover = industry === 'enquiry' ? 'text-amber-800' : 'text-indigo-800';
   const avatarBg    = industry === 'enquiry' ? 'bg-amber-100'  : 'bg-indigo-100';
-  const brandColor  = industry === 'enquiry' ? 'text-amber-600' : 'text-indigo-600';
-  const brandHover  = industry === 'enquiry' ? 'hover:text-amber-800' : 'hover:text-indigo-800';
+  const brandColor    = industry === 'enquiry' ? 'text-amber-600' : 'text-indigo-600';
+  const brandHover    = industry === 'enquiry' ? 'hover:text-amber-800' : 'hover:text-indigo-800';
+  const sidebarBg     = industry === 'enquiry' ? 'bg-[#FDF3E7] border-amber-100' : 'bg-white border-gray-200';
+  const sidebarDivider = industry === 'enquiry' ? 'border-amber-100' : 'border-gray-200';
 
   // ── Enquiry-industry nav (additive — does not touch clinic link definitions) ──
   const enquiryMainLinks = [
@@ -173,10 +175,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         onClick={() => setIsOpen(false)}
       />
 
-      <aside className={`fixed inset-y-0 left-0 z-50 w-[220px] flex-shrink-0 flex flex-col h-full bg-white border-r border-gray-200 transform transition-transform md:relative md:translate-x-0 shadow-2xl md:shadow-none ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-[220px] flex-shrink-0 flex flex-col h-full border-r transform transition-transform md:relative md:translate-x-0 shadow-2xl md:shadow-none ${sidebarBg} ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
 
         {/* Header */}
-        <div className="p-5 border-b border-gray-200 flex justify-between items-center">
+        <div className={`p-5 border-b ${sidebarDivider} flex justify-between items-center`}>
           <div className="flex-1 min-w-0">
             <Link to="/dashboard" className={`text-base font-bold ${brandColor} truncate ${brandHover} transition`}>
               ReceptionAI
@@ -215,7 +217,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         </nav>
 
         {/* Bottom */}
-        <div className="p-4 border-t border-gray-200">
+        <div className={`p-4 border-t ${sidebarDivider}`}>
           <div className="flex items-center gap-2 mb-3 px-1">
             <div className={`w-7 h-7 rounded-full ${avatarBg} flex items-center justify-center flex-shrink-0`}>
               <span className={`text-xs font-bold ${activeText}`}>
