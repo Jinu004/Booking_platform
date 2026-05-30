@@ -174,10 +174,102 @@ async function getConversationStats(tenantId, period) {
   }
 }
 
+async function getEnquiryOverview(tenantId, period) {
+  try {
+    const interval = getInterval(period)
+
+    const leadsRes = await pool.query(`
+      SELECT
+        count(*) as total_leads,
+        count(*) FILTER (WHERE status = 'new') as new_leads,
+        count(*) FILTER (WHERE status = 'in_progress') as in_progress,
+        count(*) FILTER (WHERE status = 'shipped') as shipped,
+        count(*) FILTER (WHERE status = 'delivered') as delivered,
+        COALESCE(SUM(order_total) FILTER (WHERE status = 'delivered' AND payment_status != 'unpaid'), 0) as total_revenue,
+        count(*) FILTER (WHERE payment_status = 'unpaid' AND status != 'delivered') as unpaid_count
+      FROM leads
+      WHERE tenant_id = $1 AND created_at >= NOW() - $2::interval
+    `, [tenantId, interval])
+
+    const cRes = await pool.query(`
+      SELECT
+        count(*) as total,
+        sum(case when mode = 'ai' then 1 else 0 end) as ai_handled
+      FROM conversations
+      WHERE tenant_id = $1 AND started_at >= NOW() - $2::interval
+    `, [tenantId, interval])
+
+    const row = leadsRes.rows[0]
+    const cStats = cRes.rows[0]
+    const total = parseInt(cStats.total) || 0
+    const aiHandled = parseInt(cStats.ai_handled) || 0
+    const resolutionRate = total > 0 ? Math.round((aiHandled / total) * 100) : 0
+
+    return {
+      leads: {
+        total: parseInt(row.total_leads) || 0,
+        new: parseInt(row.new_leads) || 0,
+        in_progress: parseInt(row.in_progress) || 0,
+        shipped: parseInt(row.shipped) || 0,
+        delivered: parseInt(row.delivered) || 0
+      },
+      revenue: {
+        total: parseFloat(row.total_revenue) || 0,
+        unpaid_count: parseInt(row.unpaid_count) || 0
+      },
+      aiStats: { resolutionRate }
+    }
+  } catch (error) {
+    logger.error('Error fetching enquiry overview:', error.message)
+    throw error
+  }
+}
+
+async function getEnquiryDailyLeads(tenantId, period) {
+  try {
+    const interval = getInterval(period)
+    const res = await pool.query(`
+      SELECT DATE(created_at AT TIME ZONE 'Asia/Kolkata') as date, count(*) as count
+      FROM leads
+      WHERE tenant_id = $1 AND created_at >= NOW() - $2::interval
+      GROUP BY date ORDER BY date ASC
+    `, [tenantId, interval])
+    return { daily: res.rows }
+  } catch (error) {
+    logger.error('Error fetching enquiry daily leads:', error.message)
+    throw error
+  }
+}
+
+async function getTopProducts(tenantId, period) {
+  try {
+    const interval = getInterval(period)
+    const res = await pool.query(`
+      SELECT l.product_name, COUNT(*) as order_count, COALESCE(SUM(l.order_total), 0) as revenue
+      FROM leads l
+      WHERE l.tenant_id = $1 AND l.created_at >= NOW() - $2::interval
+      GROUP BY l.product_name ORDER BY order_count DESC LIMIT 5
+    `, [tenantId, interval])
+    return {
+      products: res.rows.map(row => ({
+        product_name: row.product_name,
+        order_count: parseInt(row.order_count) || 0,
+        revenue: parseFloat(row.revenue) || 0
+      }))
+    }
+  } catch (error) {
+    logger.error('Error fetching top products:', error.message)
+    throw error
+  }
+}
+
 module.exports = {
   getOverviewStats,
   getDailyBookings,
   getDoctorStats,
   getPatientStats,
-  getConversationStats
+  getConversationStats,
+  getEnquiryOverview,
+  getEnquiryDailyLeads,
+  getTopProducts
 }

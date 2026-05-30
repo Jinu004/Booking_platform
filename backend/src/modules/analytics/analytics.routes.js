@@ -5,8 +5,11 @@ const {
   getDailyBookings,
   getDoctorStats,
   getPatientStats,
-  getConversationStats
-} = require('./analytics.controller')
+  getConversationStats,
+  getEnquiryOverview,
+  getEnquiryDailyLeads,
+  getTopProducts
+} = require("./analytics.controller")
 
 const router = express.Router()
 
@@ -19,5 +22,9 @@ router.get('/bookings/daily', getDailyBookings)
 router.get('/doctors', getDoctorStats)
 router.get('/patients', getPatientStats)
 router.get('/conversations', getConversationStats)
+
+router.get("/enquiry/overview", getEnquiryOverview)
+router.get("/enquiry/daily-leads", getEnquiryDailyLeads)
+router.get("/enquiry/top-products", getTopProducts)
 
 module.exports = router

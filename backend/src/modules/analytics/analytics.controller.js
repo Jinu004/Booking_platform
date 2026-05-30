@@ -69,10 +69,52 @@ async function getConversationStats(req, res, next) {
   }
 }
 
+/**
+ * GET /analytics/enquiry/overview
+ */
+async function getEnquiryOverview(req, res, next) {
+  try {
+    const { period = 'month' } = req.query
+    const data = await AnalyticsService.getEnquiryOverview(req.tenantId, period)
+    return successResponse(res, data)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * GET /analytics/enquiry/daily-leads
+ */
+async function getEnquiryDailyLeads(req, res, next) {
+  try {
+    const { period = 'month' } = req.query
+    const data = await AnalyticsService.getEnquiryDailyLeads(req.tenantId, period)
+    return successResponse(res, data)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * GET /analytics/enquiry/top-products
+ */
+async function getTopProducts(req, res, next) {
+  try {
+    const { period = 'month' } = req.query
+    const data = await AnalyticsService.getTopProducts(req.tenantId, period)
+    return successResponse(res, data)
+  } catch (err) {
+    next(err)
+  }
+}
+
 module.exports = {
   getOverview,
   getDailyBookings,
   getDoctorStats,
   getPatientStats,
-  getConversationStats
+  getConversationStats,
+  getEnquiryOverview,
+  getEnquiryDailyLeads,
+  getTopProducts
 }
