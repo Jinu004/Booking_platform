@@ -3,6 +3,7 @@ import { getClinicSettings, updateClinicSettings, getHITLSettings, updateHITLSet
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import { PLANS } from '../constants';
+import { useIndustry } from '../hooks/useIndustry';
 
 const DAYS = [
   { key: 'mon', label: 'Monday' },
@@ -21,12 +22,20 @@ export default function Settings() {
   const plan = staff?.tenantPlan || 'starter';
   const whatsappNumber = staff?.tenantWhatsapp || null;
   const { addToast } = useStore();
+  const { industry } = useIndustry();
 
   const [activeTab, setActiveTab] = useState('clinic');
   const [saving, setSaving] = useState(false);
   const [savingAI, setSavingAI] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
   const [savingKB, setSavingKB] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  const [businessProfile, setBusinessProfile] = useState({
+    business_address: '',
+    business_phone: '',
+    business_email: '',
+  });
 
   const [clinic, setClinic] = useState({ opening_time: '09:00', closing_time: '18:00', address: '' });
   const [hitl, setHITL] = useState({
@@ -71,6 +80,11 @@ export default function Settings() {
         if (hitlData?.ai_knowledge_base) {
           setKnowledgeBase(hitlData.ai_knowledge_base);
         }
+        setBusinessProfile({
+          business_address: hitlData?.business_address || '',
+          business_phone:   hitlData?.business_phone   || '',
+          business_email:   hitlData?.business_email   || '',
+        });
       })
       .catch(() => { })
       .finally(() => setHITLLoading(false));
@@ -115,6 +129,22 @@ export default function Settings() {
       addToast('Failed to save working hours', 'error');
     } finally {
       setSavingHours(false);
+    }
+  };
+
+  const handleSaveBusinessProfile = async () => {
+    try {
+      setSavingProfile(true);
+      await updateHITLSettings({
+        business_address: businessProfile.business_address,
+        business_phone:   businessProfile.business_phone,
+        business_email:   businessProfile.business_email,
+      });
+      addToast('Business profile saved', 'success');
+    } catch {
+      addToast('Failed to save business profile', 'error');
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -308,6 +338,61 @@ export default function Settings() {
               </>
             )}
           </div>
+
+          {/* BUSINESS PROFILE — enquiry industry only */}
+          {industry === 'enquiry' && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Business Profile</h2>
+                <p className="text-sm text-gray-500 mt-1">These details appear on your invoices and address labels.</p>
+              </div>
+              {hitlLoading ? (
+                <p className="text-sm text-gray-400">Loading...</p>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Business Address</label>
+                    <textarea
+                      rows={3}
+                      value={businessProfile.business_address}
+                      onChange={e => setBusinessProfile(p => ({ ...p, business_address: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="123 Main Street, City, State, PIN"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Business Phone</label>
+                    <input
+                      type="text"
+                      value={businessProfile.business_phone}
+                      onChange={e => setBusinessProfile(p => ({ ...p, business_phone: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Business Email</label>
+                    <input
+                      type="email"
+                      value={businessProfile.business_email}
+                      onChange={e => setBusinessProfile(p => ({ ...p, business_email: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="orders@yourbusiness.com"
+                    />
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={handleSaveBusinessProfile}
+                      disabled={savingProfile}
+                      className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {savingProfile ? 'Saving...' : 'Save Profile'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* AI KNOWLEDGE BASE */}
           <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">

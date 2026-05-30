@@ -1,36 +1,131 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import useStore from '../../store/useStore';
-import { getLeads, updateLeadStatus } from '../../services/leads.service';
+import { getLeads, updateLeadStatus, updateOrderPayment, updateOrderNotes, updateOrderTracking } from '../../services/leads.service';
+import { getHITLSettings } from '../../services/settings.service';
 
+// ── Status pipeline ──────────────────────────────────────────────────────────
 const STATUS_OPTIONS = [
-  { value: 'new',       label: 'New' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'converted', label: 'Converted' },
-  { value: 'lost',      label: 'Lost' },
+  { value: 'new',        label: 'New' },
+  { value: 'confirmed',  label: 'Confirmed' },
+  { value: 'printing',   label: 'Printing' },
+  { value: 'ready',      label: 'Ready' },
+  { value: 'shipped',    label: 'Shipped' },
+  { value: 'delivered',  label: 'Delivered' },
+  { value: 'cancelled',  label: 'Cancelled' },
 ];
 
 const STATUS_BADGE = {
-  new:       'bg-blue-100 text-blue-700',
-  contacted: 'bg-amber-100 text-amber-700',
-  converted: 'bg-green-100 text-green-700',
-  lost:      'bg-red-100 text-red-600',
+  new:       'bg-gray-100 text-gray-600',
+  confirmed: 'bg-blue-100 text-blue-700',
+  printing:  'bg-purple-100 text-purple-700',
+  ready:     'bg-amber-100 text-amber-700',
+  shipped:   'bg-orange-100 text-orange-700',
+  delivered: 'bg-green-100 text-green-700',
+  cancelled: 'bg-red-100 text-red-600',
 };
 
 const STATUS_PANEL_ACTIVE = {
   new:       'bg-gray-600 text-white border-gray-600',
-  contacted: 'bg-blue-600 text-white border-blue-600',
-  converted: 'bg-green-600 text-white border-green-600',
-  lost:      'bg-red-600 text-white border-red-600',
+  confirmed: 'bg-blue-600 text-white border-blue-600',
+  printing:  'bg-purple-600 text-white border-purple-600',
+  ready:     'bg-amber-500 text-white border-amber-500',
+  shipped:   'bg-orange-500 text-white border-orange-500',
+  delivered: 'bg-green-600 text-white border-green-600',
+  cancelled: 'bg-red-600 text-white border-red-600',
 };
 
 const STATUS_PANEL_IDLE = {
   new:       'bg-white text-gray-600 border-gray-200 hover:bg-gray-50',
-  contacted: 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50',
-  converted: 'bg-white text-green-600 border-green-200 hover:bg-green-50',
-  lost:      'bg-white text-red-600 border-red-200 hover:bg-red-50',
+  confirmed: 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50',
+  printing:  'bg-white text-purple-600 border-purple-200 hover:bg-purple-50',
+  ready:     'bg-white text-amber-600 border-amber-200 hover:bg-amber-50',
+  shipped:   'bg-white text-orange-600 border-orange-200 hover:bg-orange-50',
+  delivered: 'bg-white text-green-600 border-green-200 hover:bg-green-50',
+  cancelled: 'bg-white text-red-600 border-red-200 hover:bg-red-50',
 };
 
+// ── Print helpers ────────────────────────────────────────────────────────────
+function printAddressLabel(lead, sellerName) {
+  const win = window.open('', '_blank', 'width=420,height=340');
+  if (!win) return;
+  win.document.write(`<!DOCTYPE html><html><head><title>Address Label</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+  .wrap { border: 2px solid #000; padding: 16px; max-width: 380px; }
+  .to-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #555; margin-bottom: 4px; }
+  .name { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+  .phone { font-size: 14px; margin-bottom: 8px; }
+  .address { font-size: 13px; line-height: 1.5; border-top: 1px dashed #aaa; padding-top: 8px; }
+  .from { margin-top: 16px; font-size: 10px; color: #888; border-top: 1px solid #ccc; padding-top: 8px; }
+  .order-no { font-size: 10px; color: #999; margin-bottom: 12px; }
+</style></head><body>
+<div class="wrap">
+  <div class="order-no">Order #${lead.order_number || lead.id}</div>
+  <div class="to-label">Deliver To</div>
+  <div class="name">${lead.customer_name || '—'}</div>
+  <div class="phone">${lead.customer_phone || ''}${lead.alt_phone ? ' / ' + lead.alt_phone : ''}</div>
+  <div class="address">${(lead.delivery_address || '—').replace(/\n/g, '<br/>')}</div>
+  <div class="from">From: ${sellerName || 'Seller'}</div>
+</div>
+<script>window.onload = function(){ window.print(); window.close(); }<\/script>
+</body></html>`);
+  win.document.close();
+}
+
+function printInvoice(lead, sellerProfile) {
+  const subtotal = (lead.price || 0) * (lead.quantity || 1);
+  const win = window.open('', '_blank', 'width=600,height=700');
+  if (!win) return;
+  win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 0; padding: 24px; color: #222; }
+  h1 { font-size: 22px; margin: 0 0 2px; color: #4338ca; }
+  .sub { font-size: 12px; color: #888; margin-bottom: 20px; }
+  .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+  .label { color: #666; }
+  .val { font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  th { background: #f3f4f6; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
+  .total-row td { font-weight: bold; font-size: 15px; border-top: 2px solid #222; border-bottom: none; }
+  .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #aaa; margin: 16px 0 6px; }
+  .divider { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+  .footer { font-size: 11px; color: #999; text-align: center; margin-top: 24px; }
+</style></head><body>
+<h1>${sellerProfile?.tenantName || 'Invoice'}</h1>
+<div class="sub">Invoice for Order #${lead.order_number || lead.id} &nbsp;·&nbsp; ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+<hr class="divider"/>
+<div class="section-title">Bill To</div>
+<div class="row"><span class="label">Name</span><span class="val">${lead.customer_name || '—'}</span></div>
+<div class="row"><span class="label">Phone</span><span class="val">${lead.customer_phone || '—'}${lead.alt_phone ? ' / ' + lead.alt_phone : ''}</span></div>
+<div class="row"><span class="label">Address</span><span class="val" style="text-align:right;max-width:65%">${(lead.delivery_address || '—').replace(/\n/g, ', ')}</span></div>
+<hr class="divider"/>
+<div class="section-title">Order Details</div>
+<table>
+  <thead><tr><th>Item</th><th>ID</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>${lead.product_name || '—'}</td>
+      <td style="color:#999;font-family:monospace;font-size:11px">${lead.product_id || '—'}</td>
+      <td style="text-align:center">${lead.quantity || 1}</td>
+      <td style="text-align:right">₹${(lead.price || 0).toLocaleString('en-IN')}</td>
+      <td style="text-align:right">₹${subtotal.toLocaleString('en-IN')}</td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr class="total-row"><td colspan="4">Total</td><td style="text-align:right">₹${subtotal.toLocaleString('en-IN')}</td></tr>
+  </tfoot>
+</table>
+${lead.tracking_id ? `<div class="row"><span class="label">Tracking ID</span><span class="val">${lead.tracking_id}</span></div>` : ''}
+${lead.payment_status ? `<div class="row"><span class="label">Payment</span><span class="val">${lead.payment_status === 'paid' ? '✓ Paid' : lead.payment_status === 'cod' ? 'Cash on Delivery' : 'Pending'}</span></div>` : ''}
+<div class="footer">Thank you for your order!</div>
+<script>window.onload = function(){ window.print(); window.close(); }<\/script>
+</body></html>`);
+  win.document.close();
+}
+
+// ── Sub-components ───────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const label = STATUS_OPTIONS.find(s => s.value === status)?.label || status;
   return (
@@ -45,16 +140,50 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function fmtCurrency(val) {
+  if (val == null || val === '') return '—';
+  return '₹' + Number(val).toLocaleString('en-IN');
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
 export default function Leads() {
   const { addToast } = useStore();
+
+  // List state
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState(null);
-  const [selectedLead, setSelectedLead] = useState(null);
 
+  // Panel state
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [updatingId, setUpdatingId] = useState(null);
+
+  // Seller profile for print
+  const [sellerProfile, setSellerProfile] = useState(null);
+
+  // Inline-edit state
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState('');
+  const [trackingValue, setTrackingValue] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [savingTracking, setSavingTracking] = useState(false);
+  const [savingPayment, setSavingPayment] = useState(false);
+
+  // Load leads
+  useEffect(() => { loadLeads(); }, []);
+
+  // Load seller profile for printing
   useEffect(() => {
-    loadLeads();
+    getHITLSettings().then(data => setSellerProfile(data)).catch(() => {});
   }, []);
+
+  // Sync inline-edit fields when panel lead changes
+  useEffect(() => {
+    if (selectedLead) {
+      setNotesValue(selectedLead.internal_notes || '');
+      setTrackingValue(selectedLead.tracking_id || '');
+      setEditingNotes(false);
+    }
+  }, [selectedLead?.id]);
 
   const loadLeads = async () => {
     setLoading(true);
@@ -69,16 +198,16 @@ export default function Leads() {
     }
   };
 
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
   const handleStatusChange = async (lead, newStatus) => {
     if (newStatus === lead.status) return;
     setUpdatingId(lead.id);
-    // Optimistic update in list and panel
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: newStatus } : l));
     setSelectedLead(prev => prev?.id === lead.id ? { ...prev, status: newStatus } : prev);
     try {
       await updateLeadStatus(lead.id, newStatus);
     } catch {
-      // Revert both
       setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: lead.status } : l));
       setSelectedLead(prev => prev?.id === lead.id ? { ...prev, status: lead.status } : prev);
       addToast('Failed to update status', 'error');
@@ -87,8 +216,60 @@ export default function Leads() {
     }
   };
 
-  const handleClosePanel = () => setSelectedLead(null);
+  const handleSaveNotes = async () => {
+    if (!selectedLead) return;
+    setSavingNotes(true);
+    try {
+      await updateOrderNotes(selectedLead.id, { internal_notes: notesValue });
+      setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, internal_notes: notesValue } : l));
+      setSelectedLead(prev => prev ? { ...prev, internal_notes: notesValue } : prev);
+      setEditingNotes(false);
+      addToast('Notes saved', 'success');
+    } catch {
+      addToast('Failed to save notes', 'error');
+    } finally {
+      setSavingNotes(false);
+    }
+  };
 
+  const handleSaveTracking = async () => {
+    if (!selectedLead) return;
+    setSavingTracking(true);
+    try {
+      await updateOrderTracking(selectedLead.id, { tracking_id: trackingValue });
+      setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, tracking_id: trackingValue } : l));
+      setSelectedLead(prev => prev ? { ...prev, tracking_id: trackingValue } : prev);
+      addToast('Tracking ID saved', 'success');
+    } catch {
+      addToast('Failed to save tracking ID', 'error');
+    } finally {
+      setSavingTracking(false);
+    }
+  };
+
+  const handlePaymentChange = async (paymentStatus) => {
+    if (!selectedLead || savingPayment) return;
+    setSavingPayment(true);
+    const prev = selectedLead.payment_status;
+    setSelectedLead(s => s ? { ...s, payment_status: paymentStatus } : s);
+    setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, payment_status: paymentStatus } : l));
+    try {
+      await updateOrderPayment(selectedLead.id, { payment_status: paymentStatus });
+    } catch {
+      setSelectedLead(s => s ? { ...s, payment_status: prev } : s);
+      setLeads(p => p.map(l => l.id === selectedLead.id ? { ...l, payment_status: prev } : l));
+      addToast('Failed to update payment', 'error');
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const handleClosePanel = () => {
+    setSelectedLead(null);
+    setEditingNotes(false);
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-6xl">
 
@@ -191,7 +372,7 @@ export default function Leads() {
         </div>
       )}
 
-      {/* ── Side Panel Overlay ── */}
+      {/* ── Overlay ── */}
       {selectedLead && (
         <div
           className="fixed inset-0 bg-gray-900 bg-opacity-40 z-40"
@@ -200,13 +381,20 @@ export default function Leads() {
       )}
 
       {/* ── Side Panel ── */}
-      <div className={`fixed top-0 right-0 h-full w-full md:w-[400px] bg-white shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out ${selectedLead ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed top-0 right-0 h-full w-full md:w-[420px] bg-white shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out ${selectedLead ? 'translate-x-0' : 'translate-x-full'}`}>
         {selectedLead && (
           <>
             {/* Panel header */}
-            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
               <div className="min-w-0">
-                <h2 className="text-lg font-bold text-gray-900 truncate">{selectedLead.customer_name || 'Lead Details'}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-gray-900 truncate">{selectedLead.customer_name || 'Lead Details'}</h2>
+                  {selectedLead.order_number && (
+                    <span className="flex-shrink-0 text-xs font-mono bg-gray-100 text-gray-500 rounded px-2 py-0.5">
+                      ORD-{selectedLead.order_number}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-400 mt-0.5">{fmtDate(selectedLead.created_at)}</p>
               </div>
               <button
@@ -220,13 +408,20 @@ export default function Leads() {
             </div>
 
             {/* Panel body */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
-              {/* Customer */}
+              {/* 1. Customer */}
               <section>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Customer</p>
                 <div className="bg-gray-50 rounded-lg px-4 py-3 space-y-1">
-                  <p className="text-sm font-semibold text-gray-900">{selectedLead.customer_name || '—'}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-gray-900">{selectedLead.customer_name || '—'}</p>
+                    {selectedLead.order_count > 1 && (
+                      <span className="text-xs bg-indigo-100 text-indigo-700 rounded-full px-2 py-0.5 font-semibold">
+                        Repeat customer
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-600">{selectedLead.customer_phone || '—'}</p>
                   {selectedLead.alt_phone && (
                     <p className="text-sm text-gray-500">Alt: {selectedLead.alt_phone}</p>
@@ -234,7 +429,7 @@ export default function Leads() {
                 </div>
               </section>
 
-              {/* Order */}
+              {/* 2. Order */}
               <section>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Order</p>
                 <div className="bg-gray-50 rounded-lg px-4 py-3 space-y-2">
@@ -249,23 +444,100 @@ export default function Leads() {
                   {selectedLead.product_id && (
                     <p className="text-xs font-mono text-gray-400">{selectedLead.product_id}</p>
                   )}
-                </div>
-              </section>
-
-              {/* Delivery */}
-              <section>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Delivery</p>
-                <div className="bg-gray-50 rounded-lg px-4 py-3 space-y-2">
-                  <p className="text-sm text-gray-700 leading-relaxed">{selectedLead.delivery_address || '—'}</p>
-                  {selectedLead.notes && (
-                    <p className="text-sm text-gray-500 italic border-t border-gray-200 pt-2 mt-2">{selectedLead.notes}</p>
+                  {selectedLead.price != null && (
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-200 mt-1">
+                      <p className="text-xs text-gray-500">Unit price</p>
+                      <p className="text-sm font-semibold text-gray-800">{fmtCurrency(selectedLead.price)}</p>
+                    </div>
+                  )}
+                  {selectedLead.price != null && selectedLead.quantity && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-gray-500">Subtotal</p>
+                      <p className="text-sm font-bold text-gray-900">{fmtCurrency(selectedLead.price * selectedLead.quantity)}</p>
+                    </div>
                   )}
                 </div>
               </section>
 
-              {/* Status */}
+              {/* 3. Delivery */}
               <section>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Status</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Delivery</p>
+                <div className="bg-gray-50 rounded-lg px-4 py-3 space-y-3">
+                  <p className="text-sm text-gray-700 leading-relaxed">{selectedLead.delivery_address || '—'}</p>
+                  {/* Tracking ID inline edit */}
+                  <div className="border-t border-gray-200 pt-3">
+                    <p className="text-xs text-gray-400 mb-1.5">Tracking ID</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={trackingValue}
+                        onChange={e => setTrackingValue(e.target.value)}
+                        placeholder="Enter tracking ID…"
+                        className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                      />
+                      <button
+                        onClick={handleSaveTracking}
+                        disabled={savingTracking || trackingValue === (selectedLead.tracking_id || '')}
+                        className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition"
+                      >
+                        {savingTracking ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* 4. Internal Notes */}
+              <section>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Internal Notes</p>
+                  {!editingNotes && (
+                    <button
+                      onClick={() => setEditingNotes(true)}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                    >
+                      {selectedLead.internal_notes ? 'Edit' : '+ Add'}
+                    </button>
+                  )}
+                </div>
+                {editingNotes ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={notesValue}
+                      onChange={e => setNotesValue(e.target.value)}
+                      rows={3}
+                      placeholder="Add internal notes visible only to your team…"
+                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSaveNotes}
+                        disabled={savingNotes}
+                        className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition"
+                      >
+                        {savingNotes ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => { setEditingNotes(false); setNotesValue(selectedLead.internal_notes || ''); }}
+                        className="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-lg px-4 py-3 min-h-[44px]">
+                    {selectedLead.internal_notes
+                      ? <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedLead.internal_notes}</p>
+                      : <p className="text-sm text-gray-400 italic">No notes added yet.</p>
+                    }
+                  </div>
+                )}
+              </section>
+
+              {/* 5. Order Status Pipeline */}
+              <section>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Order Status</p>
                 <div className="grid grid-cols-2 gap-2">
                   {STATUS_OPTIONS.map(opt => {
                     const isActive = (selectedLead.status || 'new') === opt.value;
@@ -274,7 +546,31 @@ export default function Leads() {
                         key={opt.value}
                         disabled={updatingId === selectedLead.id}
                         onClick={() => handleStatusChange(selectedLead, opt.value)}
-                        className={`py-2.5 rounded-lg text-sm font-semibold border transition disabled:opacity-50 ${isActive ? STATUS_PANEL_ACTIVE[opt.value] : STATUS_PANEL_IDLE[opt.value]}`}
+                        className={`py-2 rounded-lg text-xs font-semibold border transition disabled:opacity-50 ${isActive ? STATUS_PANEL_ACTIVE[opt.value] : STATUS_PANEL_IDLE[opt.value]}`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* 6. Payment */}
+              <section>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Payment</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'pending', label: 'Pending', active: 'bg-gray-600 text-white border-gray-600', idle: 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50' },
+                    { value: 'cod',     label: 'COD',     active: 'bg-amber-500 text-white border-amber-500', idle: 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50' },
+                    { value: 'paid',    label: 'Paid',    active: 'bg-green-600 text-white border-green-600', idle: 'bg-white text-green-600 border-green-200 hover:bg-green-50' },
+                  ].map(opt => {
+                    const isCurrent = (selectedLead.payment_status || 'pending') === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        disabled={savingPayment}
+                        onClick={() => handlePaymentChange(opt.value)}
+                        className={`py-2 rounded-lg text-xs font-semibold border transition disabled:opacity-50 ${isCurrent ? opt.active : opt.idle}`}
                       >
                         {opt.label}
                       </button>
@@ -286,7 +582,29 @@ export default function Leads() {
             </div>
 
             {/* Panel footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+            <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 space-y-2">
+              {/* Print buttons */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => printAddressLabel(selectedLead, sellerProfile?.tenantName)}
+                  className="flex items-center justify-center gap-1.5 py-2 text-sm font-semibold text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  Address Label
+                </button>
+                <button
+                  onClick={() => printInvoice(selectedLead, sellerProfile)}
+                  className="flex items-center justify-center gap-1.5 py-2 text-sm font-semibold text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Invoice
+                </button>
+              </div>
+              {/* Conversation link */}
               <Link
                 to="/conversations"
                 onClick={handleClosePanel}
