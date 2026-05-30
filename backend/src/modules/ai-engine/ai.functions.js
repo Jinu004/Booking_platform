@@ -123,6 +123,55 @@ function getFunctionDefinitions(industry) {
     }
   ]
 
+  if (industry === 'enquiry') {
+    return [
+      {
+        name: 'get_catalogue',
+        description: 'Get the full product catalogue with names, IDs, prices, descriptions and stock status. Call this when a customer asks about products, prices, or what is available.',
+        parameters: { type: 'OBJECT', properties: {}, required: [] }
+      },
+      {
+        name: 'get_product',
+        description: 'Get details of a specific product by product ID or name. Call this when customer asks about a specific item.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            query: { type: 'STRING', description: 'Product name or product ID to search for' }
+          },
+          required: ['query']
+        }
+      },
+      {
+        name: 'capture_lead',
+        description: 'Save a customer order/lead after collecting all required details. Call this ONLY after you have confirmed: customer name, product ID, quantity, and delivery address read back and confirmed by customer.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            customer_name: { type: 'STRING', description: 'Full name of the customer' },
+            product_id: { type: 'STRING', description: 'Product ID from the catalogue' },
+            product_name: { type: 'STRING', description: 'Product name' },
+            quantity: { type: 'INTEGER', description: 'Number of units ordered' },
+            delivery_address: { type: 'STRING', description: 'Full delivery address confirmed by customer' },
+            alt_phone: { type: 'STRING', description: 'Alternative phone number if provided, otherwise empty string' },
+            notes: { type: 'STRING', description: 'Any special instructions or notes, otherwise empty string' }
+          },
+          required: ['customer_name', 'product_id', 'product_name', 'quantity', 'delivery_address']
+        }
+      },
+      {
+        name: 'escalate_to_human',
+        description: 'Transfer the conversation to a human staff member. Call this when customer requests to talk to a person or when you cannot help.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            reason: { type: 'STRING', description: 'Brief reason for escalation' }
+          },
+          required: ['reason']
+        }
+      }
+    ]
+  }
+
   return commonFunctions
 }
 

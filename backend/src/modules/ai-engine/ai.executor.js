@@ -583,6 +583,65 @@ Reply CANCEL to cancel your booking.`
         return `ESCALATE:${reason}`
       }
 
+
+      case 'get_catalogue': {
+        const result = await pool.query(
+          'SELECT product_id, name, description, price, in_stock FROM catalogue_items WHERE tenant_id = $1 ORDER BY name',
+          [tenant.id]
+        )
+        if (!result.rows.length) {
+          return 'No products in catalogue yet.'
+        }
+        const lines = result.rows.map(p =>
+          `${p.in_stock ? '✅' : '❌'} [${p.product_id}] ${p.name} — ₹${parseFloat(p.price).toFixed(2)}\n   ${p.description || 'No description'}`
+        )
+        return 'Our products:\n\n' + lines.join('\n\n')
+      }
+
+      case 'get_product': {
+        const { query } = args
+        const result = await pool.query(
+          'SELECT product_id, name, description, price, in_stock FROM catalogue_items WHERE tenant_id = $1 AND (LOWER(name) LIKE LOWER($2) OR LOWER(product_id) LIKE LOWER($2)) LIMIT 1',
+          [tenant.id, `%${query}%`]
+        )
+        if (!result.rows.length) {
+          return `Sorry, I could not find a product matching "${query}". Type "catalogue" to see all available products.`
+        }
+        const p = result.rows[0]
+        return `*${p.name}* [${p.product_id}]
+💰 Price: ₹${parseFloat(p.price).toFixed(2)}
+📦 Status: ${p.in_stock ? 'In Stock ✅' : 'Out of Stock ❌'}
+📝 ${p.description || 'No description available'}`
+      }
+
+      case 'capture_lead': {
+        const { customer_name, product_id, product_name, quantity, delivery_address, alt_phone, notes } = args
+        await pool.query(
+          'INSERT INTO leads (tenant_id, customer_phone, customer_name, product_id, product_name, quantity, delivery_address, alt_phone, notes, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, \'new\')',
+          [
+            tenant.id,
+            customer.phone || customer.id,
+            customer_name,
+            product_id,
+            product_name,
+            quantity || 1,
+            delivery_address,
+            alt_phone || '',
+            notes || ''
+          ]
+        )
+        return `✅ Order confirmed!
+
+*Order Summary:*
+📦 Product: ${product_name} [${product_id}]
+🔢 Quantity: ${quantity}
+👤 Name: ${customer_name}
+📍 Delivery to: ${delivery_address}
+${alt_phone ? `📞 Contact: ${alt_phone}` : ''}
+
+Our team will contact you soon to confirm payment and delivery details. Thank you for your order! 🙏`
+      }
+
       default: {
         logger.warn('Unknown function called by Gemini:', name);
         return 'Function not available. Please respond with text only.';
