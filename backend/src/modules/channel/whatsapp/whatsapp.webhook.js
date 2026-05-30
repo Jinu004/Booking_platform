@@ -175,8 +175,8 @@ if (!isEscalated) {
         try {
           const pool = require('../../../config/database')
           const countResult = await pool.query(
-            'SELECT COUNT(*) FROM conversations WHERE tenant_id = $1 AND customer_id = $2',
-            [tenant.id, context.conversation.customer_id]
+            'SELECT COUNT(*) FROM conversations WHERE tenant_id = $1 AND customer_phone = $2',
+            [tenant.id, context.customer?.phone]
           )
           const convCount = parseInt(countResult.rows[0].count, 10)
           if (convCount === 1) {
