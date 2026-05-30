@@ -165,13 +165,16 @@ async function getHITLSettings(req, res, next) {
  */
 async function updateHITLSettings(req, res, next) {
   try {
-    const { working_hours, handoff_message, out_of_hours_message, ai_knowledge_base } = req.body
+    const { working_hours, handoff_message, out_of_hours_message, ai_knowledge_base, business_address, business_phone, business_email } = req.body
     const result = await pool.query(
       `UPDATE tenant_settings
        SET working_hours = COALESCE($1, working_hours),
            handoff_message = COALESCE($2, handoff_message),
            out_of_hours_message = COALESCE($3, out_of_hours_message),
            ai_knowledge_base = COALESCE($5, ai_knowledge_base),
+           business_address = COALESCE($6, business_address),
+           business_phone = COALESCE($7, business_phone),
+           business_email = COALESCE($8, business_email),
            updated_at = NOW()
        WHERE tenant_id = $4
        RETURNING *`,
@@ -180,7 +183,10 @@ async function updateHITLSettings(req, res, next) {
         handoff_message || null,
         out_of_hours_message || null,
         req.tenantId,
-        ai_knowledge_base !== undefined ? ai_knowledge_base : null
+        ai_knowledge_base !== undefined ? ai_knowledge_base : null,
+        business_address !== undefined ? business_address : null,
+        business_phone !== undefined ? business_phone : null,
+        business_email !== undefined ? business_email : null
       ]
     )
     if (!result.rows.length) {

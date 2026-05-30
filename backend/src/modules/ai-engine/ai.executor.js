@@ -616,8 +616,22 @@ Reply CANCEL to cancel your booking.`
 
       case 'capture_lead': {
         const { customer_name, product_id, product_name, quantity, delivery_address, alt_phone, notes } = args
+        let unitPrice = 0
+        let orderTotal = 0
+        if (product_id) {
+          try {
+            const priceResult = await pool.query(
+              'SELECT price FROM catalogue_items WHERE tenant_id = $1 AND product_id = $2',
+              [tenant.id, product_id]
+            )
+            if (priceResult.rows.length) {
+              unitPrice = parseFloat(priceResult.rows[0].price) || 0
+              orderTotal = unitPrice * (quantity || 1)
+            }
+          } catch (e) {}
+        }
         await pool.query(
-          'INSERT INTO leads (tenant_id, customer_phone, customer_name, product_id, product_name, quantity, delivery_address, alt_phone, notes, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, \'new\')',
+          'INSERT INTO leads (tenant_id, customer_phone, customer_name, product_id, product_name, quantity, delivery_address, alt_phone, notes, status, unit_price, order_total) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, \'new\', $10, $11)',
           [
             tenant.id,
             customer.phone || customer.id,
@@ -627,7 +641,9 @@ Reply CANCEL to cancel your booking.`
             quantity || 1,
             delivery_address,
             alt_phone || '',
-            notes || ''
+            notes || '',
+            unitPrice,
+            orderTotal
           ]
         )
         return `✅ Order confirmed!
@@ -635,6 +651,8 @@ Reply CANCEL to cancel your booking.`
 *Order Summary:*
 📦 Product: ${product_name} [${product_id}]
 🔢 Quantity: ${quantity}
+💰 Unit Price: ₹${unitPrice}
+💵 Order Total: ₹${orderTotal}
 👤 Name: ${customer_name}
 📍 Delivery to: ${delivery_address}
 ${alt_phone ? `📞 Contact: ${alt_phone}` : ''}

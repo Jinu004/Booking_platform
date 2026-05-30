@@ -39,7 +39,7 @@ async function updateLeadStatus(req, res, next) {
     if (!status) {
       return errorResponse(res, 'status is required', 400)
     }
-    const allowed = ['new', 'contacted', 'qualified', 'converted', 'lost']
+    const allowed = ['new', 'confirmed', 'printing', 'ready', 'shipped', 'delivered', 'cancelled']
     if (!allowed.includes(status)) {
       return errorResponse(res, 'Invalid status', 400)
     }
@@ -57,4 +57,64 @@ async function updateLeadStatus(req, res, next) {
   }
 }
 
-module.exports = { listLeads, createLead, updateLeadStatus }
+
+async function updateOrderPayment(req, res, next) {
+  try {
+    const { id } = req.params
+    const { payment_status, payment_method } = req.body
+    const allowed_status = ['unpaid', 'paid', 'cod']
+    const allowed_method = ['upi', 'cash', 'bank_transfer', 'cod', '']
+    if (payment_status && !allowed_status.includes(payment_status)) {
+      return errorResponse(res, 'Invalid payment status', 400)
+    }
+    if (payment_method !== undefined && !allowed_method.includes(payment_method)) {
+      return errorResponse(res, 'Invalid payment method', 400)
+    }
+    const result = await pool.query(
+      `UPDATE leads SET 
+        payment_status = COALESCE($1, payment_status),
+        payment_method = COALESCE($2, payment_method)
+       WHERE id = $3 AND tenant_id = $4 RETURNING *`,
+      [payment_status || null, payment_method !== undefined ? payment_method : null, id, req.tenantId]
+    )
+    if (!result.rows.length) return errorResponse(res, 'Order not found', 404)
+    return successResponse(res, result.rows[0])
+  } catch (err) {
+    logger.error('updateOrderPayment failed:', err.message)
+    next(err)
+  }
+}
+
+async function updateOrderNotes(req, res, next) {
+  try {
+    const { id } = req.params
+    const { internal_notes } = req.body
+    const result = await pool.query(
+      'UPDATE leads SET internal_notes = $1 WHERE id = $2 AND tenant_id = $3 RETURNING *',
+      [internal_notes || '', id, req.tenantId]
+    )
+    if (!result.rows.length) return errorResponse(res, 'Order not found', 404)
+    return successResponse(res, result.rows[0])
+  } catch (err) {
+    logger.error('updateOrderNotes failed:', err.message)
+    next(err)
+  }
+}
+
+async function updateOrderTracking(req, res, next) {
+  try {
+    const { id } = req.params
+    const { tracking_id } = req.body
+    const result = await pool.query(
+      'UPDATE leads SET tracking_id = $1 WHERE id = $2 AND tenant_id = $3 RETURNING *',
+      [tracking_id || '', id, req.tenantId]
+    )
+    if (!result.rows.length) return errorResponse(res, 'Order not found', 404)
+    return successResponse(res, result.rows[0])
+  } catch (err) {
+    logger.error('updateOrderTracking failed:', err.message)
+    next(err)
+  }
+}
+
+module.exports = { listLeads, createLead, updateLeadStatus, updateOrderPayment, updateOrderNotes, updateOrderTracking }
