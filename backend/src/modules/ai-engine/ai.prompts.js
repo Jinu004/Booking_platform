@@ -240,8 +240,6 @@ If the patient explicitly asks to speak to a real person, staff, doctor, or rece
 `
 }
 
-/**
-
 function getEnquiryPrompt(tenant, configs, additionalData = {}) {
   const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
   const todayDate = nowIST.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata' })
@@ -329,13 +327,6 @@ DO NOT:
 - Promise specific delivery dates unless the knowledge base specifies them
 - Capture an order without completing the address read-back step`
 }
- * Gets correct system prompt for tenant industry
- *
- * @param {object} tenant
- * @param {object} configs
- * @param {object} additionalData
- * @returns {string}
- */
 function getSystemPrompt(tenant, configs, additionalData = {}) {
   switch (tenant.industry) {
     case 'clinic':
