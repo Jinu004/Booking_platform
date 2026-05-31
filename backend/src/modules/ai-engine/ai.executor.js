@@ -323,6 +323,26 @@ Please reply with your name to confirm booking.`
   // Create today's booking inside a transaction.
   // A FOR UPDATE lock on the doctor row serialises concurrent
   // WhatsApp bookings so the subquery token count is race-free.
+  // Find or create patient record
+  let patientId = null;
+  if (customer?.id && formattedName) {
+    const existingPatient = await pool.query(
+      `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
+      [tenant.id, customer.id, formattedName]
+    );
+    if (existingPatient.rows.length > 0) {
+      patientId = existingPatient.rows[0].id;
+    } else {
+      const newPatient = await pool.query(
+        `INSERT INTO patients (tenant_id, customer_id, name, phone)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
+        [tenant.id, customer.id, formattedName, customer.phone]
+      );
+      patientId = newPatient.rows[0].id;
+    }
+  }
   const bookingClient = await pool.connect()
   let tokenNumber, booking
   try {
@@ -334,13 +354,13 @@ Please reply with your name to confirm booking.`
     const bookingRes = await bookingClient.query(
       `INSERT INTO bookings
          (tenant_id, customer_id, conversation_id, doctor_id,
-          source, status, booking_date, token_number, notes, patient_name)
+          source, status, booking_date, token_number, notes, patient_name, patient_id)
        VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE,
          (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled'),
-         $5, $6)
+         $5, $6, $7)
        RETURNING id, token_number`,
       [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
-       `Booked via WhatsApp for ${formattedName}`, formattedName]
+       `Booked via WhatsApp for ${formattedName}`, formattedName, patientId]
     )
     tokenNumber = bookingRes.rows[0].token_number
     booking = bookingRes.rows[0]
@@ -485,6 +505,26 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
 
         // Create tomorrow booking inside a transaction with a FOR UPDATE
         // lock on the doctor row to prevent duplicate token numbers.
+        // Find or create patient record
+        let patientId = null;
+        if (customer?.id && formattedName) {
+          const existingPatient = await pool.query(
+            `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
+            [tenant.id, customer.id, formattedName]
+          );
+          if (existingPatient.rows.length > 0) {
+            patientId = existingPatient.rows[0].id;
+          } else {
+            const newPatient = await pool.query(
+              `INSERT INTO patients (tenant_id, customer_id, name, phone)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
+               RETURNING id`,
+              [tenant.id, customer.id, formattedName, customer.phone]
+            );
+            patientId = newPatient.rows[0].id;
+          }
+        }
         const tomorrowClient = await pool.connect()
         let tokenNumber, booking
         try {
@@ -496,13 +536,13 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
           const bookingRes = await tomorrowClient.query(
             `INSERT INTO bookings
                (tenant_id, customer_id, conversation_id, doctor_id,
-                source, status, booking_date, token_number, notes, patient_name)
+                source, status, booking_date, token_number, notes, patient_name, patient_id)
              VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', $5,
                (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
-               $6, $7)
+               $6, $7, $8)
              RETURNING id, token_number`,
             [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
-             tomorrowDate, `Booked via WhatsApp for ${formattedName}`, formattedName]
+             tomorrowDate, `Booked via WhatsApp for ${formattedName}`, formattedName, patientId]
           )
           tokenNumber = bookingRes.rows[0].token_number
           booking = bookingRes.rows[0]
