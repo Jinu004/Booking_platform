@@ -147,7 +147,7 @@ async function sendManualMessage(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
-    const { message } = req.body;
+    const message = req.body.message || req.body.content;
     if (!message || !message.trim()) {
       return res.status(400).json({ success: false, error: 'Message content is required' });
     }
