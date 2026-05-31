@@ -223,6 +223,12 @@ export default function Conversations() {
 
     try {
       await api.post(`/conversations/${selectedConversation.id}/message`, { content });
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'staff',
+        content: content,
+        created_at: new Date().toISOString()
+      }]);
     } catch (err) {
       setReplyText(content);
       addToast('Failed to send message', 'error');
