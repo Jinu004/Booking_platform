@@ -601,7 +601,7 @@ Reply CANCEL to cancel your booking.`
       case 'get_product': {
         const { query } = args
         const result = await pool.query(
-          'SELECT product_id, name, description, price, in_stock FROM catalogue_items WHERE tenant_id = $1 AND (LOWER(name) LIKE LOWER($2) OR LOWER(product_id) LIKE LOWER($2)) LIMIT 1',
+          'SELECT product_id, name, description, price, in_stock FROM catalogue_items WHERE tenant_id = $1 AND (LOWER(name) LIKE LOWER($2) OR LOWER(product_id) LIKE LOWER($2) OR LOWER(REPLACE(name, \' \', \'\')) LIKE LOWER(REPLACE($2, \' \', \'\'))) LIMIT 1',
           [tenant.id, `%${query}%`]
         )
         if (!result.rows.length) {
