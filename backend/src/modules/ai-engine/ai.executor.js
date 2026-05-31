@@ -630,8 +630,13 @@ Reply CANCEL to cancel your booking.`
             }
           } catch (e) {}
         }
+        const duplicateCheck = await pool.query(
+          `SELECT id FROM leads WHERE tenant_id = $1 AND customer_phone = $2 AND product_id = $3 AND created_at >= NOW() - INTERVAL '24 hours' LIMIT 1`,
+          [tenant.id, customer.phone || customer.id, product_id]
+        )
+        const isDuplicate = duplicateCheck.rows.length > 0
         await pool.query(
-          'INSERT INTO leads (tenant_id, customer_phone, customer_name, product_id, product_name, quantity, delivery_address, alt_phone, notes, status, unit_price, order_total) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, \'new\', $10, $11)',
+          'INSERT INTO leads (tenant_id, customer_phone, customer_name, product_id, product_name, quantity, delivery_address, alt_phone, notes, status, unit_price, order_total, is_duplicate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, \'new\', $10, $11, $12)',
           [
             tenant.id,
             customer.phone || customer.id,
@@ -643,7 +648,8 @@ Reply CANCEL to cancel your booking.`
             alt_phone || '',
             notes || '',
             unitPrice,
-            orderTotal
+            orderTotal,
+            isDuplicate
           ]
         )
         return `✅ Order confirmed!
