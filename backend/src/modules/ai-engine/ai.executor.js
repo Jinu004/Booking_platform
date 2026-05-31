@@ -325,23 +325,28 @@ Please reply with your name to confirm booking.`
   // WhatsApp bookings so the subquery token count is race-free.
   // Find or create patient record
   let patientId = null;
-  if (customer?.id && formattedName) {
-    const existingPatient = await pool.query(
-      `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
-      [tenant.id, customer.id, formattedName]
-    );
-    if (existingPatient.rows.length > 0) {
-      patientId = existingPatient.rows[0].id;
-    } else {
-      const newPatient = await pool.query(
-        `INSERT INTO patients (tenant_id, customer_id, name, phone)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
-         RETURNING id`,
-        [tenant.id, customer.id, formattedName, customer.phone]
+  try {
+    if (customer?.id && formattedName) {
+      const existingPatient = await pool.query(
+        `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
+        [tenant.id, customer.id, formattedName]
       );
-      patientId = newPatient.rows[0].id;
+      if (existingPatient.rows.length > 0) {
+        patientId = existingPatient.rows[0].id;
+      } else {
+        const newPatient = await pool.query(
+          `INSERT INTO patients (tenant_id, customer_id, name, phone)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
+           RETURNING id`,
+          [tenant.id, customer.id, formattedName, customer.phone]
+        );
+        patientId = newPatient.rows[0].id;
+      }
     }
+  } catch (patientErr) {
+    logger.warn('Patient find-or-create failed (non-fatal), booking will proceed without patient_id:', patientErr.message);
+    patientId = null;
   }
   const bookingClient = await pool.connect()
   let tokenNumber, booking
@@ -507,23 +512,28 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
         // lock on the doctor row to prevent duplicate token numbers.
         // Find or create patient record
         let patientId = null;
-        if (customer?.id && formattedName) {
-          const existingPatient = await pool.query(
-            `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
-            [tenant.id, customer.id, formattedName]
-          );
-          if (existingPatient.rows.length > 0) {
-            patientId = existingPatient.rows[0].id;
-          } else {
-            const newPatient = await pool.query(
-              `INSERT INTO patients (tenant_id, customer_id, name, phone)
-               VALUES ($1, $2, $3, $4)
-               ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
-               RETURNING id`,
-              [tenant.id, customer.id, formattedName, customer.phone]
+        try {
+          if (customer?.id && formattedName) {
+            const existingPatient = await pool.query(
+              `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
+              [tenant.id, customer.id, formattedName]
             );
-            patientId = newPatient.rows[0].id;
+            if (existingPatient.rows.length > 0) {
+              patientId = existingPatient.rows[0].id;
+            } else {
+              const newPatient = await pool.query(
+                `INSERT INTO patients (tenant_id, customer_id, name, phone)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
+                 RETURNING id`,
+                [tenant.id, customer.id, formattedName, customer.phone]
+              );
+              patientId = newPatient.rows[0].id;
+            }
           }
+        } catch (patientErr) {
+          logger.warn('Patient find-or-create failed (non-fatal), booking will proceed without patient_id:', patientErr.message);
+          patientId = null;
         }
         const tomorrowClient = await pool.connect()
         let tokenNumber, booking
