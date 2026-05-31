@@ -148,6 +148,9 @@ async function sendManualMessage(req, res, next) {
     const tenantId = req.tenant.id;
     const { id } = req.params;
     const { message } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, error: 'Message content is required' });
+    }
     const conversation = await ConversationModel.getConversationById(pool, tenantId, id);
     if (!conversation) {
       return res.status(404).json({ success: false, error: 'Conversation not found' });
