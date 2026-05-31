@@ -1,0 +1,2 @@
+ALTER TABLE tenant_settings ADD COLUMN IF NOT EXISTS payment_upi VARCHAR(100) DEFAULT '';
+ALTER TABLE tenant_settings ADD COLUMN IF NOT EXISTS payment_phone VARCHAR(20) DEFAULT '';

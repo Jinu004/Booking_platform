@@ -257,6 +257,11 @@ CURRENT DATE & TIME (IST): ${todayDate}, ${currentTime}
 BUSINESS INFORMATION:
 Name: ${tenant.name}
 Type: Online sales and product enquiry
+${additionalData.businessAddress ? `Address: ${additionalData.businessAddress}` : ''}
+${additionalData.businessPhone ? `Phone: ${additionalData.businessPhone}` : ''}
+${additionalData.businessEmail ? `Email: ${additionalData.businessEmail}` : ''}
+${additionalData.paymentUpi ? `UPI ID for payments: ${additionalData.paymentUpi}` : ''}
+${additionalData.paymentPhone ? `Payment phone (GPay/PhonePe): ${additionalData.paymentPhone}` : ''}
 ${knowledgeBlock}
 
 YOUR ROLE:
@@ -309,6 +314,11 @@ Example: Jinu Joy, Rose Villa, Mangad, Kollam 691015"
    If the customer voluntarily includes a phone number in their reply, save it as alt_phone. Otherwise set alt_phone to empty string.
 Step 3: Call capture_lead immediately with all collected details.
    After order confirmation, include this line: "We'll use this WhatsApp number to contact you for delivery updates."
+   If UPI ID or payment phone is available in BUSINESS INFORMATION, include payment details in the confirmation:
+   → "💳 Pay ₹[total] via UPI: [upi_id]" (if UPI ID exists)
+   → "Or GPay/PhonePe to: [payment_phone]" (if payment phone exists)
+   Calculate the total as quantity × product price.
+   If neither UPI nor payment phone is set, skip the payment line entirely.
 NEVER ask for name and address in separate messages.
 NEVER do an address read-back or confirmation step.
 NEVER ask for an alternative phone number.

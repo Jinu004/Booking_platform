@@ -75,12 +75,20 @@ async function processMessage(context) {
     if ((tenant.plan === 'growth' || tenant.plan === 'pro') && (tenant.industry === 'clinic' || tenant.industry === 'enquiry')) {
       try {
         const kbResult = await pool.query(
-          'SELECT ai_knowledge_base FROM tenant_settings WHERE tenant_id = $1',
+          'SELECT ai_knowledge_base, business_address, business_phone, business_email, payment_upi, payment_phone FROM tenant_settings WHERE tenant_id = $1',
           [tenant.id]
         )
-        const kb = kbResult.rows[0]?.ai_knowledge_base
+        const row = kbResult.rows[0]
+        const kb = row?.ai_knowledge_base
         if (kb && kb.trim()) {
           additionalData.knowledgeBase = kb.trim()
+        }
+        if (row) {
+          additionalData.businessAddress = row.business_address || ''
+          additionalData.businessPhone = row.business_phone || ''
+          additionalData.businessEmail = row.business_email || ''
+          additionalData.paymentUpi = row.payment_upi || ''
+          additionalData.paymentPhone = row.payment_phone || ''
         }
       } catch (err) {
         logger.warn('Failed to fetch knowledge base for prompt:', err.message)
