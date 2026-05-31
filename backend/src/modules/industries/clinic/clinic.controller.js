@@ -223,6 +223,7 @@ async function deleteDoctor(req, res, next) {
     const result = await pool.query(
       `UPDATE clinic_doctors
        SET available_today = false,
+           is_active = false,
            leave_days = $3
        WHERE id = $1 AND tenant_id = $2
        RETURNING *`,

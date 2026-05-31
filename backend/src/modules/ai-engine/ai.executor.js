@@ -58,7 +58,7 @@ async function executeFunction(name, args, ctx) {
              AND b.booking_date = CURRENT_DATE
              AND b.status != 'cancelled'
            WHERE cd.tenant_id = $1
-             AND cd.available_today = true
+             AND cd.available_today = true AND cd.is_active = true
            GROUP BY cd.id
            ORDER BY cd.name ASC`,
           [tenant.id]
@@ -111,7 +111,7 @@ const doctorList = doctorsResult.rows.map(doc => {
              ON dl.doctor_id = cd.id
              AND dl.leave_date = $3
            WHERE cd.tenant_id = $1
-             AND dl.id IS NULL
+             AND cd.is_active = true AND dl.id IS NULL
            GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
                     ds.start_time, ds.end_time
            ORDER BY cd.name ASC`,
@@ -151,7 +151,7 @@ const doctorList = doctorsResult.rows.map(doc => {
              AND b.booking_date = CURRENT_DATE
              AND b.status != 'cancelled'
            WHERE cd.tenant_id = $1
-             AND LOWER(cd.name) LIKE LOWER($2)
+             AND LOWER(cd.name) LIKE LOWER($2) AND cd.is_active = true
            GROUP BY cd.id`,
           [tenant.id, `%${doctor_name}%`]
         )
@@ -276,7 +276,7 @@ Please reply with your name to confirm booking.`
   // Find doctor
   const doctorRes = await pool.query(
     `SELECT id, name, specialization, max_tokens_daily FROM clinic_doctors
-     WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND available_today = true
+     WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND available_today = true AND is_active = true
      LIMIT 1`,
     [tenant.id, `%${doctor_name}%`]
   )
@@ -442,7 +442,7 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
         // Find doctor
         const doctorRes = await pool.query(
           `SELECT id, name, specialization, max_tokens_daily FROM clinic_doctors
-           WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2)
+           WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND is_active = true
            LIMIT 1`,
           [tenant.id, `%${doctor_name}%`]
         )

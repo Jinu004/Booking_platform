@@ -8,7 +8,7 @@ const tenantQuery = require('../../../utils/tenantQuery');
  * @returns {Promise<Array>}
  */
 async function getDoctors(pool, tenantId, availableOnly) {
-  let sql = `SELECT * FROM clinic_doctors WHERE tenant_id = $1 AND leave_days != 999`;
+  let sql = `SELECT * FROM clinic_doctors WHERE tenant_id = $1 AND leave_days != 999 AND is_active = true`;
   const params = [];
   let paramCount = 2;
 
