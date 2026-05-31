@@ -35,6 +35,8 @@ export default function Settings() {
     business_address: '',
     business_phone: '',
     business_email: '',
+    payment_upi: '',
+    payment_phone: '',
   });
 
   const [clinic, setClinic] = useState({ opening_time: '09:00', closing_time: '18:00', address: '' });
@@ -84,6 +86,8 @@ export default function Settings() {
           business_address: hitlData?.business_address || '',
           business_phone:   hitlData?.business_phone   || '',
           business_email:   hitlData?.business_email   || '',
+          payment_upi:      hitlData?.payment_upi      || '',
+          payment_phone:    hitlData?.payment_phone    || '',
         });
       })
       .catch(() => { })
@@ -139,6 +143,8 @@ export default function Settings() {
         business_address: businessProfile.business_address,
         business_phone:   businessProfile.business_phone,
         business_email:   businessProfile.business_email,
+        payment_upi:      businessProfile.payment_upi,
+        payment_phone:    businessProfile.payment_phone,
       });
       addToast('Business profile saved', 'success');
     } catch {
@@ -380,6 +386,32 @@ export default function Settings() {
                       placeholder="orders@yourbusiness.com"
                     />
                   </div>
+
+                  <div className="border-t border-gray-100 pt-4">
+                    <p className="text-sm font-semibold text-gray-800">Payment Details</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Customers will see these in order confirmations</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">UPI ID (for payments)</label>
+                    <input
+                      type="text"
+                      value={businessProfile.payment_upi}
+                      onChange={e => setBusinessProfile(p => ({ ...p, payment_upi: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="yourname@ybl"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Phone (GPay/PhonePe)</label>
+                    <input
+                      type="text"
+                      value={businessProfile.payment_phone}
+                      onChange={e => setBusinessProfile(p => ({ ...p, payment_phone: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="9876543210"
+                    />
+                  </div>
+
                   <div className="flex justify-end pt-2">
                     <button
                       onClick={handleSaveBusinessProfile}
