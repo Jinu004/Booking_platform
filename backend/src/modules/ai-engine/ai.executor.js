@@ -356,6 +356,10 @@ Please reply with your name to confirm booking.`
   } finally {
     bookingClient.release()
   }
+  await pool.query(
+    `UPDATE customers SET name = $1 WHERE tenant_id = $2 AND phone = $3`,
+    [args.patient_name, tenant.id, customer.phone]
+  )
 
   // Fetch doctor's actual session start time for today (IST day-of-week)
   const todayDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
@@ -518,6 +522,10 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
         } finally {
           tomorrowClient.release()
         }
+        await pool.query(
+          `UPDATE customers SET name = $1 WHERE tenant_id = $2 AND phone = $3`,
+          [args.patient_name, tenant.id, customer.phone]
+        )
 
         return `Booking confirmed for tomorrow! 🏥
 Token Number: ${tokenNumber}
@@ -651,6 +659,10 @@ Reply CANCEL to cancel your booking.`
             orderTotal,
             isDuplicate
           ]
+        )
+        await pool.query(
+          `UPDATE customers SET name = $1 WHERE tenant_id = $2 AND phone = $3`,
+          [args.customer_name, tenant.id, customer.phone]
         )
         return `✅ Order confirmed!
 
