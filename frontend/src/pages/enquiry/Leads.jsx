@@ -317,8 +317,13 @@ export default function Leads() {
                   </div>
                   <p className="text-sm text-gray-700">{lead.quantity ?? '—'}</p>
                   <p className="text-sm text-gray-600 truncate" title={lead.delivery_address}>{lead.delivery_address || '—'}</p>
-                  <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <StatusBadge status={lead.status || 'new'} />
+                    {lead.is_duplicate && (
+                      <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                        Possible Duplicate
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-400">{fmtDate(lead.created_at)}</p>
                 </div>
@@ -334,6 +339,11 @@ export default function Leads() {
                       )}
                     </div>
                     <StatusBadge status={lead.status || 'new'} />
+                    {lead.is_duplicate && (
+                      <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                        Possible Duplicate
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-medium text-gray-700">{lead.product_name || '—'}</span>
@@ -370,11 +380,16 @@ export default function Leads() {
             {/* Panel header */}
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-base font-bold text-gray-900 truncate">{selectedLead.customer_name || 'Lead Details'}</h2>
                   {selectedLead.order_number && (
                     <span className="flex-shrink-0 text-xs font-mono bg-gray-100 text-gray-500 rounded px-2 py-0.5">
                       ORD-{selectedLead.order_number}
+                    </span>
+                  )}
+                  {selectedLead.is_duplicate && (
+                    <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                      Possible Duplicate
                     </span>
                   )}
                 </div>
