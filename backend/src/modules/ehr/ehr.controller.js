@@ -106,7 +106,7 @@ async function createPatient(req, res) {
   if (!name || !name.trim()) {
     return res.status(400).json({ success: false, error: 'Patient name is required' });
   }
-  if (!phone || !normalizedPhone) {
+  if (!phone || !phone.trim()) {
     return res.status(400).json({ success: false, error: 'Phone number is required' });
   }
 
