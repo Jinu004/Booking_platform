@@ -4,6 +4,7 @@ import { getEHRPatients } from '../services/ehr.service';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import { TableRowSkeleton } from '../components/shared/Skeleton';
+import api from '../utils/api';
 
 const AVATAR_COLORS = [
   'bg-indigo-100 text-indigo-700',
@@ -65,6 +66,12 @@ export default function Patients() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
+  const [showAddPatient, setShowAddPatient] = useState(false);
+  const [addPatientPhone, setAddPatientPhone] = useState('');
+  const [addPatientSearch, setAddPatientSearch] = useState(null); // null = not searched yet, [] = no results
+  const [addPatientSearching, setAddPatientSearching] = useState(false);
+  const [addPatientForm, setAddPatientForm] = useState({ name: '', age: '', gender: '', blood_group: '' });
+  const [addPatientSaving, setAddPatientSaving] = useState(false);
 
   useEffect(() => {
     if (!isPro) return;
@@ -85,6 +92,50 @@ export default function Patients() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearchPhone = async () => {
+    if (!addPatientPhone.trim()) return;
+    setAddPatientSearching(true);
+    try {
+      const res = await api.get(`/ehr/patients?search=${addPatientPhone.trim()}`);
+      setAddPatientSearch(res.data?.customers || []);
+    } catch (err) {
+      setAddPatientSearch([]);
+    } finally {
+      setAddPatientSearching(false);
+    }
+  };
+
+  const handleAddPatient = async () => {
+    if (!addPatientForm.name.trim() || !addPatientPhone.trim()) return;
+    setAddPatientSaving(true);
+    try {
+      await api.post('/ehr/patients', {
+        name: addPatientForm.name.trim(),
+        phone: addPatientPhone.trim(),
+        age: addPatientForm.age || null,
+        gender: addPatientForm.gender || null,
+        blood_group: addPatientForm.blood_group || null
+      });
+      addToast('Patient added successfully', 'success');
+      setShowAddPatient(false);
+      setAddPatientPhone('');
+      setAddPatientSearch(null);
+      setAddPatientForm({ name: '', age: '', gender: '', blood_group: '' });
+      fetchPatients();
+    } catch (err) {
+      addToast('Failed to add patient', 'error');
+    } finally {
+      setAddPatientSaving(false);
+    }
+  };
+
+  const handleCloseAddPatient = () => {
+    setShowAddPatient(false);
+    setAddPatientPhone('');
+    setAddPatientSearch(null);
+    setAddPatientForm({ name: '', age: '', gender: '', blood_group: '' });
   };
 
   if (!isPro) {
@@ -136,13 +187,24 @@ export default function Patients() {
             <span className="text-sm text-blue-600 font-medium">{returningCount} returning</span>
           </div>
         </div>
-        <input
-          type="text"
-          placeholder="Search name or phone..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-        />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowAddPatient(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Patient
+          </button>
+          <input
+            type="text"
+            placeholder="Search name or phone..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+          />
+        </div>
       </div>
 
       {/* Filter tabs */}
@@ -271,6 +333,143 @@ export default function Patients() {
             >
               Next →
             </button>
+          </div>
+        </div>
+      )}
+      {showAddPatient && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Add Patient</h2>
+              <button onClick={handleCloseAddPatient} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Step 1 — Phone search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Phone Number</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={addPatientPhone}
+                    onChange={e => { setAddPatientPhone(e.target.value); setAddPatientSearch(null); }}
+                    placeholder="+919876543210"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button
+                    onClick={handleSearchPhone}
+                    disabled={addPatientSearching || !addPatientPhone.trim()}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                  >
+                    {addPatientSearching ? 'Searching...' : 'Search'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Existing patients under this number */}
+              {addPatientSearch !== null && (
+                <div>
+                  {addPatientSearch.length > 0 ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <p className="text-xs font-medium text-amber-800 mb-2">Existing patients under this number:</p>
+                      {addPatientSearch.map(p => (
+                        <div key={p.id} className="flex items-center justify-between py-1">
+                          <span className="text-sm text-amber-900">{p.name}</span>
+                          <button
+                            onClick={() => navigate(`/patients/${p.id}`)}
+                            className="text-xs text-indigo-600 hover:underline"
+                          >
+                            View Profile
+                          </button>
+                        </div>
+                      ))}
+                      <p className="text-xs text-amber-700 mt-2">You can add another patient under the same number below.</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">No existing patients found for this number. A new customer record will be created.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Step 2 — Patient details (show after search) */}
+              {addPatientSearch !== null && (
+                <div className="space-y-3 border-t border-gray-100 pt-4">
+                  <p className="text-sm font-medium text-gray-700">New Patient Details</p>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
+                    <input
+                      type="text"
+                      value={addPatientForm.name}
+                      onChange={e => setAddPatientForm(p => ({ ...p, name: e.target.value }))}
+                      placeholder="Patient full name"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Age</label>
+                      <input
+                        type="number"
+                        value={addPatientForm.age}
+                        onChange={e => setAddPatientForm(p => ({ ...p, age: e.target.value }))}
+                        placeholder="Age"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Gender</label>
+                      <select
+                        value={addPatientForm.gender}
+                        onChange={e => setAddPatientForm(p => ({ ...p, gender: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="">-</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Blood Group</label>
+                      <select
+                        value={addPatientForm.blood_group}
+                        onChange={e => setAddPatientForm(p => ({ ...p, blood_group: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="">-</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {addPatientSearch !== null && (
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+                <button onClick={handleCloseAddPatient} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+                <button
+                  onClick={handleAddPatient}
+                  disabled={addPatientSaving || !addPatientForm.name.trim()}
+                  className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {addPatientSaving ? 'Saving...' : 'Add Patient'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
