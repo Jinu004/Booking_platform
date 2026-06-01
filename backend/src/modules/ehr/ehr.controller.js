@@ -2,6 +2,9 @@ const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 
+// HTML tag stripper — prevents stored XSS in free-text fields
+const stripHtml = (str) => str ? str.replace(/<[^>]*>/g, '').trim() : str;
+
 // UUID v4 format validation helper
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
@@ -184,10 +187,13 @@ async function addCondition(req, res, next) {
     const { type, name, notes } = req.body;
     if (!type || !name) return errorResponse(res, 'Type and name are required', 400);
     if (!['condition', 'allergy', 'medication'].includes(type)) return errorResponse(res, 'Invalid type', 400);
+    if (!name || !name.trim()) return res.status(400).json({ success: false, error: 'Condition name is required' });
+    if (name.length > 500) return res.status(400).json({ success: false, error: 'Name too long (max 500 chars)' });
+    if (notes && notes.length > 1000) return res.status(400).json({ success: false, error: 'Notes too long (max 1000 chars)' });
     const result = await pool.query(`
       INSERT INTO patient_conditions (tenant_id, patient_id, type, name, notes)
       VALUES ($1, $2, $3, $4, $5) RETURNING *
-    `, [req.tenantId, patientId, type, name, notes || null]);
+    `, [req.tenantId, patientId, type, stripHtml(name), notes ? stripHtml(notes) : null]);
     return successResponse(res, result.rows[0]);
   } catch (err) {
     next(err);
@@ -217,11 +223,14 @@ async function addVisitNote(req, res, next) {
     if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
     const { visit_date, doctor_id, diagnosis, prescription, follow_up_date, notes, booking_id } = req.body;
     if (!visit_date) return errorResponse(res, 'Visit date is required', 400);
+    if (diagnosis && diagnosis.length > 5000) return res.status(400).json({ success: false, error: 'Diagnosis too long (max 5000 chars)' });
+    if (prescription && prescription.length > 5000) return res.status(400).json({ success: false, error: 'Prescription too long (max 5000 chars)' });
+    if (notes && notes.length > 2000) return res.status(400).json({ success: false, error: 'Notes too long (max 2000 chars)' });
     const capitalizeFirst = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
     const body = {};
-    if (diagnosis) body.diagnosis = capitalizeFirst(diagnosis);
-    if (prescription) body.prescription = capitalizeFirst(prescription);
-    if (notes) body.notes = capitalizeFirst(notes);
+    if (diagnosis) body.diagnosis = capitalizeFirst(stripHtml(diagnosis));
+    if (prescription) body.prescription = capitalizeFirst(stripHtml(prescription));
+    if (notes) body.notes = capitalizeFirst(stripHtml(notes));
     const result = await pool.query(`
       INSERT INTO visit_notes (tenant_id, patient_id, booking_id, doctor_id, visit_date, diagnosis, prescription, follow_up_date, notes, created_by)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *

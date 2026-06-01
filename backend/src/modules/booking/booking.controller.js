@@ -252,6 +252,9 @@ async function createManualBooking(req, res, next) {
     return `+${digits}`;
   })();
 
+  const cleanPatientName = (patientName || '').trim().replace(/<[^>]*>/g, '').slice(0, 255) || 'Unknown Patient';
+  const cleanNotes = (notes || '').trim().replace(/<[^>]*>/g, '').slice(0, 2000);
+
   if (!patientPhone || !doctorId) {
     return errorResponse(res, 'Patient phone and doctor ID are required', 400);
   }
@@ -286,7 +289,7 @@ async function createManualBooking(req, res, next) {
     if (cusRes.rows.length > 0) {
       customerId = cusRes.rows[0].id;
     } else {
-      const pName = patientName || 'Unknown Patient';
+      const pName = cleanPatientName;
       const insertCus = await client.query(
         'INSERT INTO customers (tenant_id, phone, name) VALUES ($1, $2, $3) RETURNING id',
         [tenantId, normalizedPhone, pName]
@@ -296,7 +299,7 @@ async function createManualBooking(req, res, next) {
 
     // Find or create patient record
     let patientId = null;
-    const patientNameClean = (patientName || 'Unknown Patient').trim();
+    const patientNameClean = cleanPatientName;
     if (customerId) {
       try {
         const existingPatient = await pool.query(
@@ -338,7 +341,7 @@ async function createManualBooking(req, res, next) {
          (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes, patient_name, patient_id)
        VALUES ($1, $2, $3, 'walkin', 'pending', CURRENT_DATE, $4, $5, $6, $7)
        RETURNING *`,
-      [tenantId, customerId, doctorId, tokenNumber, notes || '', patientNameClean, patientId]
+      [tenantId, customerId, doctorId, tokenNumber, cleanNotes, patientNameClean, patientId]
     );
     const booking = bRes.rows[0];
 
