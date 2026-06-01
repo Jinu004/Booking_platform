@@ -191,6 +191,11 @@ async function processMessage(context) {
               { tenant, customer, conversation }
             )
 
+            // Handle direct-return signal — bypass Gemini rewrite
+            if (typeof functionResult === 'string' && functionResult.startsWith('DIRECT:')) {
+              return functionResult.slice(7).trim();
+            }
+
             // Handle escalation signal
             if (
               typeof functionResult === 'string' &&

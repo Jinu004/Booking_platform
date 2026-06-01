@@ -79,7 +79,7 @@ async function executeFunction(name, args, ctx) {
 const doctorList = doctorsResult.rows.map(doc => {
           return `🩺 ${doc.name} (${doc.specialization})`
         }).join('\n')
-        return `Which doctor would you like to see?\n\n${doctorList}\n\nReply with the doctor's name.`
+        return `DIRECT:Which doctor would you like to see?\n\n${doctorList}\n\nReply with the doctor's name.`
 
       }
 
@@ -136,7 +136,7 @@ const doctorList = doctorsResult.rows.map(doc => {
           return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime} — ${remaining} tokens available`
         }).join('\n\n')
 
-        return `Doctors available tomorrow (${dayNamesTd[tomorrowDowTd]}):\n\n${doctorList}\n\nReply with the doctor's name to book.`
+        return `DIRECT:Doctors available tomorrow (${dayNamesTd[tomorrowDowTd]}):\n\n${doctorList}\n\nReply with the doctor's name to book.`
       }
 
       case 'check_doctor_availability': {
