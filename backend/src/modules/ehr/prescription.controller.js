@@ -8,20 +8,19 @@ function isPro(req) {
   return req.tenant?.plan === 'pro';
 }
 
-async function getPrescriptionData(tenantId, customerId, noteId) {
+async function getPrescriptionData(tenantId, patientId, noteId) {
   const noteRes = await pool.query(`
     SELECT vn.*,
       d.name as doctor_name, d.specialization, d.qualification,
-      c.name as patient_name, c.phone as patient_phone,
-      pp.age, pp.blood_group, pp.gender,
+      pt.name as patient_name, pt.phone as patient_phone,
+      pt.age, pt.blood_group, pt.gender,
       t.name as clinic_name
     FROM visit_notes vn
     LEFT JOIN clinic_doctors d ON d.id = vn.doctor_id
-    LEFT JOIN customers c ON c.id = vn.customer_id
-    LEFT JOIN patient_profiles pp ON pp.customer_id = vn.customer_id AND pp.tenant_id = vn.tenant_id
+    LEFT JOIN patients pt ON pt.id = vn.patient_id
     JOIN tenants t ON t.id = vn.tenant_id
-    WHERE vn.id = $1 AND vn.tenant_id = $2 AND vn.customer_id = $3
-  `, [noteId, tenantId, customerId]);
+    WHERE vn.id = $1 AND vn.tenant_id = $2 AND vn.patient_id = $3
+  `, [noteId, tenantId, patientId]);
 
   if (!noteRes.rows.length) return null;
 
@@ -300,8 +299,9 @@ function generatePDF(data) {
 async function downloadPrescription(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'Prescription PDF is a Pro plan feature', 403);
   try {
-    const { customerId, noteId } = req.params;
-    const data = await getPrescriptionData(req.tenantId, customerId, noteId);
+    const patientId = req.params.patientId || req.params.customerId;
+    const { noteId } = req.params;
+    const data = await getPrescriptionData(req.tenantId, patientId, noteId);
     if (!data) return errorResponse(res, 'Visit note not found', 404);
 
     const pdfBuffer = await generatePDF(data);
@@ -320,8 +320,9 @@ async function downloadPrescription(req, res, next) {
 async function sendPrescriptionToWhatsApp(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'Prescription PDF is a Pro plan feature', 403);
   try {
-    const { customerId, noteId } = req.params;
-    const data = await getPrescriptionData(req.tenantId, customerId, noteId);
+    const patientId = req.params.patientId || req.params.customerId;
+    const { noteId } = req.params;
+    const data = await getPrescriptionData(req.tenantId, patientId, noteId);
     if (!data) return errorResponse(res, 'Visit note not found', 404);
     if (!data.patient_phone) return errorResponse(res, 'Patient has no phone number', 400);
 

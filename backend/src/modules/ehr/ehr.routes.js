@@ -15,14 +15,14 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get('/patients', getPatients);
-router.get('/patients/:customerId', getPatient);
-router.put('/patients/:customerId/profile', upsertProfile);
-router.post('/patients/:customerId/conditions', addCondition);
-router.delete('/patients/:customerId/conditions/:id', deleteCondition);
-router.post('/patients/:customerId/visit-notes', addVisitNote);
-router.put('/patients/:customerId/visit-notes/:id', updateVisitNote);
+router.get('/patients/:patientId', getPatient);
+router.put('/patients/:patientId/profile', upsertProfile);
+router.post('/patients/:patientId/conditions', addCondition);
+router.delete('/patients/:patientId/conditions/:id', deleteCondition);
+router.post('/patients/:patientId/visit-notes', addVisitNote);
+router.put('/patients/:patientId/visit-notes/:id', updateVisitNote);
 
-router.get('/patients/:customerId/visit-notes/:noteId/prescription', downloadPrescription);
-router.post('/patients/:customerId/visit-notes/:noteId/prescription/send', sendPrescriptionToWhatsApp);
+router.get('/patients/:patientId/visit-notes/:noteId/prescription', downloadPrescription);
+router.post('/patients/:patientId/visit-notes/:noteId/prescription/send', sendPrescriptionToWhatsApp);
 
 module.exports = router;

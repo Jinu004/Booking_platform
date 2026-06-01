@@ -15,31 +15,28 @@ async function getPatients(req, res, next) {
   try {
     const { search } = req.query;
     let query = `
-      SELECT
-        c.id, c.name, c.phone, c.email, c.created_at,
-        pp.age, pp.gender, pp.blood_group,
-        MAX(b.booking_date) as last_visit,
-        COUNT(DISTINCT b.id) as total_visits
-      FROM customers c
-      LEFT JOIN patient_profiles pp ON pp.customer_id = c.id AND pp.tenant_id = c.tenant_id
-      LEFT JOIN bookings b ON b.customer_id = c.id AND b.tenant_id = c.tenant_id AND b.status = 'completed'
-      WHERE c.tenant_id = $1
+      SELECT p.id, p.name, p.phone, p.age, p.gender, p.blood_group, p.created_at,
+             MAX(b.booking_date) as last_visit,
+             COUNT(DISTINCT b.id) as total_visits
+      FROM patients p
+      LEFT JOIN bookings b ON b.patient_id = p.id AND b.tenant_id = p.tenant_id AND b.status = 'completed'
+      WHERE p.tenant_id = $1
     `;
     const params = [req.tenantId];
     if (search) {
-      query += ` AND (c.name ILIKE $2 OR c.phone ILIKE $2)`;
+      query += ` AND (p.name ILIKE $2 OR p.phone ILIKE $2)`;
       params.push(`%${search}%`);
     }
     // Doctors only see patients who have had a booking with them
     if (req.staff.role === 'doctor' && req.staff.doctor_id) {
       const nextParam = params.length + 1;
-      query += ` AND c.id IN (
-        SELECT DISTINCT customer_id FROM bookings
-        WHERE tenant_id = $1 AND doctor_id = $${nextParam}
+      query += ` AND p.id IN (
+        SELECT DISTINCT patient_id FROM bookings
+        WHERE tenant_id = $1 AND doctor_id = $${nextParam} AND patient_id IS NOT NULL
       )`;
       params.push(req.staff.doctor_id);
     }
-    query += ` GROUP BY c.id, c.name, c.phone, c.email, c.created_at, pp.age, pp.gender, pp.blood_group ORDER BY last_visit DESC NULLS LAST, c.created_at DESC`;
+    query += ` GROUP BY p.id ORDER BY last_visit DESC NULLS LAST, p.created_at DESC`;
     const result = await pool.query(query, params);
     return successResponse(res, { customers: result.rows, total: result.rows.length });
   } catch (err) {
@@ -47,35 +44,42 @@ async function getPatients(req, res, next) {
   }
 }
 
-// GET /ehr/patients/:customerId -- full patient profile
+// GET /ehr/patients/:patientId -- full patient profile
 async function getPatient(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
-    const { customerId } = req.params;
-    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
-    const [customerRes, profileRes, conditionsRes, visitNotesRes, bookingsRes] = await Promise.all([
-      pool.query(`SELECT * FROM customers WHERE id = $1 AND tenant_id = $2`, [customerId, req.tenantId]),
-      pool.query(`SELECT * FROM patient_profiles WHERE customer_id = $1 AND tenant_id = $2`, [customerId, req.tenantId]),
-      pool.query(`SELECT * FROM patient_conditions WHERE customer_id = $1 AND tenant_id = $2 ORDER BY created_at DESC`, [customerId, req.tenantId]),
+    const patientId = req.params.patientId || req.params.customerId;
+    if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
+    const [patientRes, conditionsRes, visitNotesRes, bookingsRes] = await Promise.all([
+      pool.query(`SELECT * FROM patients WHERE id = $1 AND tenant_id = $2`, [patientId, req.tenantId]),
+      pool.query(`SELECT * FROM patient_conditions WHERE patient_id = $1 AND tenant_id = $2 ORDER BY created_at DESC`, [patientId, req.tenantId]),
       pool.query(`
         SELECT vn.*, d.name as doctor_name, d.specialization as doctor_specialization
         FROM visit_notes vn
         LEFT JOIN clinic_doctors d ON d.id = vn.doctor_id
-        WHERE vn.customer_id = $1 AND vn.tenant_id = $2
+        WHERE vn.patient_id = $1 AND vn.tenant_id = $2
         ORDER BY vn.visit_date DESC
-      `, [customerId, req.tenantId]),
+      `, [patientId, req.tenantId]),
       pool.query(`
         SELECT b.*, d.name as doctor_name
         FROM bookings b
         LEFT JOIN clinic_doctors d ON d.id = b.doctor_id
-        WHERE b.customer_id = $1 AND b.tenant_id = $2
+        WHERE b.patient_id = $1 AND b.tenant_id = $2
         ORDER BY b.booking_date DESC
-      `, [customerId, req.tenantId])
+      `, [patientId, req.tenantId])
     ]);
-    if (!customerRes.rows.length) return errorResponse(res, 'Patient not found', 404);
+    if (!patientRes.rows.length) return errorResponse(res, 'Patient not found', 404);
+    const patientRow = patientRes.rows[0];
     return successResponse(res, {
-      customer: customerRes.rows[0],
-      profile: profileRes.rows[0] || null,
+      customer: patientRow,
+      profile: {
+        age: patientRow.age,
+        gender: patientRow.gender,
+        blood_group: patientRow.blood_group,
+        emergency_contact_name: patientRow.emergency_contact_name,
+        emergency_contact_phone: patientRow.emergency_contact_phone,
+        emergency_contact_relationship: patientRow.emergency_contact_relationship
+      },
       conditions: conditionsRes.rows,
       visitNotes: visitNotesRes.rows,
       bookings: bookingsRes.rows
@@ -85,71 +89,72 @@ async function getPatient(req, res, next) {
   }
 }
 
-// PUT /ehr/patients/:customerId/profile -- create or update patient profile
+// PUT /ehr/patients/:patientId/profile -- update patient demographics
 async function upsertProfile(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
-    const { customerId } = req.params;
-    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
+    const patientId = req.params.patientId || req.params.customerId;
+    if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
     const { age, gender, blood_group, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship } = req.body;
     const result = await pool.query(`
-      INSERT INTO patient_profiles (tenant_id, customer_id, age, gender, blood_group, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-      ON CONFLICT (tenant_id, customer_id) DO UPDATE SET
-        age = EXCLUDED.age,
-        gender = EXCLUDED.gender,
-        blood_group = EXCLUDED.blood_group,
-        emergency_contact_name = EXCLUDED.emergency_contact_name,
-        emergency_contact_phone = EXCLUDED.emergency_contact_phone,
-        emergency_contact_relationship = EXCLUDED.emergency_contact_relationship,
+      UPDATE patients SET
+        age = $3,
+        gender = $4,
+        blood_group = $5,
+        emergency_contact_name = $6,
+        emergency_contact_phone = $7,
+        emergency_contact_relationship = $8,
         updated_at = NOW()
+      WHERE id = $2 AND tenant_id = $1
       RETURNING *
-    `, [req.tenantId, customerId, age || null, gender || null, blood_group || null, emergency_contact_name || null, emergency_contact_phone || null, emergency_contact_relationship || null]);
+    `, [req.tenantId, patientId, age || null, gender || null, blood_group || null, emergency_contact_name || null, emergency_contact_phone || null, emergency_contact_relationship || null]);
+    if (!result.rows.length) return errorResponse(res, 'Patient not found', 404);
     return successResponse(res, result.rows[0]);
   } catch (err) {
     next(err);
   }
 }
 
-// POST /ehr/patients/:customerId/conditions -- add condition/allergy/medication
+// POST /ehr/patients/:patientId/conditions -- add condition/allergy/medication
 async function addCondition(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
-    const { customerId } = req.params;
-    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
+    const patientId = req.params.patientId || req.params.customerId;
+    if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
     const { type, name, notes } = req.body;
     if (!type || !name) return errorResponse(res, 'Type and name are required', 400);
     if (!['condition', 'allergy', 'medication'].includes(type)) return errorResponse(res, 'Invalid type', 400);
     const result = await pool.query(`
-      INSERT INTO patient_conditions (tenant_id, customer_id, type, name, notes)
+      INSERT INTO patient_conditions (tenant_id, patient_id, type, name, notes)
       VALUES ($1, $2, $3, $4, $5) RETURNING *
-    `, [req.tenantId, customerId, type, name, notes || null]);
+    `, [req.tenantId, patientId, type, name, notes || null]);
     return successResponse(res, result.rows[0]);
   } catch (err) {
     next(err);
   }
 }
 
-// DELETE /ehr/patients/:customerId/conditions/:id -- remove condition
+// DELETE /ehr/patients/:patientId/conditions/:id -- remove condition
 async function deleteCondition(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
-    const { customerId, id } = req.params;
-    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
+    const patientId = req.params.patientId || req.params.customerId;
+    const { id } = req.params;
+    if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
     if (!isUUID(id)) return errorResponse(res, 'Invalid condition ID', 400);
-    await pool.query(`DELETE FROM patient_conditions WHERE id = $1 AND customer_id = $2 AND tenant_id = $3`, [id, customerId, req.tenantId]);
+    await pool.query(`DELETE FROM patient_conditions WHERE id = $1 AND patient_id = $2 AND tenant_id = $3`, [id, patientId, req.tenantId]);
     return successResponse(res, { deleted: true });
   } catch (err) {
     next(err);
   }
 }
 
-// POST /ehr/patients/:customerId/visit-notes -- add visit note
+// POST /ehr/patients/:patientId/visit-notes -- add visit note
 async function addVisitNote(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
-    const { customerId } = req.params;
-    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
+    const patientId = req.params.patientId || req.params.customerId;
+    if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
     const { visit_date, doctor_id, diagnosis, prescription, follow_up_date, notes, booking_id } = req.body;
     if (!visit_date) return errorResponse(res, 'Visit date is required', 400);
     const capitalizeFirst = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
@@ -158,21 +163,22 @@ async function addVisitNote(req, res, next) {
     if (prescription) body.prescription = capitalizeFirst(prescription);
     if (notes) body.notes = capitalizeFirst(notes);
     const result = await pool.query(`
-      INSERT INTO visit_notes (tenant_id, customer_id, booking_id, doctor_id, visit_date, diagnosis, prescription, follow_up_date, notes, created_by)
+      INSERT INTO visit_notes (tenant_id, patient_id, booking_id, doctor_id, visit_date, diagnosis, prescription, follow_up_date, notes, created_by)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *
-    `, [req.tenantId, customerId, booking_id || null, doctor_id || null, visit_date, body.diagnosis || null, body.prescription || null, follow_up_date || null, body.notes || null, req.staff.id]);
+    `, [req.tenantId, patientId, booking_id || null, doctor_id || null, visit_date, body.diagnosis || null, body.prescription || null, follow_up_date || null, body.notes || null, req.staff.id]);
     return successResponse(res, result.rows[0]);
   } catch (err) {
     next(err);
   }
 }
 
-// PUT /ehr/patients/:customerId/visit-notes/:id -- edit visit note
+// PUT /ehr/patients/:patientId/visit-notes/:id -- edit visit note
 async function updateVisitNote(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
-    const { customerId, id } = req.params;
-    if (!isUUID(customerId)) return errorResponse(res, 'Invalid customer ID', 400);
+    const patientId = req.params.patientId || req.params.customerId;
+    const { id } = req.params;
+    if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
     if (!isUUID(id)) return errorResponse(res, 'Invalid visit note ID', 400);
     const { visit_date, doctor_id, diagnosis, prescription, follow_up_date, notes } = req.body;
     const capitalizeFirst = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
@@ -189,9 +195,9 @@ async function updateVisitNote(req, res, next) {
         follow_up_date = COALESCE($5, follow_up_date),
         notes = COALESCE($6, notes),
         updated_at = NOW()
-      WHERE id = $7 AND customer_id = $8 AND tenant_id = $9
+      WHERE id = $7 AND patient_id = $8 AND tenant_id = $9
       RETURNING *
-    `, [visit_date || null, doctor_id || null, body.diagnosis || null, body.prescription || null, follow_up_date || null, body.notes || null, id, customerId, req.tenantId]);
+    `, [visit_date || null, doctor_id || null, body.diagnosis || null, body.prescription || null, follow_up_date || null, body.notes || null, id, patientId, req.tenantId]);
     if (!result.rows.length) return errorResponse(res, 'Visit note not found', 404);
     return successResponse(res, result.rows[0]);
   } catch (err) {
