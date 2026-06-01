@@ -3,6 +3,7 @@ const router = express.Router()
 const { parseIncoming, sendMessage, sendButtons } = require('./whatsapp.adapter')
 const { successResponse } = require('../../../utils/response')
 const logger = require('../../../utils/logger')
+const crypto = require('crypto');
 
 router.get('/', (req, res) => {
   const meta = require('./whatsapp.meta')
@@ -16,6 +17,20 @@ router.get('/', (req, res) => {
 })
 
 router.post('/', async (req, res) => {
+  // Verify X-Hub-Signature-256 for Meta webhooks only
+  const signature = req.headers['x-hub-signature-256'];
+  const appSecret = process.env.META_APP_SECRET;
+  if (appSecret && signature) {
+    const expectedSignature = 'sha256=' + crypto
+      .createHmac('sha256', appSecret)
+      .update(req.rawBody)
+      .digest('hex');
+    if (signature !== expectedSignature) {
+      logger.warn('Webhook signature mismatch — possible forged request rejected');
+      return res.status(403).json({ success: false, error: 'Invalid signature' });
+    }
+  }
+
   res.status(200).json({ success: true, data: { received: true }, error: null })
 
   setImmediate(async () => {
