@@ -238,8 +238,8 @@ const Bookings = () => {
                         <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
                       </>
                     )}
-                    {b.customer_id && (
-                      <Link to={`/patients/${b.customer_id}`} className="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                    {b.patient_id && (
+                      <Link to={`/patients/${b.patient_id}`} className="text-blue-600 hover:text-blue-900 text-sm font-medium">
                         View Profile
                       </Link>
                     )}

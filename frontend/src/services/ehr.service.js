@@ -1,9 +1,9 @@
 import api from '../utils/api';
 
 export const getEHRPatients = (search) => api.get('/ehr/patients', { params: { search } });
-export const getEHRPatient = (customerId) => api.get(`/ehr/patients/${customerId}`);
-export const upsertProfile = (customerId, data) => api.put(`/ehr/patients/${customerId}/profile`, data);
-export const addCondition = (customerId, data) => api.post(`/ehr/patients/${customerId}/conditions`, data);
-export const deleteCondition = (customerId, id) => api.delete(`/ehr/patients/${customerId}/conditions/${id}`);
-export const addVisitNote = (customerId, data) => api.post(`/ehr/patients/${customerId}/visit-notes`, data);
-export const updateVisitNote = (customerId, id, data) => api.put(`/ehr/patients/${customerId}/visit-notes/${id}`, data);
+export const getEHRPatient = (patientId) => api.get(`/ehr/patients/${patientId}`);
+export const upsertProfile = (patientId, data) => api.put(`/ehr/patients/${patientId}/profile`, data);
+export const addCondition = (patientId, data) => api.post(`/ehr/patients/${patientId}/conditions`, data);
+export const deleteCondition = (patientId, id) => api.delete(`/ehr/patients/${patientId}/conditions/${id}`);
+export const addVisitNote = (patientId, data) => api.post(`/ehr/patients/${patientId}/visit-notes`, data);
+export const updateVisitNote = (patientId, id, data) => api.put(`/ehr/patients/${patientId}/visit-notes/${id}`, data);
