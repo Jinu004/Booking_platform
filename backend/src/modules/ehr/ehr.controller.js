@@ -94,10 +94,19 @@ async function createPatient(req, res) {
   const tenantId = req.tenantId;
   const { name, phone, age, gender, blood_group } = req.body;
 
+  // Normalize phone to +91XXXXXXXXXX format
+  const normalizedPhone = (() => {
+    const digits = (phone || '').replace(/\D/g, '');
+    if (digits.length === 10) return `+91${digits}`;
+    if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
+    if (digits.length === 13 && digits.startsWith('91')) return `+${digits.slice(1)}`;
+    return `+${digits}`;
+  })();
+
   if (!name || !name.trim()) {
     return res.status(400).json({ success: false, error: 'Patient name is required' });
   }
-  if (!phone || !phone.trim()) {
+  if (!phone || !normalizedPhone) {
     return res.status(400).json({ success: false, error: 'Phone number is required' });
   }
 
@@ -106,14 +115,14 @@ async function createPatient(req, res) {
     let customerId;
     const existingCustomer = await pool.query(
       `SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1`,
-      [tenantId, phone.trim()]
+      [tenantId, normalizedPhone]
     );
     if (existingCustomer.rows.length > 0) {
       customerId = existingCustomer.rows[0].id;
     } else {
       const newCustomer = await pool.query(
         `INSERT INTO customers (tenant_id, phone, name) VALUES ($1, $2, $3) RETURNING id`,
-        [tenantId, phone.trim(), name.trim()]
+        [tenantId, normalizedPhone, name.trim()]
       );
       customerId = newCustomer.rows[0].id;
     }
@@ -130,7 +139,7 @@ async function createPatient(req, res) {
     const newPatient = await pool.query(
       `INSERT INTO patients (tenant_id, customer_id, name, phone, age, gender, blood_group)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [tenantId, customerId, name.trim(), phone.trim(), age || null, gender || null, blood_group || null]
+      [tenantId, customerId, name.trim(), normalizedPhone, age || null, gender || null, blood_group || null]
     );
 
     return res.json({ success: true, data: { patient: newPatient.rows[0] } });

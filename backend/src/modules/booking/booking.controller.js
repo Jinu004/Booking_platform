@@ -242,10 +242,19 @@ async function createManualBooking(req, res, next) {
   const tenantId = req.tenant.id;
   const { patientName, patientPhone, doctorId, notes } = req.body;
 
+  // Normalize phone to +91XXXXXXXXXX format
+  const normalizedPhone = (() => {
+    const digits = (patientPhone || '').replace(/\D/g, '');
+    if (digits.length === 10) return `+91${digits}`;
+    if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
+    if (digits.length === 13 && digits.startsWith('91')) return `+${digits.slice(1)}`;
+    return `+${digits}`;
+  })();
+
   if (!patientPhone || !doctorId) {
     return errorResponse(res, 'Patient phone and doctor ID are required', 400);
   }
-  if (!isPhone(patientPhone)) {
+  if (!isPhone(normalizedPhone)) {
     return errorResponse(res, 'Invalid phone number format', 400);
   }
   if (!isUUID(doctorId)) {
@@ -270,7 +279,7 @@ async function createManualBooking(req, res, next) {
     // Find or create customer
     let cusRes = await client.query(
       'SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1',
-      [tenantId, patientPhone]
+      [tenantId, normalizedPhone]
     );
     let customerId;
     if (cusRes.rows.length > 0) {
@@ -279,7 +288,7 @@ async function createManualBooking(req, res, next) {
       const pName = patientName || 'Unknown Patient';
       const insertCus = await client.query(
         'INSERT INTO customers (tenant_id, phone, name) VALUES ($1, $2, $3) RETURNING id',
-        [tenantId, patientPhone, pName]
+        [tenantId, normalizedPhone, pName]
       );
       customerId = insertCus.rows[0].id;
     }
@@ -301,7 +310,7 @@ async function createManualBooking(req, res, next) {
              VALUES ($1, $2, $3, $4)
              ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
              RETURNING id`,
-            [tenantId, customerId, patientNameClean, patientPhone]
+            [tenantId, customerId, patientNameClean, normalizedPhone]
           );
           patientId = newPatient.rows[0].id;
         }
@@ -343,7 +352,7 @@ async function createManualBooking(req, res, next) {
 
     // Fetch doctor name outside the transaction (read-only, no locking needed)
     const docRes = await pool.query('SELECT name FROM clinic_doctors WHERE id = $1', [doctorId]);
-    booking.patient_phone = patientPhone;
+    booking.patient_phone = normalizedPhone;
     booking.doctor_name = docRes.rows[0]?.name;
 
     return successResponse(res, booking, 201);
