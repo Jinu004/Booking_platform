@@ -2,6 +2,7 @@ const BookingService = require('./booking.service');
 const BookingModel = require('./booking.model');
 const { successResponse, errorResponse } = require('../../utils/response');
 const pool = require('../../config/database');
+const logger = require('../../utils/logger');
 
 // UUID v4 format validation helper
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
