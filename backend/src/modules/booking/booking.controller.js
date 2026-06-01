@@ -284,6 +284,33 @@ async function createManualBooking(req, res, next) {
       customerId = insertCus.rows[0].id;
     }
 
+    // Find or create patient record
+    let patientId = null;
+    const patientNameClean = (patientName || 'Unknown Patient').trim();
+    if (customerId) {
+      try {
+        const existingPatient = await pool.query(
+          `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
+          [tenantId, customerId, patientNameClean]
+        );
+        if (existingPatient.rows.length > 0) {
+          patientId = existingPatient.rows[0].id;
+        } else {
+          const newPatient = await pool.query(
+            `INSERT INTO patients (tenant_id, customer_id, name, phone)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
+             RETURNING id`,
+            [tenantId, customerId, patientNameClean, patientPhone]
+          );
+          patientId = newPatient.rows[0].id;
+        }
+      } catch (patientErr) {
+        logger.warn('Patient find-or-create failed in manual booking (non-fatal):', patientErr.message);
+        patientId = null;
+      }
+    }
+
     // Count existing tokens inside the locked transaction — no race condition
     const tokenCountResult = await client.query(
       `SELECT COUNT(*) AS count
@@ -298,10 +325,10 @@ async function createManualBooking(req, res, next) {
     // Insert booking
     const bRes = await client.query(
       `INSERT INTO bookings
-         (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes)
-       VALUES ($1, $2, $3, 'walkin', 'pending', CURRENT_DATE, $4, $5)
+         (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes, patient_name, patient_id)
+       VALUES ($1, $2, $3, 'walkin', 'pending', CURRENT_DATE, $4, $5, $6, $7)
        RETURNING *`,
-      [tenantId, customerId, doctorId, tokenNumber, notes || '']
+      [tenantId, customerId, doctorId, tokenNumber, notes || '', patientNameClean, patientId]
     );
     const booking = bRes.rows[0];
 
@@ -316,7 +343,6 @@ async function createManualBooking(req, res, next) {
 
     // Fetch doctor name outside the transaction (read-only, no locking needed)
     const docRes = await pool.query('SELECT name FROM clinic_doctors WHERE id = $1', [doctorId]);
-    booking.patient_name = patientName || 'Unknown Patient';
     booking.patient_phone = patientPhone;
     booking.doctor_name = docRes.rows[0]?.name;
 
