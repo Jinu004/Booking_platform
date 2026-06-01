@@ -3,6 +3,7 @@ const { requireAuth } = require('../auth/auth.middleware');
 const {
   getPatients,
   getPatient,
+  createPatient,
   upsertProfile,
   addCondition,
   deleteCondition,
@@ -15,6 +16,7 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get('/patients', getPatients);
+router.post('/patients', requireAuth, createPatient);
 router.get('/patients/:patientId', getPatient);
 router.put('/patients/:patientId/profile', upsertProfile);
 router.post('/patients/:patientId/conditions', addCondition);

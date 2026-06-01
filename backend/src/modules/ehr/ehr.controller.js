@@ -89,6 +89,57 @@ async function getPatient(req, res, next) {
   }
 }
 
+// POST /ehr/patients -- manually create a new patient record
+async function createPatient(req, res) {
+  const tenantId = req.tenantId;
+  const { name, phone, age, gender, blood_group } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ success: false, error: 'Patient name is required' });
+  }
+  if (!phone || !phone.trim()) {
+    return res.status(400).json({ success: false, error: 'Phone number is required' });
+  }
+
+  try {
+    // Find or create customer record
+    let customerId;
+    const existingCustomer = await pool.query(
+      `SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1`,
+      [tenantId, phone.trim()]
+    );
+    if (existingCustomer.rows.length > 0) {
+      customerId = existingCustomer.rows[0].id;
+    } else {
+      const newCustomer = await pool.query(
+        `INSERT INTO customers (tenant_id, phone, name) VALUES ($1, $2, $3) RETURNING id`,
+        [tenantId, phone.trim(), name.trim()]
+      );
+      customerId = newCustomer.rows[0].id;
+    }
+
+    // Find or create patient record
+    const existingPatient = await pool.query(
+      `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
+      [tenantId, customerId, name.trim()]
+    );
+    if (existingPatient.rows.length > 0) {
+      return res.status(409).json({ success: false, error: 'A patient with this name already exists for this phone number' });
+    }
+
+    const newPatient = await pool.query(
+      `INSERT INTO patients (tenant_id, customer_id, name, phone, age, gender, blood_group)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [tenantId, customerId, name.trim(), phone.trim(), age || null, gender || null, blood_group || null]
+    );
+
+    return res.json({ success: true, data: { patient: newPatient.rows[0] } });
+  } catch (err) {
+    logger.error('Error creating patient:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to create patient' });
+  }
+}
+
 // PUT /ehr/patients/:patientId/profile -- update patient demographics
 async function upsertProfile(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
@@ -205,4 +256,4 @@ async function updateVisitNote(req, res, next) {
   }
 }
 
-module.exports = { getPatients, getPatient, upsertProfile, addCondition, deleteCondition, addVisitNote, updateVisitNote };
+module.exports = { getPatients, getPatient, createPatient, upsertProfile, addCondition, deleteCondition, addVisitNote, updateVisitNote };
