@@ -152,16 +152,21 @@ export default function Conversations() {
           setConversations(prev => prev.map(c =>
             c.id === data.conversationId ? { ...c, mode: data.mode } : c
           ));
-          // If this is the currently selected conversation, update it too
-          setSelectedConversation(prev =>
-            prev?.id === data.conversationId ? { ...prev, mode: data.mode } : prev
-          );
+          // selectedConversation is derived from the conversations array,
+          // so it automatically reflects the new mode.
         }
       } catch {}
     });
     eventSource.addEventListener('new_conversation', (e) => {
       fetchConversations();
     });
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchConversations();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     eventSource.addEventListener('handoff_requested', (e) => {
       try {
         const data = JSON.parse(e.data);
@@ -189,7 +194,10 @@ export default function Conversations() {
       }
     });
 
-    return () => eventSource.close();
+    return () => {
+      eventSource.close();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -484,6 +492,22 @@ export default function Conversations() {
 
               {/* ── Input ── */}
               {selectedConversation.mode === 'human' ? (
+                <>
+                {(() => {
+                  const lastCustomerMessage = messages.filter(m => m.role === 'user').slice(-1)[0];
+                  const isWindowClosed = lastCustomerMessage &&
+                    (new Date() - new Date(lastCustomerMessage.created_at)) > 24 * 60 * 60 * 1000;
+                  return isWindowClosed ? (
+                    <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-xs text-amber-700">
+                        24-hour window closed — last customer message was over 24 hours ago. Free-form replies may not be delivered.
+                      </p>
+                    </div>
+                  ) : null;
+                })()}
                 <div className="px-4 py-3 bg-white border-t border-gray-200 flex-shrink-0">
                   <div className="flex items-end gap-3">
                     <textarea
@@ -504,6 +528,7 @@ export default function Conversations() {
                     </button>
                   </div>
                 </div>
+                </>
               ) : (
                 <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-center justify-between flex-shrink-0">
                   <p className="text-sm text-gray-400">Switch to Human mode to reply</p>
