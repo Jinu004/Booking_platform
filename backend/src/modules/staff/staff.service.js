@@ -50,7 +50,7 @@ async function getStaffWithStats(tenantId) {
   for (const row of bookingRes.rows) {
     countByEmail[row.email] = parseInt(row.count) || 0
   }
-  return staffArray.map(staff => ({
+  return staffArray.map(({ password_hash, ...staff }) => ({
     ...staff,
     bookings_count: countByEmail[staff.email] || 0
   }))

@@ -32,7 +32,8 @@ async function getStaffById(req, res, next) {
     if (!staff) {
       return errorResponse(res, 'Staff member not found', 404)
     }
-    return successResponse(res, { staff })
+    const { password_hash: _ph1, ...safeStaff1 } = staff;
+    return successResponse(res, { staff: safeStaff1 })
   } catch (error) {
     next(error)
   }
@@ -63,7 +64,8 @@ async function inviteStaff(req, res, next) {
       clinicName: req.tenant.name || 'Your Clinic',
       tempPassword: password
     })
-    return successResponse(res, { staff }, 201)
+    const { password_hash: _ph2, ...safeStaff2 } = staff;
+    return successResponse(res, { staff: safeStaff2 }, 201)
   } catch (error) {
     next(error)
   }
@@ -98,7 +100,8 @@ async function updateStaff(req, res, next) {
     if (!staff) {
       return errorResponse(res, 'Staff member not found', 404)
     }
-    return successResponse(res, { staff })
+    const { password_hash: _ph3, ...safeStaff3 } = staff;
+    return successResponse(res, { staff: safeStaff3 })
   } catch (error) {
     next(error)
   }
@@ -141,7 +144,8 @@ async function activateStaff(req, res, next) {
   try {
     const staff = await StaffModel.updateStaff(pool, req.tenantId, req.params.id, { is_active: true })
     if (!staff) return errorResponse(res, 'Staff member not found', 404)
-    return successResponse(res, { staff })
+    const { password_hash: _ph4, ...safeStaff4 } = staff;
+    return successResponse(res, { staff: safeStaff4 })
   } catch (error) {
     next(error)
   }

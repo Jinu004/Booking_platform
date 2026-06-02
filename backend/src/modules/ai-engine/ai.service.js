@@ -145,6 +145,21 @@ async function processMessage(context) {
           return 'Your message is too long. Please send a shorter message.'
         }
 
+        // Basic prompt injection filter
+        const injectionPatterns = [
+          /ignore (all |previous |prior )?instructions/i,
+          /you are now/i,
+          /forget (all |your )?instructions/i,
+          /\[SYSTEM\]/i,
+          /new instructions:/i,
+          /pretend you are/i,
+          /act as (a |an )?different/i,
+        ];
+        if (injectionPatterns.some(pattern => pattern.test(latestMessage))) {
+          logger.warn(`Possible prompt injection attempt: ${latestMessage.slice(0, 100)}`);
+          return 'I can only help with clinic appointments and bookings. Please type 1 to Book Appointment, 2 to Check My Booking, or 3 to Talk to Staff.';
+        }
+
         // Start chat session with conversation history
         const chat = model.startChat({ history: cleanHistory })
 
