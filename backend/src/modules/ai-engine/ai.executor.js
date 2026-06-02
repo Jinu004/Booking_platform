@@ -48,37 +48,43 @@ async function executeFunction(name, args, ctx) {
       }
 
       case 'get_available_doctors': {
+        const todayDowAD = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
         const doctorsResult = await pool.query(
-          `SELECT cd.id, cd.name, cd.specialization,
-                  cd.available_today, cd.max_tokens_daily,
+          `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+                  ds.start_time, ds.end_time,
                   COUNT(b.id) AS booked_count
            FROM clinic_doctors cd
+           JOIN doctor_schedules ds
+             ON ds.doctor_id = cd.id
+             AND ds.tenant_id = cd.tenant_id
+             AND ds.day_of_week = $2
+             AND ds.is_available = true
            LEFT JOIN bookings b
              ON b.doctor_id = cd.id
              AND b.booking_date = CURRENT_DATE
              AND b.status != 'cancelled'
            WHERE cd.tenant_id = $1
              AND cd.available_today = true AND cd.is_active = true
-           GROUP BY cd.id
+           GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+                    ds.start_time, ds.end_time
            ORDER BY cd.name ASC`,
-          [tenant.id]
+          [tenant.id, todayDowAD]
         )
-
         if (!doctorsResult.rows.length) {
           return 'No doctors are available today. Please visit us tomorrow or call us directly.'
         }
-
-        const configResult = await pool.query(
-          `SELECT value FROM tenant_configs
-           WHERE tenant_id = $1
-           AND key = 'opening_time'`,
-          [tenant.id]
-        )
-        const openingTime = configResult.rows[0]?.value || '9:00 AM'
-
-const doctorList = doctorsResult.rows.map(doc => {
-          return `🩺 ${doc.name} (${doc.specialization})`
-        }).join('\n')
+        const fmtAD = (t) => {
+          const [h, m] = t.split(':')
+          const hour = parseInt(h)
+          const ampm = hour >= 12 ? 'PM' : 'AM'
+          const h12 = hour % 12 || 12
+          return `${h12}:${m} ${ampm}`
+        }
+        const doctorList = doctorsResult.rows.map(doc => {
+          const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
+          const sessionTime = `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
+          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime} — ${remaining} tokens available`
+        }).join('\n\n')
         return `DIRECT:Which doctor would you like to see?\n\n${doctorList}\n\nReply with the doctor's name.`
 
       }
