@@ -13,10 +13,6 @@ function schedule24HourReminders() {
 cron.schedule('30 2 * * *', async () => {
     logger.info('Running 24hr reminder job');
     try {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
       const bookings = await pool.query(
         `SELECT b.*, c.phone, c.name as patient_name,
          cd.name as doctor_name, t.name as clinic_name
@@ -24,15 +20,14 @@ cron.schedule('30 2 * * *', async () => {
          JOIN customers c ON c.id = b.customer_id
          JOIN clinic_doctors cd ON cd.id = b.doctor_id
          JOIN tenants t ON t.id = b.tenant_id
-         WHERE b.booking_date = $1
+         WHERE b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
          AND b.status IN ('pending', 'confirmed')
          AND NOT EXISTS (
            SELECT 1 FROM notifications n
            WHERE n.booking_id = b.id
            AND n.type = 'reminder_24h'
            AND n.status = 'sent'
-         )`,
-        [tomorrowStr]
+         )`
       );
 
       for (const booking of bookings.rows) {
