@@ -417,7 +417,7 @@ Please reply with your name to confirm booking.`
     }
   }
 
-  return `Booking confirmed! 🏥
+  return `DIRECT:Booking confirmed! 🏥
 Token Number: ${tokenNumber}
 Doctor: ${doctor.name}
 ${doctor.specialization}
@@ -569,7 +569,7 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
           tomorrowClient.release()
         }
 
-        return `Booking confirmed for tomorrow! 🏥
+        return `DIRECT:Booking confirmed for tomorrow! 🏥
 Token Number: ${tokenNumber}
 Doctor: ${doctor.name}
 ${doctor.specialization}
@@ -706,7 +706,7 @@ Reply CANCEL to cancel your booking.`
           `UPDATE customers SET name = $1 WHERE tenant_id = $2 AND phone = $3`,
           [args.customer_name, tenant.id, customer.phone]
         )
-        return `✅ Order confirmed!
+        return `DIRECT:✅ Order confirmed!
 
 *Order Summary:*
 📦 Product: ${product_name} [${product_id}]
