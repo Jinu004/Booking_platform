@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT now()
+);
+GRANT ALL PRIVILEGES ON TABLE auth_sessions TO appuser;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO appuser;
