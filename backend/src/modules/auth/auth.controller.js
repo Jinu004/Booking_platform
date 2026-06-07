@@ -107,7 +107,7 @@ tenantWhatsapp: staff.whatsapp_number,
       }
     })
   } catch (err) {
-    logger.error('Login error:', err.message)
+    logger.error('Login error:', { message: err.message, code: err.code, detail: err.detail, column: err.column, stack: err.stack })
     return errorResponse(res, 'Login failed')
   }
 }
