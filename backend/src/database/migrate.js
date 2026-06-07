@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
-require('dotenv').config({ path: path.join(__dirname, '../../.env.example') }); // Load .env file securely
+require('dotenv').config({ path: path.join(__dirname, '../../.env') }); // Load .env file securely
 
 // Need a dedicated pool just for migrations or use .env values
 const pool = new Pool({
