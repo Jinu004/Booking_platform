@@ -14,6 +14,11 @@ self.addEventListener('activate', event => {
   );
 });
 self.addEventListener('fetch', event => {
+  // Never intercept API calls — always go straight to network
+  if (event.request.url.includes('/api/')) return;
+  // Never intercept POST requests — request body would be consumed and lost
+  if (event.request.method === 'POST') return;
+  // Never intercept /assets/ — hashed filenames change on every build
   if (event.request.url.includes('/assets/')) return;
   event.respondWith(
     caches.match(event.request).then(response => response || fetch(event.request))
