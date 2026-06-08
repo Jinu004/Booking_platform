@@ -6,6 +6,7 @@ import { getConversations } from '../services/conversation.service';
 import { StatCardSkeleton, TableRowSkeleton, CardSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
+import { saveToCache, loadFromCache } from '../utils/offlineCache';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({ bookingsToday: 0, activeConversations: 0, availableDoctors: 0, pendingTokens: 0 });
@@ -18,6 +19,7 @@ const Dashboard = () => {
   const [doctors, setDoctors] = useState([]);
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
+  const [isOffline, setIsOffline] = useState(false);
   const staff = getStoredStaff();
   const isDoctor = staff?.role === 'doctor';
   const staffDoctorId = isDoctor ? staff?.doctor_id : null;
@@ -50,23 +52,45 @@ const Dashboard = () => {
         ? tokensArray.filter(t => t.doctor_id === staffDoctorId)
         : tokensArray;
 
-      setStats({
-        bookingsToday: isDoctor ? filteredByDoctor.length : totalBookings,
-        activeConversations: activeConvs.length,
-        availableDoctors: availableDocsArray.length,
-        pendingTokens: filteredByDoctor.filter(t => t.status === 'waiting' || t.status === 'pending').length
-      });
+      const dashboardData = {
+        stats: {
+          bookingsToday: isDoctor ? filteredByDoctor.length : totalBookings,
+          activeConversations: activeConvs.length,
+          availableDoctors: availableDocsArray.length,
+          pendingTokens: filteredByDoctor.filter(t => t.status === 'waiting' || t.status === 'pending').length
+        },
+        tokenQueue: filteredByDoctor,
+        recentConversations: activeConvs.slice(0, 5),
+        recentBookings: bookingsArray.slice(0, 5),
+        doctors: docsArray,
+        availableDoctors: availableDocsArray,
+        hasDoctors: docsArray.length > 0
+      };
 
-      setTokenQueue(filteredByDoctor);
-      setRecentConversations(activeConvs.slice(0, 5));
-      setRecentBookings(bookingsArray.slice(0, 5));
-      setDoctors(docsArray);
-      setAvailableDoctors(availableDocsArray);
+      await saveToCache('dashboard', dashboardData);
 
-      const hasDoctorsCheck = docsArray.length > 0;
-      setHasDoctors(hasDoctorsCheck);
+      setStats(dashboardData.stats);
+      setTokenQueue(dashboardData.tokenQueue);
+      setRecentConversations(dashboardData.recentConversations);
+      setRecentBookings(dashboardData.recentBookings);
+      setDoctors(dashboardData.doctors);
+      setAvailableDoctors(dashboardData.availableDoctors);
+      setHasDoctors(dashboardData.hasDoctors);
+      setIsOffline(false);
     } catch (err) {
-      addToast('Failed to load dashboard data', 'error');
+      const cached = await loadFromCache('dashboard');
+      if (cached) {
+        setStats(cached.stats);
+        setTokenQueue(cached.tokenQueue);
+        setRecentConversations(cached.recentConversations);
+        setRecentBookings(cached.recentBookings);
+        setDoctors(cached.doctors);
+        setAvailableDoctors(cached.availableDoctors);
+        setHasDoctors(cached.hasDoctors);
+        setIsOffline(true);
+      } else {
+        addToast('Failed to load dashboard data', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -111,6 +135,13 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col gap-0">
+
+      {isOffline && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800 flex items-center gap-2">
+          <span>⚠️</span>
+          <span>Offline — showing cached data. Changes won't be saved until internet is restored.</span>
+        </div>
+      )}
 
       {/* Setup Banner */}
       {!hasDoctors && (

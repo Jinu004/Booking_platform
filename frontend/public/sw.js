@@ -1,4 +1,4 @@
-const CACHE_NAME = 'receptionai-v5';
+const CACHE_NAME = 'receptionai-v6';
 const urlsToCache = ['/'];
 self.addEventListener('install', event => {
   self.skipWaiting();

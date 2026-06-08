@@ -9,6 +9,7 @@ import api from '../utils/api';
 import TokenReceipt from '../components/shared/TokenReceipt';
 import useStore from '../store/useStore';
 import { TableRowSkeleton, StatCardSkeleton } from '../components/shared/Skeleton';
+import { saveToCache, loadFromCache } from '../utils/offlineCache';
 
 const Bookings = () => {
   const { addToast } = useStore();
@@ -33,6 +34,8 @@ const Bookings = () => {
 
   const [receiptBooking, setReceiptBooking] = useState(null);
 
+  const [isOffline, setIsOffline] = useState(false);
+
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 30000); // 30s poll
@@ -46,11 +49,26 @@ const Bookings = () => {
         getBookingStats(),
         getDoctors()
       ]);
-      setBookings(bookingsRes?.data?.bookings || bookingsRes?.data || []);
-      setStats(statsRes?.data || { total: 0, confirmed: 0, completed: 0, noshow: 0 });
-      setDoctors(docsRes?.data || []);
+      const bookingsData = {
+        bookings: bookingsRes?.data?.bookings || bookingsRes?.data || [],
+        stats: statsRes?.data || { total: 0, confirmed: 0, completed: 0, noshow: 0 },
+        doctors: docsRes?.data || []
+      };
+      await saveToCache('bookings', bookingsData);
+      setBookings(bookingsData.bookings);
+      setStats(bookingsData.stats);
+      setDoctors(bookingsData.doctors);
+      setIsOffline(false);
     } catch (err) {
-      addToast('Failed to load bookings', 'error');
+      const cached = await loadFromCache('bookings');
+      if (cached) {
+        setBookings(cached.bookings);
+        setStats(cached.stats);
+        setDoctors(cached.doctors);
+        setIsOffline(true);
+      } else {
+        addToast('Failed to load bookings', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -103,6 +121,12 @@ const Bookings = () => {
 
   return (
     <div className="p-8 space-y-6 relative">
+      {isOffline && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800 flex items-center gap-2">
+          <span>⚠️</span>
+          <span>Offline — showing cached data. New bookings cannot be created until internet is restored.</span>
+        </div>
+      )}
       <div className="flex flex-col md:flex-row flex-wrap justify-between items-start md:items-center gap-4">
         <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
           <input 
