@@ -15,6 +15,15 @@ async function getDoctors(pool, tenantId, availableOnly) {
   if (availableOnly !== undefined) {
     sql += ` AND available_today = $${paramCount}`;
     params.push(availableOnly);
+    paramCount++;
+    sql += ` AND EXISTS (
+      SELECT 1 FROM doctor_schedules ds
+      WHERE ds.doctor_id = clinic_doctors.id
+        AND ds.day_of_week = EXTRACT(DOW FROM CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
+        AND ds.is_available = true
+        AND ds.start_time <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::time
+        AND ds.end_time >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::time
+    )`;
   }
 
   sql += ` ORDER BY name ASC`;
