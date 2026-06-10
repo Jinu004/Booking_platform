@@ -130,7 +130,7 @@ async function getPlatformStats(req, res) {
 async function createTenant(req, res) {
   const client = await pool.connect();
   try {
-    const { clinicName, email, password, plan } = req.body;
+    const { clinicName, email, password, plan, industry } = req.body;
 
     if (!clinicName || !email || !password || !plan) {
       return errorResponse(res, 'All fields required', 400);
@@ -138,6 +138,10 @@ async function createTenant(req, res) {
 
     if (!['starter', 'growth', 'pro'].includes(plan)) {
       return errorResponse(res, 'Invalid plan', 400);
+    }
+
+    if (industry && !['clinic', 'enquiry'].includes(industry)) {
+      return errorResponse(res, 'Invalid industry', 400);
     }
 
     const password_hash = await bcrypt.hash(password, 12);
@@ -154,9 +158,9 @@ async function createTenant(req, res) {
     }
     const tenantResult = await client.query(
       `INSERT INTO tenants (id, name, slug, plan, status, industry, created_at, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, 'pending', 'clinic', NOW(), NOW())
+       VALUES (gen_random_uuid(), $1, $2, $3, 'pending', $4, NOW(), NOW())
        RETURNING *`,
-      [clinicName, slug, plan]
+      [clinicName, slug, plan, industry || 'clinic']
     );
 
     const tenant = tenantResult.rows[0];
@@ -189,17 +193,18 @@ async function createTenant(req, res) {
 async function updateTenant(req, res) {
   try {
     const { id } = req.params;
-    const { clinicName, plan, whatsappNumber } = req.body;
+    const { clinicName, plan, whatsappNumber, industry } = req.body;
 
     const result = await pool.query(
       `UPDATE tenants
        SET name = COALESCE($1, name),
            plan = COALESCE($2, plan),
            whatsapp_number = COALESCE($3, whatsapp_number),
+           industry = COALESCE($4, industry),
            updated_at = NOW()
-       WHERE id = $4
+       WHERE id = $5
        RETURNING *`,
-      [clinicName || null, plan || null, whatsappNumber || null, id]
+      [clinicName || null, plan || null, whatsappNumber || null, industry || null, id]
     );
 
     if (result.rows.length === 0) {
