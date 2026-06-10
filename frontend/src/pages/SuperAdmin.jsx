@@ -19,6 +19,22 @@ const statusBadge = (status) => {
   );
 };
 
+const industryBadge = (industry) => {
+  const map = {
+    clinic: { className: 'bg-blue-100 text-blue-800', label: 'Clinic' },
+    enquiry: { className: 'bg-amber-100 text-amber-800', label: 'Enquiry' },
+  };
+  const fallbackLabel = industry
+    ? industry.charAt(0).toUpperCase() + industry.slice(1)
+    : '—';
+  const { className, label } = map[industry] || { className: 'bg-gray-100 text-gray-800', label: fallbackLabel };
+  return (
+    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${className}`}>
+      {label}
+    </span>
+  );
+};
+
 export default function SuperAdmin() {
   const { staff, addToast } = useStore();
 
@@ -247,13 +263,14 @@ export default function SuperAdmin() {
       {/* Tenants table */}
       <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Registered Clinics</h2>
+          <h2 className="text-lg font-medium text-gray-900">Registered Tenants</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clinic</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Industry</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WhatsApp</th>
@@ -267,6 +284,7 @@ export default function SuperAdmin() {
               {tenants.map(t => (
                 <tr key={t.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{t.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{industryBadge(t.industry)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 capitalize">{t.plan}</span>
                   </td>
