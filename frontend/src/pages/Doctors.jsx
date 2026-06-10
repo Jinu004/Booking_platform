@@ -357,13 +357,13 @@ const Doctors = () => {
   };
 
   // Derived availability counts
-  const availableCount = doctors.filter(d => d.available_today).length;
+  const availableCount = doctors.filter(d => d.available_now).length;
   const onLeaveCount = doctors.filter(d => !d.available_today && d.leave_days > 0).length;
-  const absentCount = doctors.filter(d => !d.available_today && !d.leave_days).length;
+  const absentCount = doctors.filter(d => !d.available_now && !d.leave_days).length;
 
   const filteredAvail = doctors.filter(doc => {
-    if (availFilter === 'available') return doc.available_today;
-    if (availFilter === 'absent') return !doc.available_today && !doc.leave_days;
+    if (availFilter === 'available') return doc.available_now;
+    if (availFilter === 'absent') return !doc.available_now && !doc.leave_days;
     if (availFilter === 'leave') return !doc.available_today && doc.leave_days > 0;
     return true;
   });
@@ -526,15 +526,16 @@ const Doctors = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {filteredAvail.map(doc => {
+              const isAvailableNow = doc.available_now;
               const isAvailable = doc.available_today;
-              const isOnLeave = !isAvailable && doc.leave_days > 0;
-              const isAbsent = !isAvailable && !doc.leave_days;
+              const isOnLeave = !isAvailableNow && doc.leave_days > 0;
+              const isAbsent = !isAvailableNow && !doc.leave_days;
               const todayCount = docTodayTokens(doc);
               const maxTokens = doc.max_tokens_daily || 1;
               const progress = Math.min((todayCount / maxTokens) * 100, 100);
 
               return (
-                <div key={doc.id} className={`bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4 border-l-4 ${isAvailable ? 'border-l-green-500' : isOnLeave ? 'border-l-red-500' : 'border-l-red-500'
+                <div key={doc.id} className={`bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4 border-l-4 ${isAvailableNow ? 'border-l-green-500' : isOnLeave ? 'border-l-red-500' : 'border-l-red-500'
                   }`}>
 
                   {/* Top: avatar + name + badge */}
@@ -550,7 +551,7 @@ const Doctors = () => {
 
                   {/* Status badge */}
                   <div>
-                    {isAvailable && (
+                    {isAvailableNow && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Available
                       </span>
