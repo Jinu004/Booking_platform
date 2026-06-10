@@ -8,7 +8,15 @@ const tenantQuery = require('../../../utils/tenantQuery');
  * @returns {Promise<Array>}
  */
 async function getDoctors(pool, tenantId, availableOnly) {
-  let sql = `SELECT * FROM clinic_doctors WHERE tenant_id = $1 AND leave_days != 999 AND is_active = true`;
+  let sql = `SELECT *, EXISTS (
+      SELECT 1 FROM doctor_schedules ds
+      WHERE ds.doctor_id = clinic_doctors.id
+        AND ds.day_of_week = EXTRACT(DOW FROM CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
+        AND ds.is_available = true
+        AND ds.start_time <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::time
+        AND ds.end_time >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::time
+    ) AS available_now
+    FROM clinic_doctors WHERE tenant_id = $1 AND leave_days != 999 AND is_active = true`;
   const params = [];
   let paramCount = 2;
 
