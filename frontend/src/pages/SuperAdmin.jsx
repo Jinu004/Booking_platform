@@ -46,13 +46,13 @@ export default function SuperAdmin() {
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ clinicName: '', email: '', password: '', plan: 'starter' });
+  const [createForm, setCreateForm] = useState({ clinicName: '', email: '', password: '', plan: 'starter', industry: 'clinic' });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
 
   // Edit modal
   const [editTenant, setEditTenant] = useState(null);
-  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '' });
+  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', industry: 'clinic' });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -117,7 +117,7 @@ export default function SuperAdmin() {
       setCreateLoading(true);
       await createTenant(createForm);
       setShowCreate(false);
-      setCreateForm({ clinicName: '', email: '', password: '', plan: 'starter' });
+      setCreateForm({ clinicName: '', email: '', password: '', plan: 'starter', industry: 'clinic' });
       fetchData();
     } catch (err) {
       setCreateError(err?.response?.data?.error || 'Failed to create clinic');
@@ -128,7 +128,7 @@ export default function SuperAdmin() {
 
   const openEdit = (t) => {
     setEditTenant(t);
-    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '' });
+    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', industry: t.industry || 'clinic' });
     setEditError('');
   };
 
@@ -241,15 +241,15 @@ export default function SuperAdmin() {
           onClick={() => setShowCreate(true)}
           className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
         >
-          + New Clinic
+          + New Tenant
         </button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
-          { label: 'Total Clinics', value: stats?.total_tenants || 0, color: 'text-gray-900' },
-          { label: 'Active Clinics', value: stats?.active_tenants || 0, color: 'text-green-600' },
+          { label: 'Total Tenants', value: stats?.total_tenants || 0, color: 'text-gray-900' },
+          { label: 'Active Tenants', value: stats?.active_tenants || 0, color: 'text-green-600' },
           { label: 'Bookings Today', value: stats?.total_bookings_today || 0, color: 'text-gray-900' },
           { label: 'Conversations Today', value: stats?.total_conversations_today || 0, color: 'text-blue-600' },
         ].map(s => (
@@ -269,7 +269,7 @@ export default function SuperAdmin() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clinic</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Industry</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -359,6 +359,17 @@ export default function SuperAdmin() {
                 {PLANS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+              <select
+                value={createForm.industry}
+                onChange={e => setCreateForm(f => ({ ...f, industry: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="clinic">Clinic</option>
+                <option value="enquiry">Enquiry</option>
+              </select>
+            </div>
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => { setShowCreate(false); setCreateError(''); }}
@@ -402,6 +413,17 @@ export default function SuperAdmin() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
               >
                 {PLANS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+              <select
+                value={editForm.industry}
+                onChange={e => setEditForm(f => ({ ...f, industry: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="clinic">Clinic</option>
+                <option value="enquiry">Enquiry</option>
               </select>
             </div>
             <div>
