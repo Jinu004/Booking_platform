@@ -43,6 +43,7 @@ export default function SuperAdmin() {
   const [stats, setStats] = useState(null);
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [industryFilter, setIndustryFilter] = useState('all');
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false);
@@ -233,6 +234,17 @@ export default function SuperAdmin() {
     );
   }
 
+  const clinicCount = tenants.filter(t => t.industry === 'clinic').length;
+  const enquiryCount = tenants.filter(t => t.industry === 'enquiry').length;
+  const industryTabs = [
+    { key: 'all', label: 'All', count: tenants.length },
+    { key: 'clinic', label: 'Clinic', count: clinicCount },
+    { key: 'enquiry', label: 'Enquiry', count: enquiryCount },
+  ];
+  const filteredTenants = industryFilter === 'all'
+    ? tenants
+    : tenants.filter(t => t.industry === industryFilter);
+
   return (
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
@@ -265,6 +277,21 @@ export default function SuperAdmin() {
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">Registered Tenants</h2>
         </div>
+        <div className="px-6 py-3 border-b border-gray-200 flex gap-2">
+          {industryTabs.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setIndustryFilter(tab.key)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                industryFilter === tab.key
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {tab.label} ({tab.count})
+            </button>
+          ))}
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -281,7 +308,13 @@ export default function SuperAdmin() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {tenants.map(t => (
+              {filteredTenants.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="px-6 py-8 text-center text-sm text-gray-500">
+                    No tenants in this category
+                  </td>
+                </tr>
+              ) : filteredTenants.map(t => (
                 <tr key={t.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{t.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{industryBadge(t.industry)}</td>
