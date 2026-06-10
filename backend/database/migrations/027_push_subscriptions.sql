@@ -19,3 +19,4 @@ CREATE INDEX IF NOT EXISTS push_subscriptions_tenant_id_idx
   ON push_subscriptions (tenant_id);
 
 GRANT ALL PRIVILEGES ON TABLE push_subscriptions TO appuser;
+GRANT ALL PRIVILEGES ON TABLE push_subscriptions TO appuser;
