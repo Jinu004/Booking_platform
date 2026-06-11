@@ -39,12 +39,16 @@ api.interceptors.response.use(
     const { status } = error.response;
 
     if (status === 401) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('staff_data');
-      if (useStore.getState().clearAuth) {
-        useStore.getState().clearAuth();
+      const isAuthRoute = window.location.pathname === '/login' ||
+                          window.location.pathname === '/reset-password';
+      if (!isAuthRoute) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('staff_data');
+        if (useStore.getState().clearAuth) {
+          useStore.getState().clearAuth();
+        }
+        window.location.href = '/login';
       }
-      window.location.href = '/login';
     } else if (status === 403) {
       useStore.getState().addToast('You do not have permission', 'error');
     } else if (status === 500) {
