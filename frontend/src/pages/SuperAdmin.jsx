@@ -133,6 +133,12 @@ export default function SuperAdmin() {
 
   const handleEdit = async () => {
     setEditError('');
+    if (editForm.industry !== editTenant.industry) {
+      const confirmed = window.confirm(
+        `Changing industry from "${editTenant.industry}" to "${editForm.industry}" will change the AI behaviour, pages, and theme for this tenant immediately. Are you sure?`
+      );
+      if (!confirmed) return;
+    }
     try {
       setEditLoading(true);
       await updateTenant(editTenant.id, editForm);
