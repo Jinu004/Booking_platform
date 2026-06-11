@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Toast from './components/shared/Toast';
 import Layout from './components/shared/Layout';
 import PrivateRoute from './components/shared/PrivateRoute';
+import RoleRoute from './components/shared/RoleRoute';
 import { useIndustry } from './hooks/useIndustry';
 
 const Dashboard      = React.lazy(() => import('./pages/Dashboard'));
@@ -64,8 +65,10 @@ const App = () => {
               <Route path="/settings" element={<Settings />} />
               <Route path="/catalogue" element={<Catalogue />} />
               <Route path="/leads" element={<Leads />} />
-              <Route path="/superadmin" element={<SuperAdmin />} />
-              <Route path="/superadmin/pricing-calculator" element={<PricingCalculator />} />
+              <Route element={<RoleRoute allowedRoles={['super_admin']} />}>
+                <Route path="/superadmin" element={<SuperAdmin />} />
+                <Route path="/superadmin/pricing-calculator" element={<PricingCalculator />} />
+              </Route>
             </Route>
           </Route>
 

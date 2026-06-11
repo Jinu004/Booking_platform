@@ -64,9 +64,7 @@ export default function SuperAdmin() {
   const [wabaStep, setWabaStep] = useState('idle'); // idle | sending | otp_sent | verifying | done
   const [wabaError, setWabaError] = useState('');
 
-  if (staff?.role !== 'super_admin') {
-    return <div className="p-8 text-red-600 font-medium">Access Denied. Super Admin only.</div>;
-  }
+  const ownTenantId = staff?.tenantId;
 
   useEffect(() => { fetchData(); }, []);
 
@@ -328,16 +326,24 @@ export default function SuperAdmin() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                     <button onClick={() => openEdit(t)} className="text-blue-600 hover:text-blue-900">Edit</button>
-                    <button onClick={() => handleClearConversations(t)} className="text-orange-600 hover:text-orange-900">Clear Chats</button>                    <button
-                      onClick={() => handleStatusChange(t.id, t.status)}
-                      className={
-                        t.status === 'pending' ? 'text-green-600 hover:text-green-900' :
-                          t.status === 'active' ? 'text-red-600 hover:text-red-900' :
-                            'text-green-600 hover:text-green-900'
-                      }
-                    >
-                      {t.status === 'pending' ? 'Approve' : t.status === 'active' ? 'Suspend' : 'Reactivate'}
-                    </button>
+                    {t.id === ownTenantId && (
+                      <span className="inline-flex text-xs leading-5 font-semibold text-gray-400">(You)</span>
+                    )}
+                    {t.id !== ownTenantId && (
+                      <button onClick={() => handleClearConversations(t)} className="text-orange-600 hover:text-orange-900">Clear Chats</button>
+                    )}
+                    {t.id !== ownTenantId && (
+                      <button
+                        onClick={() => handleStatusChange(t.id, t.status)}
+                        className={
+                          t.status === 'pending' ? 'text-green-600 hover:text-green-900' :
+                            t.status === 'active' ? 'text-red-600 hover:text-red-900' :
+                              'text-green-600 hover:text-green-900'
+                        }
+                      >
+                        {t.status === 'pending' ? 'Approve' : t.status === 'active' ? 'Suspend' : 'Reactivate'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
