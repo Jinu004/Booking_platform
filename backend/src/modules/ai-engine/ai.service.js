@@ -103,8 +103,8 @@ async function processMessage(context) {
       try {
         let currentModel = MODEL;
         if (attempt === 2 && lastError && (lastError.message?.includes('503') || lastError.message?.includes('Service Unavailable'))) {
-          logger.warn('Falling back to gemini-2.0-flash due to 503 error');
-          currentModel = 'gemini-2.0-flash';
+          logger.warn('Falling back to gemini-2.5-flash-lite due to 503 error');
+          currentModel = 'gemini-2.5-flash-lite';
         }
 
         // Initialize Gemini model with tools
