@@ -290,7 +290,7 @@ async function sendContact(to, clinicName, phoneNumber, wabaId, accessToken) {
     });
     logger.info(`Contact card sent to ${to}`);
   } catch (err) {
-    logger.error('sendContact failed:', err.message);
+    logger.error('sendContact failed:', JSON.stringify(err.response?.data || err.message));
   }
 }
 

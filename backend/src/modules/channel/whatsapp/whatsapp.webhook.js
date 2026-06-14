@@ -190,8 +190,8 @@ if (!isEscalated) {
         try {
           const pool = require('../../../config/database')
           const countResult = await pool.query(
-            'SELECT COUNT(*) FROM conversations WHERE tenant_id = $1 AND customer_phone = $2',
-            [tenant.id, context.customer?.phone]
+            'SELECT COUNT(*) FROM conversations WHERE tenant_id = $1 AND customer_id = $2',
+            [tenant.id, context.customer?.id]
           )
           const convCount = parseInt(countResult.rows[0].count, 10)
           if (convCount === 1) {
@@ -201,7 +201,7 @@ if (!isEscalated) {
             await sendContact(message.from, tenant.name, tenant.whatsapp_number, META_PHONE_ID, META_TOKEN)
           }
         } catch (err) {
-          logger.error('Contact card send failed (non-fatal):', err.message)
+          logger.error('Contact card send failed (non-fatal):', JSON.stringify(err.response?.data || err.message))
         }
       }
 
