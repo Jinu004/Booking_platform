@@ -3,8 +3,8 @@ const pool = require('../config/database')
 const logger = require('../utils/logger')
 
 function startRetentionCron() {
-  // Runs every day at 2 AM IST (20:30 UTC)
-  cron.schedule('30 20 * * *', async () => {
+  // Runs every day at 3 AM IST (after 2AM DB backup; timezone-pinned)
+  cron.schedule('0 3 * * *', async () => {
     logger.info('Running message retention cleanup...')
     try {
       const result = await pool.query(`
@@ -16,8 +16,8 @@ function startRetentionCron() {
     } catch (err) {
       logger.error('Retention cleanup failed:', err.message)
     }
-  })
-  logger.info('Retention cron started (runs daily at 2AM IST)')
+  }, { timezone: 'Asia/Kolkata' })
+  logger.info('Retention cron started (runs daily at 3AM IST)')
 }
 
 module.exports = { startRetentionCron }
