@@ -189,16 +189,20 @@ if (!isEscalated) {
       if (source === 'meta' && tenant.whatsapp_number) {
         try {
           const pool = require('../../../config/database')
-          const countResult = await pool.query(
-            'SELECT COUNT(*) FROM conversations WHERE tenant_id = $1 AND customer_id = $2',
-            [tenant.id, context.customer?.id]
+          const flagResult = await pool.query(
+            'SELECT contact_card_sent FROM conversations WHERE id = $1',
+            [context.conversation.id]
           )
-          const convCount = parseInt(countResult.rows[0].count, 10)
-          if (convCount === 1) {
+          const alreadySent = flagResult.rows[0]?.contact_card_sent === true
+          if (!alreadySent) {
             const { sendContact } = require('./whatsapp.meta')
             const META_TOKEN = process.env.META_WHATSAPP_TOKEN || ''
             const META_PHONE_ID = process.env.META_PHONE_NUMBER_ID || ''
             await sendContact(message.from, tenant.name, tenant.whatsapp_number, META_PHONE_ID, META_TOKEN)
+            await pool.query(
+              'UPDATE conversations SET contact_card_sent = true WHERE id = $1',
+              [context.conversation.id]
+            )
           }
         } catch (err) {
           logger.error('Contact card send failed (non-fatal):', JSON.stringify(err.response?.data || err.message))
