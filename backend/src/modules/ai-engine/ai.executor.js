@@ -59,6 +59,7 @@ async function executeFunction(name, args, ctx) {
              AND ds.tenant_id = cd.tenant_id
              AND ds.day_of_week = $2
              AND ds.is_available = true
+             AND ds.end_time > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::time
            LEFT JOIN bookings b
              ON b.doctor_id = cd.id
              AND b.booking_date = CURRENT_DATE
