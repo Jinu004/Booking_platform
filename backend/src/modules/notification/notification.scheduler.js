@@ -10,7 +10,7 @@ const logger = require('../../utils/logger');
  * Sends reminder to each patient
  */
 function schedule24HourReminders() {
-cron.schedule('30 2 * * *', async () => {
+cron.schedule('0 8 * * *', async () => {
     logger.info('Running 24hr reminder job');
     try {
       const bookings = await pool.query(
@@ -61,7 +61,7 @@ cron.schedule('30 2 * * *', async () => {
     } catch (err) {
       logger.error(`24hr reminder job failed: ${err.message}`);
     }
-  });
+  }, { timezone: 'Asia/Kolkata' });
 }
 
 /**
@@ -69,22 +69,22 @@ cron.schedule('30 2 * * *', async () => {
  * Sets available_today based on doctor_schedules for the current day
  */
 function resetDoctorAvailability() {
-  cron.schedule('30 18 * * *', async () => {
+  cron.schedule('0 0 * * *', async () => {
     logger.info('Resetting doctor availability based on schedules');
     try {
       const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
       const today = nowIST.getDay();
       // Decrement leave days for doctors currently on leave
       await pool.query(`
-        UPDATE clinic_doctors 
-        SET leave_days = leave_days - 1 
+        UPDATE clinic_doctors
+        SET leave_days = leave_days - 1
         WHERE leave_days > 0 AND leave_days != 999
       `);
 
       // Clear leave flag for doctors whose leave has ended
       await pool.query(`
-        UPDATE clinic_doctors 
-        SET leave_days = 0 
+        UPDATE clinic_doctors
+        SET leave_days = 0
         WHERE leave_days < 0
       `);
       await pool.query('UPDATE clinic_doctors SET available_today = false WHERE leave_days != 999');
@@ -102,7 +102,7 @@ function resetDoctorAvailability() {
     } catch (err) {
       logger.error('Doctor availability reset failed:', err.message);
     }
-  });
+  }, { timezone: 'Asia/Kolkata' });
 }
 
 /**
