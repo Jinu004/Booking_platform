@@ -310,17 +310,17 @@ const Doctors = () => {
   };
 
   const handleToggleAvailability = async (doc) => {
-    if (doc.available_today) {
-      // Trying to mark unavailable, open modal
-      setLeaveModalDoc(doc);
-    } else {
-      // Mark available
+    if (doc.leave_days > 0) {
+      // Currently on leave — clear it directly
       try {
         await updateAvailability(doc.id, { available: true, leaveDays: 0 });
         fetchDoctors();
       } catch (err) {
         addToast('Failed to update availability', 'error');
       }
+    } else {
+      // Not on leave — open the leave modal to register leave
+      setLeaveModalDoc(doc);
     }
   };
 
@@ -358,13 +358,13 @@ const Doctors = () => {
 
   // Derived availability counts
   const availableCount = doctors.filter(d => d.available_now).length;
-  const onLeaveCount = doctors.filter(d => !d.available_today && d.leave_days > 0).length;
-  const absentCount = doctors.filter(d => !d.available_now && !d.leave_days).length;
+  const onLeaveCount = doctors.filter(d => d.leave_days > 0).length;
+  const offDutyCount = doctors.filter(d => !d.available_now && !(d.leave_days > 0)).length;
 
   const filteredAvail = doctors.filter(doc => {
     if (availFilter === 'available') return doc.available_now;
-    if (availFilter === 'absent') return !doc.available_now && !doc.leave_days;
-    if (availFilter === 'leave') return !doc.available_today && doc.leave_days > 0;
+    if (availFilter === 'offduty') return !doc.available_now && !(doc.leave_days > 0);
+    if (availFilter === 'leave') return doc.leave_days > 0;
     return true;
   });
 
@@ -482,8 +482,8 @@ const Doctors = () => {
             </span>
             <span className="text-gray-300">·</span>
             <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
-              <span className="text-gray-600">{absentCount} absent</span>
+              <span className="w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
+              <span className="text-gray-600">{offDutyCount} off duty</span>
             </span>
             <span className="text-gray-300">·</span>
             <span className="flex items-center gap-1.5">
@@ -498,7 +498,7 @@ const Doctors = () => {
           {[
             { key: 'all', label: 'All', count: doctors.length },
             { key: 'available', label: 'Available', count: availableCount },
-            { key: 'absent', label: 'Absent', count: absentCount },
+            { key: 'offduty', label: 'Off Duty', count: offDutyCount },
             { key: 'leave', label: 'On Leave', count: onLeaveCount },
           ].map(tab => (
             <button
@@ -527,15 +527,14 @@ const Doctors = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {filteredAvail.map(doc => {
               const isAvailableNow = doc.available_now;
-              const isAvailable = doc.available_today;
-              const isOnLeave = !isAvailableNow && doc.leave_days > 0;
-              const isAbsent = !isAvailableNow && !doc.leave_days;
+              const isOnLeave = doc.leave_days > 0;
+              const isOffDuty = !isAvailableNow && !isOnLeave;
               const todayCount = docTodayTokens(doc);
               const maxTokens = doc.max_tokens_daily || 1;
               const progress = Math.min((todayCount / maxTokens) * 100, 100);
 
               return (
-                <div key={doc.id} className={`bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4 border-l-4 ${isAvailableNow ? 'border-l-green-500' : isOnLeave ? 'border-l-red-500' : 'border-l-red-500'
+                <div key={doc.id} className={`bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4 border-l-4 ${isAvailableNow ? 'border-l-green-500' : isOnLeave ? 'border-l-red-500' : 'border-l-gray-300'
                   }`}>
 
                   {/* Top: avatar + name + badge */}
@@ -556,9 +555,9 @@ const Doctors = () => {
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Available
                       </span>
                     )}
-                    {isAbsent && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Absent
+                    {isOffDuty && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Off Duty
                       </span>
                     )}
                     {isOnLeave && (
@@ -584,19 +583,19 @@ const Doctors = () => {
 
                   {/* Action button */}
                   <div className="pt-1">
-                    {isAvailable ? (
-                      <button
-                        onClick={() => handleToggleAvailability(doc)}
-                        className="w-full py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition border border-red-200"
-                      >
-                        Mark Absent
-                      </button>
-                    ) : (
+                    {isOnLeave ? (
                       <button
                         onClick={() => handleToggleAvailability(doc)}
                         className="w-full py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition border border-emerald-200"
                       >
-                        Mark Available
+                        End Leave
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setLeaveModalDoc(doc)}
+                        className="w-full py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition border border-red-200"
+                      >
+                        Mark on Leave
                       </button>
                     )}
                   </div>
