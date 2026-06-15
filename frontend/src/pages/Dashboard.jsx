@@ -206,7 +206,7 @@ const Dashboard = () => {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Doctors on Duty</p>
             <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-4xl font-black text-emerald-600">{doctors.filter(d => d.available_now).length}</span>
+              <span className="text-4xl font-black text-emerald-600">{doctors.filter(d => d.available_now && !d.leave_days).length}</span>
               <span className="text-xl text-gray-400 font-bold">/ {doctors.length}</span>
             </div>
           </div>
@@ -337,12 +337,12 @@ const Dashboard = () => {
               <p className="text-sm text-gray-500">No doctors added yet</p>
             ) : doctors.map(d => (
               <div key={d.id} className="min-w-[160px] bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex-shrink-0">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-3 ${d.available_now ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-3 ${d.available_now && !d.leave_days ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
                   {(d.name || '?').split(' ').filter(w => w.toLowerCase() !== 'dr.' && w.toLowerCase() !== 'dr')[0]?.[0]?.toUpperCase() || '?'}
                 </div>
                 <p className="font-semibold text-sm text-gray-900 truncate">{d.name}</p>
                 <p className="text-xs text-gray-500 truncate mb-2">{d.specialization}</p>
-                {d.available_now ? (
+                {d.available_now && !d.leave_days ? (
                   <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
                     Available
