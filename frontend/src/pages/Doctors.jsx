@@ -232,6 +232,7 @@ const Doctors = () => {
       await saveDoctorSchedule(scheduleModalDoc.id, doctorSchedule);
       setScheduleModalDoc(null);
       addToast('Schedule saved successfully', 'success');
+      fetchDoctors();
     } catch (err) {
       addToast('Failed to save schedule', 'error');
     } finally {
