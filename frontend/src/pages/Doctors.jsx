@@ -358,13 +358,13 @@ const Doctors = () => {
   };
 
   // Derived availability counts
-  const availableCount = doctors.filter(d => d.available_now).length;
+  const availableCount = doctors.filter(d => !d.leave_days && d.available_now).length;
   const onLeaveCount = doctors.filter(d => d.leave_days > 0).length;
-  const offDutyCount = doctors.filter(d => !d.available_now && !(d.leave_days > 0)).length;
+  const offDutyCount = doctors.filter(d => !d.leave_days && !d.available_now).length;
 
   const filteredAvail = doctors.filter(doc => {
-    if (availFilter === 'available') return doc.available_now;
-    if (availFilter === 'offduty') return !doc.available_now && !(doc.leave_days > 0);
+    if (availFilter === 'available') return !doc.leave_days && doc.available_now;
+    if (availFilter === 'offduty') return !doc.leave_days && !doc.available_now;
     if (availFilter === 'leave') return doc.leave_days > 0;
     return true;
   });
@@ -527,8 +527,8 @@ const Doctors = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {filteredAvail.map(doc => {
-              const isAvailableNow = doc.available_now;
               const isOnLeave = doc.leave_days > 0;
+              const isAvailableNow = !isOnLeave && doc.available_now;
               const isOffDuty = !isAvailableNow && !isOnLeave;
               const todayCount = docTodayTokens(doc);
               const maxTokens = doc.max_tokens_daily || 1;
