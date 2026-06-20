@@ -1,6 +1,11 @@
 const pool = require('../../config/database')
 const logger = require('../../utils/logger')
 
+// Escape special LIKE pattern characters to prevent unexpected query behavior
+function escapeLike(str) {
+  return str.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 /**
  * Executes a named AI function with given arguments.
  * All functions query PostgreSQL and return plain text results
@@ -160,7 +165,7 @@ async function executeFunction(name, args, ctx) {
            WHERE cd.tenant_id = $1
              AND LOWER(cd.name) LIKE LOWER($2) AND cd.is_active = true
            GROUP BY cd.id`,
-          [tenant.id, `%${doctor_name}%`]
+          [tenant.id, `%${escapeLike(doctor_name)}%`]
         )
         if (!result.rows.length) {
           return { available: false, message: `No doctor found matching "${doctor_name}"` }
@@ -285,7 +290,7 @@ Please reply with your name to confirm booking.`
     `SELECT id, name, specialization, max_tokens_daily FROM clinic_doctors
      WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND available_today = true AND is_active = true
      LIMIT 1`,
-    [tenant.id, `%${doctor_name}%`]
+    [tenant.id, `%${escapeLike(doctor_name)}%`]
   )
   if (!doctorRes.rows.length) {
     return { success: false, message: `Dr. ${doctor_name} is not available today.` }
@@ -456,7 +461,7 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
           `SELECT id, name, specialization, max_tokens_daily FROM clinic_doctors
            WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND is_active = true
            LIMIT 1`,
-          [tenant.id, `%${doctor_name}%`]
+          [tenant.id, `%${escapeLike(doctor_name)}%`]
         )
         if (!doctorRes.rows.length) {
           return { success: false, message: `No doctor found matching "${doctor_name}"` }
@@ -659,7 +664,7 @@ Reply CANCEL to cancel your booking.`
         const { query } = args
         const result = await pool.query(
           'SELECT product_id, name, description, price, in_stock FROM catalogue_items WHERE tenant_id = $1 AND (LOWER(name) LIKE LOWER($2) OR LOWER(product_id) LIKE LOWER($2) OR LOWER(REPLACE(name, \' \', \'\')) LIKE LOWER(REPLACE($2, \' \', \'\'))) LIMIT 1',
-          [tenant.id, `%${query}%`]
+          [tenant.id, `%${escapeLike(query)}%`]
         )
         if (!result.rows.length) {
           return `Sorry, I could not find a product matching "${query}". Type "catalogue" to see all available products.`
