@@ -36,6 +36,8 @@ const Bookings = () => {
 
   const [isOffline, setIsOffline] = useState(false);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 30000); // 30s poll
@@ -100,6 +102,8 @@ const Bookings = () => {
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       const { data } = await api.post('/bookings/manual', newBooking);
       setReceiptBooking(data.data);
@@ -108,6 +112,8 @@ const Bookings = () => {
       fetchData();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to create booking');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -262,8 +268,8 @@ const Bookings = () => {
                         <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
                       </>
                     )}
-                    {b.patient_id && (
-                      <Link to={`/patients/${b.patient_id}`} className="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                    {(b.patient_id || b.customer_id) && (
+                      <Link to={`/patients/${b.patient_id || b.customer_id}`} className="text-blue-600 hover:text-blue-900 text-sm font-medium">
                         View Profile
                       </Link>
                     )}
@@ -332,7 +338,9 @@ const Bookings = () => {
 
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 rounded-lg text-gray-700 font-bold hover:bg-gray-100 transition">Cancel</button>
-                <button type="submit" className="px-6 py-2.5 bg-indigo-600 font-bold text-white rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition transform hover:scale-105">Issue Token</button>
+                <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-indigo-600 font-bold text-white rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
+                  {isSubmitting ? 'Issuing...' : 'Issue Token'}
+                </button>
               </div>
             </form>
           </div>
