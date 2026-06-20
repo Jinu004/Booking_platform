@@ -98,13 +98,29 @@ async function processMessage(context) {
     const systemPrompt = getSystemPrompt(tenant, configs, additionalData)
     const functionDeclarations = getFunctionDefinitions(tenant.industry)
 
+    const FALLBACK_MODEL = 'gemini-2.5-flash-lite';
+    const MAX_ATTEMPTS = 3;
+    const isTransientError = (err) => {
+      const msg = err.message || '';
+      return (
+        msg.includes('503') ||
+        msg.includes('Service Unavailable') ||
+        msg.includes('429') ||
+        msg.includes('Too Many Requests') ||
+        msg.includes('RESOURCE_EXHAUSTED') ||
+        msg.includes('UNAVAILABLE') ||
+        msg.includes('timeout') ||
+        msg.includes('ECONNRESET') ||
+        msg.includes('ETIMEDOUT')
+      );
+    };
+
     let lastError;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        let currentModel = MODEL;
-        if (attempt === 2 && lastError && (lastError.message?.includes('503') || lastError.message?.includes('Service Unavailable'))) {
-          logger.warn('Falling back to gemini-2.5-flash-lite due to 503 error');
-          currentModel = 'gemini-2.5-flash-lite';
+        const currentModel = attempt === 1 ? MODEL : FALLBACK_MODEL;
+        if (attempt > 1) {
+          logger.warn(`Gemini falling back to ${FALLBACK_MODEL} on attempt ${attempt}`);
         }
 
         // Initialize Gemini model with tools
@@ -254,9 +270,16 @@ async function processMessage(context) {
 
       } catch (err) {
         lastError = err;
-        if (attempt === 1) {
-          logger.warn(`Gemini attempt 1 failed: ${err.message}. Retrying in 2000ms...`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        if (attempt < MAX_ATTEMPTS) {
+          if (isTransientError(err)) {
+            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000); // 1s, 2s, 4s cap 8s
+            logger.warn(`Gemini attempt ${attempt} failed (${err.message}). Retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            // Non-transient error (bad API key, invalid request) — don't retry
+            logger.warn(`Gemini attempt ${attempt} failed with non-transient error — not retrying: ${err.message}`);
+            break;
+          }
         }
       }
     }
