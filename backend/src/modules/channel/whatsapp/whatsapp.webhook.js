@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const { parseIncoming, sendMessage, sendButtons } = require('./whatsapp.adapter')
+const { executeFunction } = require('../../ai-engine/ai.executor')
 const { successResponse } = require('../../../utils/response')
 const logger = require('../../../utils/logger')
 const crypto = require('crypto');
@@ -104,6 +105,32 @@ router.post('/', async (req, res) => {
         )
         logger.info(`Conversation ${context.conversation.id} is in human mode — skipping AI`)
         return
+      }
+
+      // TOMORROW intent interception — read Redis key set when today was fully booked
+      // or booking was outside hours. Bypass Gemini entirely for this case.
+      if (message.message?.trim().toUpperCase() === 'TOMORROW' && tenant.industry === 'clinic') {
+        try {
+          const redisClient = require('../../../config/redis')
+          const tomorrowKey = `tomorrow_booking:${context.conversation.id}`
+          const stored = await redisClient.get(tomorrowKey)
+          if (stored) {
+            const { doctor_name, patient_name } = JSON.parse(stored)
+            await sendMessage(message.from, '⏳ Please wait a moment...')
+            const result = await executeFunction(
+              'create_tomorrow_booking',
+              { doctor_name, patient_name },
+              { tenant, customer: context.customer, conversation: context.conversation }
+            )
+            const responseText = typeof result === 'string' ? result : result?.message || 'Booking processed.'
+            const finalText = responseText.startsWith('DIRECT:') ? responseText.slice(7).trim() : responseText
+            await sendMessage(message.from, finalText)
+            await redisClient.del(tomorrowKey)
+            return
+          }
+        } catch (tomorrowErr) {
+          logger.warn('TOMORROW intent lookup failed, falling through to AI:', tomorrowErr.message)
+        }
       }
 
       const configs = await TenantService.getAllConfigs(tenant.id)
