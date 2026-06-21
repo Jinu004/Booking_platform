@@ -4,6 +4,7 @@ const { getFunctionDefinitions } = require('./ai.functions')
 const { executeFunction } = require('./ai.executor')
 const logger = require('../../utils/logger')
 const pool = require('../../config/database')
+const redisClient = require('../../config/redis')
 
 const client = new GoogleGenerativeAI(
   process.env.GEMINI_API_KEY || ''
@@ -46,26 +47,45 @@ async function processMessage(context) {
       try {
         const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
         const todayDow = nowIST.getDay()
-        const schedResult = await pool.query(
-          `SELECT d.name, d.specialization, ds.day_of_week, ds.start_time, ds.end_time, ds.is_available
-           FROM clinic_doctors d
-           LEFT JOIN doctor_schedules ds ON d.id = ds.doctor_id
-           WHERE d.tenant_id = $1 AND d.is_active = true
-           ORDER BY d.name, ds.day_of_week`,
-          [tenant.id]
-        )
-        additionalData.doctorSchedules = schedResult.rows
-        const onDutyResult = await pool.query(
-          `SELECT DISTINCT d.name FROM clinic_doctors d
-           JOIN doctor_schedules ds ON d.id = ds.doctor_id
-           WHERE d.tenant_id = $1
-             AND d.is_active = true
-             AND ds.day_of_week = $2
-             AND ds.is_available = true
-             AND d.leave_days = 0`,
-          [tenant.id, todayDow]
-        )
-        additionalData.onDutyDoctors = onDutyResult.rows.map(r => r.name)
+        const schedCacheKey = `doctor_schedules:${tenant.id}:${todayDow}`
+        let schedData = null
+        try {
+          const cached = await redisClient.get(schedCacheKey)
+          if (cached) schedData = JSON.parse(cached)
+        } catch (err) {
+          logger.warn('Redis get failed for doctor schedules:', err.message)
+        }
+        if (!schedData) {
+          const schedResult = await pool.query(
+            `SELECT d.name, d.specialization, ds.day_of_week, ds.start_time, ds.end_time, ds.is_available
+             FROM clinic_doctors d
+             LEFT JOIN doctor_schedules ds ON d.id = ds.doctor_id
+             WHERE d.tenant_id = $1 AND d.is_active = true
+             ORDER BY d.name, ds.day_of_week`,
+            [tenant.id]
+          )
+          const onDutyResult = await pool.query(
+            `SELECT DISTINCT d.name FROM clinic_doctors d
+             JOIN doctor_schedules ds ON d.id = ds.doctor_id
+             WHERE d.tenant_id = $1
+               AND d.is_active = true
+               AND ds.day_of_week = $2
+               AND ds.is_available = true
+               AND d.leave_days = 0`,
+            [tenant.id, todayDow]
+          )
+          schedData = {
+            doctorSchedules: schedResult.rows,
+            onDutyDoctors: onDutyResult.rows.map(r => r.name)
+          }
+          try {
+            await redisClient.setEx(schedCacheKey, 60, JSON.stringify(schedData))
+          } catch (err) {
+            logger.warn('Redis set failed for doctor schedules:', err.message)
+          }
+        }
+        additionalData.doctorSchedules = schedData.doctorSchedules
+        additionalData.onDutyDoctors = schedData.onDutyDoctors
       } catch (err) {
         logger.warn('Failed to fetch doctor schedules for prompt:', err.message)
       }
@@ -74,22 +94,35 @@ async function processMessage(context) {
     // Inject knowledge base for Growth and Pro plan clinics
     if ((tenant.plan === 'growth' || tenant.plan === 'pro') && (tenant.industry === 'clinic' || tenant.industry === 'enquiry')) {
       try {
-        const kbResult = await pool.query(
-          'SELECT ai_knowledge_base, business_address, business_phone, business_email, payment_upi, payment_phone FROM tenant_settings WHERE tenant_id = $1',
-          [tenant.id]
-        )
-        const row = kbResult.rows[0]
-        const kb = row?.ai_knowledge_base
+        const kbCacheKey = `tenant_settings:${tenant.id}`
+        let kbData = null
+        try {
+          const cached = await redisClient.get(kbCacheKey)
+          if (cached) kbData = JSON.parse(cached)
+        } catch (err) {
+          logger.warn('Redis get failed for knowledge base:', err.message)
+        }
+        if (!kbData) {
+          const kbResult = await pool.query(
+            'SELECT ai_knowledge_base, business_address, business_phone, business_email, payment_upi, payment_phone FROM tenant_settings WHERE tenant_id = $1',
+            [tenant.id]
+          )
+          kbData = kbResult.rows[0] || {}
+          try {
+            await redisClient.setEx(kbCacheKey, 60, JSON.stringify(kbData))
+          } catch (err) {
+            logger.warn('Redis set failed for knowledge base:', err.message)
+          }
+        }
+        const kb = kbData.ai_knowledge_base
         if (kb && kb.trim()) {
           additionalData.knowledgeBase = kb.trim()
         }
-        if (row) {
-          additionalData.businessAddress = row.business_address || ''
-          additionalData.businessPhone = row.business_phone || ''
-          additionalData.businessEmail = row.business_email || ''
-          additionalData.paymentUpi = row.payment_upi || ''
-          additionalData.paymentPhone = row.payment_phone || ''
-        }
+        additionalData.businessAddress = kbData.business_address || ''
+        additionalData.businessPhone = kbData.business_phone || ''
+        additionalData.businessEmail = kbData.business_email || ''
+        additionalData.paymentUpi = kbData.payment_upi || ''
+        additionalData.paymentPhone = kbData.payment_phone || ''
       } catch (err) {
         logger.warn('Failed to fetch knowledge base for prompt:', err.message)
       }

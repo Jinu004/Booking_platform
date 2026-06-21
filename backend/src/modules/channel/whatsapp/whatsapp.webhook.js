@@ -138,12 +138,23 @@ router.post('/', async (req, res) => {
       let additionalData = {}
       if (tenant.industry === 'clinic') {
         try {
-          const pool = require('../../../config/database')
-          const doctorsResult = await pool.query(
-            `SELECT * FROM clinic_doctors WHERE tenant_id = $1 AND available_today = true`,
-            [tenant.id]
-          )
-          additionalData.doctors = doctorsResult.rows
+          const doctorsCacheKey = `available_doctors:${tenant.id}`
+          const cachedDoctors = await redisClient.get(doctorsCacheKey)
+          if (cachedDoctors) {
+            additionalData.doctors = JSON.parse(cachedDoctors)
+          } else {
+            const pool = require('../../../config/database')
+            const doctorsResult = await pool.query(
+              `SELECT * FROM clinic_doctors WHERE tenant_id = $1 AND available_today = true`,
+              [tenant.id]
+            )
+            additionalData.doctors = doctorsResult.rows
+            try {
+              await redisClient.setEx(doctorsCacheKey, 60, JSON.stringify(doctorsResult.rows))
+            } catch (cacheErr) {
+              logger.warn('Redis set failed for available doctors:', cacheErr.message)
+            }
+          }
         } catch (err) {
           logger.warn('Could not load doctors:', err.message)
           additionalData.doctors = []
