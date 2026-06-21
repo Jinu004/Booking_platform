@@ -136,19 +136,7 @@ router.post('/', async (req, res) => {
       const configs = await TenantService.getAllConfigs(tenant.id)
 
       let additionalData = {}
-      if (tenant.industry === 'clinic') {
-        try {
-          const pool = require('../../../config/database')
-          const doctorsResult = await pool.query(
-            `SELECT * FROM clinic_doctors WHERE tenant_id = $1 AND available_today = true`,
-            [tenant.id]
-          )
-          additionalData.doctors = doctorsResult.rows
-        } catch (err) {
-          logger.warn('Could not load doctors:', err.message)
-          additionalData.doctors = []
-        }
-      }
+      // doctors are fetched on-demand via get_available_doctors function call in ai.executor.js
 
       await sendMessage(message.from, '⏳ Please wait a moment...')
 

@@ -1,5 +1,6 @@
 const pool = require('../../config/database');
-const tenantModel = require('./tenant.model');
+const tenantModel = require('./tenant.model')
+const redisClient = require('../../config/redis');
 const logger = require('../../utils/logger');
 
 const defaultConfigsMap = {
@@ -161,10 +162,22 @@ const setConfig = async (tenantId, key, value) => {
  * Gets all configs as a key-value object
  */
 const getAllConfigs = async (tenantId) => {
+  const cacheKey = `tenant_configs:${tenantId}`;
+  try {
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (err) {
+    logger.warn('Redis get failed for tenant configs:', err.message);
+  }
   const configRows = await tenantModel.getTenantConfigs(pool, tenantId);
   const configs = {};
   for (const row of configRows) {
     configs[row.key] = row.value;
+  }
+  try {
+    await redisClient.setEx(cacheKey, 60, JSON.stringify(configs));
+  } catch (err) {
+    logger.warn('Redis set failed for tenant configs:', err.message);
   }
   return configs;
 };
