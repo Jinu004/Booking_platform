@@ -94,15 +94,13 @@ async function executeFunction(name, args, ctx) {
         // Doctor profile keyword matching for symptom-aware highlight
         if (ctx.doctorProfiles && ctx.doctorProfiles.length > 0 && ctx.latestMessage) {
           const msg = ctx.latestMessage.toLowerCase()
-          // Only consider doctors who are actually available right now
           const availableIds = new Set(doctorsResult.rows.map(d => d.id))
+          // Find best matching doctor from ALL profiles (available or not)
           let bestMatch = null
           let bestMatchScore = 0
           for (const profile of ctx.doctorProfiles) {
             if (!profile.profile_description) continue
-            if (!availableIds.has(profile.id)) continue // skip unavailable doctors
             const desc = profile.profile_description.toLowerCase()
-            // Score: count how many words from the patient message appear in the profile
             const msgWords = msg.split(/[\s,،.?!]+/).filter(w => w.length > 3)
             const score = msgWords.filter(word => desc.includes(word)).length
             if (score > bestMatchScore) {
@@ -111,8 +109,12 @@ async function executeFunction(name, args, ctx) {
             }
           }
           if (bestMatch && bestMatchScore > 0) {
-            const highlightLine = `For your concern, ${bestMatch.name} (${bestMatch.specialization || 'General'}) may be a good fit 😊\n\n`
-            return `DIRECT:Let me show you our available doctors 😊\n\n${highlightLine}${doctorList}\n\nReply with the doctor's name to book.`
+            const isAvailable = availableIds.has(bestMatch.id)
+            if (isAvailable) {
+              return `DIRECT:Sorry to hear that! ${bestMatch.name} (${bestMatch.specialization || 'General'}) is available today 🩺\n\nHere are all our available doctors:\n\n${doctorList}\n\nReply with the doctor's name to book.`
+            } else {
+              return `DIRECT:Sorry to hear that! Our ${bestMatch.specialization || 'specialist'} isn't available right now.\n\nHere are all our available doctors today:\n\n${doctorList}\n\nReply with the doctor's name to book.`
+            }
           }
         }
         return `DIRECT:Let me show you our available doctors 😊\n\n${doctorList}\n\nReply with the doctor's name to book.`
