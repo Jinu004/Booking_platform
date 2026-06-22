@@ -193,18 +193,22 @@ async function createTenant(req, res) {
 async function updateTenant(req, res) {
   try {
     const { id } = req.params;
-    const { clinicName, plan, whatsappNumber, industry } = req.body;
-
+    const { clinicName, plan, whatsappNumber, industry, aiModel } = req.body;
+    const VALID_AI_MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
+    if (aiModel && !VALID_AI_MODELS.includes(aiModel)) {
+      return errorResponse(res, 'Invalid AI model. Must be one of: ' + VALID_AI_MODELS.join(', '), 400)
+    }
     const result = await pool.query(
       `UPDATE tenants
        SET name = COALESCE($1, name),
            plan = COALESCE($2, plan),
            whatsapp_number = COALESCE($3, whatsapp_number),
            industry = COALESCE($4, industry),
+           ai_model = COALESCE($6, ai_model),
            updated_at = NOW()
        WHERE id = $5
        RETURNING *`,
-      [clinicName || null, plan || null, whatsappNumber || null, industry || null, id]
+      [clinicName || null, plan || null, whatsappNumber || null, industry || null, id, aiModel || null]
     );
 
     if (result.rows.length === 0) {
@@ -214,6 +218,10 @@ async function updateTenant(req, res) {
     try {
       const { broadcastToTenant } = require('../hitl/hitl.service');
       broadcastToTenant(id, 'session_refresh', { reason: 'plan_changed' });
+    } catch (_) {}
+    try {
+      const redisClient = require('../../config/redis');
+      await redisClient.del(`tenant_configs:${id}`);
     } catch (_) {}
 
     return successResponse(res, result.rows[0]);

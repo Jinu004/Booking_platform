@@ -152,7 +152,7 @@ async function processMessage(context) {
     let lastError;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        let currentModel = attempt === 1 ? (MODELS[tenant.plan] || MODEL) : (tenant.plan === 'pro' ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite');
+        let currentModel = attempt === 1 ? (tenant.ai_model || MODELS[tenant.plan] || MODEL) : (tenant.plan === 'pro' ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite');
         if (attempt === 2 && lastError && (lastError.message?.includes('503') || lastError.message?.includes('Service Unavailable'))) {
           logger.warn('Falling back to gemini-2.5-flash-lite due to 503 error');
           currentModel = tenant.plan === 'pro' ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
