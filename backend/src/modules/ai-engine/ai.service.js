@@ -13,7 +13,7 @@ const client = new GoogleGenerativeAI(
 const MODELS = {
   pro: 'gemini-2.5-pro',
   growth: 'gemini-2.5-flash',
-  starter: 'gemini-2.5-flash-lite'
+  starter: 'gemini-2.5-flash'
 }
 const MODEL = 'gemini-2.5-flash' // default fallback
 
