@@ -10,7 +10,12 @@ const client = new GoogleGenerativeAI(
   process.env.GEMINI_API_KEY || ''
 )
 
-const MODEL = 'gemini-2.5-flash'
+const MODELS = {
+  pro: 'gemini-2.5-pro',
+  growth: 'gemini-2.5-flash',
+  starter: 'gemini-2.5-flash-lite'
+}
+const MODEL = 'gemini-2.5-flash' // default fallback
 
 /**
  * Processes an incoming message through Gemini
@@ -134,10 +139,10 @@ async function processMessage(context) {
     let lastError;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        let currentModel = MODEL;
+        let currentModel = attempt === 1 ? (MODELS[tenant.plan] || MODEL) : (tenant.plan === 'pro' ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite');
         if (attempt === 2 && lastError && (lastError.message?.includes('503') || lastError.message?.includes('Service Unavailable'))) {
           logger.warn('Falling back to gemini-2.5-flash-lite due to 503 error');
-          currentModel = 'gemini-2.5-flash-lite';
+          currentModel = tenant.plan === 'pro' ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
         }
 
         // Initialize Gemini model with tools
