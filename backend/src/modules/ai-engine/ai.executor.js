@@ -264,7 +264,7 @@ async function executeFunction(name, args, ctx) {
         }
         const sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
 
-        return `${doctor.name} (${doctor.specialization})
+        return `DIRECT:${doctor.name} (${doctor.specialization})
 Session: ${sessionTime}
 ${remaining} tokens remaining.
 
