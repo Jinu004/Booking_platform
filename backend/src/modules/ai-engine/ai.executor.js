@@ -91,6 +91,23 @@ async function executeFunction(name, args, ctx) {
           const sessionTime = `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
           return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime} — ${remaining} tokens available`
         }).join('\n\n')
+        // Doctor profile keyword matching for symptom-aware highlight
+        if (ctx.doctorProfiles && ctx.doctorProfiles.length > 0 && ctx.latestMessage) {
+          const msg = ctx.latestMessage.toLowerCase()
+          let highlightLine = ''
+          for (const profile of ctx.doctorProfiles) {
+            if (!profile.profile_description) continue
+            const keywords = profile.profile_description.toLowerCase().split(/[\s,،.]+/).filter(w => w.length > 3)
+            const matched = keywords.some(word => msg.includes(word))
+            if (matched) {
+              highlightLine = `For your concern, ${profile.name} (${profile.specialization || 'General'}) may be a good fit 😊\n\n`
+              break
+            }
+          }
+          if (highlightLine) {
+            return `DIRECT:Let me show you our available doctors 😊\n\n${highlightLine}${doctorList}\n\nReply with the doctor's name to book.`
+          }
+        }
         return `DIRECT:Let me show you our available doctors 😊\n\n${doctorList}\n\nReply with the doctor's name to book.`
 
       }
