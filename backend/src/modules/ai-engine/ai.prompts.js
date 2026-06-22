@@ -79,6 +79,17 @@ function getClinicPrompt(tenant, configs, additionalData = {}) {
     doctorBlock += '\n';
   }
 
+  // Build Pro plan doctor profiles block
+  let doctorProfilesBlock = '';
+  if (tenant.plan === 'pro' && additionalData.doctorProfiles && additionalData.doctorProfiles.length > 0) {
+    const profileLines = additionalData.doctorProfiles
+      .filter(d => d.profile_description && d.profile_description.trim())
+      .map(d => `- ${d.name} (${d.specialization || 'General'}): ${d.profile_description.trim()}`)
+    if (profileLines.length > 0) {
+      doctorProfilesBlock = '\nDOCTOR PROFILES (use to identify relevant doctor for patient concern — always show full list, never recommend without showing all options):\n' + profileLines.join('\n') + '\n'
+    }
+  }
+
   // Build Growth/Pro knowledge base block
   let knowledgeBlock = '';
   if (additionalData.knowledgeBase) {
@@ -95,7 +106,7 @@ Booking mode: ${configs.booking_mode || 'token'}
 Weekly off: ${configs.weekly_off || 'sunday'}
 Average consultation: ${configs.avg_consultation_minutes || 10} minutes
 Max tokens per doctor: ${configs.max_tokens_per_day || 50}
-${doctorBlock}${knowledgeBlock}
+${doctorBlock}${doctorProfilesBlock}${knowledgeBlock}
 COMMON PATIENT REQUESTS:
 1. "I want to book" / "appointment" / "token"
    → Ask which doctor

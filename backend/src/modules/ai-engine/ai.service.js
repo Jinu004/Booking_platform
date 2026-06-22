@@ -47,6 +47,19 @@ async function processMessage(context) {
       return 'Our AI assistant is currently being set up. Please call the clinic directly for assistance.'
     }
 
+    // Inject doctor profiles for Pro plan clinics
+    if (tenant.plan === 'pro' && tenant.industry === 'clinic') {
+      try {
+        const profilesResult = await pool.query(
+          `SELECT name, specialization, profile_description FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true AND profile_description IS NOT NULL AND profile_description != ''`,
+          [tenant.id]
+        )
+        additionalData.doctorProfiles = profilesResult.rows
+      } catch (err) {
+        logger.warn('Failed to fetch doctor profiles for prompt:', err.message)
+      }
+    }
+
     // Inject doctor schedules for Pro plan clinics
     if (tenant.plan === 'pro' && tenant.industry === 'clinic') {
       try {
