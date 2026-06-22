@@ -94,17 +94,24 @@ async function executeFunction(name, args, ctx) {
         // Doctor profile keyword matching for symptom-aware highlight
         if (ctx.doctorProfiles && ctx.doctorProfiles.length > 0 && ctx.latestMessage) {
           const msg = ctx.latestMessage.toLowerCase()
-          let highlightLine = ''
+          // Only consider doctors who are actually available right now
+          const availableIds = new Set(doctorsResult.rows.map(d => d.id))
+          let bestMatch = null
+          let bestMatchScore = 0
           for (const profile of ctx.doctorProfiles) {
             if (!profile.profile_description) continue
-            const keywords = profile.profile_description.toLowerCase().split(/[\s,،.]+/).filter(w => w.length > 3)
-            const matched = keywords.some(word => msg.includes(word))
-            if (matched) {
-              highlightLine = `For your concern, ${profile.name} (${profile.specialization || 'General'}) may be a good fit 😊\n\n`
-              break
+            if (!availableIds.has(profile.id)) continue // skip unavailable doctors
+            const desc = profile.profile_description.toLowerCase()
+            // Score: count how many words from the patient message appear in the profile
+            const msgWords = msg.split(/[\s,،.?!]+/).filter(w => w.length > 3)
+            const score = msgWords.filter(word => desc.includes(word)).length
+            if (score > bestMatchScore) {
+              bestMatchScore = score
+              bestMatch = profile
             }
           }
-          if (highlightLine) {
+          if (bestMatch && bestMatchScore > 0) {
+            const highlightLine = `For your concern, ${bestMatch.name} (${bestMatch.specialization || 'General'}) may be a good fit 😊\n\n`
             return `DIRECT:Let me show you our available doctors 😊\n\n${highlightLine}${doctorList}\n\nReply with the doctor's name to book.`
           }
         }

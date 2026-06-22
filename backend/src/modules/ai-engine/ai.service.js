@@ -51,7 +51,7 @@ async function processMessage(context) {
     if (tenant.plan === 'pro' && tenant.industry === 'clinic') {
       try {
         const profilesResult = await pool.query(
-          `SELECT name, specialization, profile_description FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true AND profile_description IS NOT NULL AND profile_description != ''`,
+          `SELECT id, name, specialization, profile_description FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true AND profile_description IS NOT NULL AND profile_description != ''`,
           [tenant.id]
         )
         additionalData.doctorProfiles = profilesResult.rows
