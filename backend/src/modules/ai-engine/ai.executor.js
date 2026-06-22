@@ -91,7 +91,7 @@ async function executeFunction(name, args, ctx) {
           const sessionTime = `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
           return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime} — ${remaining} tokens available`
         }).join('\n\n')
-        return `DIRECT:Which doctor would you like to see?\n\n${doctorList}\n\nReply with the doctor's name.`
+        return `DIRECT:Let me show you our available doctors 😊\n\n${doctorList}\n\nReply with the doctor's name to book.`
 
       }
 
