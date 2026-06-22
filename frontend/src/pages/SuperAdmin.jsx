@@ -142,8 +142,8 @@ export default function SuperAdmin() {
     try {
       setEditLoading(true);
       await updateTenant(editTenant.id, editForm);
+      await fetchData();
       closeEditModal();
-      fetchData();
     } catch (err) {
       setEditError(err?.response?.data?.error || 'Failed to update clinic');
     } finally {
