@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getClinicSettings, updateClinicSettings, getHITLSettings, updateHITLSettings, getSettings, updateSettings } from '../services/settings.service';
+import { getDoctors, updateDoctor } from '../services/clinic.service';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import { PLANS } from '../constants';
@@ -20,6 +21,31 @@ const DAYS = [
 export default function Settings() {
   const staff = getStoredStaff();
   const plan = staff?.tenantPlan || 'starter';
+  const [doctors, setDoctors] = useState([])
+  const [profileSaving, setProfileSaving] = useState({})
+  const [profileDescriptions, setProfileDescriptions] = useState({})
+
+  useEffect(() => {
+    if (plan !== 'pro') return
+    getDoctors().then(res => {
+      const activeDoctors = (res.data || []).filter(d => d.is_active && d.leave_days !== 999)
+      setDoctors(activeDoctors)
+      const initial = {}
+      activeDoctors.forEach(d => { initial[d.id] = d.profile_description || '' })
+      setProfileDescriptions(initial)
+    }).catch(() => {})
+  }, [plan])
+
+  const saveDoctorProfile = async (doctorId) => {
+    setProfileSaving(prev => ({ ...prev, [doctorId]: true }))
+    try {
+      await updateDoctor(doctorId, { profileDescription: profileDescriptions[doctorId] || '' })
+    } catch (err) {
+      console.error('Failed to save doctor profile:', err)
+    } finally {
+      setProfileSaving(prev => ({ ...prev, [doctorId]: false }))
+    }
+  }
   const whatsappNumber = staff?.tenantWhatsapp || null;
   const { addToast } = useStore();
   const { industry } = useIndustry();
@@ -180,6 +206,7 @@ export default function Settings() {
     { key: 'clinic', label: 'Clinic Profile' },
     { key: 'ai', label: 'AI & HITL' },
     { key: 'whatsapp', label: 'WhatsApp' },
+    ...(plan === 'pro' ? [{ key: 'doctors', label: 'Doctor Profiles' }] : []),
     { key: 'billing', label: 'Billing' },
   ];
 
@@ -505,6 +532,56 @@ export default function Settings() {
       )}
 
       {/* BILLING */}
+      {activeTab === 'doctors' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Doctor Profiles</h2>
+              <p className="text-sm text-gray-500 mb-5">
+                Describe each doctor's expertise so the AI can guide patients to the right doctor.
+                Write in plain language — e.g. "treats ear pain, hearing loss, sinusitis".
+              </p>
+              {doctors.length === 0 ? (
+                <p className="text-sm text-gray-400">No active doctors found. Add doctors first from the Doctors page.</p>
+              ) : (
+                <div className="space-y-5">
+                  {doctors.map(doctor => (
+                    <div key={doctor.id} className="border border-gray-100 rounded-lg p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0">
+                          {doctor.name?.charAt(0) || 'D'}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{doctor.name}</p>
+                          <p className="text-xs text-gray-400">{doctor.specialization || 'General'}</p>
+                        </div>
+                      </div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Treats / Expertise
+                      </label>
+                      <textarea
+                        rows={2}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        placeholder={`e.g. ${doctor.specialization ? `${doctor.specialization.toLowerCase()} conditions, ` : ''}common symptoms this doctor treats`}
+                        value={profileDescriptions[doctor.id] || ''}
+                        onChange={e => setProfileDescriptions(prev => ({ ...prev, [doctor.id]: e.target.value }))}
+                      />
+                      <div className="flex justify-end mt-2">
+                        <button
+                          onClick={() => saveDoctorProfile(doctor.id)}
+                          disabled={profileSaving[doctor.id]}
+                          className="px-4 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+                        >
+                          {profileSaving[doctor.id] ? 'Saving...' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
       {activeTab === 'billing' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
           <div className="flex items-center justify-between">
