@@ -10,7 +10,12 @@ const client = new GoogleGenerativeAI(
   process.env.GEMINI_API_KEY || ''
 )
 
-const MODEL = 'gemini-2.5-flash'
+const MODELS = {
+  pro: 'gemini-2.5-pro',
+  growth: 'gemini-2.5-flash',
+  starter: 'gemini-2.5-flash'
+}
+const MODEL = 'gemini-2.5-flash' // default fallback
 
 /**
  * Processes an incoming message through Gemini
@@ -40,6 +45,19 @@ async function processMessage(context) {
     if (!process.env.GEMINI_API_KEY) {
       logger.warn('GEMINI_API_KEY not set — AI features disabled')
       return 'Our AI assistant is currently being set up. Please call the clinic directly for assistance.'
+    }
+
+    // Inject doctor profiles for Pro plan clinics
+    if (tenant.plan === 'pro' && tenant.industry === 'clinic') {
+      try {
+        const profilesResult = await pool.query(
+          `SELECT id, name, specialization, profile_description FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true AND profile_description IS NOT NULL AND profile_description != ''`,
+          [tenant.id]
+        )
+        additionalData.doctorProfiles = profilesResult.rows
+      } catch (err) {
+        logger.warn('Failed to fetch doctor profiles for prompt:', err.message)
+      }
     }
 
     // Inject doctor schedules for Pro plan clinics
@@ -252,7 +270,7 @@ async function processMessage(context) {
             const functionResult = await executeFunction(
               name,
               args,
-              { tenant, customer, conversation }
+              { tenant, customer, conversation, latestMessage, doctorProfiles: additionalData.doctorProfiles || [] }
             )
 
             // Handle direct-return signal — bypass Gemini rewrite

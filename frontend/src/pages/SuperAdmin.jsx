@@ -53,7 +53,7 @@ export default function SuperAdmin() {
 
   // Edit modal
   const [editTenant, setEditTenant] = useState(null);
-  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', industry: 'clinic' });
+  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', industry: 'clinic', aiModel: '' });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -127,7 +127,7 @@ export default function SuperAdmin() {
 
   const openEdit = (t) => {
     setEditTenant(t);
-    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', industry: t.industry || 'clinic' });
+    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', industry: t.industry || 'clinic', aiModel: t.ai_model || '' });
     setEditError('');
   };
 
@@ -142,8 +142,8 @@ export default function SuperAdmin() {
     try {
       setEditLoading(true);
       await updateTenant(editTenant.id, editForm);
+      await fetchData();
       closeEditModal();
-      fetchData();
     } catch (err) {
       setEditError(err?.response?.data?.error || 'Failed to update clinic');
     } finally {
@@ -480,6 +480,19 @@ export default function SuperAdmin() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 placeholder="+919876543210"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">AI Model Override <span className="text-gray-400 font-normal">(optional — overrides plan default)</span></label>
+              <select
+                value={editForm.aiModel}
+                onChange={e => setEditForm(f => ({ ...f, aiModel: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="">Use plan default</option>
+                <option value="gemini-2.5-pro">gemini-2.5-pro (Pro quality)</option>
+                <option value="gemini-2.5-flash">gemini-2.5-flash (Balanced)</option>
+                <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Fast)</option>
+              </select>
             </div>
 
             {/* WhatsApp WABA Registration */}

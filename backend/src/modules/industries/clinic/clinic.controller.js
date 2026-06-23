@@ -180,12 +180,13 @@ async function updateDoctor(req, res, next) {
 
     const result = await pool.query(
       `UPDATE clinic_doctors
-       SET name = COALESCE($1, name),
-           specialization = COALESCE($2, specialization),
-           phone = COALESCE($3, phone),
-           qualification = COALESCE($4, qualification),
-           max_tokens_daily = COALESCE($5, max_tokens_daily),
-           consultation_fee = COALESCE($6, consultation_fee)
+       SET name                = COALESCE($1, name),
+           specialization      = COALESCE($2, specialization),
+           phone               = COALESCE($3, phone),
+           qualification       = COALESCE($4, qualification),
+           max_tokens_daily    = COALESCE($5, max_tokens_daily),
+           consultation_fee    = COALESCE($6, consultation_fee),
+           profile_description = COALESCE($9, profile_description)
        WHERE id = $7 AND tenant_id = $8
        RETURNING *`,
       [
@@ -196,7 +197,8 @@ async function updateDoctor(req, res, next) {
         req.body.maxTokensDaily,
         req.body.consultationFee,
         id,
-        tenantId
+        tenantId,
+        req.body.profileDescription !== undefined ? req.body.profileDescription : null
       ]
     );
 
