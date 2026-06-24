@@ -27,3 +27,7 @@ export async function completeBooking(id) {
 export async function markNoShow(id) {
   return api.post(`/bookings/${id}/noshow`);
 }
+
+export async function createManualBooking(data) {
+  return api.post('/bookings/manual', data);
+}
