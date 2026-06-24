@@ -327,14 +327,15 @@ async function createManualBooking(req, res, next) {
 
     // Count existing tokens inside the locked transaction — no race condition
     const tokenCountResult = await client.query(
-      `SELECT COUNT(*) AS count
-       FROM clinic_tokens
+      `SELECT COALESCE(MAX(token_number), 0) AS max_token
+       FROM bookings
        WHERE doctor_id = $1
-       AND issued_at::date = CURRENT_DATE
-       AND status != 'cancelled'`,
-      [doctorId]
+       AND booking_date = $2
+       AND status != 'cancelled'
+       AND tenant_id = $3`,
+      [doctorId, bookingDate || new Date().toISOString().split('T')[0], tenantId]
     );
-    const tokenNumber = parseInt(tokenCountResult.rows[0].count) + 1;
+    const tokenNumber = parseInt(tokenCountResult.rows[0].max_token) + 1;
 
     // Insert booking
     const bRes = await client.query(
