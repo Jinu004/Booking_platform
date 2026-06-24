@@ -317,7 +317,8 @@ async function createManualBooking(req, res, next) {
              RETURNING id`,
             [tenantId, customerId, patientNameClean, normalizedPhone]
           );
-          patientId = newPatient.rows[0].id;
+          logger.info('Patient insert result:', JSON.stringify({ rows: newPatient.rows, rowCount: newPatient.rowCount, tenantId, customerId, patientNameClean }));
+          patientId = newPatient.rows[0]?.id || null;
         }
       } catch (patientErr) {
         logger.warn('Patient find-or-create failed in manual booking (non-fatal):', JSON.stringify({ message: patientErr.message, code: patientErr.code, detail: patientErr.detail, stack: patientErr.stack?.split('\n')[0] }));
