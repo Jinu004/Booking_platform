@@ -320,7 +320,7 @@ async function createManualBooking(req, res, next) {
           patientId = newPatient.rows[0].id;
         }
       } catch (patientErr) {
-        logger.warn('Patient find-or-create failed in manual booking (non-fatal):', patientErr.message);
+        logger.warn('Patient find-or-create failed in manual booking (non-fatal):', JSON.stringify({ message: patientErr.message, code: patientErr.code, detail: patientErr.detail, stack: patientErr.stack?.split('\n')[0] }));
         patientId = null;
       }
     }
