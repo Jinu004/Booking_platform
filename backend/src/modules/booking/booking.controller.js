@@ -242,7 +242,10 @@ async function exportBookings(req, res, next) {
  */
 async function createManualBooking(req, res, next) {
   const tenantId = req.tenant.id;
-  const { patientName, patientPhone, doctorId, notes, bookingDate, sendWhatsapp } = req.body;
+  const { patientName, patientPhone, notes, bookingDate, sendWhatsapp } = req.body
+  const doctorId = req.staff?.role === 'doctor' && req.staff?.doctor_id
+    ? req.staff.doctor_id
+    : req.body.doctorId
 
   // Normalize phone to +91XXXXXXXXXX format
   const normalizedPhone = (() => {
