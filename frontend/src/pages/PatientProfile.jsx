@@ -431,7 +431,8 @@ export default function PatientProfile() {
         patientPhone: customer?.phone,
         doctorId: scheduleForm.doctorId,
         bookingDate: scheduleForm.bookingDate,
-        notes: scheduleForm.notes
+        notes: scheduleForm.notes,
+        sendWhatsapp: true
       })
       setScheduleModal(false)
       await loadData()
