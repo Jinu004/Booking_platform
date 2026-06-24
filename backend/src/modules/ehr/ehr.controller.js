@@ -51,10 +51,16 @@ async function getPatients(req, res, next) {
 async function getPatient(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
-    const patientId = req.params.patientId || req.params.customerId;
-    if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
-    const [patientRes, conditionsRes, visitNotesRes, bookingsRes] = await Promise.all([
-      pool.query(`SELECT * FROM patients WHERE id = $1 AND tenant_id = $2`, [patientId, req.tenantId]),
+    const rawId = req.params.patientId || req.params.customerId;
+    if (!isUUID(rawId)) return errorResponse(res, 'Invalid patient ID', 400);
+    // Resolve real patient.id — accepts either patient.id or customer_id
+    const patientRes = await pool.query(
+      `SELECT * FROM patients WHERE (id = $1 OR customer_id = $1) AND tenant_id = $2 LIMIT 1`,
+      [rawId, req.tenantId]
+    );
+    if (!patientRes.rows.length) return errorResponse(res, 'Patient not found', 404);
+    const patientId = patientRes.rows[0].id;
+    const [conditionsRes, visitNotesRes, bookingsRes] = await Promise.all([
       pool.query(`SELECT * FROM patient_conditions WHERE patient_id = $1 AND tenant_id = $2 ORDER BY created_at DESC`, [patientId, req.tenantId]),
       pool.query(`
         SELECT vn.*, d.name as doctor_name, d.specialization as doctor_specialization
@@ -71,7 +77,6 @@ async function getPatient(req, res, next) {
         ORDER BY b.booking_date DESC
       `, [patientId, req.tenantId])
     ]);
-    if (!patientRes.rows.length) return errorResponse(res, 'Patient not found', 404);
     const patientRow = patientRes.rows[0];
     return successResponse(res, {
       customer: patientRow,
