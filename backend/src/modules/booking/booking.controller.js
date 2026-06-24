@@ -242,7 +242,7 @@ async function exportBookings(req, res, next) {
  */
 async function createManualBooking(req, res, next) {
   const tenantId = req.tenant.id;
-  const { patientName, patientPhone, doctorId, notes, bookingDate } = req.body;
+  const { patientName, patientPhone, doctorId, notes, bookingDate, sendWhatsapp } = req.body;
 
   // Normalize phone to +91XXXXXXXXXX format
   const normalizedPhone = (() => {
@@ -360,16 +360,20 @@ async function createManualBooking(req, res, next) {
     const docRes = await pool.query('SELECT name FROM clinic_doctors WHERE id = $1', [doctorId]);
     booking.patient_phone = normalizedPhone;
     booking.doctor_name = docRes.rows[0]?.name;
-    // Send WhatsApp confirmation to patient
-    try {
-      const doctorName = docRes.rows[0]?.name || 'your doctor'
-      const apptDate = new Date(bookingDate || new Date()).toLocaleDateString('en-IN', {
-        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata'
+    // Send WhatsApp confirmation in background only if requested
+    if (sendWhatsapp) {
+      setImmediate(async () => {
+        try {
+          const doctorName = docRes.rows[0]?.name || 'your doctor'
+          const apptDate = new Date(bookingDate || new Date()).toLocaleDateString('en-IN', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata'
+          })
+          const msg = `Hi ${patientNameClean}, your next appointment has been scheduled with ${doctorName} on ${apptDate}. Token: ${tokenNumber}. Please arrive on time. Reply CANCEL to cancel.`
+          await sendMessage(normalizedPhone, msg)
+        } catch (waErr) {
+          logger.warn('WhatsApp confirmation failed for manual booking:', waErr.message)
+        }
       })
-      const msg = `Hi ${patientNameClean}, your next appointment has been scheduled with ${doctorName} on ${apptDate}. Token: ${tokenNumber}. Please arrive on time. Reply CANCEL to cancel.`
-      await sendMessage(normalizedPhone, msg)
-    } catch (waErr) {
-      logger.warn('WhatsApp confirmation failed for manual booking:', waErr.message)
     }
     return successResponse(res, booking, 201);
   } catch (error) {
