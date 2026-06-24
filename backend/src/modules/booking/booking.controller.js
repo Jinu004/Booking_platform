@@ -301,28 +301,26 @@ async function createManualBooking(req, res, next) {
     // Find or create patient record
     let patientId = null;
     const patientNameClean = cleanPatientName;
-    logger.info('Patient block check:', JSON.stringify({ customerId, patientNameClean, tenantId }));
     if (customerId) {
       try {
-        const existingPatient = await pool.query(
+        const existingPatient = await client.query(
           `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
           [tenantId, customerId, patientNameClean]
         );
         if (existingPatient.rows.length > 0) {
           patientId = existingPatient.rows[0].id;
         } else {
-          const newPatient = await pool.query(
+          const newPatient = await client.query(
             `INSERT INTO patients (tenant_id, customer_id, name, phone)
              VALUES ($1, $2, $3, $4)
              ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
              RETURNING id`,
             [tenantId, customerId, patientNameClean, normalizedPhone]
           );
-          logger.info('Patient insert result:', JSON.stringify({ rows: newPatient.rows, rowCount: newPatient.rowCount, tenantId, customerId, patientNameClean }));
           patientId = newPatient.rows[0]?.id || null;
         }
       } catch (patientErr) {
-        logger.warn('Patient find-or-create failed in manual booking (non-fatal):', JSON.stringify({ message: patientErr.message, code: patientErr.code, detail: patientErr.detail, stack: patientErr.stack?.split('\n')[0] }));
+        logger.warn('Patient find-or-create failed in manual booking (non-fatal):', patientErr.message, patientErr.code, patientErr.detail);
         patientId = null;
       }
     }
