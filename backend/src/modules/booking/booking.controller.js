@@ -301,6 +301,7 @@ async function createManualBooking(req, res, next) {
     // Find or create patient record
     let patientId = null;
     const patientNameClean = cleanPatientName;
+    logger.info('Patient block check:', JSON.stringify({ customerId, patientNameClean, tenantId }));
     if (customerId) {
       try {
         const existingPatient = await pool.query(
