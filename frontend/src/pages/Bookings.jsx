@@ -8,11 +8,13 @@ import { getDoctors } from '../services/clinic.service';
 import api from '../utils/api';
 import TokenReceipt from '../components/shared/TokenReceipt';
 import useStore from '../store/useStore';
+import { getStoredStaff } from '../services/auth.service';
 import { TableRowSkeleton, StatCardSkeleton } from '../components/shared/Skeleton';
 import { saveToCache, loadFromCache } from '../utils/offlineCache';
 
 const Bookings = () => {
   const { addToast } = useStore();
+  const staff = getStoredStaff();
   const [bookings, setBookings] = useState([]);
   const [stats, setStats] = useState({ total: 0, confirmed: 0, completed: 0, noshow: 0 });
   const [loading, setLoading] = useState(true);
@@ -313,10 +315,11 @@ const Bookings = () => {
 
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Assign Doctor <span className="text-red-500">*</span></label>
-                <select 
+                <select
                   required
-                  value={newBooking.doctorId}
-                  onChange={e => setNewBooking({...newBooking, doctorId: e.target.value})}
+                  value={staff?.role === 'doctor' ? staff.doctor_id : newBooking.doctorId}
+                  onChange={e => staff?.role !== 'doctor' && setNewBooking(b => ({ ...b, doctorId: e.target.value }))}
+                  disabled={staff?.role === 'doctor'}
                   className="block w-full rounded-md border border-gray-300 p-2 bg-gray-50 font-medium"
                 >
                   <option value="">Select Doctor...</option>

@@ -5,6 +5,7 @@ const pool = require('../../config/database');
 const logger = require('../../utils/logger');
 
 // UUID v4 format validation helper
+const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter')
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 // Phone: 7–15 digits optionally prefixed with +
 const isPhone = (str) => /^\+?\d{7,15}$/.test(str);
@@ -241,7 +242,10 @@ async function exportBookings(req, res, next) {
  */
 async function createManualBooking(req, res, next) {
   const tenantId = req.tenant.id;
-  const { patientName, patientPhone, doctorId, notes } = req.body;
+  const { patientName, patientPhone, notes, bookingDate, sendWhatsapp } = req.body
+  const doctorId = req.staff?.role === 'doctor' && req.staff?.doctor_id
+    ? req.staff.doctor_id
+    : req.body.doctorId
 
   // Normalize phone to +91XXXXXXXXXX format
   const normalizedPhone = (() => {
@@ -302,46 +306,47 @@ async function createManualBooking(req, res, next) {
     const patientNameClean = cleanPatientName;
     if (customerId) {
       try {
-        const existingPatient = await pool.query(
+        const existingPatient = await client.query(
           `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
           [tenantId, customerId, patientNameClean]
         );
         if (existingPatient.rows.length > 0) {
           patientId = existingPatient.rows[0].id;
         } else {
-          const newPatient = await pool.query(
+          const newPatient = await client.query(
             `INSERT INTO patients (tenant_id, customer_id, name, phone)
              VALUES ($1, $2, $3, $4)
              ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
              RETURNING id`,
             [tenantId, customerId, patientNameClean, normalizedPhone]
           );
-          patientId = newPatient.rows[0].id;
+          patientId = newPatient.rows[0]?.id || null;
         }
       } catch (patientErr) {
-        logger.warn('Patient find-or-create failed in manual booking (non-fatal):', patientErr.message);
+        logger.warn('Patient find-or-create failed in manual booking (non-fatal):', patientErr.message, patientErr.code, patientErr.detail);
         patientId = null;
       }
     }
 
     // Count existing tokens inside the locked transaction — no race condition
     const tokenCountResult = await client.query(
-      `SELECT COUNT(*) AS count
-       FROM clinic_tokens
+      `SELECT COALESCE(MAX(token_number), 0) AS max_token
+       FROM bookings
        WHERE doctor_id = $1
-       AND issued_at::date = CURRENT_DATE
-       AND status != 'cancelled'`,
-      [doctorId]
+       AND booking_date = $2
+       AND status != 'cancelled'
+       AND tenant_id = $3`,
+      [doctorId, bookingDate || new Date().toISOString().split('T')[0], tenantId]
     );
-    const tokenNumber = parseInt(tokenCountResult.rows[0].count) + 1;
+    const tokenNumber = parseInt(tokenCountResult.rows[0].max_token) + 1;
 
     // Insert booking
     const bRes = await client.query(
       `INSERT INTO bookings
          (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes, patient_name, patient_id)
-       VALUES ($1, $2, $3, 'walkin', 'pending', CURRENT_DATE, $4, $5, $6, $7)
+       VALUES ($1, $2, $3, 'walkin', 'pending', $8, $4, $5, $6, $7)
        RETURNING *`,
-      [tenantId, customerId, doctorId, tokenNumber, cleanNotes, patientNameClean, patientId]
+      [tenantId, customerId, doctorId, tokenNumber, cleanNotes, patientNameClean, patientId, bookingDate || new Date().toISOString().split('T')[0]]
     );
     const booking = bRes.rows[0];
 
@@ -358,7 +363,21 @@ async function createManualBooking(req, res, next) {
     const docRes = await pool.query('SELECT name FROM clinic_doctors WHERE id = $1', [doctorId]);
     booking.patient_phone = normalizedPhone;
     booking.doctor_name = docRes.rows[0]?.name;
-
+    // Send WhatsApp confirmation in background only if requested
+    if (sendWhatsapp) {
+      setImmediate(async () => {
+        try {
+          const doctorName = docRes.rows[0]?.name || 'your doctor'
+          const apptDate = new Date(bookingDate || new Date()).toLocaleDateString('en-IN', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata'
+          })
+          const msg = `Hi ${patientNameClean}, your next appointment has been scheduled with ${doctorName} on ${apptDate}. Token: ${tokenNumber}. Please arrive on time. Reply CANCEL to cancel.`
+          await sendMessage(normalizedPhone, msg)
+        } catch (waErr) {
+          logger.warn('WhatsApp confirmation failed for manual booking:', waErr.message)
+        }
+      })
+    }
     return successResponse(res, booking, 201);
   } catch (error) {
     await client.query('ROLLBACK');
