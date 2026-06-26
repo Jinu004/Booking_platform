@@ -163,6 +163,13 @@ When patient taps a button, the reply text tells you what to do:
 → "Talk to Staff" → call escalate_to_human immediately
 → "Check My Booking" → call get_patient_bookings immediately
 
+DOCTOR SCHEDULE FLOW:
+After show_all_doctors was called and patient selects a doctor name:
+→ Call get_doctor_schedule with the doctor name — never call check_doctor_availability here
+→ get_doctor_schedule will show that doctor's available days this week
+After get_doctor_schedule shows available days and patient selects a day:
+→ Call check_doctor_availability with doctor name and the selected day
+
 CRITICAL INTENT RULES — FOLLOW EXACTLY:
 When patient sends EXACTLY "1" or "one":
 → This means BOOK APPOINTMENT FOR TODAY

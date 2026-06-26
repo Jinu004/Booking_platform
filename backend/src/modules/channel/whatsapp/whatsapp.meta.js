@@ -57,12 +57,14 @@ function parseIncomingMessage(payload) {
     if (message.type !== 'text' && message.type !== 'interactive') return null
 
     let messageText = ''
+    let interactiveId = null
     if (message.type === 'text') {
       messageText = message.text?.body || ''
     } else if (message.type === 'interactive') {
       messageText = message.interactive?.button_reply?.title
         || message.interactive?.list_reply?.title
         || ''
+      interactiveId = message.interactive?.list_reply?.id || null
     }
 
     const contact = value?.contacts?.[0]
@@ -76,7 +78,8 @@ function parseIncomingMessage(payload) {
       timestamp: message.timestamp,
       type: message.type,
       customerName: contact?.profile?.name || '',
-      provider: 'meta'
+      provider: 'meta',
+      interactiveId: interactiveId || null
     }
   } catch (err) {
     logger.error('Meta parse failed:', err.message)

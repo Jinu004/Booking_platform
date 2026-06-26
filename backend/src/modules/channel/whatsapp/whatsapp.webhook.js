@@ -153,7 +153,8 @@ router.post('/', async (req, res) => {
           recentMessages: context.recentMessages,
           session: context.session,
           configs,
-          additionalData
+          additionalData,
+          interactiveId: message.interactiveId || null
         })
 
 

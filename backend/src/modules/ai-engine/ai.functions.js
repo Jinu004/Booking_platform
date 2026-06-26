@@ -53,6 +53,17 @@ function getFunctionDefinitions(industry) {
       }
     },
     {
+      name: 'get_doctor_schedule',
+      description: 'Gets a specific doctor\'s available days and sessions this week. Call this after show_all_doctors when patient selects a doctor to see their weekly schedule.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          doctor_name: { type: 'STRING', description: 'Name of the doctor selected' }
+        },
+        required: ['doctor_name']
+      }
+    },
+    {
       name: 'check_doctor_availability',
       description: 'Check if a specific doctor is available today and how many tokens remain',
       parameters: {

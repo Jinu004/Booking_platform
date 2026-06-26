@@ -38,7 +38,8 @@ async function processMessage(context) {
     conversation,
     recentMessages,
     configs = {},
-    additionalData = {}
+    additionalData = {},
+    interactiveId
   } = context
 
   try {
@@ -270,7 +271,7 @@ async function processMessage(context) {
             const functionResult = await executeFunction(
               name,
               args,
-              { tenant, customer, conversation, latestMessage, doctorProfiles: additionalData.doctorProfiles || [] }
+              { tenant, customer, conversation, latestMessage, interactiveId, doctorProfiles: additionalData.doctorProfiles || [] }
             )
 
             // Handle direct-return signal — bypass Gemini rewrite
