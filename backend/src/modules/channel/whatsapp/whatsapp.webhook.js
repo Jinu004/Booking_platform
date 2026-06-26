@@ -157,7 +157,10 @@ router.post('/', async (req, res) => {
 
 
         isAIError = typeof aiResponse === 'object' && aiResponse.error
-        if (isAIError) {
+        const isInteractiveSent = typeof aiResponse === 'object' && aiResponse.interactiveSent
+        if (isInteractiveSent) {
+          aiResponse = aiResponse.text  // use text for DB/Gemini context
+        } else if (isAIError) {
           aiResponse = aiResponse.text
         } else if (aiResponse?.escalated) {
           isEscalated = true
@@ -187,16 +190,16 @@ if (!isAIError && !isEscalated) {
   })
   await ConversationService.saveOutboundMessage(
     context.conversation.id,
-    aiResponse === '__INTERACTIVE_SENT__' ? '[Interactive doctor list sent]' : aiResponse,
+    aiResponse,
     'assistant'
   )
   HITLService.broadcastToTenant(tenant.id, 'new_message', {
     conversationId: context.conversation.id,
-    message: { role: 'assistant', content: aiResponse === '__INTERACTIVE_SENT__' ? '[Interactive doctor list sent]' : aiResponse, created_at: new Date().toISOString() }
+    message: { role: 'assistant', content: aiResponse, created_at: new Date().toISOString() }
   })
 }
 
-if (!isEscalated && aiResponse && aiResponse !== '__INTERACTIVE_SENT__') {
+if (!isEscalated && !isInteractiveSent && aiResponse) {
   await sendMessage(message.from, aiResponse)
 }
 

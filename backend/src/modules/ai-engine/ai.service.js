@@ -276,9 +276,12 @@ async function processMessage(context) {
             // Handle direct-return signal — bypass Gemini rewrite
             if (typeof functionResult === 'string' && functionResult.startsWith('DIRECT:')) {
               const directContent = functionResult.slice(7).trim()
-              // Interactive list sentinel — extract text portion for DB/Gemini context
+              // Interactive list sentinel — return structured object so webhook can skip sendMessage
               if (directContent.startsWith('__INTERACTIVE_SENT__::')) {
-                return directContent.slice('__INTERACTIVE_SENT__::'.length)
+                return {
+                  interactiveSent: true,
+                  text: directContent.slice('__INTERACTIVE_SENT__::'.length)
+                }
               }
               return directContent
             }
