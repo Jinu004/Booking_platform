@@ -17,6 +17,15 @@ function getFunctionDefinitions(industry) {
       }
     },
     {
+      name: 'show_welcome',
+      description: 'Shows the welcome message with today\'s available doctors as an interactive list and option buttons. Call this when patient sends their first message, says hi/hello, or needs to see the main menu.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {},
+        required: []
+      }
+    },
+    {
       name: 'get_available_doctors',
       description: 'Gets list of all doctors available today with their specialization, tokens remaining and session start time. Call this when patient wants to book an appointment and you need to show them which doctors are available.',
       parameters: {

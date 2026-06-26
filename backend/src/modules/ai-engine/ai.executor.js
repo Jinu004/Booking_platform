@@ -52,7 +52,71 @@ async function executeFunction(name, args, ctx) {
 📅 Weekly off: ${configs.weekly_off || 'Sunday'}`
       }
 
-      case 'get_available_doctors': {
+      case 'show_welcome': {
+      // Only for clinic industry
+      if (tenant.industry !== 'clinic') break
+
+      const { sendDoctorList, sendButtons } = require('../channel/whatsapp/whatsapp.adapter')
+      const nowISTW = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+      const todayDowW = nowISTW.getDay()
+      const nowTimeW = nowISTW.getHours() * 60 + nowISTW.getMinutes()
+      const fmtW = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` }
+
+      const welcomeRes = await pool.query(`
+        SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+               ds.start_time, ds.end_time,
+               COUNT(b.id) FILTER (WHERE b.status != 'cancelled') AS booked_count
+        FROM clinic_doctors cd
+        JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
+        LEFT JOIN bookings b ON b.doctor_id = cd.id AND b.booking_date = CURRENT_DATE AND b.tenant_id = $1
+        WHERE cd.tenant_id = $1 AND cd.available_today = true AND cd.is_active = true
+          AND (EXTRACT(HOUR FROM ds.end_time) * 60 + EXTRACT(MINUTE FROM ds.end_time)) > $3
+        GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily, ds.start_time, ds.end_time
+        ORDER BY cd.name ASC
+      `, [tenant.id, todayDowW, nowTimeW])
+
+      const customerPhone = ctx.customer?.phone
+      const hasDoctors = welcomeRes.rows.length > 0
+
+      const textList = hasDoctors
+        ? welcomeRes.rows.map(doc => {
+            const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
+            return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${fmtW(doc.start_time)} - ${fmtW(doc.end_time)} — ${remaining} tokens available`
+          }).join('\n\n')
+        : 'No doctors available today.'
+
+      const contextText = `Hello! Welcome to ${tenant.name} 👋\n\n${textList}\n\nOptions: Book Another Day | Talk to Staff | Check My Booking`
+
+      if (customerPhone && hasDoctors) {
+        const listItems = welcomeRes.rows.map(doc => {
+          const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
+          return {
+            id: doc.id,
+            title: doc.name.slice(0, 24),
+            description: `${doc.specialization || 'General'} — ${fmtW(doc.start_time)} - ${fmtW(doc.end_time)} (${remaining} left)`.slice(0, 72)
+          }
+        })
+
+        try {
+          await sendDoctorList(customerPhone, `Hello! Welcome to ${tenant.name} 👋\nHere are today's available doctors:`, listItems)
+          await sendButtons(customerPhone, 'Need something else?', [
+            { id: 'book_other_day', title: 'Book Another Day' },
+            { id: 'talk_to_staff', title: 'Talk to Staff' },
+            { id: 'check_booking', title: 'Check My Booking' }
+          ])
+          return `DIRECT:__INTERACTIVE_SENT__::${contextText}`
+        } catch (err) {
+          logger.warn('show_welcome interactive failed, falling back to text:', err.message)
+        }
+      }
+
+      if (!hasDoctors) {
+        return `DIRECT:Hello! Welcome to ${tenant.name} 👋\n\nNo doctors are available today.\n\nPlease choose an option:\n1️⃣ Book Another Day\n2️⃣ Talk to Staff\n3️⃣ Check My Booking`
+      }
+      return `DIRECT:Hello! Welcome to ${tenant.name} 👋\n\nPlease choose an option:\n1️⃣ Book Appointment — Today\n2️⃣ Book Tomorrow\n3️⃣ Talk to Staff\n4️⃣ Check My Booking`
+    }
+
+    case 'get_available_doctors': {
         const todayDowAD = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
         const doctorsResult = await pool.query(
           `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
