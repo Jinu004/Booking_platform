@@ -35,6 +35,15 @@ function getFunctionDefinitions(industry) {
       }
     },
     {
+      name: 'show_all_doctors',
+      description: 'Shows all active doctors with their next available day. Call this when patient taps Book Another Day button or wants to book for a future date.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {},
+        required: []
+      }
+    },
+    {
       name: 'get_available_doctors_tomorrow',
       description: 'Gets list of all doctors available tomorrow with their specialization, session times and tokens remaining. Call this when patient selects option 2 (Book for Tomorrow) and you need to show which doctors are available the next day.',
       parameters: {
