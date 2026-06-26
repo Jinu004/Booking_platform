@@ -107,7 +107,7 @@ async function executeFunction(name, args, ctx) {
           if (customerPhone) {
             try {
               await sendDoctorList(customerPhone, 'Please select a doctor to book your appointment', listItems)
-              return 'DIRECT:__INTERACTIVE_SENT__'
+              return `DIRECT:__INTERACTIVE_SENT__::Let me show you our available doctors 😊\n\n${doctorList}\n\nReply with the doctor's name to book.`
             } catch (err) {
               logger.warn('sendDoctorList failed, falling back to text list:', err.message)
               return `DIRECT:Let me show you our available doctors 😊\n\n${doctorList}\n\nReply with the doctor's name to book.`

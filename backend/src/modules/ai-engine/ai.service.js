@@ -275,7 +275,12 @@ async function processMessage(context) {
 
             // Handle direct-return signal — bypass Gemini rewrite
             if (typeof functionResult === 'string' && functionResult.startsWith('DIRECT:')) {
-              return functionResult.slice(7).trim();
+              const directContent = functionResult.slice(7).trim()
+              // Interactive list sentinel — extract text portion for DB/Gemini context
+              if (directContent.startsWith('__INTERACTIVE_SENT__::')) {
+                return directContent.slice('__INTERACTIVE_SENT__::'.length)
+              }
+              return directContent
             }
 
             // Handle escalation signal
