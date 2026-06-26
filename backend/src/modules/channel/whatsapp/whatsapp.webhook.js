@@ -144,6 +144,7 @@ router.post('/', async (req, res) => {
       let aiResponse
       let isAIError = false
       let isEscalated = false
+      let isInteractiveSent = false
       try {
         aiResponse = await AIService.processMessage({
           tenant,
@@ -157,7 +158,7 @@ router.post('/', async (req, res) => {
 
 
         isAIError = typeof aiResponse === 'object' && aiResponse.error
-        let isInteractiveSent = typeof aiResponse === 'object' && aiResponse.interactiveSent
+        isInteractiveSent = typeof aiResponse === 'object' && aiResponse.interactiveSent
         if (isInteractiveSent) {
           aiResponse = aiResponse.text  // use text for DB/Gemini context
         } else if (isAIError) {
