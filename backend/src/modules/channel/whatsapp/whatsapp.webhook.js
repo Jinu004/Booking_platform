@@ -192,7 +192,7 @@ if (!isAIError && !isEscalated) {
   )
   HITLService.broadcastToTenant(tenant.id, 'new_message', {
     conversationId: context.conversation.id,
-    message: { role: 'assistant', content: aiResponse, created_at: new Date().toISOString() }
+    message: { role: 'assistant', content: aiResponse === '__INTERACTIVE_SENT__' ? '[Interactive doctor list sent]' : aiResponse, created_at: new Date().toISOString() }
   })
 }
 
