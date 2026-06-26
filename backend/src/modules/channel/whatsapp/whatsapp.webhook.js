@@ -157,7 +157,7 @@ router.post('/', async (req, res) => {
 
 
         isAIError = typeof aiResponse === 'object' && aiResponse.error
-        const isInteractiveSent = typeof aiResponse === 'object' && aiResponse.interactiveSent
+        let isInteractiveSent = typeof aiResponse === 'object' && aiResponse.interactiveSent
         if (isInteractiveSent) {
           aiResponse = aiResponse.text  // use text for DB/Gemini context
         } else if (isAIError) {
