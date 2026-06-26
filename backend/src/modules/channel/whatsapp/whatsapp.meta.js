@@ -60,7 +60,9 @@ function parseIncomingMessage(payload) {
     if (message.type === 'text') {
       messageText = message.text?.body || ''
     } else if (message.type === 'interactive') {
-      messageText = message.interactive?.button_reply?.title || ''
+      messageText = message.interactive?.button_reply?.title
+        || message.interactive?.list_reply?.title
+        || ''
     }
 
     const contact = value?.contacts?.[0]
