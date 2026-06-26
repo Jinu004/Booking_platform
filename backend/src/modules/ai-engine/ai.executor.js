@@ -91,6 +91,29 @@ async function executeFunction(name, args, ctx) {
           const sessionTime = `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
           return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime} — ${remaining} tokens available`
         }).join('\n\n')
+        // Pro plan — send interactive list message directly, bypass Gemini
+        if (tenant.plan === 'pro') {
+          const { sendDoctorList } = require('../channel/whatsapp/whatsapp.adapter')
+          const listItems = doctorsResult.rows.map(doc => {
+            const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
+            const sessionTime = `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
+            return {
+              id: doc.id,
+              title: doc.name.slice(0, 24),
+              description: `${doc.specialization || 'General'} — ${sessionTime} (${remaining} left)`.slice(0, 72)
+            }
+          })
+          const customerPhone = ctx.customer?.phone
+          if (customerPhone) {
+            try {
+              await sendDoctorList(customerPhone, 'Please select a doctor to book your appointment', listItems)
+              return 'DIRECT:__INTERACTIVE_SENT__'
+            } catch (err) {
+              logger.warn('sendDoctorList failed, falling back to text list:', err.message)
+              return `DIRECT:Let me show you our available doctors 😊\n\n${doctorList}\n\nReply with the doctor's name to book.`
+            }
+          }
+        }
         return `DIRECT:Let me show you our available doctors 😊\n\n${doctorList}\n\nReply with the doctor's name to book.`
 
       }

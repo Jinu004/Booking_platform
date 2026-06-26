@@ -187,7 +187,7 @@ if (!isAIError && !isEscalated) {
   })
   await ConversationService.saveOutboundMessage(
     context.conversation.id,
-    aiResponse,
+    aiResponse === '__INTERACTIVE_SENT__' ? '[Interactive doctor list sent]' : aiResponse,
     'assistant'
   )
   HITLService.broadcastToTenant(tenant.id, 'new_message', {
@@ -196,7 +196,7 @@ if (!isAIError && !isEscalated) {
   })
 }
 
-if (!isEscalated) {
+if (!isEscalated && aiResponse && aiResponse !== '__INTERACTIVE_SENT__') {
   await sendMessage(message.from, aiResponse)
 }
 
