@@ -182,6 +182,71 @@ async function executeFunction(name, args, ctx) {
 
       }
 
+      case 'show_all_doctors': {
+      const { sendDoctorList } = require('../channel/whatsapp/whatsapp.adapter')
+      const nowISTAD = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+      const todayDowAD2 = nowISTAD.getDay()
+      const dayNamesAD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+      // Get all active doctors with their next available day after today
+      const allDoctorsRes = await pool.query(`
+        SELECT cd.id, cd.name, cd.specialization,
+               ds.day_of_week, ds.start_time, ds.end_time
+        FROM clinic_doctors cd
+        JOIN doctor_schedules ds ON ds.doctor_id = cd.id
+          AND ds.is_available = true
+          AND ds.day_of_week != $2
+        WHERE cd.tenant_id = $1 AND cd.is_active = true AND cd.leave_days != 999
+        ORDER BY cd.name ASC,
+          CASE WHEN ds.day_of_week > $2 THEN ds.day_of_week - $2
+               ELSE ds.day_of_week + 7 - $2
+          END ASC
+      `, [tenant.id, todayDowAD2])
+
+      if (!allDoctorsRes.rows.length) {
+        return `DIRECT:No doctors are available in the coming days. Please contact the clinic directly.`
+      }
+
+      // Pick earliest next available day per doctor
+      const doctorMap = new Map()
+      for (const row of allDoctorsRes.rows) {
+        if (!doctorMap.has(row.id)) {
+          doctorMap.set(row.id, row)
+        }
+      }
+      const doctors = Array.from(doctorMap.values())
+
+      const fmtAD2 = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` }
+      const daysFromToday = d => d > todayDowAD2 ? d - todayDowAD2 : d + 7 - todayDowAD2
+
+      const listItems = doctors.map(doc => {
+        const daysAway = daysFromToday(doc.day_of_week)
+        const dayLabel = daysAway === 1 ? 'Tomorrow' : dayNamesAD[doc.day_of_week]
+        return {
+          id: doc.id,
+          title: doc.name.slice(0, 24),
+          description: `${doc.specialization || 'General'} — ${dayLabel} ${fmtAD2(doc.start_time)}`.slice(0, 72)
+        }
+      })
+
+      const textList = doctors.map(doc => {
+        const daysAway = daysFromToday(doc.day_of_week)
+        const dayLabel = daysAway === 1 ? 'Tomorrow' : dayNamesAD[doc.day_of_week]
+        return `🩺 ${doc.name} (${doc.specialization}) — Next: ${dayLabel} ${fmtAD2(doc.start_time)}`
+      }).join('\n')
+
+      const customerPhone = ctx.customer?.phone
+      if (customerPhone) {
+        try {
+          await sendDoctorList(customerPhone, 'Select a doctor to see their available days:', listItems)
+          return `DIRECT:__INTERACTIVE_SENT__::Select a doctor to see their available days:\n\n${textList}`
+        } catch (err) {
+          logger.warn('show_all_doctors interactive failed:', err.message)
+        }
+      }
+      return `DIRECT:Here are our doctors and their next available day:\n\n${textList}\n\nReply with the doctor name to see their schedule.`
+    }
+
       case 'get_available_doctors_tomorrow': {
         // Compute tomorrow in IST to avoid UTC date boundary issues
         const nowIST_td = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
