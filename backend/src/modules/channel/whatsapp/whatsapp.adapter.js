@@ -62,7 +62,6 @@ function parseIncoming(payload, source) {
  * @param {Array} buttons - [{ id, title }]
  */
 async function sendButtons(to, bodyText, buttons) {
-  await randomDelay(2000, 5000)
   const provider = getProvider()
 
   if (provider === 'meta') {
@@ -84,7 +83,6 @@ async function sendButtons(to, bodyText, buttons) {
  * @param {Array} items - [{ id, title, description }]
  */
 async function sendDoctorList(to, bodyText, items) {
-  await randomDelay(2000, 5000)
   const provider = getProvider()
 
   if (provider === 'meta') {
