@@ -303,6 +303,108 @@ async function executeFunction(name, args, ctx) {
         return `DIRECT:Doctors available tomorrow (${dayNamesTd[tomorrowDowTd]}):\n\n${doctorList}\n\nReply with the doctor's name to book.`
       }
 
+      case 'get_doctor_schedule': {
+      const { sendButtons } = require('../channel/whatsapp/whatsapp.adapter')
+      const doctorNameGDS = (args.doctor_name || '').trim()
+      const nowISTGDS = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+      const todayDowGDS = nowISTGDS.getDay()
+      const dayNamesGDS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      const fmtGDS = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` }
+
+      // Find doctor by id (from interactiveId) or name
+      let doctorIdGDS = ctx.interactiveId || null
+      if (!doctorIdGDS) {
+        const docSearch = await pool.query(
+          `SELECT id FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true AND LOWER(name) LIKE LOWER($2) LIMIT 1`,
+          [tenant.id, `%${doctorNameGDS}%`]
+        )
+        doctorIdGDS = docSearch.rows[0]?.id
+      }
+      if (!doctorIdGDS) return `DIRECT:Sorry, I couldn't find that doctor. Please try again.`
+
+      // Get doctor details
+      const docResGDS = await pool.query(
+        `SELECT name, specialization FROM clinic_doctors WHERE id = $1 AND tenant_id = $2`,
+        [doctorIdGDS, tenant.id]
+      )
+      if (!docResGDS.rows.length) return `DIRECT:Sorry, I couldn't find that doctor. Please try again.`
+      const doctorGDS = docResGDS.rows[0]
+
+      // Get all sessions this week for this doctor (excluding today)
+      const schedRes = await pool.query(`
+        SELECT day_of_week, start_time, end_time
+        FROM doctor_schedules
+        WHERE tenant_id = $1 AND doctor_id = $2 AND is_available = true
+          AND day_of_week != $3
+        ORDER BY
+          CASE WHEN day_of_week > $3 THEN day_of_week - $3
+               ELSE day_of_week + 7 - $3
+          END ASC,
+          start_time ASC
+      `, [tenant.id, doctorIdGDS, todayDowGDS])
+
+      if (!schedRes.rows.length) {
+        return `DIRECT:${doctorGDS.name} has no upcoming sessions scheduled this week. Please contact the clinic for more information.`
+      }
+
+      // Group sessions by day
+      const dayMap = new Map()
+      for (const row of schedRes.rows) {
+        const daysAway = row.day_of_week > todayDowGDS
+          ? row.day_of_week - todayDowGDS
+          : row.day_of_week + 7 - todayDowGDS
+        const dayLabel = daysAway === 1 ? 'Tomorrow' : dayNamesGDS[row.day_of_week]
+        const key = row.day_of_week
+        if (!dayMap.has(key)) dayMap.set(key, { dayLabel, daysAway, sessions: [], dayOfWeek: row.day_of_week })
+        dayMap.get(key).sessions.push({ start: row.start_time, end: row.end_time })
+      }
+
+      const days = Array.from(dayMap.values()).sort((a, b) => a.daysAway - b.daysAway)
+      const customerPhone = ctx.customer?.phone
+
+      // If only one day available — skip day selection, show sessions directly
+      if (days.length === 1) {
+        const day = days[0]
+        if (day.sessions.length === 1) {
+          const s = day.sessions[0]
+          return `DIRECT:${doctorGDS.name} (${doctorGDS.specialization}) is available on ${day.dayLabel}.\nSession: ${fmtGDS(s.start)} - ${fmtGDS(s.end)}\n\nPlease reply with your name to confirm booking.`
+        }
+        if (customerPhone) {
+          try {
+            const sessionButtons = day.sessions.slice(0, 3).map((s, i) => ({
+              id: `session_${day.dayOfWeek}_${i}`,
+              title: `${fmtGDS(s.start)} - ${fmtGDS(s.end)}`.slice(0, 20)
+            }))
+            await sendButtons(customerPhone, `${doctorGDS.name} is available on ${day.dayLabel}. Select a session:`, sessionButtons)
+            return `DIRECT:__INTERACTIVE_SENT__::${doctorGDS.name} sessions on ${day.dayLabel}: ${day.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(', ')}`
+          } catch (err) {
+            logger.warn('get_doctor_schedule sendButtons failed:', err.message)
+          }
+        }
+      }
+
+      // Multiple days — show day selection as buttons (max 3) or text
+      if (customerPhone && days.length <= 3) {
+        try {
+          const dayButtons = days.slice(0, 3).map(d => ({
+            id: `day_${d.dayOfWeek}`,
+            title: `${d.dayLabel} (${d.sessions.length > 1 ? d.sessions.length + ' sessions' : fmtGDS(d.sessions[0].start)})`.slice(0, 20)
+          }))
+          await sendButtons(customerPhone, `When would you like to see ${doctorGDS.name}?`, dayButtons)
+          const contextText = days.map(d => `${d.dayLabel}: ${d.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(', ')}`).join('\n')
+          return `DIRECT:__INTERACTIVE_SENT__::${doctorGDS.name} (${doctorGDS.specialization}) available on:\n${contextText}\n\nReply with your preferred day.`
+        } catch (err) {
+          logger.warn('get_doctor_schedule sendButtons failed:', err.message)
+        }
+      }
+
+      // Fallback text
+      const textSchedule = days.map(d =>
+        `${d.dayLabel}: ${d.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(' | ')}`
+      ).join('\n')
+      return `DIRECT:${doctorGDS.name} (${doctorGDS.specialization}) is available on:\n\n${textSchedule}\n\nReply with your preferred day to book.`
+    }
+
       case 'check_doctor_availability': {
         const { doctor_name } = args
         const result = await pool.query(
