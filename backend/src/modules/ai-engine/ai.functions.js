@@ -114,6 +114,19 @@ function getFunctionDefinitions(industry) {
       }
     },
     {
+      name: 'create_future_booking',
+      description: 'Creates a booking for a future date selected by the patient from get_doctor_schedule. Use this instead of create_tomorrow_booking when patient selected a specific future day from the doctor schedule.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          doctor_name: { type: 'STRING', description: 'Name of the doctor' },
+          patient_name: { type: 'STRING', description: 'Name of the patient' },
+          booking_date: { type: 'STRING', description: 'Date in YYYY-MM-DD format for the booking' }
+        },
+        required: ['doctor_name', 'patient_name', 'booking_date']
+      }
+    },
+    {
       name: 'cancel_booking',
       description: 'Cancel an existing booking for the patient',
       parameters: {

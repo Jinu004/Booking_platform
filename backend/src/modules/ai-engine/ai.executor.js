@@ -359,16 +359,28 @@ async function executeFunction(name, args, ctx) {
         dayMap.get(key).sessions.push({ start: row.start_time, end: row.end_time })
       }
 
-      const days = Array.from(dayMap.values()).sort((a, b) => a.daysAway - b.daysAway)
+      // Limit to next 3 days only
+      const days = Array.from(dayMap.values()).sort((a, b) => a.daysAway - b.daysAway).slice(0, 3)
       const customerPhone = ctx.customer?.phone
+
+      // Compute actual booking dates for each day
+      const nowISTDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+      const getBookingDate = (dayOfWeek) => {
+        const d = new Date(nowISTDate)
+        const daysAway = dayOfWeek > todayDowGDS ? dayOfWeek - todayDowGDS : dayOfWeek + 7 - todayDowGDS
+        d.setDate(d.getDate() + daysAway)
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      }
 
       // If only one day available — skip day selection, show sessions directly
       if (days.length === 1) {
         const day = days[0]
+        const bookingDate = getBookingDate(day.dayOfWeek)
         if (day.sessions.length === 1) {
           const s = day.sessions[0]
-          return `DIRECT:${doctorGDS.name} (${doctorGDS.specialization}) is available on ${day.dayLabel}.\nSession: ${fmtGDS(s.start)} - ${fmtGDS(s.end)}\n\nPlease reply with your name to confirm booking.`
+          return `DIRECT:${doctorGDS.name} (${doctorGDS.specialization}) is available on ${day.dayLabel}.\nSession: ${fmtGDS(s.start)} - ${fmtGDS(s.end)}\n\nPlease reply with your name to confirm booking on ${day.dayLabel} [date:${bookingDate}]`
         }
+        // One day, multiple sessions — show session buttons
         if (customerPhone) {
           try {
             const sessionButtons = day.sessions.slice(0, 3).map((s, i) => ({
@@ -376,32 +388,44 @@ async function executeFunction(name, args, ctx) {
               title: `${fmtGDS(s.start)} - ${fmtGDS(s.end)}`.slice(0, 20)
             }))
             await sendButtons(customerPhone, `${doctorGDS.name} is available on ${day.dayLabel}. Select a session:`, sessionButtons)
-            return `DIRECT:__INTERACTIVE_SENT__::${doctorGDS.name} sessions on ${day.dayLabel}: ${day.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(', ')}`
+            return `DIRECT:__INTERACTIVE_SENT__::${doctorGDS.name} sessions on ${day.dayLabel} [date:${bookingDate}]: ${day.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(', ')}`
           } catch (err) {
             logger.warn('get_doctor_schedule sendButtons failed:', err.message)
           }
         }
       }
 
-      // Multiple days — show day selection as buttons (max 3) or text
-      if (customerPhone && days.length <= 3) {
+      // Multiple days — show as interactive list (supports more than 3)
+      if (customerPhone) {
         try {
-          const dayButtons = days.slice(0, 3).map(d => ({
-            id: `day_${d.dayOfWeek}`,
-            title: `${d.dayLabel} (${d.sessions.length > 1 ? d.sessions.length + ' sessions' : fmtGDS(d.sessions[0].start)})`.slice(0, 20)
-          }))
-          await sendButtons(customerPhone, `When would you like to see ${doctorGDS.name}?`, dayButtons)
-          const contextText = days.map(d => `${d.dayLabel}: ${d.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(', ')}`).join('\n')
+          const { sendDoctorList } = require('../channel/whatsapp/whatsapp.adapter')
+          const dayListItems = days.map(d => {
+            const bookingDate = getBookingDate(d.dayOfWeek)
+            const sessionInfo = d.sessions.length > 1
+              ? `${d.sessions.length} sessions available`
+              : `${fmtGDS(d.sessions[0].start)} - ${fmtGDS(d.sessions[0].end)}`
+            return {
+              id: `${d.dayOfWeek}::${bookingDate}`,
+              title: d.dayLabel.slice(0, 24),
+              description: sessionInfo.slice(0, 72)
+            }
+          })
+          await sendDoctorList(customerPhone, `When would you like to see ${doctorGDS.name}?`, dayListItems)
+          const contextText = days.map(d => {
+            const bookingDate = getBookingDate(d.dayOfWeek)
+            return `${d.dayLabel} [date:${bookingDate}]: ${d.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(', ')}`
+          }).join('\n')
           return `DIRECT:__INTERACTIVE_SENT__::${doctorGDS.name} (${doctorGDS.specialization}) available on:\n${contextText}\n\nReply with your preferred day.`
         } catch (err) {
-          logger.warn('get_doctor_schedule sendButtons failed:', err.message)
+          logger.warn('get_doctor_schedule sendDoctorList failed:', err.message)
         }
       }
 
       // Fallback text
-      const textSchedule = days.map(d =>
-        `${d.dayLabel}: ${d.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(' | ')}`
-      ).join('\n')
+      const textSchedule = days.map(d => {
+        const bookingDate = getBookingDate(d.dayOfWeek)
+        return `${d.dayLabel} [date:${bookingDate}]: ${d.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(' | ')}`
+      }).join('\n')
       return `DIRECT:${doctorGDS.name} (${doctorGDS.specialization}) is available on:\n\n${textSchedule}\n\nReply with your preferred day to book.`
     }
 
@@ -844,6 +868,100 @@ ${doctor.specialization}
 Please arrive before session begins.
 Reply CANCEL to cancel your booking.`
       }
+
+      case 'create_future_booking': {
+      const { doctor_name: doctorNameFB, patient_name: patientNameFB, booking_date: bookingDateFB } = args
+      if (!doctorNameFB || !patientNameFB || !bookingDateFB) {
+        return `DIRECT:Sorry, I need the doctor name, your name, and booking date to complete this booking.`
+      }
+      const targetDate = new Date(bookingDateFB)
+      if (isNaN(targetDate.getTime())) {
+        return `DIRECT:Sorry, I couldn't process that date. Please try again.`
+      }
+      const targetDow = targetDate.getDay()
+      const formattedNameFB = patientNameFB.replace(/[^a-zA-Z\sഀ-ൿ-]/g, '').trim().slice(0, 100).replace(/\b\w/g, c => c.toUpperCase())
+      if (!formattedNameFB) return `DIRECT:Please provide a valid name to confirm booking.`
+
+      const fmtFB = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` }
+
+      // Find doctor with schedule for the target day
+      const docResFB = await pool.query(
+        `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+                ds.start_time, ds.end_time
+         FROM clinic_doctors cd
+         JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
+         WHERE cd.tenant_id = $1 AND cd.is_active = true AND LOWER(cd.name) LIKE LOWER($3)
+         LIMIT 1`,
+        [tenant.id, targetDow, `%${doctorNameFB}%`]
+      )
+      if (!docResFB.rows.length) {
+        return `DIRECT:Sorry, ${doctorNameFB} is not available on that day. Please choose another day.`
+      }
+      const doctorFB = docResFB.rows[0]
+
+      // Find or create customer
+      const custResFB = await pool.query(
+        `SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1`,
+        [tenant.id, customer.phone]
+      )
+      const customerIdFB = custResFB.rows[0]?.id || customer.id
+
+      // Find or create patient
+      let patientIdFB = null
+      try {
+        const existingPat = await pool.query(
+          `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3) LIMIT 1`,
+          [tenant.id, customerIdFB, formattedNameFB]
+        )
+        if (existingPat.rows.length) {
+          patientIdFB = existingPat.rows[0].id
+        } else {
+          const newPat = await pool.query(
+            `INSERT INTO patients (tenant_id, customer_id, name, phone)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
+             RETURNING id`,
+            [tenant.id, customerIdFB, formattedNameFB, customer.phone]
+          )
+          patientIdFB = newPat.rows[0]?.id || null
+        }
+      } catch (patErr) {
+        logger.warn('create_future_booking patient find-or-create failed:', patErr.message)
+      }
+
+      // Get token number using MAX to be consistent with manual booking
+      const tokenResFB = await pool.query(
+        `SELECT COALESCE(MAX(token_number), 0) AS max_token FROM bookings
+         WHERE doctor_id = $1 AND booking_date = $2 AND status != 'cancelled' AND tenant_id = $3`,
+        [doctorFB.id, bookingDateFB, tenant.id]
+      )
+      const tokenNumberFB = parseInt(tokenResFB.rows[0].max_token) + 1
+
+      // Insert booking
+      await pool.query(
+        `INSERT INTO bookings (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, patient_name, patient_id)
+         VALUES ($1, $2, $3, 'whatsapp', 'pending', $4, $5, $6, $7)`,
+        [tenant.id, customerIdFB, doctorFB.id, bookingDateFB, tokenNumberFB, formattedNameFB, patientIdFB]
+      )
+
+      // Insert clinic token
+      await pool.query(
+        `INSERT INTO clinic_tokens (tenant_id, doctor_id, token_number, status)
+         VALUES ($1, $2, $3, 'waiting')`,
+        [tenant.id, doctorFB.id, tokenNumberFB]
+      )
+
+      const bookingDayName = targetDate.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' })
+
+      return `DIRECT:Booking confirmed! 🏥
+Token Number: ${tokenNumberFB}
+Doctor: ${doctorFB.name}
+${doctorFB.specialization}
+Date: ${bookingDayName}, ${bookingDateFB}
+🕘 Session starts at ${fmtFB(doctorFB.start_time)}
+Please arrive before session begins.
+Reply CANCEL to cancel your booking.`
+    }
 
       case 'cancel_booking': {
         const { booking_id } = args
