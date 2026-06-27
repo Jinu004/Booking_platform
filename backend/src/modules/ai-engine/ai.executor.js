@@ -98,7 +98,7 @@ async function executeFunction(name, args, ctx) {
         })
 
         try {
-          await sendDoctorList(customerPhone, `Hello! Welcome to ${tenant.name} 👋\nHere are today's available doctors:`, listItems)
+          await sendDoctorList(customerPhone, `Hello! Welcome to ${tenant.name} 👋\nHere are today's available doctors:`, listItems, 'Book Today')
           await sendButtons(customerPhone, 'Need something else?', [
             { id: 'book_other_day', title: 'Book Another Day' },
             { id: 'talk_to_staff', title: 'Talk to Staff' },
