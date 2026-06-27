@@ -11,6 +11,17 @@ import { CardSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
 import api from '../utils/api';
 
+function getMessageDateLabel(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+  if (d.toDateString() === today.toDateString()) return 'Today'
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
 function formatTime(dateString) {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -52,7 +63,11 @@ function getAvatarColor(str) {
 }
 
 export default function Conversations() {
-  const { addToast } = useStore();
+  const { addToast, clearHandoffs } = useStore()
+
+  useEffect(() => {
+    clearHandoffs()
+  }, []);
   const [conversations, setConversations] = useState([]);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -237,6 +252,10 @@ export default function Conversations() {
         content: content,
         created_at: new Date().toISOString()
       }]);
+      // Clear red dot for this conversation when staff replies
+      setConversations(prev => prev.map(c =>
+        c.id === selectedConversationId ? { ...c, needs_attention: false } : c
+      ))
     } catch (err) {
       setReplyText(content);
       addToast('Failed to send message', 'error');
@@ -460,9 +479,23 @@ export default function Conversations() {
                     const isPatient = msg.role === 'user';
                     const isStaff   = msg.role === 'staff';
                     const isAI      = msg.role === 'assistant';
+                    const prevMsg = messages[idx - 1]
+                    const showDateSeparator = !prevMsg || getMessageDateLabel(msg.created_at) !== getMessageDateLabel(prevMsg.created_at)
 
                     return (
-                      <div key={msg.id || idx} className={`flex flex-col ${isPatient ? 'items-start' : 'items-end'}`}>
+                      <React.Fragment key={msg.id || idx}>
+                        {showDateSeparator && (
+                          <div className="flex items-center gap-3 my-3">
+                            <div className="flex-1 h-px bg-gray-200" />
+                            <span className="text-[11px] text-gray-400 font-medium px-2 whitespace-nowrap">
+                              {getMessageDateLabel(msg.created_at)}
+                            </span>
+                            <div className="flex-1 h-px bg-gray-200" />
+                          </div>
+                        )}
+                        <div
+                          className={`flex flex-col ${isPatient ? 'items-start' : 'items-end'}`}
+                        >
                         {/* Sender label */}
                         <p className={`text-[11px] font-semibold mb-1 px-1 ${
                           isPatient ? 'text-gray-400' : 'text-teal-600'
@@ -483,7 +516,8 @@ export default function Conversations() {
                         <p className="text-[10px] text-gray-400 mt-1 px-1">
                           {formatTime(msg.created_at)}
                         </p>
-                      </div>
+                        </div>
+                      </React.Fragment>
                     );
                   })
                 )}
