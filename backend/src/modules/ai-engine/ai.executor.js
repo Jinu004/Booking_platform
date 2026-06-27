@@ -414,7 +414,7 @@ async function executeFunction(name, args, ctx) {
               description: sessionInfo.slice(0, 72)
             }
           })
-          await sendDoctorList(customerPhone, `When would you like to see ${doctorGDS.name}?`, dayListItems)
+          await sendDoctorList(customerPhone, `When would you like to see ${doctorGDS.name}?`, dayListItems, 'Select Day')
           const contextText = days.map(d => {
             const bookingDate = getBookingDate(d.dayOfWeek)
             return `${d.dayLabel} [date:${bookingDate}]: ${d.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(', ')}`

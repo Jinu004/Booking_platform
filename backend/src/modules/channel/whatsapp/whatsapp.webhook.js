@@ -109,9 +109,6 @@ router.post('/', async (req, res) => {
 
       // Intercept button replies before Gemini — direct function calls (skip Please wait for these)
       const isButtonReply = ['Book Another Day', 'Talk to Staff', 'Check My Booking'].includes(message.message)
-      if (!isButtonReply) {
-        await sendMessage(message.from, '⏳ Please wait a moment...')
-      }
 
       if (message.message === 'Book Another Day') {
         try {
