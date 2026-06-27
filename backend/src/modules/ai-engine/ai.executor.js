@@ -219,20 +219,24 @@ async function executeFunction(name, args, ctx) {
       const fmtAD2 = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` }
       const daysFromToday = d => d > todayDowAD2 ? d - todayDowAD2 : d + 7 - todayDowAD2
 
+      // Count available days per doctor this week
+      const doctorDaysCount = new Map()
+      for (const row of allDoctorsRes.rows) {
+        doctorDaysCount.set(row.id, (doctorDaysCount.get(row.id) || 0) + 1)
+      }
+
       const listItems = doctors.map(doc => {
-        const daysAway = daysFromToday(doc.day_of_week)
-        const dayLabel = daysAway === 1 ? 'Tomorrow' : dayNamesAD[doc.day_of_week]
+        const daysCount = doctorDaysCount.get(doc.id) || 1
         return {
           id: doc.id,
           title: doc.name.slice(0, 24),
-          description: `${doc.specialization || 'General'} — ${dayLabel} ${fmtAD2(doc.start_time)}`.slice(0, 72)
+          description: `${doc.specialization || 'General'} — ${daysCount} day${daysCount > 1 ? 's' : ''} this week`.slice(0, 72)
         }
       })
 
       const textList = doctors.map(doc => {
-        const daysAway = daysFromToday(doc.day_of_week)
-        const dayLabel = daysAway === 1 ? 'Tomorrow' : dayNamesAD[doc.day_of_week]
-        return `🩺 ${doc.name} (${doc.specialization}) — Next: ${dayLabel} ${fmtAD2(doc.start_time)}`
+        const daysCount = doctorDaysCount.get(doc.id) || 1
+        return `🩺 ${doc.name} (${doc.specialization}) — ${daysCount} day${daysCount > 1 ? 's' : ''} this week`
       }).join('\n')
 
       const customerPhone = ctx.customer?.phone
