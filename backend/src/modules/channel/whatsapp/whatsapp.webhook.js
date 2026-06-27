@@ -107,6 +107,60 @@ router.post('/', async (req, res) => {
         return
       }
 
+      // Intercept button replies before Gemini — direct function calls
+      if (message.message === 'Book Another Day') {
+        try {
+          const { executeFunction } = require('../../ai-engine/ai.executor')
+          const result = await executeFunction('show_all_doctors', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] })
+          if (typeof result === 'string' && result.startsWith('DIRECT:')) {
+            const directContent = result.slice(7).trim()
+            if (directContent.startsWith('__INTERACTIVE_SENT__::')) {
+              const textContent = directContent.slice('__INTERACTIVE_SENT__::'.length)
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              await ConversationService.saveOutboundMessage(context.conversation.id, textContent, 'assistant')
+            } else {
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              await sendMessage(message.from, directContent)
+              await ConversationService.saveOutboundMessage(context.conversation.id, directContent, 'assistant')
+            }
+          }
+        } catch (err) {
+          logger.error('show_all_doctors direct call failed:', err.message)
+          await sendMessage(message.from, 'Sorry, I could not load the doctor list. Please try again.')
+        }
+        return
+      }
+
+      if (message.message === 'Talk to Staff') {
+        try {
+          await sendMessage(message.from, 'Connecting you to our staff. Please wait a moment...')
+          await HITLService.handleAIHandoffRequest(tenant, { ...context.conversation, customer_phone: context.customer?.phone }, null)
+          await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+          await ConversationService.saveOutboundMessage(context.conversation.id, 'Connecting you to our staff. Please wait a moment...', 'assistant')
+        } catch (err) {
+          logger.error('Talk to Staff direct call failed:', err.message)
+          await sendMessage(message.from, 'Sorry, I could not connect you to staff. Please try again.')
+        }
+        return
+      }
+
+      if (message.message === 'Check My Booking') {
+        try {
+          const { executeFunction } = require('../../ai-engine/ai.executor')
+          const result = await executeFunction('get_patient_bookings', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] })
+          if (typeof result === 'string' && result.startsWith('DIRECT:')) {
+            const directContent = result.slice(7).trim()
+            await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+            await sendMessage(message.from, directContent)
+            await ConversationService.saveOutboundMessage(context.conversation.id, directContent, 'assistant')
+          }
+        } catch (err) {
+          logger.error('get_patient_bookings direct call failed:', err.message)
+          await sendMessage(message.from, 'Sorry, I could not retrieve your bookings. Please try again.')
+        }
+        return
+      }
+
       // TOMORROW intent interception — read Redis key set when today was fully booked
       // or booking was outside hours. Bypass Gemini entirely for this case.
       if (message.message?.trim().toUpperCase() === 'TOMORROW' && tenant.industry === 'clinic') {
