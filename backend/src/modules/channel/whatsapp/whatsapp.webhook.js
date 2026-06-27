@@ -256,8 +256,9 @@ router.post('/', async (req, res) => {
           aiResponse = aiResponse.text
         }
       } catch (err) {
-       logger.error(`AI processing crashed for ${message.from}: ${err?.message} ${err?.stack}`) 
-        aiResponse = 'Sorry, I could not process that. Reply 1 to Book Today, 2 to Book Tomorrow, 3 to Talk to Staff, 4 to Check Booking.'
+       logger.error(`AI processing crashed for ${message.from}: ${err?.message} ${err?.stack}`)
+        const clinicPhone = configs?.business_phone ? ` or call us at ${configs.business_phone}` : ''
+        aiResponse = `Sorry, I could not process that. Please say Hi to try again${clinicPhone}.`
         isAIError = true
       }
 
