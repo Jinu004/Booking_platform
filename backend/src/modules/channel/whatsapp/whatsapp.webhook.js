@@ -148,11 +148,16 @@ router.post('/', async (req, res) => {
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
           const result = await executeFunction('get_patient_bookings', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] })
+          let responseText = ''
           if (typeof result === 'string' && result.startsWith('DIRECT:')) {
-            const directContent = result.slice(7).trim()
+            responseText = result.slice(7).trim()
+          } else if (result?.message) {
+            responseText = result.message
+          }
+          if (responseText) {
             await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
-            await sendMessage(message.from, directContent)
-            await ConversationService.saveOutboundMessage(context.conversation.id, directContent, 'assistant')
+            await sendMessage(message.from, responseText)
+            await ConversationService.saveOutboundMessage(context.conversation.id, responseText, 'assistant')
           }
         } catch (err) {
           logger.error('get_patient_bookings direct call failed:', err.message)
