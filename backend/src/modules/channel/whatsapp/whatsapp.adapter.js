@@ -82,14 +82,14 @@ async function sendButtons(to, bodyText, buttons) {
  * @param {string} bodyText
  * @param {Array} items - [{ id, title, description }]
  */
-async function sendDoctorList(to, bodyText, items) {
+async function sendDoctorList(to, bodyText, items, buttonText = 'Select Doctor') {
   const provider = getProvider()
 
   if (provider === 'meta') {
     return meta.sendListMessage(
       to,
       bodyText,
-      'Select Doctor',
+      buttonText,
       items
     )
   }
