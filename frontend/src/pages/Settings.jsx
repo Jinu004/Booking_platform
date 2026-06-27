@@ -78,6 +78,7 @@ export default function Settings() {
     },
     handoff_message: 'Please hold on, I am connecting you with our staff.',
     out_of_hours_message: 'Our clinic is currently closed. We will get back to you during working hours.',
+    business_phone: '',
   });
   const [knowledgeBase, setKnowledgeBase] = useState('');
 
@@ -121,6 +122,7 @@ export default function Settings() {
   }, []);
 
   const handleSaveClinic = async () => {
+    await updateHITLSettings({ business_phone: hitl.business_phone })
     try {
       setSaving(true);
       await updateClinicSettings(clinic);
@@ -240,6 +242,16 @@ export default function Settings() {
           ) : (
             <>
               <div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Business Phone</label>
+                  <input
+                    type="tel"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    placeholder="+91XXXXXXXXXX"
+                    value={hitl.business_phone || ''}
+                    onChange={e => setHITL(h => ({ ...h, business_phone: e.target.value }))}
+                  />
+                </div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Address</label>
                 <textarea
                   rows={2}
