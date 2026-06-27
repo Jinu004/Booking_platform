@@ -107,7 +107,12 @@ router.post('/', async (req, res) => {
         return
       }
 
-      // Intercept button replies before Gemini — direct function calls
+      // Intercept button replies before Gemini — direct function calls (skip Please wait for these)
+      const isButtonReply = ['Book Another Day', 'Talk to Staff', 'Check My Booking'].includes(message.message)
+      if (!isButtonReply) {
+        await sendMessage(message.from, '⏳ Please wait a moment...')
+      }
+
       if (message.message === 'Book Another Day') {
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
@@ -191,8 +196,6 @@ router.post('/', async (req, res) => {
 
       let additionalData = {}
       // doctors are fetched on-demand via get_available_doctors function call in ai.executor.js
-
-      await sendMessage(message.from, '⏳ Please wait a moment...')
 
       const AIService = require('../../ai-engine/ai.service')
       let aiResponse
