@@ -135,10 +135,8 @@ router.post('/', async (req, res) => {
 
       if (message.message === 'Talk to Staff') {
         try {
-          await sendMessage(message.from, 'Connecting you to our staff. Please wait a moment...')
-          await HITLService.handleAIHandoffRequest(tenant, { ...context.conversation, customer_phone: context.customer?.phone }, null)
           await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
-          await ConversationService.saveOutboundMessage(context.conversation.id, 'Connecting you to our staff. Please wait a moment...', 'assistant')
+          await HITLService.handleAIHandoffRequest(tenant, { ...context.conversation, customer_phone: context.customer?.phone }, null)
         } catch (err) {
           logger.error('Talk to Staff direct call failed:', err.message)
           await sendMessage(message.from, 'Sorry, I could not connect you to staff. Please try again.')
