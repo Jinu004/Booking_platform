@@ -158,13 +158,14 @@ const Layout = () => {
               ) : (
                 <button
                   type="button"
-                  className="cursor-pointer z-50 relative p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 focus:outline-none"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-400 text-sm transition w-48"
                   onClick={(e) => {
                     e.stopPropagation();
                     setSearchOpen(true);
                   }}
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                  <span>Search patients...</span>
                 </button>
               )}
             </div>
