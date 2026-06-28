@@ -145,16 +145,16 @@ const Bookings = () => {
       )}
       <div className="flex flex-col md:flex-row flex-wrap justify-between items-start md:items-center gap-4">
         <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
+          <input
+            type="date"
+            value={date}
+            onChange={e => { setDate(e.target.value); setViewMode('today') }}
+            className={`border-gray-300 rounded-md shadow-sm p-2 ${viewMode !== 'today' ? 'opacity-50' : ''}`}
+          />
           <div className="flex rounded-lg border border-gray-300 overflow-hidden">
             <button
-              onClick={() => { setViewMode('today'); setDate(new Date().toISOString().split('T')[0]) }}
-              className={`px-3 py-2 text-sm font-medium transition ${viewMode === 'today' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-            >
-              Today
-            </button>
-            <button
-              onClick={() => setViewMode('tomorrow')}
-              className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${viewMode === 'tomorrow' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              onClick={() => { setViewMode('tomorrow'); setDate(new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]) }}
+              className={`px-3 py-2 text-sm font-medium transition ${viewMode === 'tomorrow' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               Tomorrow
             </button>
@@ -165,12 +165,6 @@ const Bookings = () => {
               Upcoming
             </button>
           </div>
-          <input
-            type="date"
-            value={date}
-            onChange={e => { setDate(e.target.value); setViewMode('today') }}
-            className="border-gray-300 rounded-md shadow-sm p-2"
-          />
           <input
             type="text"
             placeholder="Search patient..."
