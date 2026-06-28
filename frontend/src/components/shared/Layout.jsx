@@ -121,10 +121,15 @@ const Layout = () => {
           <span className="truncate">🆕 A new version of ReceptionAI is available — please update to get the latest features.</span>
           <button
             onClick={async () => {
-                const res = await fetch(`/version.json?t=${Date.now()}`)
-                const data = await res.json()
-                localStorage.setItem('acceptedVersion', data.version)
-                window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now()
+                try {
+                  const res = await fetch(`/version.json?t=${Date.now()}`)
+                  const data = await res.json()
+                  localStorage.setItem('acceptedVersion', data.version)
+                } catch (e) {
+                  localStorage.setItem('acceptedVersion', 'updated')
+                } finally {
+                  window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now()
+                }
               }}
             className="ml-4 flex-shrink-0 px-3 py-1 bg-white text-teal-600 rounded font-semibold hover:bg-teal-50 transition"
           >
