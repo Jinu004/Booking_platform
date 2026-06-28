@@ -71,7 +71,9 @@ async function getBookings(pool, tenantId, filters = {}) {
   const params = [];
   let paramCount = 2; // $1 is tenantId
 
-  if (filters.date) {
+  if (filters.upcoming) {
+    sql += ` AND b.booking_date >= CURRENT_DATE`;
+  } else if (filters.date) {
     sql += ` AND b.booking_date = $${paramCount}`;
     params.push(filters.date);
     paramCount++;
