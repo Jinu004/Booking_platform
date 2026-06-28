@@ -20,7 +20,8 @@ const Bookings = () => {
   const [loading, setLoading] = useState(true);
   
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [upcomingMode, setUpcomingMode] = useState(false);
+  const [viewMode, setViewMode] = useState('today')
+  const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('');
   
   const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -45,12 +46,14 @@ const Bookings = () => {
     fetchData();
     const interval = setInterval(fetchData, 30000); // 30s poll
     return () => clearInterval(interval);
-  }, [date, statusFilter, upcomingMode]);
+  }, [date, statusFilter, viewMode]);
 
   const fetchData = async () => {
     try {
       const [bookingsRes, statsRes, docsRes] = await Promise.all([
-        getBookings(upcomingMode ? { upcoming: true, status: statusFilter } : { date, status: statusFilter }),
+        getBookings(viewMode === 'upcoming'
+          ? { upcoming: true, status: statusFilter }
+          : { date: viewMode === 'tomorrow' ? new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0] : date, status: statusFilter }),
         getBookingStats(),
         getDoctors()
       ]);
@@ -79,9 +82,13 @@ const Bookings = () => {
     }
   };
 
-  const filteredBookings = selectedDoctor
-    ? bookings.filter(b => b.doctor_name === selectedDoctor.name)
-    : bookings;
+  const filteredBookings = bookings.filter(b => {
+    const matchesDoctor = !selectedDoctor || b.doctor_name === selectedDoctor.name
+    const matchesSearch = !searchQuery ||
+      b.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      b.patient_phone?.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesDoctor && matchesSearch
+  })
 
   const loadFormDependencies = async () => {
     try {
@@ -138,21 +145,42 @@ const Bookings = () => {
       )}
       <div className="flex flex-col md:flex-row flex-wrap justify-between items-start md:items-center gap-4">
         <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
-          <button
-            onClick={() => { setUpcomingMode(m => !m) }}
-            className={`px-3 py-2 rounded-md text-sm font-medium border transition ${upcomingMode ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
-          >
-            📅 Upcoming
-          </button>
+          <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+            <button
+              onClick={() => { setViewMode('today'); setDate(new Date().toISOString().split('T')[0]) }}
+              className={`px-3 py-2 text-sm font-medium transition ${viewMode === 'today' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setViewMode('tomorrow')}
+              className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${viewMode === 'tomorrow' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              Tomorrow
+            </button>
+            <button
+              onClick={() => setViewMode('upcoming')}
+              className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${viewMode === 'upcoming' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              Upcoming
+            </button>
+          </div>
           <input
             type="date"
             value={date}
-            disabled={upcomingMode}
-            onChange={e => setDate(e.target.value)}
-            className={`border-gray-300 rounded-md shadow-sm p-2${upcomingMode ? ' opacity-40 cursor-not-allowed' : ''}`}
+            disabled={viewMode !== 'today'}
+            onChange={e => { setDate(e.target.value); setViewMode('today') }}
+            className={`border-gray-300 rounded-md shadow-sm p-2 ${viewMode !== 'today' ? 'opacity-40 cursor-not-allowed' : ''}`}
           />
-          <select 
-            value={statusFilter} 
+          <input
+            type="text"
+            placeholder="Search patient..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="border border-gray-300 rounded-md shadow-sm p-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          />
+          <select
+            value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
             className="border-gray-300 rounded-md shadow-sm p-2"
           >
@@ -248,7 +276,7 @@ const Bookings = () => {
                 </td>
               </tr>
             ) : (
-              upcomingMode ? (
+              viewMode === 'upcoming' ? (
                 (() => {
                   const grouped = {}
                   filteredBookings.forEach(b => {
