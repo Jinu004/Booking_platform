@@ -16,20 +16,23 @@ const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { tenant, addToast } = useStore();
-  const [swUpdate, setSwUpdate] = useState(null)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+  const currentVersion = '1.0.0'
 
   useEffect(() => {
-    const handler = (e) => setSwUpdate(e.detail)
-    window.addEventListener('swUpdateAvailable', handler)
-    return () => window.removeEventListener('swUpdateAvailable', handler)
-  }, [])
-
-  const handleUpdate = () => {
-    if (swUpdate && swUpdate.waiting) {
-      swUpdate.waiting.postMessage('skipWaiting')
-      window.location.reload()
+    const checkVersion = async () => {
+      try {
+        const res = await fetch(`/version.json?t=${Date.now()}`)
+        const data = await res.json()
+        if (data.version !== currentVersion) {
+          setUpdateAvailable(true)
+        }
+      } catch (err) {}
     }
-  }
+    checkVersion()
+    const interval = setInterval(checkVersion, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
   const { industry } = useIndustry();
   const isEnquiry = industry === 'enquiry';
   const staff = (() => { try { return JSON.parse(localStorage.getItem('staff') || '{}'); } catch { return {}; } })();
@@ -112,11 +115,11 @@ const Layout = () => {
 
   return (
     <div className={`flex h-screen w-full overflow-hidden relative ${isEnquiry ? 'bg-[#F0F4F8] text-[#1E2E45]' : 'bg-gray-50 text-gray-900'}`}>
-      {swUpdate && (
+      {updateAvailable && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-teal-600 text-white px-4 py-2 flex items-center justify-between text-sm">
           <span>🆕 A new version of ReceptionAI is available.</span>
           <button
-            onClick={handleUpdate}
+            onClick={() => window.location.reload(true)}
             className="ml-4 px-3 py-1 bg-white text-teal-600 rounded font-semibold hover:bg-teal-50 transition"
           >
             Update Now
