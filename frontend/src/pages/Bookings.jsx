@@ -53,10 +53,11 @@ const Bookings = () => {
       const [bookingsRes, statsRes, docsRes] = await Promise.all([
         getBookings(viewMode === 'upcoming'
           ? { upcoming: true, status: statusFilter }
-          : { date: viewMode === 'tomorrow' ? new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0] : date, status: statusFilter }),
-        getBookingStats(),
-        getDoctors()
+          : { date: viewMode === 'tomorrow' ? new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0] : date, status: statusFilter }).catch(() => ({ data: [] })),
+        getBookingStats().catch(() => ({ data: { total: 0, confirmed: 0, completed: 0, noshow: 0 } })),
+        getDoctors().catch(() => ({ data: [] }))
       ]);
+      setIsOffline(false);
       const bookingsData = {
         bookings: bookingsRes?.data?.bookings || bookingsRes?.data || [],
         stats: statsRes?.data || { total: 0, confirmed: 0, completed: 0, noshow: 0 },
