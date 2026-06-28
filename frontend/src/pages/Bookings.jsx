@@ -168,9 +168,8 @@ const Bookings = () => {
           <input
             type="date"
             value={date}
-            disabled={viewMode !== 'today'}
             onChange={e => { setDate(e.target.value); setViewMode('today') }}
-            className={`border-gray-300 rounded-md shadow-sm p-2 ${viewMode !== 'today' ? 'opacity-40 cursor-not-allowed' : ''}`}
+            className="border-gray-300 rounded-md shadow-sm p-2"
           />
           <input
             type="text"
