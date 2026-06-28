@@ -28,6 +28,21 @@ const Landing        = React.lazy(() => import('./pages/Landing'));
 const PendingApproval = React.lazy(() => import('./pages/PendingApproval'));
 const PatientProfile = React.lazy(() => import('./pages/PatientProfile'));
 
+// Prefetch all page chunks immediately after app loads
+const prefetchPages = () => {
+  const pages = [
+    () => import('./pages/Dashboard'),
+    () => import('./pages/Bookings'),
+    () => import('./pages/Conversations'),
+    () => import('./pages/Patients'),
+    () => import('./pages/Analytics'),
+    () => import('./pages/Settings'),
+    () => import('./pages/SuperAdmin'),
+  ]
+  pages.forEach(p => p().catch(() => {}))
+}
+setTimeout(prefetchPages, 2000)
+
 const PageLoader = (
   <div className="flex items-center justify-center h-screen">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
