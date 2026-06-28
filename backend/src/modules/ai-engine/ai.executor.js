@@ -873,7 +873,55 @@ Please arrive before session begins.
 Reply CANCEL to cancel your booking.`
       }
 
-      case 'create_future_booking': {
+      case 'get_patient_profiles': {
+      const { sendDoctorList } = require('../channel/whatsapp/whatsapp.adapter')
+      const customerPhone = ctx.customer?.phone
+      const customerId = ctx.customer?.id
+
+      if (!customerId) {
+        return `DIRECT:NEW_PATIENT::No existing profiles found`
+      }
+
+      const patientRes = await pool.query(
+        `SELECT id, name FROM patients WHERE tenant_id = $1 AND customer_id = $2 ORDER BY name ASC LIMIT 9`,
+        [tenant.id, customerId]
+      )
+
+      if (!patientRes.rows.length) {
+        return `DIRECT:NEW_PATIENT::No existing profiles found`
+      }
+
+      // Build interactive list with existing names + Someone new option
+      const listItems = [
+        ...patientRes.rows.map(p => ({
+          id: `patient_${p.id}`,
+          title: p.name.slice(0, 24),
+          description: 'Existing profile'
+        })),
+        {
+          id: 'patient_new',
+          title: 'Someone new',
+          description: 'Add a new patient'
+        }
+      ]
+
+      const nameList = patientRes.rows.map(p => `• ${p.name}`).join('\n')
+      const contextText = `Who is this booking for?\n${nameList}\n• Someone new`
+
+      if (customerPhone) {
+        try {
+          await sendDoctorList(customerPhone, 'Who is this booking for?', listItems, 'Select Patient')
+          return `DIRECT:__INTERACTIVE_SENT__::${contextText}`
+        } catch (err) {
+          logger.warn('get_patient_profiles sendDoctorList failed:', err.message)
+        }
+      }
+
+      // Text fallback
+      return `DIRECT:${contextText}\n\nPlease reply with the name to book for, or type a new name.`
+    }
+
+    case 'create_future_booking': {
       const { doctor_name: doctorNameFB, patient_name: patientNameFB, booking_date: bookingDateFB } = args
       if (!doctorNameFB || !patientNameFB || !bookingDateFB) {
         return `DIRECT:Sorry, I need the doctor name, your name, and booking date to complete this booking.`
