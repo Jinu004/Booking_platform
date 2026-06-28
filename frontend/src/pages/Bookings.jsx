@@ -20,6 +20,7 @@ const Bookings = () => {
   const [loading, setLoading] = useState(true);
   
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [upcomingMode, setUpcomingMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   
   const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -44,12 +45,12 @@ const Bookings = () => {
     fetchData();
     const interval = setInterval(fetchData, 30000); // 30s poll
     return () => clearInterval(interval);
-  }, [date, statusFilter]);
+  }, [date, statusFilter, upcomingMode]);
 
   const fetchData = async () => {
     try {
       const [bookingsRes, statsRes, docsRes] = await Promise.all([
-        getBookings({ date, status: statusFilter }),
+        getBookings(upcomingMode ? { upcoming: true, status: statusFilter } : { date, status: statusFilter }),
         getBookingStats(),
         getDoctors()
       ]);
@@ -137,11 +138,18 @@ const Bookings = () => {
       )}
       <div className="flex flex-col md:flex-row flex-wrap justify-between items-start md:items-center gap-4">
         <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
-          <input 
-            type="date" 
-            value={date} 
+          <button
+            onClick={() => { setUpcomingMode(m => !m) }}
+            className={`px-3 py-2 rounded-md text-sm font-medium border transition ${upcomingMode ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+          >
+            📅 Upcoming
+          </button>
+          <input
+            type="date"
+            value={date}
+            disabled={upcomingMode}
             onChange={e => setDate(e.target.value)}
-            className="border-gray-300 rounded-md shadow-sm p-2"
+            className={`border-gray-300 rounded-md shadow-sm p-2${upcomingMode ? ' opacity-40 cursor-not-allowed' : ''}`}
           />
           <select 
             value={statusFilter} 
@@ -240,7 +248,63 @@ const Bookings = () => {
                 </td>
               </tr>
             ) : (
-              filteredBookings.map(b => (
+              upcomingMode ? (
+                (() => {
+                  const grouped = {}
+                  filteredBookings.forEach(b => {
+                    const d = new Date(b.booking_date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' })
+                    if (!grouped[d]) grouped[d] = []
+                    grouped[d].push(b)
+                  })
+                  return Object.entries(grouped).map(([dateLabel, dayBookings]) => (
+                    <React.Fragment key={dateLabel}>
+                      <tr>
+                        <td colSpan="6" className="px-4 py-2 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                          {dateLabel}
+                        </td>
+                      </tr>
+                      {dayBookings.map(b => (
+                        <tr key={b.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-indigo-700">
+                            <div className="bg-indigo-50 w-10 h-10 flex items-center justify-center rounded-full">
+                              {b.token_number || '-'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-bold text-gray-900">{b.patient_name || 'Unknown'}</div>
+                            <div className="text-sm text-gray-500 font-medium">{b.patient_phone}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">
+                            {b.doctor_name || 'Unassigned'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                            {new Date(b.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            <span className="block text-[10px] uppercase font-bold tracking-widest text-gray-400 mt-1">{b.source}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-bold uppercase tracking-wide rounded-full ${statusColors[b.status] || 'bg-gray-100 text-gray-800'}`}>
+                              {b.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold space-x-3">
+                            {(b.status === 'confirmed' || b.status === 'pending') && (
+                              <>
+                                <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
+                                <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
+                              </>
+                            )}
+                            {(b.patient_id || b.customer_id) && (
+                              <Link to={`/patients/${b.patient_id || b.customer_id}`} className="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                                View Profile
+                              </Link>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  ))
+                })()
+              ) : filteredBookings.map(b => (
                 <tr key={b.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-indigo-700">
                     <div className="bg-indigo-50 w-10 h-10 flex items-center justify-center rounded-full">
