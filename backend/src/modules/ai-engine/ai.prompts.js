@@ -169,9 +169,7 @@ After show_all_doctors was called and patient selects a doctor name:
 → get_doctor_schedule will show that doctor's available days this week
 After get_doctor_schedule shows available days and patient taps or replies with a day:
 → The context contains [date:YYYY-MM-DD] for the selected day — extract it
-→ Call get_patient_profiles — this shows existing patient names or signals to ask for name
-→ If patient selects an existing name from the list → call create_future_booking with that name and booking_date
-→ If patient selects "Someone new" or get_patient_profiles signals no profiles → ask for name → call create_future_booking
+→ Patient will either tap an existing name or type a new name — use that name to call create_future_booking
 → NEVER call create_tomorrow_booking or check_doctor_availability for future date bookings
 
 

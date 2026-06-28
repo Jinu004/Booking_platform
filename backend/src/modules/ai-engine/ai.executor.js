@@ -982,7 +982,7 @@ Reply CANCEL to cancel your booking.`
 
       const fmtFB = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` }
 
-      // Find doctor with schedule for the target day
+      // Find doctor (outside transaction — read-only)
       const docResFB = await pool.query(
         `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
                 ds.start_time, ds.end_time
@@ -997,14 +997,14 @@ Reply CANCEL to cancel your booking.`
       }
       const doctorFB = docResFB.rows[0]
 
-      // Find or create customer
+      // Find customer (outside transaction — read-only)
       const custResFB = await pool.query(
         `SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1`,
         [tenant.id, customer.phone]
       )
       const customerIdFB = custResFB.rows[0]?.id || customer.id
 
-      // Find or create patient
+      // Find or create patient (outside transaction — non-fatal)
       let patientIdFB = null
       try {
         const existingPat = await pool.query(
@@ -1027,32 +1027,50 @@ Reply CANCEL to cancel your booking.`
         logger.warn('create_future_booking patient find-or-create failed:', patErr.message)
       }
 
-      // Get token number using MAX to be consistent with manual booking
-      const tokenResFB = await pool.query(
-        `SELECT COALESCE(MAX(token_number), 0) AS max_token FROM bookings
-         WHERE doctor_id = $1 AND booking_date = $2 AND status != 'cancelled' AND tenant_id = $3`,
-        [doctorFB.id, bookingDateFB, tenant.id]
-      )
-      const tokenNumberFB = parseInt(tokenResFB.rows[0].max_token) + 1
+      // Transactional booking insert with FOR UPDATE lock
+      const clientFB = await pool.connect()
+      let tokenNumberFB, bookingIdFB
+      try {
+        await clientFB.query('BEGIN')
 
-      // Insert booking
-      await pool.query(
-        `INSERT INTO bookings (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, patient_name, patient_id)
-         VALUES ($1, $2, $3, 'whatsapp', 'pending', $4, $5, $6, $7)`,
-        [tenant.id, customerIdFB, doctorFB.id, bookingDateFB, tokenNumberFB, formattedNameFB, patientIdFB]
-      )
+        // Lock doctor row to serialise concurrent bookings
+        await clientFB.query(
+          `SELECT id FROM clinic_doctors WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
+          [doctorFB.id, tenant.id]
+        )
 
-      // Insert clinic token
-      const bookingResFB = await pool.query(
-        `SELECT id FROM bookings WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3 AND token_number = $4`,
-        [tenant.id, doctorFB.id, bookingDateFB, tokenNumberFB]
-      )
-      const bookingIdFB = bookingResFB.rows[0]?.id || null
-      await pool.query(
-        `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status, issued_at)
-         VALUES ($1, $2, $3, $4, 'waiting', NOW())`,
-        [tenant.id, bookingIdFB, doctorFB.id, tokenNumberFB]
-      )
+        // MAX-based token number inside transaction
+        const tokenResFB = await clientFB.query(
+          `SELECT COALESCE(MAX(token_number), 0) AS max_token FROM bookings
+           WHERE doctor_id = $1 AND booking_date = $2 AND status != 'cancelled' AND tenant_id = $3`,
+          [doctorFB.id, bookingDateFB, tenant.id]
+        )
+        tokenNumberFB = parseInt(tokenResFB.rows[0].max_token) + 1
+
+        // Insert booking — RETURNING id eliminates separate SELECT
+        const bookingResFB = await clientFB.query(
+          `INSERT INTO bookings (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, patient_name, patient_id)
+           VALUES ($1, $2, $3, 'whatsapp', 'pending', $4, $5, $6, $7)
+           RETURNING id`,
+          [tenant.id, customerIdFB, doctorFB.id, bookingDateFB, tokenNumberFB, formattedNameFB, patientIdFB]
+        )
+        bookingIdFB = bookingResFB.rows[0].id
+
+        // Insert clinic token
+        await clientFB.query(
+          `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status, issued_at)
+           VALUES ($1, $2, $3, $4, 'waiting', $5)`,
+          [tenant.id, bookingIdFB, doctorFB.id, tokenNumberFB, bookingDateFB]
+        )
+
+        await clientFB.query('COMMIT')
+      } catch (txErrFB) {
+        await clientFB.query('ROLLBACK')
+        logger.error('create_future_booking transaction failed:', txErrFB.message)
+        return `DIRECT:Sorry, I could not complete your booking. Please try again.`
+      } finally {
+        clientFB.release()
+      }
 
       const bookingDayName = targetDate.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' })
 
