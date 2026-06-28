@@ -348,10 +348,12 @@ if (!isEscalated && !isInteractiveSent && aiResponse) {
 
     } catch (err) {
       logger.error('Async webhook processing error: ' + err?.message + ' ' + err?.stack)
-      const fallbackMessage = 'Sorry, I could not process that. Reply 1 to Book Today, 2 to Book Tomorrow, 3 to Talk to Staff, 4 to Check Booking.'
-      if (req.body?.payload?.from) {
+      const fallbackMessage = 'Sorry, I could not process that. Please say Hi to try again.'
+      const fallbackFrom = req.body?.payload?.from
+        || req.body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from
+      if (fallbackFrom) {
         try {
-          await sendMessage(req.body.payload.from, fallbackMessage)
+          await sendMessage(fallbackFrom, fallbackMessage)
         } catch (e) {}
       }
     }
