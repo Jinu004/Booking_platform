@@ -46,7 +46,7 @@ const Dashboard = () => {
 
       let activeConvs = Array.isArray(convRes?.data) ? convRes.data : (convRes?.data?.conversations || []);
       let totalBookings = statsRes?.data?.total || 0;
-      let bookingsArray = bookingsRes?.data?.bookings || [];
+      let bookingsArray = bookingsRes?.data || [];
 
       const filteredByDoctor = isDoctor && staffDoctorId
         ? tokensArray.filter(t => t.doctor_id === staffDoctorId)
