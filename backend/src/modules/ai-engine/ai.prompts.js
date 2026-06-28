@@ -174,11 +174,6 @@ After get_doctor_schedule shows available days and patient taps or replies with 
 → If patient selects "Someone new" or get_patient_profiles signals no profiles → ask for name → call create_future_booking
 → NEVER call create_tomorrow_booking or check_doctor_availability for future date bookings
 
-PATIENT NAME FLOW (for today bookings):
-After check_doctor_availability confirms availability:
-→ Call get_patient_profiles — this shows existing patient names or signals to ask for name
-→ If patient selects an existing name → call create_token_booking with that name
-→ If patient selects "Someone new" or no profiles exist → ask for name → call create_token_booking
 
 CRITICAL INTENT RULES — FOLLOW EXACTLY:
 When patient sends EXACTLY "1" or "one":

@@ -382,6 +382,29 @@ async function executeFunction(name, args, ctx) {
         const bookingDate = getBookingDate(day.dayOfWeek)
         if (day.sessions.length === 1) {
           const s = day.sessions[0]
+          const { sendDoctorList: sendDLGDS } = require('../channel/whatsapp/whatsapp.adapter')
+          const custPhoneGDS = ctx.customer?.phone
+          const custIdGDS = ctx.customer?.id
+          if (custIdGDS && custPhoneGDS) {
+            try {
+              const patResGDS = await pool.query(
+                `SELECT id, name FROM patients WHERE tenant_id = $1 AND customer_id = $2 ORDER BY name ASC LIMIT 9`,
+                [tenant.id, custIdGDS]
+              )
+              if (patResGDS.rows.length > 0) {
+                const listItemsGDS = [
+                  ...patResGDS.rows.map(p => ({ id: `patient_${p.id}`, title: p.name.slice(0, 24), description: 'Existing profile' })),
+                  { id: 'patient_new', title: 'Someone new', description: 'Add a new patient' }
+                ]
+                const nameListGDS = patResGDS.rows.map(p => `• ${p.name}`).join('\n')
+                const ctxGDS = `${doctorGDS.name} (${doctorGDS.specialization}) available on ${day.dayLabel}.\nSession: ${fmtGDS(s.start)} - ${fmtGDS(s.end)}\n\nWho is this booking for?\n${nameListGDS}\n• Someone new [date:${bookingDate}]`
+                await sendDLGDS(custPhoneGDS, `${doctorGDS.name} available on ${day.dayLabel}.\nWho is this booking for?`, listItemsGDS, 'Select Patient')
+                return `DIRECT:__INTERACTIVE_SENT__::${ctxGDS}`
+              }
+            } catch (err) {
+              logger.warn('Patient profiles check failed in get_doctor_schedule:', err.message)
+            }
+          }
           return `DIRECT:${doctorGDS.name} (${doctorGDS.specialization}) is available on ${day.dayLabel}.\nSession: ${fmtGDS(s.start)} - ${fmtGDS(s.end)}\n\nPlease reply with your name to confirm booking on ${day.dayLabel} [date:${bookingDate}]`
         }
         // One day, multiple sessions — show session buttons
@@ -546,7 +569,30 @@ async function executeFunction(name, args, ctx) {
         }
         const sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
 
-        return `DIRECT:${doctor.name} (${doctor.specialization})
+      const { sendDoctorList: sendDLCDA } = require('../channel/whatsapp/whatsapp.adapter')
+      const custPhoneCDA = ctx.customer?.phone
+      const custIdCDA = ctx.customer?.id
+      if (custIdCDA && custPhoneCDA) {
+        try {
+          const patResCDA = await pool.query(
+            `SELECT id, name FROM patients WHERE tenant_id = $1 AND customer_id = $2 ORDER BY name ASC LIMIT 9`,
+            [tenant.id, custIdCDA]
+          )
+          if (patResCDA.rows.length > 0) {
+            const listItemsCDA = [
+              ...patResCDA.rows.map(p => ({ id: `patient_${p.id}`, title: p.name.slice(0, 24), description: 'Existing profile' })),
+              { id: 'patient_new', title: 'Someone new', description: 'Add a new patient' }
+            ]
+            const nameListCDA = patResCDA.rows.map(p => `• ${p.name}`).join('\n')
+            const ctxCDA = `${doctor.name} (${doctor.specialization})\nSession: ${sessionTime}\n${remaining} tokens remaining.\n\nWho is this booking for?\n${nameListCDA}\n• Someone new`
+            await sendDLCDA(custPhoneCDA, `${doctor.name} is available.\nWho is this booking for?`, listItemsCDA, 'Select Patient')
+            return `DIRECT:__INTERACTIVE_SENT__::${ctxCDA}`
+          }
+        } catch (err) {
+          logger.warn('Patient profiles check failed in check_doctor_availability:', err.message)
+        }
+      }
+      return `DIRECT:${doctor.name} (${doctor.specialization})
 Session: ${sessionTime}
 ${remaining} tokens remaining.
 

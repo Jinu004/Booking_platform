@@ -191,6 +191,39 @@ router.post('/', async (req, res) => {
         return
       }
 
+      // Intercept "Someone new" tap — ask for name
+      if (message.interactiveId === 'patient_new') {
+        const newPatientMsg = 'Please reply with the patient\'s name to confirm booking.'
+        await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+        await sendMessage(message.from, newPatientMsg)
+        await ConversationService.saveOutboundMessage(context.conversation.id, newPatientMsg, 'assistant')
+        return
+      }
+
+      // Intercept day selection from get_doctor_schedule list (id format: "DOW::YYYY-MM-DD")
+      if (message.interactiveId && /^\d+::\d{4}-\d{2}-\d{2}$/.test(message.interactiveId)) {
+        try {
+          const { executeFunction } = require('../../ai-engine/ai.executor')
+          const result = await executeFunction('get_patient_profiles', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: message.interactiveId, doctorProfiles: [] })
+          if (typeof result === 'string' && result.startsWith('DIRECT:')) {
+            const directContent = result.slice(7).trim()
+            if (directContent.startsWith('__INTERACTIVE_SENT__::')) {
+              const textContent = directContent.slice('__INTERACTIVE_SENT__::'.length)
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              await ConversationService.saveOutboundMessage(context.conversation.id, textContent, 'assistant')
+            } else if (directContent.startsWith('NEW_PATIENT::')) {
+              const askName = 'Please reply with your name to confirm booking.'
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              await sendMessage(message.from, askName)
+              await ConversationService.saveOutboundMessage(context.conversation.id, askName, 'assistant')
+            }
+          }
+        } catch (err) {
+          logger.error('Day selection patient profiles failed:', err.message)
+        }
+        return
+      }
+
       // TOMORROW intent interception — read Redis key set when today was fully booked
       // or booking was outside hours. Bypass Gemini entirely for this case.
       if (message.message?.trim().toUpperCase() === 'TOMORROW' && tenant.industry === 'clinic') {
