@@ -15,6 +15,15 @@ if ('serviceWorker' in navigator) {
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');
 
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            window.dispatchEvent(new CustomEvent('swUpdateAvailable', { detail: reg }))
+          }
+        })
+      })
+
       // Request push permission after login
       if ('PushManager' in window) {
         const permission = await Notification.requestPermission();

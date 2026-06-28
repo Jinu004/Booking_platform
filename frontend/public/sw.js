@@ -1,4 +1,4 @@
-const CACHE_NAME = 'receptionai-v7';
+const CACHE_NAME = 'receptionai-v8';
 const urlsToCache = ['/'];
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -6,6 +6,12 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
   );
 });
+self.addEventListener('message', event => {
+  if (event.data === 'skipWaiting') {
+    self.skipWaiting()
+  }
+})
+
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
