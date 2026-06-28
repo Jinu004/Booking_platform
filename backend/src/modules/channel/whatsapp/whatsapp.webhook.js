@@ -191,7 +191,7 @@ router.post('/', async (req, res) => {
         return
       }
 
-      // Intercept "Someone new" tap — ask for name
+      // Intercept "Book for someone else" tap — ask for name
       if (message.interactiveId === 'patient_new') {
         const newPatientMsg = 'Please reply with the patient\'s name to confirm booking.'
         await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')

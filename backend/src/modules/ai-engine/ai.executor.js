@@ -394,10 +394,10 @@ async function executeFunction(name, args, ctx) {
               if (patResGDS.rows.length > 0) {
                 const listItemsGDS = [
                   ...patResGDS.rows.map(p => ({ id: `patient_${p.id}`, title: p.name.slice(0, 24), description: 'Existing profile' })),
-                  { id: 'patient_new', title: 'Someone new', description: 'Add a new patient' }
+                  { id: 'patient_new', title: 'Book for someone else', description: 'Add a new patient' }
                 ]
                 const nameListGDS = patResGDS.rows.map(p => `• ${p.name}`).join('\n')
-                const ctxGDS = `${doctorGDS.name} (${doctorGDS.specialization}) available on ${day.dayLabel}.\nSession: ${fmtGDS(s.start)} - ${fmtGDS(s.end)}\n\nWho is this booking for?\n${nameListGDS}\n• Someone new [date:${bookingDate}]`
+                const ctxGDS = `${doctorGDS.name} (${doctorGDS.specialization}) available on ${day.dayLabel}.\nSession: ${fmtGDS(s.start)} - ${fmtGDS(s.end)}\n\nWho is this booking for?\n${nameListGDS}\n• Book for someone else [date:${bookingDate}]`
                 await sendDLGDS(custPhoneGDS, `${doctorGDS.name} available on ${day.dayLabel}.\nWho is this booking for?`, listItemsGDS, 'Select Patient')
                 return `DIRECT:__INTERACTIVE_SENT__::${ctxGDS}`
               }
@@ -581,10 +581,10 @@ async function executeFunction(name, args, ctx) {
           if (patResCDA.rows.length > 0) {
             const listItemsCDA = [
               ...patResCDA.rows.map(p => ({ id: `patient_${p.id}`, title: p.name.slice(0, 24), description: 'Existing profile' })),
-              { id: 'patient_new', title: 'Someone new', description: 'Add a new patient' }
+              { id: 'patient_new', title: 'Book for someone else', description: 'Add a new patient' }
             ]
             const nameListCDA = patResCDA.rows.map(p => `• ${p.name}`).join('\n')
-            const ctxCDA = `${doctor.name} (${doctor.specialization})\nSession: ${sessionTime}\n${remaining} tokens remaining.\n\nWho is this booking for?\n${nameListCDA}\n• Someone new`
+            const ctxCDA = `${doctor.name} (${doctor.specialization})\nSession: ${sessionTime}\n${remaining} tokens remaining.\n\nWho is this booking for?\n${nameListCDA}\n• Book for someone else`
             await sendDLCDA(custPhoneCDA, `${doctor.name} is available.\nWho is this booking for?`, listItemsCDA, 'Select Patient')
             return `DIRECT:__INTERACTIVE_SENT__::${ctxCDA}`
           }
@@ -946,13 +946,13 @@ Reply CANCEL to cancel your booking.`
         })),
         {
           id: 'patient_new',
-          title: 'Someone new',
+          title: 'Book for someone else',
           description: 'Add a new patient'
         }
       ]
 
       const nameList = patientRes.rows.map(p => `• ${p.name}`).join('\n')
-      const contextText = `Who is this booking for?\n${nameList}\n• Someone new`
+      const contextText = `Who is this booking for?\n${nameList}\n• Book for someone else`
 
       if (customerPhone) {
         try {
