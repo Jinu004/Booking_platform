@@ -17,14 +17,15 @@ const Layout = () => {
   const location = useLocation();
   const { tenant, addToast } = useStore();
   const [updateAvailable, setUpdateAvailable] = useState(false)
-  const currentVersion = '1.0.0'
 
   useEffect(() => {
     const checkVersion = async () => {
       try {
         const res = await fetch(`/version.json?t=${Date.now()}`)
         const data = await res.json()
-        if (data.version !== currentVersion) {
+        const serverVersion = data.version
+        const acceptedVersion = localStorage.getItem('acceptedVersion')
+        if (serverVersion !== acceptedVersion) {
           setUpdateAvailable(true)
         }
       } catch (err) {}
@@ -119,7 +120,12 @@ const Layout = () => {
         <div className="fixed top-0 left-0 right-0 z-50 bg-teal-600 text-white px-4 py-2 flex items-center justify-between text-sm shadow-md">
           <span className="truncate">🆕 A new version of ReceptionAI is available — please update to get the latest features.</span>
           <button
-            onClick={() => { window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now() }}
+            onClick={async () => {
+                const res = await fetch(`/version.json?t=${Date.now()}`)
+                const data = await res.json()
+                localStorage.setItem('acceptedVersion', data.version)
+                window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now()
+              }}
             className="ml-4 flex-shrink-0 px-3 py-1 bg-white text-teal-600 rounded font-semibold hover:bg-teal-50 transition"
           >
             Update Now
