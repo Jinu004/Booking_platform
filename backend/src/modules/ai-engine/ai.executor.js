@@ -949,10 +949,15 @@ Reply CANCEL to cancel your booking.`
       )
 
       // Insert clinic token
+      const bookingResFB = await pool.query(
+        `SELECT id FROM bookings WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3 AND token_number = $4`,
+        [tenant.id, doctorFB.id, bookingDateFB, tokenNumberFB]
+      )
+      const bookingIdFB = bookingResFB.rows[0]?.id || null
       await pool.query(
-        `INSERT INTO clinic_tokens (tenant_id, doctor_id, token_number, status)
-         VALUES ($1, $2, $3, 'waiting')`,
-        [tenant.id, doctorFB.id, tokenNumberFB]
+        `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status, issued_at)
+         VALUES ($1, $2, $3, $4, 'waiting', NOW())`,
+        [tenant.id, bookingIdFB, doctorFB.id, tokenNumberFB]
       )
 
       const bookingDayName = targetDate.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' })
