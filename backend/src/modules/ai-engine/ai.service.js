@@ -284,6 +284,16 @@ async function processMessage(context) {
                   text: directContent.slice('__INTERACTIVE_SENT__::'.length)
                 }
               }
+              // New patient signal — return text to Gemini as function result so it asks for name
+              if (directContent.startsWith('NEW_PATIENT::')) {
+                functionResponses.push({
+                  functionResponse: {
+                    name,
+                    response: { result: 'No existing profiles found. Please ask the patient for their name.' }
+                  }
+                })
+                continue
+              }
               return directContent
             }
 

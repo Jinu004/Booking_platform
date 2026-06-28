@@ -113,8 +113,17 @@ function getFunctionDefinitions(industry) {
         required: ['doctor_name', 'patient_name']
       }
     },
-    {
-      name: 'create_future_booking',
+  {
+    name: 'get_patient_profiles',
+    description: 'Gets existing patient profiles for this phone number. Call this after doctor and date are confirmed, before asking for patient name. If existing profiles exist, patient can select one or choose to add someone new. If no profiles exist, proceed to ask for name directly.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'create_future_booking',
       description: 'Creates a booking for a future date selected by the patient from get_doctor_schedule. Use this instead of create_tomorrow_booking when patient selected a specific future day from the doctor schedule.',
       parameters: {
         type: 'OBJECT',

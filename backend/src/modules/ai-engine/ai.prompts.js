@@ -169,9 +169,16 @@ After show_all_doctors was called and patient selects a doctor name:
 → get_doctor_schedule will show that doctor's available days this week
 After get_doctor_schedule shows available days and patient taps or replies with a day:
 → The context contains [date:YYYY-MM-DD] for the selected day — extract it
-→ Ask patient for their name if not already provided
-→ Once name is provided, call create_future_booking with doctor_name, patient_name, and booking_date (YYYY-MM-DD from context)
+→ Call get_patient_profiles — this shows existing patient names or signals to ask for name
+→ If patient selects an existing name from the list → call create_future_booking with that name and booking_date
+→ If patient selects "Someone new" or get_patient_profiles signals no profiles → ask for name → call create_future_booking
 → NEVER call create_tomorrow_booking or check_doctor_availability for future date bookings
+
+PATIENT NAME FLOW (for today bookings):
+After check_doctor_availability confirms availability:
+→ Call get_patient_profiles — this shows existing patient names or signals to ask for name
+→ If patient selects an existing name → call create_token_booking with that name
+→ If patient selects "Someone new" or no profiles exist → ask for name → call create_token_booking
 
 CRITICAL INTENT RULES — FOLLOW EXACTLY:
 When patient sends EXACTLY "1" or "one":
