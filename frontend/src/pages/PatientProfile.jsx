@@ -320,6 +320,18 @@ export default function PatientProfile() {
     }
   }
 
+  const todayStr = new Date().toISOString().split('T')[0]
+  const activeBooking = bookings.find(b =>
+    (b.status === 'pending' || b.status === 'confirmed') &&
+    b.booking_date?.startsWith(todayStr)
+  )
+  const fmtSessionTime = (t) => {
+    if (!t) return ''
+    const [h, m] = t.split(':')
+    const hr = parseInt(h)
+    return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
+  }
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -649,6 +661,29 @@ export default function PatientProfile() {
             </div>
           </div>
         </div>
+        {activeBooking && (
+          <div className="flex flex-col items-end justify-center gap-2 ml-4 pl-4 border-l border-gray-100">
+            <div className="text-right">
+              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Today's Appointment</p>
+              <p className="text-sm font-semibold text-gray-800 mt-0.5">{activeBooking.doctor_name}</p>
+              <p className="text-xs text-gray-500">{fmtSessionTime(activeBooking.session_start_time)} · {activeBooking.status}</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleBookingAction(activeBooking.id, completeBooking, 'complete')}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition"
+              >
+                Complete
+              </button>
+              <button
+                onClick={() => handleBookingAction(activeBooking.id, cancelBooking, 'cancel')}
+                className="px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stat cards */}
