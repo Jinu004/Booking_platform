@@ -9,7 +9,7 @@ import {
   updateVisitNote,
 } from '../services/ehr.service';
 import { getDoctors } from '../services/clinic.service';
-import { createManualBooking } from '../services/booking.service';
+import { createManualBooking, completeBooking, cancelBooking } from '../services/booking.service';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import { CardSkeleton } from '../components/shared/Skeleton';
@@ -308,6 +308,17 @@ export default function PatientProfile() {
     if (!isPro) return;
     loadData();
   }, [customerId]);
+
+  const handleBookingAction = async (id, actionFn, actionName) => {
+    if (!window.confirm(`Are you sure you want to ${actionName} this booking?`)) return
+    try {
+      await actionFn(id)
+      await loadData()
+      addToast(`Booking ${actionName}d successfully`, 'success')
+    } catch (err) {
+      alert(`Failed to ${actionName} booking. Please try again.`)
+    }
+  }
 
   const loadData = async () => {
     try {
@@ -932,6 +943,7 @@ export default function PatientProfile() {
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Doctor</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -951,6 +963,24 @@ export default function PatientProfile() {
                         }`}>
                           {b.status || 'unknown'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {(b.status === 'pending' || b.status === 'confirmed') && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleBookingAction(b.id, completeBooking, 'complete')}
+                              className="text-xs text-green-600 hover:text-green-800 font-medium"
+                            >
+                              Complete
+                            </button>
+                            <button
+                              onClick={() => handleBookingAction(b.id, cancelBooking, 'cancel')}
+                              className="text-xs text-red-500 hover:text-red-700 font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
