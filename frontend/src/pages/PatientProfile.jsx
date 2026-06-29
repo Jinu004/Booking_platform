@@ -955,7 +955,11 @@ export default function PatientProfile() {
                         <p className="text-sm font-semibold text-gray-900">{fmtDate(b.booking_date)}</p>
                         <p className="text-xs text-gray-400">{fmtWeekday(b.booking_date)}</p>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{b.booking_time || '—'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {b.session_start_time
+                          ? (() => { const [h, m] = b.session_start_time.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` })()
+                          : '—'}
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-700">{b.doctor_name || '—'}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${
