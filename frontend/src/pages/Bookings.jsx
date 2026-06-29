@@ -209,31 +209,35 @@ const Bookings = () => {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-2">
-        <button
-          onClick={() => setSelectedDoctor(null)}
-          className={selectedDoctor === null
-            ? 'bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
-            : 'bg-white text-gray-600 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
-          }
-        >
-          All Doctors ({bookings.length})
-        </button>
+        {staff?.role !== 'doctor' && (
+          <button
+            onClick={() => setSelectedDoctor(null)}
+            className={selectedDoctor === null
+              ? 'bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
+              : 'bg-white text-gray-600 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
+            }
+          >
+            All Doctors ({bookings.length})
+          </button>
+        )}
 
-        {doctors.map(doctor => {
-          const count = bookings.filter(b => b.doctor_name === doctor.name).length;
-          return (
-            <button
-              key={doctor.id}
-              onClick={() => setSelectedDoctor(doctor)}
-              className={selectedDoctor?.id === doctor.id
-                ? 'bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
-                : 'bg-white text-gray-600 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
-              }
-            >
-              {doctor.name} ({count})
-            </button>
-          )
-        })}
+        {doctors
+          .filter(doctor => staff?.role !== 'doctor' || doctor.name === staff?.name)
+          .map(doctor => {
+            const count = bookings.filter(b => b.doctor_name === doctor.name).length;
+            return (
+              <button
+                key={doctor.id}
+                onClick={() => setSelectedDoctor(doctor)}
+                className={selectedDoctor?.id === doctor.id
+                  ? 'bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
+                  : 'bg-white text-gray-600 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
+                }
+              >
+                {doctor.name} ({count})
+              </button>
+            )
+          })}
       </div>
 
       <div className="bg-white shadow overflow-x-auto -mx-4 px-4 sm:rounded-lg">
