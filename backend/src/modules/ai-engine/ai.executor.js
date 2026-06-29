@@ -398,26 +398,52 @@ async function executeFunction(name, args, ctx) {
                 ]
                 const nameListGDS = patResGDS.rows.map(p => `• ${p.name}`).join('\n')
                 const ctxGDS = `${doctorGDS.name} (${doctorGDS.specialization}) available on ${day.dayLabel}.\nSession: ${fmtGDS(s.start)} - ${fmtGDS(s.end)}\n\nWho is this booking for?\n${nameListGDS}\n• Book for someone else [date:${bookingDate}]`
-                await sendDLGDS(custPhoneGDS, `${doctorGDS.name} available on ${day.dayLabel}.\nWho is this booking for?`, listItemsGDS, 'Select Patient')
-                return `DIRECT:__INTERACTIVE_SENT__::${ctxGDS}`
+                const bodyTextGDS = `${doctorGDS.name} available on ${day.dayLabel}.\nWho is this booking for?`
+                let sentGDS = false
+                try {
+                  await sendDLGDS(custPhoneGDS, bodyTextGDS, listItemsGDS, 'Select Patient')
+                  sentGDS = true
+                } catch (sendErr1) {
+                  logger.warn('Patient profiles send attempt 1 failed (GDS), retrying:', sendErr1.message)
+                  await new Promise(r => setTimeout(r, 500))
+                  try {
+                    await sendDLGDS(custPhoneGDS, bodyTextGDS, listItemsGDS, 'Select Patient')
+                    sentGDS = true
+                  } catch (sendErr2) {
+                    logger.warn('Patient profiles send attempt 2 failed (GDS), falling back to text:', sendErr2.message)
+                  }
+                }
+                if (sentGDS) return `DIRECT:__INTERACTIVE_SENT__::${ctxGDS}`
+                // Text fallback with patient list
+                return `DIRECT:${doctorGDS.name} available on ${day.dayLabel}.\n\nWho is this booking for?\n${nameListGDS}\n• Book for someone else\n\nReply with the name to confirm. [date:${bookingDate}]`
               }
-            } catch (err) {
-              logger.warn('Patient profiles check failed in get_doctor_schedule:', err.message)
+            } catch (dbErr) {
+              logger.warn('Patient profiles DB query failed in get_doctor_schedule:', dbErr.message)
             }
           }
           return `DIRECT:${doctorGDS.name} (${doctorGDS.specialization}) is available on ${day.dayLabel}.\nSession: ${fmtGDS(s.start)} - ${fmtGDS(s.end)}\n\nPlease reply with your name to confirm booking on ${day.dayLabel} [date:${bookingDate}]`
         }
         // One day, multiple sessions — show session buttons
         if (customerPhone) {
+          const sessionButtons = day.sessions.slice(0, 3).map((s, i) => ({
+            id: `session_${day.dayOfWeek}_${i}`,
+            title: `${fmtGDS(s.start)} - ${fmtGDS(s.end)}`.slice(0, 20)
+          }))
+          const sessionCtx = `${doctorGDS.name} sessions on ${day.dayLabel} [date:${bookingDate}]: ${day.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(', ')}`
           try {
-            const sessionButtons = day.sessions.slice(0, 3).map((s, i) => ({
-              id: `session_${day.dayOfWeek}_${i}`,
-              title: `${fmtGDS(s.start)} - ${fmtGDS(s.end)}`.slice(0, 20)
-            }))
             await sendButtons(customerPhone, `${doctorGDS.name} is available on ${day.dayLabel}. Select a session:`, sessionButtons)
-            return `DIRECT:__INTERACTIVE_SENT__::${doctorGDS.name} sessions on ${day.dayLabel} [date:${bookingDate}]: ${day.sessions.map(s => `${fmtGDS(s.start)}-${fmtGDS(s.end)}`).join(', ')}`
+            return `DIRECT:__INTERACTIVE_SENT__::${sessionCtx}`
           } catch (err) {
-            logger.warn('get_doctor_schedule sendButtons failed:', err.message)
+            logger.warn('get_doctor_schedule sendButtons attempt 1 failed, retrying:', err.message)
+            await new Promise(r => setTimeout(r, 500))
+            try {
+              await sendButtons(customerPhone, `${doctorGDS.name} is available on ${day.dayLabel}. Select a session:`, sessionButtons)
+              return `DIRECT:__INTERACTIVE_SENT__::${sessionCtx}`
+            } catch (err2) {
+              logger.warn('get_doctor_schedule sendButtons attempt 2 failed, using text fallback:', err2.message)
+              const sessionText = day.sessions.map((s, i) => `${i + 1}. ${fmtGDS(s.start)} - ${fmtGDS(s.end)}`).join('\n')
+              return `DIRECT:${doctorGDS.name} is available on ${day.dayLabel}.\n\nSelect a session:\n${sessionText}\n\nReply with the session number. [date:${bookingDate}]`
+            }
           }
         }
       }
@@ -585,11 +611,27 @@ async function executeFunction(name, args, ctx) {
             ]
             const nameListCDA = patResCDA.rows.map(p => `• ${p.name}`).join('\n')
             const ctxCDA = `${doctor.name} (${doctor.specialization})\nSession: ${sessionTime}\n${remaining} tokens remaining.\n\nWho is this booking for?\n${nameListCDA}\n• Book for someone else`
-            await sendDLCDA(custPhoneCDA, `${doctor.name} is available.\nWho is this booking for?`, listItemsCDA, 'Select Patient')
-            return `DIRECT:__INTERACTIVE_SENT__::${ctxCDA}`
+            const bodyTextCDA = `${doctor.name} is available.\nWho is this booking for?`
+            let sentCDA = false
+            try {
+              await sendDLCDA(custPhoneCDA, bodyTextCDA, listItemsCDA, 'Select Patient')
+              sentCDA = true
+            } catch (sendErr1) {
+              logger.warn('Patient profiles send attempt 1 failed, retrying:', sendErr1.message)
+              await new Promise(r => setTimeout(r, 500))
+              try {
+                await sendDLCDA(custPhoneCDA, bodyTextCDA, listItemsCDA, 'Select Patient')
+                sentCDA = true
+              } catch (sendErr2) {
+                logger.warn('Patient profiles send attempt 2 failed, falling back to text:', sendErr2.message)
+              }
+            }
+            if (sentCDA) return `DIRECT:__INTERACTIVE_SENT__::${ctxCDA}`
+            // Text fallback with patient list
+            return `DIRECT:${doctor.name} is available.\n\nWho is this booking for?\n${nameListCDA}\n• Book for someone else\n\nReply with the name to confirm.`
           }
-        } catch (err) {
-          logger.warn('Patient profiles check failed in check_doctor_availability:', err.message)
+        } catch (dbErr) {
+          logger.warn('Patient profiles DB query failed in check_doctor_availability:', dbErr.message)
         }
       }
       return `DIRECT:${doctor.name} (${doctor.specialization})
