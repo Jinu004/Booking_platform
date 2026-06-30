@@ -300,7 +300,14 @@ const Bookings = () => {
                             {b.doctor_name || 'Unassigned'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
-                            {new Date(b.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            {b.slot_time
+                              ? (() => {
+                                  const [h, m] = b.slot_time.split(':')
+                                  const hr = parseInt(h)
+                                  return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
+                                })()
+                              : new Date(b.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                            }
                             <span className="block text-[10px] uppercase font-bold tracking-widest text-gray-400 mt-1">{b.source}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -341,7 +348,14 @@ const Bookings = () => {
                     {b.doctor_name || 'Unassigned'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
-                    {new Date(b.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    {b.slot_time
+                      ? (() => {
+                          const [h, m] = b.slot_time.split(':')
+                          const hr = parseInt(h)
+                          return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
+                        })()
+                      : new Date(b.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                    }
                     <span className="block text-[10px] uppercase font-bold tracking-widest text-gray-400 mt-1">{b.source}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
