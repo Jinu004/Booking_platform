@@ -130,7 +130,7 @@ router.post('/', async (req, res) => {
           }
         } catch (err) {
           logger.error('show_welcome direct call failed:', err.message)
-          await sendMessage(message.from, `Hello! Welcome to ${tenant.name} 👋\n\nPlease type 1 to Book Appointment, 2 to Check My Booking, or 3 to Talk to Staff.`)
+          await sendMessage(message.from, `Hello! Welcome to ${tenant.name} 👋\n\nOops, something went wrong on our end! Please say Hi to try again 😊`)
         }
         return
       }
