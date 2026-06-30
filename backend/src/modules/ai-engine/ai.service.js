@@ -365,7 +365,7 @@ async function processMessage(context) {
       return { error: true, text: 'Our AI assistant is currently unavailable. Please contact the clinic directly.' }
     }
 
-    const fallbackClinicPhone = configs?.business_phone ? ` at ${configs.business_phone}` : ''
+    const fallbackClinicPhone = additionalData.businessPhone ? ` at ${additionalData.businessPhone}` : ''
     return { error: true, text: `We're having a brief hiccup on our end 😊 Please try again in a minute, or call us directly${fallbackClinicPhone} and our team will help you right away.` }
   }
 }
