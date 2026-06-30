@@ -213,15 +213,30 @@ const Doctors = () => {
       const existing = result?.data || [];
       if (existing.length > 0) {
         const merged = DAYS.map(d => {
-          const found = existing.find(s => s.day_of_week === d.key);
-          return found || { day_of_week: d.key, is_available: false, start_time: '09:00', end_time: '18:00' };
+          const daySessions = existing.filter(s => s.day_of_week === d.key);
+          if (daySessions.length > 0) {
+            return {
+              day_of_week: d.key,
+              is_available: true,
+              sessions: daySessions.map(s => ({ start_time: s.start_time, end_time: s.end_time }))
+            };
+          }
+          return { day_of_week: d.key, is_available: false, sessions: [{ start_time: '09:00', end_time: '18:00' }] };
         });
         setDoctorSchedule(merged);
       } else {
-        setDoctorSchedule(defaultSchedule);
+        setDoctorSchedule(defaultSchedule.map(d => ({
+          day_of_week: d.day_of_week,
+          is_available: d.is_available,
+          sessions: [{ start_time: d.start_time || '09:00', end_time: d.end_time || '18:00' }]
+        })));
       }
     } catch (err) {
-      setDoctorSchedule(defaultSchedule);
+      setDoctorSchedule(defaultSchedule.map(d => ({
+        day_of_week: d.day_of_week,
+        is_available: d.is_available,
+        sessions: [{ start_time: d.start_time || '09:00', end_time: d.end_time || '18:00' }]
+      })));
     }
   };
 
@@ -229,7 +244,16 @@ const Doctors = () => {
     if (!scheduleModalDoc) return;
     setSavingSchedule(true);
     try {
-      await saveDoctorSchedule(scheduleModalDoc.id, doctorSchedule);
+      await saveDoctorSchedule(scheduleModalDoc.id, doctorSchedule.flatMap(d =>
+        d.is_available
+          ? (d.sessions || [{ start_time: d.start_time, end_time: d.end_time }]).map(sess => ({
+              day_of_week: d.day_of_week,
+              is_available: true,
+              start_time: sess.start_time,
+              end_time: sess.end_time
+            }))
+          : [{ day_of_week: d.day_of_week, is_available: false, start_time: '09:00', end_time: '18:00' }]
+      ));
       setScheduleModalDoc(null);
       addToast('Schedule saved successfully', 'success');
       fetchDoctors();
@@ -745,48 +769,125 @@ const Doctors = () => {
             <div className="space-y-3">
               {DAYS.map((day, idx) => {
                 const s = doctorSchedule[idx];
+                const sessions = s?.sessions || [{ start_time: '09:00', end_time: '18:00' }];
                 return (
-                  <div key={day.key} className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 w-28">
-                      <input
-                        type="checkbox"
-                        checked={s?.is_available || false}
-                        onChange={e => {
-                          const updated = [...doctorSchedule];
-                          updated[idx] = { ...updated[idx], is_available: e.target.checked };
-                          setDoctorSchedule(updated);
-                        }}
-                        className="rounded"
-                      />
-                      <span className="text-sm font-medium text-gray-700">{day.label}</span>
-                    </label>
-                    {s?.is_available && (
-                      <>
+                  <div key={day.key} className="flex flex-col gap-2 py-2 border-b border-gray-50 last:border-0">
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 w-28">
                         <input
-                          type="time"
-                          value={s.start_time || '09:00'}
+                          type="checkbox"
+                          checked={s?.is_available || false}
                           onChange={e => {
                             const updated = [...doctorSchedule];
-                            updated[idx] = { ...updated[idx], start_time: e.target.value };
+                            updated[idx] = { ...updated[idx], is_available: e.target.checked };
                             setDoctorSchedule(updated);
                           }}
-                          className="border border-gray-300 rounded-md p-1.5 text-sm"
+                          className="rounded"
                         />
-                        <span className="text-gray-400 text-sm">to</span>
-                        <input
-                          type="time"
-                          value={s.end_time || '18:00'}
-                          onChange={e => {
-                            const updated = [...doctorSchedule];
-                            updated[idx] = { ...updated[idx], end_time: e.target.value };
-                            setDoctorSchedule(updated);
-                          }}
-                          className="border border-gray-300 rounded-md p-1.5 text-sm"
-                        />
-                      </>
-                    )}
-                    {!s?.is_available && (
-                      <span className="text-sm text-gray-400 italic">Not working</span>
+                        <span className="text-sm font-medium text-gray-700">{day.label}</span>
+                      </label>
+                      {!s?.is_available && (
+                        <span className="text-sm text-gray-400 italic">Not working</span>
+                      )}
+                      {s?.is_available && sessions.length === 1 && (
+                        <>
+                          <input
+                            type="time"
+                            value={sessions[0].start_time || '09:00'}
+                            onChange={e => {
+                              const updated = [...doctorSchedule];
+                              const newSessions = [...sessions];
+                              newSessions[0] = { ...newSessions[0], start_time: e.target.value };
+                              updated[idx] = { ...updated[idx], sessions: newSessions };
+                              setDoctorSchedule(updated);
+                            }}
+                            className="border border-gray-300 rounded-md p-1.5 text-sm"
+                          />
+                          <span className="text-gray-400 text-sm">to</span>
+                          <input
+                            type="time"
+                            value={sessions[0].end_time || '18:00'}
+                            onChange={e => {
+                              const updated = [...doctorSchedule];
+                              const newSessions = [...sessions];
+                              newSessions[0] = { ...newSessions[0], end_time: e.target.value };
+                              updated[idx] = { ...updated[idx], sessions: newSessions };
+                              setDoctorSchedule(updated);
+                            }}
+                            className="border border-gray-300 rounded-md p-1.5 text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = [...doctorSchedule];
+                              updated[idx] = { ...updated[idx], sessions: [...sessions, { start_time: '17:00', end_time: '21:00' }] };
+                              setDoctorSchedule(updated);
+                            }}
+                            className="text-xs text-teal-600 hover:text-teal-800 font-medium ml-1"
+                          >
+                            + Add Session
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    {s?.is_available && sessions.length > 1 && (
+                      <div className="flex flex-col gap-2 pl-32">
+                        {sessions.map((sess, sIdx) => (
+                          <div key={sIdx} className="flex items-center gap-3">
+                            <span className="text-xs text-gray-400 w-16">{sIdx === 0 ? 'Morning' : sIdx === 1 ? 'Evening' : `Session ${sIdx + 1}`}</span>
+                            <input
+                              type="time"
+                              value={sess.start_time || '09:00'}
+                              onChange={e => {
+                                const updated = [...doctorSchedule];
+                                const newSessions = [...sessions];
+                                newSessions[sIdx] = { ...newSessions[sIdx], start_time: e.target.value };
+                                updated[idx] = { ...updated[idx], sessions: newSessions };
+                                setDoctorSchedule(updated);
+                              }}
+                              className="border border-gray-300 rounded-md p-1.5 text-sm"
+                            />
+                            <span className="text-gray-400 text-sm">to</span>
+                            <input
+                              type="time"
+                              value={sess.end_time || '18:00'}
+                              onChange={e => {
+                                const updated = [...doctorSchedule];
+                                const newSessions = [...sessions];
+                                newSessions[sIdx] = { ...newSessions[sIdx], end_time: e.target.value };
+                                updated[idx] = { ...updated[idx], sessions: newSessions };
+                                setDoctorSchedule(updated);
+                              }}
+                              className="border border-gray-300 rounded-md p-1.5 text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...doctorSchedule];
+                                const newSessions = sessions.filter((_, i) => i !== sIdx);
+                                updated[idx] = { ...updated[idx], sessions: newSessions };
+                                setDoctorSchedule(updated);
+                              }}
+                              className="text-xs text-red-500 hover:text-red-700 font-medium"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                        {sessions.length < 3 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = [...doctorSchedule];
+                              updated[idx] = { ...updated[idx], sessions: [...sessions, { start_time: '17:00', end_time: '21:00' }] };
+                              setDoctorSchedule(updated);
+                            }}
+                            className="text-xs text-teal-600 hover:text-teal-800 font-medium self-start"
+                          >
+                            + Add Session
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
