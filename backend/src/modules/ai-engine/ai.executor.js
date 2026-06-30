@@ -1070,7 +1070,7 @@ Reply CANCEL to cancel your booking.`
     }
 
     case 'create_future_booking': {
-      const { doctor_name: doctorNameFB, patient_name: patientNameFB, booking_date: bookingDateFB } = args
+      const { doctor_name: doctorNameFB, patient_name: patientNameFB, booking_date: bookingDateFB, session_start_time: sessionStartFB } = args
       if (!doctorNameFB || !patientNameFB || !bookingDateFB) {
         return `DIRECT:Sorry, I need the doctor name, your name, and booking date to complete this booking.`
       }
@@ -1085,15 +1085,28 @@ Reply CANCEL to cancel your booking.`
       const fmtFB = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` }
 
       // Find doctor (outside transaction — read-only)
-      const docResFB = await pool.query(
-        `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
-                ds.start_time, ds.end_time
-         FROM clinic_doctors cd
-         JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
-         WHERE cd.tenant_id = $1 AND cd.is_active = true AND LOWER(cd.name) LIKE LOWER($3)
-         LIMIT 1`,
-        [tenant.id, targetDow, `%${doctorNameFB}%`]
-      )
+      const sessionFilterFB = sessionStartFB && /^\d{2}:\d{2}(:\d{2})?$/.test(sessionStartFB)
+      const docResFB = sessionFilterFB
+        ? await pool.query(
+            `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+                    ds.start_time, ds.end_time
+             FROM clinic_doctors cd
+             JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
+             WHERE cd.tenant_id = $1 AND cd.is_active = true AND LOWER(cd.name) LIKE LOWER($3)
+               AND ds.start_time::text LIKE $4 || '%'
+             LIMIT 1`,
+            [tenant.id, targetDow, `%${doctorNameFB}%`, sessionStartFB]
+          )
+        : await pool.query(
+            `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+                    ds.start_time, ds.end_time
+             FROM clinic_doctors cd
+             JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
+             WHERE cd.tenant_id = $1 AND cd.is_active = true AND LOWER(cd.name) LIKE LOWER($3)
+             ORDER BY ds.start_time ASC
+             LIMIT 1`,
+            [tenant.id, targetDow, `%${doctorNameFB}%`]
+          )
       if (!docResFB.rows.length) {
         return `DIRECT:Sorry, ${doctorNameFB} is not available on that day. Please choose another day.`
       }
