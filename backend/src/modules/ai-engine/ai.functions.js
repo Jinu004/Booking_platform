@@ -125,7 +125,11 @@ function getFunctionDefinitions(industry) {
         properties: {
           doctor_name: { type: 'STRING', description: 'Name of the doctor' },
           patient_name: { type: 'STRING', description: 'Name of the patient' },
-          booking_date: { type: 'STRING', description: 'Date in YYYY-MM-DD format for the booking' }
+          booking_date: { type: 'STRING', description: 'Date in YYYY-MM-DD format for the booking' },
+          session_start_time: {
+            type: 'STRING',
+            description: 'If the conversation context contains a [session:HH:MM:SS] tag, extract and pass that exact value here. Omit if no session tag is present in context.'
+          }
         },
         required: ['doctor_name', 'patient_name', 'booking_date']
       }
