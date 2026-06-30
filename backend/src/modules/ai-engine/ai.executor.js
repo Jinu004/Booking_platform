@@ -1164,10 +1164,10 @@ Reply CANCEL to cancel your booking.`
 
         // Insert booking — RETURNING id eliminates separate SELECT
         const bookingResFB = await clientFB.query(
-          `INSERT INTO bookings (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, patient_name, patient_id)
-           VALUES ($1, $2, $3, 'whatsapp', 'pending', $4, $5, $6, $7)
+          `INSERT INTO bookings (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, patient_name, patient_id, slot_time)
+           VALUES ($1, $2, $3, 'whatsapp', 'pending', $4, $5, $6, $7, $8)
            RETURNING id`,
-          [tenant.id, customerIdFB, doctorFB.id, bookingDateFB, tokenNumberFB, formattedNameFB, patientIdFB]
+          [tenant.id, customerIdFB, doctorFB.id, bookingDateFB, tokenNumberFB, formattedNameFB, patientIdFB, sessionFilterFB ? sessionStartFB : (doctorFB.start_time || null)]
         )
         bookingIdFB = bookingResFB.rows[0].id
 
@@ -1194,7 +1194,7 @@ Token Number: ${tokenNumberFB}
 Doctor: ${doctorFB.name}
 ${doctorFB.specialization}
 Date: ${bookingDayName}, ${bookingDateFB}
-🕘 Session starts at ${fmtFB(doctorFB.start_time)}
+🕘 Session starts at ${sessionFilterFB ? fmtFB(sessionStartFB) : fmtFB(doctorFB.start_time)}
 Please arrive before session begins.
 Reply CANCEL to cancel your booking.`
     }
