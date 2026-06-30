@@ -515,7 +515,7 @@ async function executeFunction(name, args, ctx) {
         const scheduleRes = await pool.query(
           `SELECT start_time, end_time FROM doctor_schedules
            WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
-           LIMIT 1`,
+           ORDER BY start_time ASC`,
           [tenant.id, doctor.id, todayDow]
         )
 
@@ -552,7 +552,6 @@ async function executeFunction(name, args, ctx) {
           }
           return { available: false, message: `${doctor.name} is not available today.` }
         }
-        const { start_time, end_time } = scheduleRes.rows[0]
         const fmt = (t) => {
           const [h, m] = t.split(':')
           const hour = parseInt(h)
@@ -560,15 +559,15 @@ async function executeFunction(name, args, ctx) {
           const h12 = hour % 12 || 12
           return `${h12}:${m} ${ampm}`
         }
-        // Check if current IST time is within doctor's session
         const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
-        const [startH, startM] = start_time.split(':').map(Number)
-        const [endH, endM] = end_time.split(':').map(Number)
         const currentMinutes = nowIST.getHours() * 60 + nowIST.getMinutes()
-        const startMinutes = startH * 60 + startM
-        const endMinutes = endH * 60 + endM
-        if (currentMinutes > endMinutes) {
-          // Session is over for today, find next available day
+
+        const liveSessions = scheduleRes.rows.filter(sess => {
+          const [eH, eM] = sess.end_time.split(':').map(Number)
+          return (eH * 60 + eM) >= currentMinutes
+        })
+
+        if (liveSessions.length === 0) {
           const nextScheduleRes2 = await pool.query(
             `SELECT day_of_week, start_time, end_time FROM doctor_schedules
              WHERE tenant_id = $1 AND doctor_id = $2 AND is_available = true
@@ -590,10 +589,39 @@ async function executeFunction(name, args, ctx) {
           }
           return { available: false, message: `${doctor.name}'s session has ended for today.` }
         }
-        if (currentMinutes < startMinutes) {
-          return { available: false, message: `${doctor.name}'s session starts at ${fmt(start_time)}. Please book after the session begins.` }
+
+        var sessionTime, selectedSessionStart
+
+        if (liveSessions.length === 1) {
+          const { start_time, end_time } = liveSessions[0]
+          const [startH, startM] = start_time.split(':').map(Number)
+          const startMinutes = startH * 60 + startM
+          if (currentMinutes < startMinutes) {
+            return { available: false, message: `${doctor.name}'s session starts at ${fmt(start_time)}. Please book after the session begins.` }
+          }
+          sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
+          selectedSessionStart = start_time
+        } else {
+          const { sendButtons: sendBtnsCDA } = require('../channel/whatsapp/whatsapp.adapter')
+          const custPhoneSel = ctx.customer?.phone
+          if (custPhoneSel) {
+            const sessionButtonsCDA = liveSessions.slice(0, 3).map(sess => ({
+              id: `session_${doctor.id}_${sess.start_time}`,
+              title: `${fmt(sess.start_time)} - ${fmt(sess.end_time)}`.slice(0, 20)
+            }))
+            const sessionListText = liveSessions.map(sess => `${fmt(sess.start_time)} - ${fmt(sess.end_time)}`).join(' or ')
+            try {
+              await sendBtnsCDA(custPhoneSel, `${doctor.name} has multiple sessions today. Select one:`, sessionButtonsCDA)
+              return `DIRECT:__INTERACTIVE_SENT__::${doctor.name} (${doctor.specialization}) has sessions: ${sessionListText}\n\nPlease select a session above.`
+            } catch (sendErrSel) {
+              logger.warn('Session selection sendButtons failed:', sendErrSel.message)
+            }
+          }
+          // Fallback — use earliest live session if send failed
+          const { start_time, end_time } = liveSessions[0]
+          sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
+          selectedSessionStart = start_time
         }
-        const sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
 
       const { sendDoctorList: sendDLCDA } = require('../channel/whatsapp/whatsapp.adapter')
       const custPhoneCDA = ctx.customer?.phone
