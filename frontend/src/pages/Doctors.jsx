@@ -244,16 +244,24 @@ const Doctors = () => {
     if (!scheduleModalDoc) return;
     setSavingSchedule(true);
     try {
-      await saveDoctorSchedule(scheduleModalDoc.id, doctorSchedule.flatMap(d =>
-        d.is_available
-          ? (d.sessions || [{ start_time: d.start_time, end_time: d.end_time }]).map(sess => ({
-              day_of_week: d.day_of_week,
-              is_available: true,
-              start_time: sess.start_time,
-              end_time: sess.end_time
-            }))
-          : [{ day_of_week: d.day_of_week, is_available: false, start_time: '09:00', end_time: '18:00' }]
-      ));
+      await saveDoctorSchedule(scheduleModalDoc.id, doctorSchedule.flatMap(d => {
+        if (!d.is_available) {
+          return [{ day_of_week: d.day_of_week, is_available: false, start_time: '09:00', end_time: '18:00' }]
+        }
+        const validSessions = (d.sessions && d.sessions.length > 0
+          ? d.sessions
+          : [{ start_time: d.start_time, end_time: d.end_time }]
+        ).filter(sess => sess.start_time && sess.end_time)
+        if (validSessions.length === 0) {
+          validSessions.push({ start_time: '09:00', end_time: '18:00' })
+        }
+        return validSessions.map(sess => ({
+          day_of_week: d.day_of_week,
+          is_available: true,
+          start_time: sess.start_time,
+          end_time: sess.end_time
+        }))
+      }));
       setScheduleModalDoc(null);
       addToast('Schedule saved successfully', 'success');
       fetchDoctors();
@@ -779,7 +787,8 @@ const Doctors = () => {
                           checked={s?.is_available || false}
                           onChange={e => {
                             const updated = [...doctorSchedule];
-                            updated[idx] = { ...updated[idx], is_available: e.target.checked };
+                            const existingSessions = s?.sessions && s.sessions.length > 0 ? s.sessions : [{ start_time: '09:00', end_time: '18:00' }]
+                            updated[idx] = { ...updated[idx], is_available: e.target.checked, sessions: existingSessions };
                             setDoctorSchedule(updated);
                           }}
                           className="rounded"
@@ -860,18 +869,20 @@ const Doctors = () => {
                               }}
                               className="border border-gray-300 rounded-md p-1.5 text-sm"
                             />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated = [...doctorSchedule];
-                                const newSessions = sessions.filter((_, i) => i !== sIdx);
-                                updated[idx] = { ...updated[idx], sessions: newSessions };
-                                setDoctorSchedule(updated);
-                              }}
-                              className="text-xs text-red-500 hover:text-red-700 font-medium"
-                            >
-                              Remove
-                            </button>
+                            {sessions.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = [...doctorSchedule];
+                                  const newSessions = sessions.filter((_, i) => i !== sIdx);
+                                  updated[idx] = { ...updated[idx], sessions: newSessions.length > 0 ? newSessions : [{ start_time: '09:00', end_time: '18:00' }] };
+                                  setDoctorSchedule(updated);
+                                }}
+                                className="text-xs text-red-500 hover:text-red-700 font-medium"
+                              >
+                                Remove
+                              </button>
+                            )}
                           </div>
                         ))}
                         {sessions.length < 3 && (
