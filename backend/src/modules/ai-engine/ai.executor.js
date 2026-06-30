@@ -606,7 +606,7 @@ async function executeFunction(name, args, ctx) {
           const custPhoneSel = ctx.customer?.phone
           if (custPhoneSel) {
             const sessionButtonsCDA = liveSessions.slice(0, 3).map(sess => ({
-              id: `session_${doctor.id}_${sess.start_time}`,
+              id: `session_${doctor.id}_${sess.start_time.replace(/:/g, '-')}`,
               title: `${fmt(sess.start_time)} - ${fmt(sess.end_time)}`.slice(0, 20)
             }))
             const sessionListText = liveSessions.map(sess => `${fmt(sess.start_time)} - ${fmt(sess.end_time)}`).join(' or ')
