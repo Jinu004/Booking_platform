@@ -1059,12 +1059,21 @@ Reply CANCEL to cancel your booking.`
       const sessionLabel = sessionMatch ? `\nSelected session: ${sessionMatch[2]}:${sessionMatch[3]}` : ''
       const contextText = `Who is this booking for?${sessionLabel}\n${nameList}\n• Book for someone else${sessionSuffix}`
       if (customerPhone) {
+        let sentGPP = false
         try {
           await sendDoctorList(customerPhone, 'Who is this booking for?', listItems, 'Select Patient')
-          return `DIRECT:__INTERACTIVE_SENT__::${contextText}`
-        } catch (err) {
-          logger.warn('get_patient_profiles sendDoctorList failed:', err.message)
+          sentGPP = true
+        } catch (sendErr1) {
+          logger.warn('get_patient_profiles send attempt 1 failed, retrying:', sendErr1.message)
+          await new Promise(r => setTimeout(r, 500))
+          try {
+            await sendDoctorList(customerPhone, 'Who is this booking for?', listItems, 'Select Patient')
+            sentGPP = true
+          } catch (sendErr2) {
+            logger.warn('get_patient_profiles send attempt 2 failed, falling back to text:', sendErr2.message)
+          }
         }
+        if (sentGPP) return `DIRECT:__INTERACTIVE_SENT__::${contextText}`
       }
       return `DIRECT:${contextText}\n\nPlease reply with the name to book for, or type a new name.`
     }
