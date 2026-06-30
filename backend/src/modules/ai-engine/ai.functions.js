@@ -90,6 +90,10 @@ function getFunctionDefinitions(industry) {
           patient_name: {
             type: 'STRING',
             description: 'Name of the patient'
+          },
+          session_start_time: {
+            type: 'STRING',
+            description: 'If the conversation context contains a [session:HH:MM:SS] tag, extract and pass that exact value here. Omit if no session tag is present in context.'
           }
         },
         required: ['doctor_name', 'patient_name']
