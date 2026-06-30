@@ -670,7 +670,7 @@ Please reply with your name to confirm booking.`
       }
 
       case 'create_token_booking': {
-  const { doctor_name, patient_name } = args
+  const { doctor_name, patient_name, session_start_time } = args
   const formattedName = (patient_name || '')
     .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')  // allow Latin, Malayalam, spaces, hyphens
     .trim()
@@ -766,16 +766,19 @@ Please reply with your name to confirm booking.`
       'SELECT id FROM clinic_doctors WHERE id = $1 FOR UPDATE',
       [doctor.id]
     )
+    const slotTimeValue = session_start_time && /^\d{2}:\d{2}(:\d{2})?$/.test(session_start_time)
+      ? session_start_time
+      : null
     const bookingRes = await bookingClient.query(
       `INSERT INTO bookings
          (tenant_id, customer_id, conversation_id, doctor_id,
-          source, status, booking_date, token_number, notes, patient_name, patient_id)
+          source, status, booking_date, token_number, notes, patient_name, patient_id, slot_time)
        VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE,
          (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled'),
-         $5, $6, $7)
+         $5, $6, $7, $8)
        RETURNING id, token_number`,
       [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
-       `Booked via WhatsApp for ${formattedName}`, formattedName, patientId]
+       `Booked via WhatsApp for ${formattedName}`, formattedName, patientId, slotTimeValue]
     )
     tokenNumber = bookingRes.rows[0].token_number
     booking = bookingRes.rows[0]
@@ -792,14 +795,6 @@ Please reply with your name to confirm booking.`
     bookingClient.release()
   }
 
-  // Fetch doctor's actual session start time for today (IST day-of-week)
-  const todayDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
-  const sessionRes = await pool.query(
-    `SELECT start_time FROM doctor_schedules
-     WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
-     LIMIT 1`,
-    [tenant.id, doctor.id, todayDow]
-  )
   const fmtTime = (t) => {
     const [h, m] = t.split(':')
     const hour = parseInt(h)
@@ -807,9 +802,22 @@ Please reply with your name to confirm booking.`
     const h12 = hour % 12 || 12
     return `${h12}:${m} ${ampm}`
   }
-  const sessionStart = sessionRes.rows[0]?.start_time
-    ? fmtTime(sessionRes.rows[0].start_time)
-    : '9:00 AM'
+  let sessionStart
+  if (slotTimeValue) {
+    sessionStart = fmtTime(slotTimeValue)
+  } else {
+    // No session chosen (single-session doctor) — fall back to today's session lookup
+    const todayDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
+    const sessionRes = await pool.query(
+      `SELECT start_time FROM doctor_schedules
+       WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
+       ORDER BY start_time ASC LIMIT 1`,
+      [tenant.id, doctor.id, todayDow]
+    )
+    sessionStart = sessionRes.rows[0]?.start_time
+      ? fmtTime(sessionRes.rows[0].start_time)
+      : '9:00 AM'
+  }
 
   // If outside working hours, store tomorrow option — non-critical, isolated from booking success
   if (!withinHours) {
