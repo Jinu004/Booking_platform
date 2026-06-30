@@ -225,7 +225,7 @@ async function processMessage(context) {
         ];
         if (injectionPatterns.some(pattern => pattern.test(latestMessage))) {
           logger.warn(`Possible prompt injection attempt: ${latestMessage.slice(0, 100)}`);
-          return 'I can only help with clinic appointments and bookings. Please type 1 to Book Appointment, 2 to Check My Booking, or 3 to Talk to Staff.';
+          return 'I can only help with clinic appointments and bookings 😊 Please say Hi to start again.';
         }
 
         // Start chat session with conversation history
@@ -330,7 +330,7 @@ async function processMessage(context) {
         try {
           text = result.text()
         } catch (textErr) {
-          return { error: true, text: 'Sorry, I could not process that. Please type 1 to Book Appointment, 2 to Check My Booking, or 3 to Talk to Staff.' };
+          return { error: true, text: 'Sorry, I didn\'t quite catch that! Please say Hi to start again 😊' };
         }
         if (!text || !text.trim()) {
           throw new Error('Empty text response from Gemini');
@@ -365,7 +365,8 @@ async function processMessage(context) {
       return { error: true, text: 'Our AI assistant is currently unavailable. Please contact the clinic directly.' }
     }
 
-    return { error: true, text: 'Sorry, I could not process that. Please type 1 to Book Appointment, 2 to Check My Booking, or 3 to Talk to Staff.' }
+    const fallbackClinicPhone = configs?.business_phone ? ` at ${configs.business_phone}` : ''
+    return { error: true, text: `We're having a brief hiccup on our end 😊 Please try again in a minute, or call us directly${fallbackClinicPhone} and our team will help you right away.` }
   }
 }
 
