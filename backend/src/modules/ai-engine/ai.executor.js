@@ -994,20 +994,28 @@ Reply CANCEL to cancel your booking.`
       const customerPhone = ctx.customer?.phone
       const customerId = ctx.customer?.id
 
-      if (!customerId) {
-        return `DIRECT:NEW_PATIENT::No existing profiles found`
+      // Parse session info if this was triggered by a session button tap
+      let sessionSuffix = ''
+      const sessionMatch = (ctx.interactiveId || '').match(/^session_([0-9a-f-]{36})_(\d{2})-(\d{2})-(\d{2})$/)
+      if (sessionMatch) {
+        const sessHH = sessionMatch[2]
+        const sessMM = sessionMatch[3]
+        const sessHour = parseInt(sessHH)
+        const sessAmpm = sessHour >= 12 ? 'PM' : 'AM'
+        const sessH12 = sessHour % 12 || 12
+        sessionSuffix = ` [session:${sessHH}:${sessMM}:${sessionMatch[4]}] (${sessH12}:${sessMM} ${sessAmpm})`
       }
 
+      if (!customerId) {
+        return `DIRECT:NEW_PATIENT::No existing profiles found${sessionSuffix}`
+      }
       const patientRes = await pool.query(
         `SELECT id, name FROM patients WHERE tenant_id = $1 AND customer_id = $2 ORDER BY name ASC LIMIT 9`,
         [tenant.id, customerId]
       )
-
       if (!patientRes.rows.length) {
-        return `DIRECT:NEW_PATIENT::No existing profiles found`
+        return `DIRECT:NEW_PATIENT::No existing profiles found${sessionSuffix}`
       }
-
-      // Build interactive list with existing names + Someone new option
       const listItems = [
         ...patientRes.rows.map(p => ({
           id: `patient_${p.id}`,
@@ -1020,10 +1028,9 @@ Reply CANCEL to cancel your booking.`
           description: 'Add a new patient'
         }
       ]
-
       const nameList = patientRes.rows.map(p => `• ${p.name}`).join('\n')
-      const contextText = `Who is this booking for?\n${nameList}\n• Book for someone else`
-
+      const sessionLabel = sessionMatch ? `\nSelected session: ${sessionMatch[2]}:${sessionMatch[3]}` : ''
+      const contextText = `Who is this booking for?${sessionLabel}\n${nameList}\n• Book for someone else${sessionSuffix}`
       if (customerPhone) {
         try {
           await sendDoctorList(customerPhone, 'Who is this booking for?', listItems, 'Select Patient')
@@ -1032,8 +1039,6 @@ Reply CANCEL to cancel your booking.`
           logger.warn('get_patient_profiles sendDoctorList failed:', err.message)
         }
       }
-
-      // Text fallback
       return `DIRECT:${contextText}\n\nPlease reply with the name to book for, or type a new name.`
     }
 
