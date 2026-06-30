@@ -64,14 +64,15 @@ async function executeFunction(name, args, ctx) {
 
       const welcomeRes = await pool.query(`
         SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
-               ds.start_time, ds.end_time,
+               MIN(ds.start_time) AS start_time, MAX(ds.end_time) AS end_time,
+               COUNT(DISTINCT ds.id) AS session_count,
                COUNT(b.id) FILTER (WHERE b.status != 'cancelled') AS booked_count
         FROM clinic_doctors cd
         JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
         LEFT JOIN bookings b ON b.doctor_id = cd.id AND b.booking_date = CURRENT_DATE AND b.tenant_id = $1
         WHERE cd.tenant_id = $1 AND cd.available_today = true AND cd.is_active = true
           AND (EXTRACT(HOUR FROM ds.end_time) * 60 + EXTRACT(MINUTE FROM ds.end_time)) > $3
-        GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily, ds.start_time, ds.end_time
+        GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily
         ORDER BY cd.name ASC
       `, [tenant.id, todayDowW, nowTimeW])
 
@@ -81,7 +82,10 @@ async function executeFunction(name, args, ctx) {
       const textList = hasDoctors
         ? welcomeRes.rows.map(doc => {
             const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
-            return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${fmtW(doc.start_time)} - ${fmtW(doc.end_time)} — ${remaining} tokens available`
+            const sessionLabel = parseInt(doc.session_count) > 1
+              ? `${doc.session_count} sessions today`
+              : `${fmtW(doc.start_time)} - ${fmtW(doc.end_time)}`
+            return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel} — ${remaining} tokens available`
           }).join('\n\n')
         : 'No doctors available today.'
 
@@ -90,10 +94,13 @@ async function executeFunction(name, args, ctx) {
       if (customerPhone && hasDoctors) {
         const listItems = welcomeRes.rows.map(doc => {
           const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
+          const sessionLabel = parseInt(doc.session_count) > 1
+            ? `${doc.session_count} sessions today`
+            : `${fmtW(doc.start_time)} - ${fmtW(doc.end_time)}`
           return {
             id: doc.id,
             title: doc.name.slice(0, 24),
-            description: `${doc.specialization || 'General'} — ${fmtW(doc.start_time)} - ${fmtW(doc.end_time)} (${remaining} left)`.slice(0, 72)
+            description: `${doc.specialization || 'General'} — ${sessionLabel} (${remaining} left)`.slice(0, 72)
           }
         })
 
