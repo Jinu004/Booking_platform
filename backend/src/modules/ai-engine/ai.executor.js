@@ -127,7 +127,8 @@ async function executeFunction(name, args, ctx) {
         const todayDowAD = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
         const doctorsResult = await pool.query(
           `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
-                  ds.start_time, ds.end_time,
+                  MIN(ds.start_time) AS start_time, MAX(ds.end_time) AS end_time,
+                  COUNT(DISTINCT ds.id) AS session_count,
                   COUNT(b.id) AS booked_count
            FROM clinic_doctors cd
            JOIN doctor_schedules ds
@@ -142,8 +143,7 @@ async function executeFunction(name, args, ctx) {
              AND b.status != 'cancelled'
            WHERE cd.tenant_id = $1
              AND cd.available_today = true AND cd.is_active = true
-           GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
-                    ds.start_time, ds.end_time
+           GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily
            ORDER BY cd.name ASC`,
           [tenant.id, todayDowAD]
         )
@@ -159,19 +159,23 @@ async function executeFunction(name, args, ctx) {
         }
         const doctorList = doctorsResult.rows.map(doc => {
           const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
-          const sessionTime = `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
-          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime} — ${remaining} tokens available`
+          const sessionLabel = parseInt(doc.session_count) > 1
+            ? `${doc.session_count} sessions today`
+            : `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
+          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel} — ${remaining} tokens available`
         }).join('\n\n')
         // Pro plan — send interactive list message directly, bypass Gemini
         if (tenant.plan === 'pro') {
           const { sendDoctorList } = require('../channel/whatsapp/whatsapp.adapter')
           const listItems = doctorsResult.rows.map(doc => {
             const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
-            const sessionTime = `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
+            const sessionLabel = parseInt(doc.session_count) > 1
+              ? `${doc.session_count} sessions today`
+              : `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
             return {
               id: doc.id,
               title: doc.name.slice(0, 24),
-              description: `${doc.specialization || 'General'} — ${sessionTime} (${remaining} left)`.slice(0, 72)
+              description: `${doc.specialization || 'General'} — ${sessionLabel} (${remaining} left)`.slice(0, 72)
             }
           })
           const customerPhone = ctx.customer?.phone
