@@ -758,6 +758,9 @@ Please reply with your name to confirm booking.`
     logger.warn('Patient find-or-create failed (non-fatal), booking will proceed without patient_id:', patientErr.message);
     patientId = null;
   }
+  const slotTimeValue = session_start_time && /^\d{2}:\d{2}(:\d{2})?$/.test(session_start_time)
+    ? session_start_time
+    : null
   const bookingClient = await pool.connect()
   let tokenNumber, booking
   try {
@@ -766,9 +769,6 @@ Please reply with your name to confirm booking.`
       'SELECT id FROM clinic_doctors WHERE id = $1 FOR UPDATE',
       [doctor.id]
     )
-    const slotTimeValue = session_start_time && /^\d{2}:\d{2}(:\d{2})?$/.test(session_start_time)
-      ? session_start_time
-      : null
     const bookingRes = await bookingClient.query(
       `INSERT INTO bookings
          (tenant_id, customer_id, conversation_id, doctor_id,
