@@ -825,9 +825,17 @@ Please reply with your name to confirm booking.`
        ORDER BY start_time ASC LIMIT 1`,
       [tenant.id, doctor.id, todayDow]
     )
-    sessionStart = sessionRes.rows[0]?.start_time
-      ? fmtTime(sessionRes.rows[0].start_time)
-      : '9:00 AM'
+    const resolvedStart = sessionRes.rows[0]?.start_time || null
+    if (resolvedStart) {
+      try {
+        await pool.query(`UPDATE bookings SET slot_time = $1, updated_at = NOW() WHERE id = $2`, [resolvedStart, booking.id])
+      } catch (updateErr) {
+        logger.warn('Failed to backfill slot_time for single-session booking:', updateErr.message)
+      }
+      sessionStart = fmtTime(resolvedStart)
+    } else {
+      sessionStart = '9:00 AM'
+    }
   }
 
   // If outside working hours, store tomorrow option — non-critical, isolated from booking success
