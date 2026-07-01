@@ -19,7 +19,7 @@ const Bookings = () => {
   const [stats, setStats] = useState({ total: 0, confirmed: 0, completed: 0, noshow: 0 });
   const [loading, setLoading] = useState(true);
   
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).toISOString().split('T')[0]);
   const [viewMode, setViewMode] = useState('today')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('');
@@ -50,10 +50,14 @@ const Bookings = () => {
 
   const fetchData = async () => {
     try {
+      const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+      const tomorrowIST = new Date(istNow)
+      tomorrowIST.setDate(tomorrowIST.getDate() + 1)
+      const tomorrowDate = tomorrowIST.toISOString().split('T')[0]
       const [bookingsRes, statsRes, docsRes] = await Promise.all([
         getBookings(viewMode === 'upcoming'
           ? { upcoming: true, status: statusFilter }
-          : { date: viewMode === 'tomorrow' ? new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0] : date, status: statusFilter }).catch(() => ({ data: [] })),
+          : { date: viewMode === 'tomorrow' ? tomorrowDate : date, status: statusFilter }),
         getBookingStats().catch(() => ({ data: { total: 0, confirmed: 0, completed: 0, noshow: 0 } })),
         getDoctors().catch(() => ({ data: [] }))
       ]);
@@ -69,14 +73,40 @@ const Bookings = () => {
       setDoctors(bookingsData.doctors);
       setIsOffline(false);
     } catch (err) {
-      const cached = await loadFromCache('bookings');
-      if (cached) {
-        setBookings(cached.bookings);
-        setStats(cached.stats);
-        setDoctors(cached.doctors);
-        setIsOffline(true);
-      } else {
-        addToast('Failed to load bookings', 'error');
+      // One automatic retry after 2s — covers brief auth/network hiccup on hard reload
+      try {
+        await new Promise(r => setTimeout(r, 2000))
+        const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+        const tomorrowIST = new Date(istNow)
+        tomorrowIST.setDate(tomorrowIST.getDate() + 1)
+        const tomorrowDate = tomorrowIST.toISOString().split('T')[0]
+        const [bookingsRes, statsRes, docsRes] = await Promise.all([
+          getBookings(viewMode === 'upcoming'
+            ? { upcoming: true, status: statusFilter }
+            : { date: viewMode === 'tomorrow' ? tomorrowDate : date, status: statusFilter }),
+          getBookingStats().catch(() => ({ data: { total: 0, confirmed: 0, completed: 0, noshow: 0 } })),
+          getDoctors().catch(() => ({ data: [] }))
+        ])
+        setIsOffline(false)
+        const bookingsData = {
+          bookings: bookingsRes?.data?.bookings || bookingsRes?.data || [],
+          stats: statsRes?.data || { total: 0, confirmed: 0, completed: 0, noshow: 0 },
+          doctors: docsRes?.data || []
+        }
+        await saveToCache('bookings', bookingsData)
+        setBookings(bookingsData.bookings)
+        setStats(bookingsData.stats)
+        setDoctors(bookingsData.doctors)
+      } catch (retryErr) {
+        const cached = await loadFromCache('bookings');
+        if (cached) {
+          setBookings(cached.bookings);
+          setStats(cached.stats);
+          setDoctors(cached.doctors);
+          setIsOffline(true);
+        } else {
+          addToast('Failed to load bookings. Please refresh the page.', 'error');
+        }
       }
     } finally {
       setLoading(false);
