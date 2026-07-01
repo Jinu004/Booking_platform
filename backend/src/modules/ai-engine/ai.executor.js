@@ -64,14 +64,15 @@ async function executeFunction(name, args, ctx) {
 
       const welcomeRes = await pool.query(`
         SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
-               ds.start_time, ds.end_time,
+               MIN(ds.start_time) AS start_time, MAX(ds.end_time) AS end_time,
+               COUNT(DISTINCT ds.id) AS session_count,
                COUNT(b.id) FILTER (WHERE b.status != 'cancelled') AS booked_count
         FROM clinic_doctors cd
         JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
         LEFT JOIN bookings b ON b.doctor_id = cd.id AND b.booking_date = CURRENT_DATE AND b.tenant_id = $1
         WHERE cd.tenant_id = $1 AND cd.available_today = true AND cd.is_active = true
           AND (EXTRACT(HOUR FROM ds.end_time) * 60 + EXTRACT(MINUTE FROM ds.end_time)) > $3
-        GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily, ds.start_time, ds.end_time
+        GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily
         ORDER BY cd.name ASC
       `, [tenant.id, todayDowW, nowTimeW])
 
@@ -81,7 +82,10 @@ async function executeFunction(name, args, ctx) {
       const textList = hasDoctors
         ? welcomeRes.rows.map(doc => {
             const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
-            return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${fmtW(doc.start_time)} - ${fmtW(doc.end_time)} — ${remaining} tokens available`
+            const sessionLabel = parseInt(doc.session_count) > 1
+              ? `${doc.session_count} sessions today`
+              : `${fmtW(doc.start_time)} - ${fmtW(doc.end_time)}`
+            return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel} — ${remaining} tokens available`
           }).join('\n\n')
         : 'No doctors available today.'
 
@@ -90,10 +94,13 @@ async function executeFunction(name, args, ctx) {
       if (customerPhone && hasDoctors) {
         const listItems = welcomeRes.rows.map(doc => {
           const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
+          const sessionLabel = parseInt(doc.session_count) > 1
+            ? `${doc.session_count} sessions today`
+            : `${fmtW(doc.start_time)} - ${fmtW(doc.end_time)}`
           return {
             id: doc.id,
             title: doc.name.slice(0, 24),
-            description: `${doc.specialization || 'General'} — ${fmtW(doc.start_time)} - ${fmtW(doc.end_time)} (${remaining} left)`.slice(0, 72)
+            description: `${doc.specialization || 'General'} — ${sessionLabel} (${remaining} left)`.slice(0, 72)
           }
         })
 
@@ -120,7 +127,8 @@ async function executeFunction(name, args, ctx) {
         const todayDowAD = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
         const doctorsResult = await pool.query(
           `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
-                  ds.start_time, ds.end_time,
+                  MIN(ds.start_time) AS start_time, MAX(ds.end_time) AS end_time,
+                  COUNT(DISTINCT ds.id) AS session_count,
                   COUNT(b.id) AS booked_count
            FROM clinic_doctors cd
            JOIN doctor_schedules ds
@@ -135,8 +143,7 @@ async function executeFunction(name, args, ctx) {
              AND b.status != 'cancelled'
            WHERE cd.tenant_id = $1
              AND cd.available_today = true AND cd.is_active = true
-           GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
-                    ds.start_time, ds.end_time
+           GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily
            ORDER BY cd.name ASC`,
           [tenant.id, todayDowAD]
         )
@@ -152,19 +159,23 @@ async function executeFunction(name, args, ctx) {
         }
         const doctorList = doctorsResult.rows.map(doc => {
           const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
-          const sessionTime = `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
-          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime} — ${remaining} tokens available`
+          const sessionLabel = parseInt(doc.session_count) > 1
+            ? `${doc.session_count} sessions today`
+            : `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
+          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel} — ${remaining} tokens available`
         }).join('\n\n')
         // Pro plan — send interactive list message directly, bypass Gemini
         if (tenant.plan === 'pro') {
           const { sendDoctorList } = require('../channel/whatsapp/whatsapp.adapter')
           const listItems = doctorsResult.rows.map(doc => {
             const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
-            const sessionTime = `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
+            const sessionLabel = parseInt(doc.session_count) > 1
+              ? `${doc.session_count} sessions today`
+              : `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
             return {
               id: doc.id,
               title: doc.name.slice(0, 24),
-              description: `${doc.specialization || 'General'} — ${sessionTime} (${remaining} left)`.slice(0, 72)
+              description: `${doc.specialization || 'General'} — ${sessionLabel} (${remaining} left)`.slice(0, 72)
             }
           })
           const customerPhone = ctx.customer?.phone
@@ -515,7 +526,7 @@ async function executeFunction(name, args, ctx) {
         const scheduleRes = await pool.query(
           `SELECT start_time, end_time FROM doctor_schedules
            WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
-           LIMIT 1`,
+           ORDER BY start_time ASC`,
           [tenant.id, doctor.id, todayDow]
         )
 
@@ -552,7 +563,6 @@ async function executeFunction(name, args, ctx) {
           }
           return { available: false, message: `${doctor.name} is not available today.` }
         }
-        const { start_time, end_time } = scheduleRes.rows[0]
         const fmt = (t) => {
           const [h, m] = t.split(':')
           const hour = parseInt(h)
@@ -560,15 +570,15 @@ async function executeFunction(name, args, ctx) {
           const h12 = hour % 12 || 12
           return `${h12}:${m} ${ampm}`
         }
-        // Check if current IST time is within doctor's session
         const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
-        const [startH, startM] = start_time.split(':').map(Number)
-        const [endH, endM] = end_time.split(':').map(Number)
         const currentMinutes = nowIST.getHours() * 60 + nowIST.getMinutes()
-        const startMinutes = startH * 60 + startM
-        const endMinutes = endH * 60 + endM
-        if (currentMinutes > endMinutes) {
-          // Session is over for today, find next available day
+
+        const liveSessions = scheduleRes.rows.filter(sess => {
+          const [eH, eM] = sess.end_time.split(':').map(Number)
+          return (eH * 60 + eM) >= currentMinutes
+        })
+
+        if (liveSessions.length === 0) {
           const nextScheduleRes2 = await pool.query(
             `SELECT day_of_week, start_time, end_time FROM doctor_schedules
              WHERE tenant_id = $1 AND doctor_id = $2 AND is_available = true
@@ -590,10 +600,39 @@ async function executeFunction(name, args, ctx) {
           }
           return { available: false, message: `${doctor.name}'s session has ended for today.` }
         }
-        if (currentMinutes < startMinutes) {
-          return { available: false, message: `${doctor.name}'s session starts at ${fmt(start_time)}. Please book after the session begins.` }
+
+        var sessionTime, selectedSessionStart
+
+        if (liveSessions.length === 1) {
+          const { start_time, end_time } = liveSessions[0]
+          const [startH, startM] = start_time.split(':').map(Number)
+          const startMinutes = startH * 60 + startM
+          if (currentMinutes < startMinutes) {
+            return { available: false, message: `${doctor.name}'s session starts at ${fmt(start_time)}. Please book after the session begins.` }
+          }
+          sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
+          selectedSessionStart = start_time
+        } else {
+          const { sendButtons: sendBtnsCDA } = require('../channel/whatsapp/whatsapp.adapter')
+          const custPhoneSel = ctx.customer?.phone
+          if (custPhoneSel) {
+            const sessionButtonsCDA = liveSessions.slice(0, 3).map(sess => ({
+              id: `session_${doctor.id}_${sess.start_time.replace(/:/g, '-')}`,
+              title: `${fmt(sess.start_time)} - ${fmt(sess.end_time)}`.slice(0, 20)
+            }))
+            const sessionListText = liveSessions.map(sess => `${fmt(sess.start_time)} - ${fmt(sess.end_time)}`).join(' or ')
+            try {
+              await sendBtnsCDA(custPhoneSel, `${doctor.name} has multiple sessions today. Select one:`, sessionButtonsCDA)
+              return `DIRECT:__INTERACTIVE_SENT__::${doctor.name} (${doctor.specialization}) has sessions: ${sessionListText}\n\nPlease select a session above.`
+            } catch (sendErrSel) {
+              logger.warn('Session selection sendButtons failed:', sendErrSel.message)
+            }
+          }
+          // Fallback — use earliest live session if send failed
+          const { start_time, end_time } = liveSessions[0]
+          sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
+          selectedSessionStart = start_time
         }
-        const sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
 
       const { sendDoctorList: sendDLCDA } = require('../channel/whatsapp/whatsapp.adapter')
       const custPhoneCDA = ctx.customer?.phone
@@ -642,7 +681,7 @@ Please reply with your name to confirm booking.`
       }
 
       case 'create_token_booking': {
-  const { doctor_name, patient_name } = args
+  const { doctor_name, patient_name, session_start_time } = args
   const formattedName = (patient_name || '')
     .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')  // allow Latin, Malayalam, spaces, hyphens
     .trim()
@@ -730,6 +769,9 @@ Please reply with your name to confirm booking.`
     logger.warn('Patient find-or-create failed (non-fatal), booking will proceed without patient_id:', patientErr.message);
     patientId = null;
   }
+  const slotTimeValue = session_start_time && /^\d{2}:\d{2}(:\d{2})?$/.test(session_start_time)
+    ? session_start_time
+    : null
   const bookingClient = await pool.connect()
   let tokenNumber, booking
   try {
@@ -741,13 +783,13 @@ Please reply with your name to confirm booking.`
     const bookingRes = await bookingClient.query(
       `INSERT INTO bookings
          (tenant_id, customer_id, conversation_id, doctor_id,
-          source, status, booking_date, token_number, notes, patient_name, patient_id)
+          source, status, booking_date, token_number, notes, patient_name, patient_id, slot_time)
        VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE,
          (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled'),
-         $5, $6, $7)
+         $5, $6, $7, $8)
        RETURNING id, token_number`,
       [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
-       `Booked via WhatsApp for ${formattedName}`, formattedName, patientId]
+       `Booked via WhatsApp for ${formattedName}`, formattedName, patientId, slotTimeValue]
     )
     tokenNumber = bookingRes.rows[0].token_number
     booking = bookingRes.rows[0]
@@ -764,14 +806,6 @@ Please reply with your name to confirm booking.`
     bookingClient.release()
   }
 
-  // Fetch doctor's actual session start time for today (IST day-of-week)
-  const todayDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
-  const sessionRes = await pool.query(
-    `SELECT start_time FROM doctor_schedules
-     WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
-     LIMIT 1`,
-    [tenant.id, doctor.id, todayDow]
-  )
   const fmtTime = (t) => {
     const [h, m] = t.split(':')
     const hour = parseInt(h)
@@ -779,9 +813,30 @@ Please reply with your name to confirm booking.`
     const h12 = hour % 12 || 12
     return `${h12}:${m} ${ampm}`
   }
-  const sessionStart = sessionRes.rows[0]?.start_time
-    ? fmtTime(sessionRes.rows[0].start_time)
-    : '9:00 AM'
+  let sessionStart
+  if (slotTimeValue) {
+    sessionStart = fmtTime(slotTimeValue)
+  } else {
+    // No session chosen (single-session doctor) — fall back to today's session lookup
+    const todayDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
+    const sessionRes = await pool.query(
+      `SELECT start_time FROM doctor_schedules
+       WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
+       ORDER BY start_time ASC LIMIT 1`,
+      [tenant.id, doctor.id, todayDow]
+    )
+    const resolvedStart = sessionRes.rows[0]?.start_time || null
+    if (resolvedStart) {
+      try {
+        await pool.query(`UPDATE bookings SET slot_time = $1, updated_at = NOW() WHERE id = $2`, [resolvedStart, booking.id])
+      } catch (updateErr) {
+        logger.warn('Failed to backfill slot_time for single-session booking:', updateErr.message)
+      }
+      sessionStart = fmtTime(resolvedStart)
+    } else {
+      sessionStart = '9:00 AM'
+    }
+  }
 
   // If outside working hours, store tomorrow option — non-critical, isolated from booking success
   if (!withinHours) {
@@ -966,20 +1021,28 @@ Reply CANCEL to cancel your booking.`
       const customerPhone = ctx.customer?.phone
       const customerId = ctx.customer?.id
 
-      if (!customerId) {
-        return `DIRECT:NEW_PATIENT::No existing profiles found`
+      // Parse session info if this was triggered by a session button tap
+      let sessionSuffix = ''
+      const sessionMatch = (ctx.interactiveId || '').match(/^session_([0-9a-f-]{36})_(\d{2})-(\d{2})-(\d{2})$/)
+      if (sessionMatch) {
+        const sessHH = sessionMatch[2]
+        const sessMM = sessionMatch[3]
+        const sessHour = parseInt(sessHH)
+        const sessAmpm = sessHour >= 12 ? 'PM' : 'AM'
+        const sessH12 = sessHour % 12 || 12
+        sessionSuffix = ` [session:${sessHH}:${sessMM}:${sessionMatch[4]}] (${sessH12}:${sessMM} ${sessAmpm})`
       }
 
+      if (!customerId) {
+        return `DIRECT:NEW_PATIENT::No existing profiles found${sessionSuffix}`
+      }
       const patientRes = await pool.query(
         `SELECT id, name FROM patients WHERE tenant_id = $1 AND customer_id = $2 ORDER BY name ASC LIMIT 9`,
         [tenant.id, customerId]
       )
-
       if (!patientRes.rows.length) {
-        return `DIRECT:NEW_PATIENT::No existing profiles found`
+        return `DIRECT:NEW_PATIENT::No existing profiles found${sessionSuffix}`
       }
-
-      // Build interactive list with existing names + Someone new option
       const listItems = [
         ...patientRes.rows.map(p => ({
           id: `patient_${p.id}`,
@@ -992,25 +1055,31 @@ Reply CANCEL to cancel your booking.`
           description: 'Add a new patient'
         }
       ]
-
       const nameList = patientRes.rows.map(p => `• ${p.name}`).join('\n')
-      const contextText = `Who is this booking for?\n${nameList}\n• Book for someone else`
-
+      const sessionLabel = sessionMatch ? `\nSelected session: ${sessionMatch[2]}:${sessionMatch[3]}` : ''
+      const contextText = `Who is this booking for?${sessionLabel}\n${nameList}\n• Book for someone else${sessionSuffix}`
       if (customerPhone) {
+        let sentGPP = false
         try {
           await sendDoctorList(customerPhone, 'Who is this booking for?', listItems, 'Select Patient')
-          return `DIRECT:__INTERACTIVE_SENT__::${contextText}`
-        } catch (err) {
-          logger.warn('get_patient_profiles sendDoctorList failed:', err.message)
+          sentGPP = true
+        } catch (sendErr1) {
+          logger.warn('get_patient_profiles send attempt 1 failed, retrying:', sendErr1.message)
+          await new Promise(r => setTimeout(r, 500))
+          try {
+            await sendDoctorList(customerPhone, 'Who is this booking for?', listItems, 'Select Patient')
+            sentGPP = true
+          } catch (sendErr2) {
+            logger.warn('get_patient_profiles send attempt 2 failed, falling back to text:', sendErr2.message)
+          }
         }
+        if (sentGPP) return `DIRECT:__INTERACTIVE_SENT__::${contextText}`
       }
-
-      // Text fallback
       return `DIRECT:${contextText}\n\nPlease reply with the name to book for, or type a new name.`
     }
 
     case 'create_future_booking': {
-      const { doctor_name: doctorNameFB, patient_name: patientNameFB, booking_date: bookingDateFB } = args
+      const { doctor_name: doctorNameFB, patient_name: patientNameFB, booking_date: bookingDateFB, session_start_time: sessionStartFB } = args
       if (!doctorNameFB || !patientNameFB || !bookingDateFB) {
         return `DIRECT:Sorry, I need the doctor name, your name, and booking date to complete this booking.`
       }
@@ -1025,15 +1094,28 @@ Reply CANCEL to cancel your booking.`
       const fmtFB = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` }
 
       // Find doctor (outside transaction — read-only)
-      const docResFB = await pool.query(
-        `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
-                ds.start_time, ds.end_time
-         FROM clinic_doctors cd
-         JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
-         WHERE cd.tenant_id = $1 AND cd.is_active = true AND LOWER(cd.name) LIKE LOWER($3)
-         LIMIT 1`,
-        [tenant.id, targetDow, `%${doctorNameFB}%`]
-      )
+      const sessionFilterFB = sessionStartFB && /^\d{2}:\d{2}(:\d{2})?$/.test(sessionStartFB)
+      const docResFB = sessionFilterFB
+        ? await pool.query(
+            `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+                    ds.start_time, ds.end_time
+             FROM clinic_doctors cd
+             JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
+             WHERE cd.tenant_id = $1 AND cd.is_active = true AND LOWER(cd.name) LIKE LOWER($3)
+               AND ds.start_time::text LIKE $4 || '%'
+             LIMIT 1`,
+            [tenant.id, targetDow, `%${doctorNameFB}%`, sessionStartFB]
+          )
+        : await pool.query(
+            `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+                    ds.start_time, ds.end_time
+             FROM clinic_doctors cd
+             JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
+             WHERE cd.tenant_id = $1 AND cd.is_active = true AND LOWER(cd.name) LIKE LOWER($3)
+             ORDER BY ds.start_time ASC
+             LIMIT 1`,
+            [tenant.id, targetDow, `%${doctorNameFB}%`]
+          )
       if (!docResFB.rows.length) {
         return `DIRECT:Sorry, ${doctorNameFB} is not available on that day. Please choose another day.`
       }
@@ -1091,10 +1173,10 @@ Reply CANCEL to cancel your booking.`
 
         // Insert booking — RETURNING id eliminates separate SELECT
         const bookingResFB = await clientFB.query(
-          `INSERT INTO bookings (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, patient_name, patient_id)
-           VALUES ($1, $2, $3, 'whatsapp', 'pending', $4, $5, $6, $7)
+          `INSERT INTO bookings (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, patient_name, patient_id, slot_time)
+           VALUES ($1, $2, $3, 'whatsapp', 'pending', $4, $5, $6, $7, $8)
            RETURNING id`,
-          [tenant.id, customerIdFB, doctorFB.id, bookingDateFB, tokenNumberFB, formattedNameFB, patientIdFB]
+          [tenant.id, customerIdFB, doctorFB.id, bookingDateFB, tokenNumberFB, formattedNameFB, patientIdFB, sessionFilterFB ? sessionStartFB : (doctorFB.start_time || null)]
         )
         bookingIdFB = bookingResFB.rows[0].id
 
@@ -1121,7 +1203,7 @@ Token Number: ${tokenNumberFB}
 Doctor: ${doctorFB.name}
 ${doctorFB.specialization}
 Date: ${bookingDayName}, ${bookingDateFB}
-🕘 Session starts at ${fmtFB(doctorFB.start_time)}
+🕘 Session starts at ${sessionFilterFB ? fmtFB(sessionStartFB) : fmtFB(doctorFB.start_time)}
 Please arrive before session begins.
 Reply CANCEL to cancel your booking.`
     }

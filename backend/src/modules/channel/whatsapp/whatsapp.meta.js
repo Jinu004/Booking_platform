@@ -64,7 +64,7 @@ function parseIncomingMessage(payload) {
       messageText = message.interactive?.button_reply?.title
         || message.interactive?.list_reply?.title
         || ''
-      interactiveId = message.interactive?.list_reply?.id || null
+      interactiveId = message.interactive?.list_reply?.id || message.interactive?.button_reply?.id || null
     }
 
     const contact = value?.contacts?.[0]

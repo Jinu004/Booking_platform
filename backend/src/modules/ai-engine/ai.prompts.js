@@ -163,6 +163,9 @@ When patient taps a button, the reply text tells you what to do:
 → "Talk to Staff" → call escalate_to_human immediately
 → "Check My Booking" → call get_patient_bookings immediately
 
+SESSION SELECTION:
+If conversation context contains a [session:HH:MM:SS] tag, the patient has already chosen a specific session time. When calling create_token_booking or create_future_booking, always extract and pass that exact value as session_start_time.
+
 DOCTOR SCHEDULE FLOW:
 After show_all_doctors was called and patient selects a doctor name:
 → Call get_doctor_schedule with the doctor name — never call check_doctor_availability here

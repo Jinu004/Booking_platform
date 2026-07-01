@@ -130,7 +130,7 @@ router.post('/', async (req, res) => {
           }
         } catch (err) {
           logger.error('show_welcome direct call failed:', err.message)
-          await sendMessage(message.from, `Hello! Welcome to ${tenant.name} 👋\n\nPlease type 1 to Book Appointment, 2 to Check My Booking, or 3 to Talk to Staff.`)
+          await sendMessage(message.from, `Hello! Welcome to ${tenant.name} 👋\n\nOops, something went wrong on our end! Please say Hi to try again 😊`)
         }
         return
       }
@@ -197,6 +197,30 @@ router.post('/', async (req, res) => {
         await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
         await sendMessage(message.from, newPatientMsg)
         await ConversationService.saveOutboundMessage(context.conversation.id, newPatientMsg, 'assistant')
+        return
+      }
+
+      // Intercept session selection button taps (id format: "session_<uuid>_HH-MM-SS")
+      if (message.interactiveId && /^session_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_\d{2}-\d{2}-\d{2}$/.test(message.interactiveId)) {
+        try {
+          const { executeFunction } = require('../../ai-engine/ai.executor')
+          const result = await executeFunction('get_patient_profiles', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: message.interactiveId, doctorProfiles: [] })
+          if (typeof result === 'string' && result.startsWith('DIRECT:')) {
+            const directContent = result.slice(7).trim()
+            if (directContent.startsWith('__INTERACTIVE_SENT__::')) {
+              const textContent = directContent.slice('__INTERACTIVE_SENT__::'.length)
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              await ConversationService.saveOutboundMessage(context.conversation.id, textContent, 'assistant')
+            } else if (directContent.startsWith('NEW_PATIENT::')) {
+              const askName = 'Please reply with your name to confirm booking.'
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              await sendMessage(message.from, askName)
+              await ConversationService.saveOutboundMessage(context.conversation.id, askName, 'assistant')
+            }
+          }
+        } catch (err) {
+          logger.error('Session selection patient profiles failed:', err.message)
+        }
         return
       }
 
