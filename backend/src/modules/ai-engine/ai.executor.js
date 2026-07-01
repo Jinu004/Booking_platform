@@ -706,14 +706,14 @@ Please reply with your name to confirm booking.`
   }
   const doctor = doctorRes.rows[0]
 
-  // Check duplicate booking for today
+  // Check duplicate booking for today — scoped to patient name so family members sharing a number can each book
   if (customer?.id) {
     const activeBookingRes = await pool.query(
-      `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
-      [customer.id, doctor.id]
+      `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE AND LOWER(patient_name) = LOWER($3) AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
+      [customer.id, doctor.id, formattedName]
     )
     if (activeBookingRes.rows.length > 0) {
-      return { success: false, message: `You already have an active booking with ${doctor.name} today. If you need to see a different doctor, please choose another doctor from the list.` }
+      return { success: false, message: `${formattedName} already has an active booking with ${doctor.name} today.` }
     }
   }
 
@@ -934,14 +934,14 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
           return { success: false, message: `${doctor.name} is fully booked for tomorrow. Please choose another doctor.` }
         }
 
-        // Check duplicate booking for tomorrow
+        // Check duplicate booking for tomorrow — scoped to patient name so family members sharing a number can each book
         if (customer?.id) {
           const activeBookingRes = await pool.query(
-            `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = $3 AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
-            [customer.id, doctor.id, tomorrowDate]
+            `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = $3 AND LOWER(patient_name) = LOWER($4) AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
+            [customer.id, doctor.id, tomorrowDate, formattedName]
           )
           if (activeBookingRes.rows.length > 0) {
-            return { success: false, message: `You already have a booking with ${doctor.name} tomorrow.` }
+            return { success: false, message: `${formattedName} already has a booking with ${doctor.name} tomorrow.` }
           }
         }
 
@@ -1120,6 +1120,17 @@ Reply CANCEL to cancel your booking.`
         return `DIRECT:Sorry, ${doctorNameFB} is not available on that day. Please choose another day.`
       }
       const doctorFB = docResFB.rows[0]
+
+      // Check duplicate booking for future date — scoped to patient name so family members sharing a number can each book
+      if (customer?.id) {
+        const activeBookingResFB = await pool.query(
+          `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = $3 AND LOWER(patient_name) = LOWER($4) AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
+          [customer.id, doctorFB.id, bookingDateFB, patientNameFB]
+        )
+        if (activeBookingResFB.rows.length > 0) {
+          return { success: false, message: `${patientNameFB} already has a booking with ${doctorFB.name} on that date.` }
+        }
+      }
 
       // Find customer (outside transaction — read-only)
       const custResFB = await pool.query(
