@@ -299,6 +299,36 @@ async function sendContact(to, clinicName, phoneNumber, wabaId, accessToken) {
   }
 }
 
+async function sendTemplateMessage(to, templateName, languageCode = 'en') {
+  try {
+    const response = await axios.post(
+      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace('+', ''),
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: []
+        }
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${META_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+    logger.info(`Meta template message sent to ${to} using template: ${templateName}`)
+    return response.data
+  } catch (err) {
+    logger.error('Meta template send failed:', err.response?.data || err.message)
+    throw err
+  }
+}
+
 module.exports = {
   sendTextMessage,
   sendInteractiveButtons,
@@ -307,5 +337,6 @@ module.exports = {
   verifyWebhook,
   uploadMedia,
   sendDocument,
-  sendContact
+  sendContact,
+  sendTemplateMessage
 }
