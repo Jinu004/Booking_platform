@@ -23,6 +23,7 @@ async function sendPushToTenant(tenantId, payload) {
       'SELECT subscription FROM push_subscriptions WHERE tenant_id = $1',
       [tenantId]
     );
+    logger.info(`sendPushToTenant: tenantId=${tenantId} subscriptions=${result.rows.length}`);
     for (const row of result.rows) {
       try {
         await webpush.sendNotification(
@@ -30,14 +31,14 @@ async function sendPushToTenant(tenantId, payload) {
           JSON.stringify(payload)
         );
       } catch (err) {
+        logger.warn('Push notification failed — statusCode:', err.statusCode, '| body:', err.body, '| message:', err.message);
         if (err.statusCode === 410) {
           // Subscription expired - remove it
           await pool.query(
             'DELETE FROM push_subscriptions WHERE subscription = $1',
-            [JSON.stringify(row.subscription)]
+            [row.subscription]
           );
         }
-        logger.warn('Push notification failed:', err.message);
       }
     }
   } catch (err) {
