@@ -114,11 +114,21 @@ async function sendDocument(to, fileBuffer, filename, caption) {
   return { success: false, reason: 'not_supported_in_dev' };
 }
 
+async function sendTemplateMessage(to, templateName, languageCode = 'en') {
+  const provider = getProvider()
+  if (provider === 'meta') {
+    return meta.sendTemplateMessage(to, templateName, languageCode)
+  }
+  // WAHA dev fallback — send as plain text so dev flow isn't broken
+  return waha.sendTextMessage(to, `[Template: ${templateName}]`)
+}
+
 module.exports = {
   sendMessage,
   sendButtons,
   sendDoctorList,
   sendDocument,
   parseIncoming,
-  getProvider
+  getProvider,
+  sendTemplateMessage
 }
