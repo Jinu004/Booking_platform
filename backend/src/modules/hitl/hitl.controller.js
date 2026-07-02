@@ -113,9 +113,9 @@ async function sendTemplate(req, res) {
     if (!enabled) return res.status(403).json({ error: 'Proactive template messaging is not enabled for this tenant' })
 
     // Get conversation phone
-    const convRow = await pool.query(`SELECT customer_phone FROM conversations WHERE id = $1 AND tenant_id = $2`, [conversationId, req.tenantId])
+    const convRow = await pool.query(`SELECT cu.phone FROM conversations c JOIN customers cu ON cu.id = c.customer_id WHERE c.id = $1 AND c.tenant_id = $2`, [conversationId, req.tenantId])
     if (!convRow.rows.length) return res.status(404).json({ error: 'Conversation not found' })
-    const phone = convRow.rows[0].customer_phone
+    const phone = convRow.rows[0].phone
 
     await sendTemplateMessage(phone, templateName, languageCode, components)
     await ConversationService.saveOutboundMessage(conversationId, `[Template sent: ${templateName}]`, 'staff')
