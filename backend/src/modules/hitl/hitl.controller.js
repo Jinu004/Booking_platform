@@ -101,6 +101,7 @@ function sseStream(req, res) {
 }
 
 async function sendTemplate(req, res) {
+  logger.info(`sendTemplate called — tenantId: ${req.tenantId}, conversationId: ${req.params.id}, body: ${JSON.stringify(req.body)}`)
   try {
     const { id: conversationId } = req.params
     const { templateName, languageCode = 'en', components = [] } = req.body
