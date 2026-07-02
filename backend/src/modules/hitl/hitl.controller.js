@@ -1,6 +1,9 @@
 const HITLModel = require('./hitl.model');
 const HITLService = require('./hitl.service');
 const logger = require('../../utils/logger');
+const pool = require('../../config/database');
+const { sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter');
+const ConversationService = require('../conversation/conversation.service');
 
 // UUID v4 format validation helper
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -97,4 +100,36 @@ function sseStream(req, res) {
   });
 }
 
-module.exports = { getConversations, getMessages, reply, toggleMode, sseStream };
+async function sendTemplate(req, res) {
+  try {
+    const { id: conversationId } = req.params
+    const { templateName, languageCode = 'en', components = [] } = req.body
+    if (!templateName) return res.status(400).json({ error: 'templateName is required' })
+
+    // Check proactive_templates_enabled flag
+    const configRow = await pool.query(
+      'SELECT value FROM tenant_configs WHERE tenant_id = $1 AND key = $2',
+      [req.tenantId, 'proactive_templates_enabled']
+    )
+    const enabled = configRow.rows[0]?.value === 'true'
+    if (!enabled) return res.status(403).json({ error: 'Proactive template messaging is not enabled for this tenant' })
+
+    // Get conversation phone
+    const convRow = await pool.query(
+      'SELECT customer_phone FROM conversations WHERE id = $1 AND tenant_id = $2',
+      [conversationId, req.tenantId]
+    )
+    if (!convRow.rows.length) return res.status(404).json({ error: 'Conversation not found' })
+    const phone = convRow.rows[0].customer_phone
+
+    await sendTemplateMessage(phone, templateName, languageCode, components)
+    await ConversationService.saveOutboundMessage(conversationId, `[Template sent: ${templateName}]`, 'staff')
+
+    return res.json({ success: true })
+  } catch (err) {
+    logger.error('sendTemplate failed:', err.response?.data || err.message)
+    return res.status(500).json({ error: 'Failed to send template' })
+  }
+}
+
+module.exports = { getConversations, getMessages, reply, toggleMode, sseStream, sendTemplate };
