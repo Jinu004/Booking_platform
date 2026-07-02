@@ -108,18 +108,12 @@ async function sendTemplate(req, res) {
     if (!templateName) return res.status(400).json({ error: 'templateName is required' })
 
     // Check proactive_templates_enabled flag
-    const configRow = await pool.query(
-      'SELECT value FROM tenant_configs WHERE tenant_id = $1 AND key = $2',
-      [req.tenantId, 'proactive_templates_enabled']
-    )
+    const configRow = await pool.query(`SELECT value FROM tenant_configs WHERE tenant_id = $1 AND key = $2`, [req.tenantId, 'proactive_templates_enabled'])
     const enabled = configRow.rows[0]?.value === 'true'
     if (!enabled) return res.status(403).json({ error: 'Proactive template messaging is not enabled for this tenant' })
 
     // Get conversation phone
-    const convRow = await pool.query(
-      'SELECT customer_phone FROM conversations WHERE id = $1 AND tenant_id = $2',
-      [conversationId, req.tenantId]
-    )
+    const convRow = await pool.query(`SELECT customer_phone FROM conversations WHERE id = $1 AND tenant_id = $2`, [conversationId, req.tenantId])
     if (!convRow.rows.length) return res.status(404).json({ error: 'Conversation not found' })
     const phone = convRow.rows[0].customer_phone
 
