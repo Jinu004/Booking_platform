@@ -34,7 +34,7 @@ async function sendTextMessage(to, message) {
     logger.info(`Meta message sent to ${to}`)
     return response.data
   } catch (err) {
-    logger.error('Meta send failed:', err.message)
+    logger.error('Meta send failed:', err.response?.data || err.message)
     throw err
   }
 }

@@ -1,5 +1,5 @@
 const HITLModel = require('./hitl.model');
-const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter');
+const { sendMessage, sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter');
 const ConversationService = require('../conversation/conversation.service');
 const logger = require('../../utils/logger');
 const pool = require('../../config/database');
@@ -46,8 +46,18 @@ async function handleAIHandoffRequest(tenant, conversation, staffId = null) {
     // Outside working hours — AI stays on, send out-of-hours message
     const customerPhone = conversation.customer_phone;
     if (customerPhone) {
-      await sendMessage(customerPhone, settings.out_of_hours_message);
-      await ConversationService.saveOutboundMessage(conversation.id, settings.out_of_hours_message, 'assistant');
+      try {
+        await sendTemplateMessage(customerPhone, 'out_of_hours', 'en');
+        await ConversationService.saveOutboundMessage(conversation.id, '[Out of hours — template message sent]', 'assistant');
+      } catch (templateErr) {
+        logger.warn('out_of_hours template failed, falling back to plain text:', templateErr.response?.data || templateErr.message);
+        try {
+          await sendMessage(customerPhone, settings.out_of_hours_message);
+          await ConversationService.saveOutboundMessage(conversation.id, settings.out_of_hours_message, 'assistant');
+        } catch (plainErr) {
+          logger.error('out_of_hours plain text fallback also failed:', plainErr.response?.data || plainErr.message);
+        }
+      }
     }
     return { switched: false, reason: 'outside_working_hours' };
   }
@@ -103,7 +113,22 @@ async function staffReply(conversationId, tenantId, staffId, content) {
     try {
       if (phone) await sendMessage(phone, content);
     } catch (err) {
-      logger.error('Background WhatsApp send failed:', err.message);
+      const metaCode = err.response?.data?.error?.code;
+      if (metaCode === 131026) {
+        logger.warn('24-hour window expired for staffReply — sending follow_up template instead');
+        try {
+          await sendTemplateMessage(phone, 'follow_up', 'en');
+          await ConversationService.saveOutboundMessage(conversationId, '[24-hour window expired — re-engagement message sent to patient]', 'staff');
+          broadcastToTenant(tenantId, 'new_message', {
+            conversationId,
+            message: { content: '[24-hour window expired — re-engagement message sent to patient]', sender_role: 'staff', created_at: new Date().toISOString() }
+          });
+        } catch (templateErr) {
+          logger.error('follow_up template send also failed:', templateErr.response?.data || templateErr.message);
+        }
+      } else {
+        logger.error('Background WhatsApp send failed:', err.response?.data || err.message);
+      }
     }
     try {
       await pool.query(
