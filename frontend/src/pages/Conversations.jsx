@@ -548,7 +548,10 @@ export default function Conversations() {
                       value={replyText}
                       onChange={e => setReplyText(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder="Type a reply..."
+                      placeholder={messages.filter(m => m.role === 'user').slice(-1)[0] &&
+                        (new Date() - new Date(messages.filter(m => m.role === 'user').slice(-1)[0].created_at)) > 24 * 60 * 60 * 1000
+                          ? 'Type your message — a re-engagement template will be sent first...'
+                          : 'Type a reply...'}
                       className="flex-1 resize-none rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 outline-none min-h-[48px] max-h-32 px-4 py-3 text-sm"
                       rows={1}
                       disabled={sending}
