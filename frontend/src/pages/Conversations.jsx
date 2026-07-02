@@ -64,7 +64,7 @@ function getAvatarColor(str) {
 }
 
 export default function Conversations() {
-  const { addToast, clearHandoffs, tenant } = useStore()
+  const { addToast, clearHandoffs, tenant, staff } = useStore()
 
   useEffect(() => {
     clearHandoffs()
@@ -74,7 +74,7 @@ export default function Conversations() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateSending, setTemplateSending] = useState(false);
   const [templateError, setTemplateError] = useState('');
-  const [proactiveEnabled, setProactiveEnabled] = useState(false);
+  const proactiveEnabled = staff?.proactiveTemplatesEnabled === true;
   const [messages, setMessages] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
@@ -107,17 +107,7 @@ export default function Conversations() {
     fetchConversations();
   }, []);
 
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const res = await api.get(`/tenants/${tenant?.id}/config`);
-        setProactiveEnabled(res.data?.proactive_templates_enabled === 'true');
-      } catch (err) {
-        // silently fail — feature just won't show
-      }
-    };
-    if (tenant?.id) fetchConfig();
-  }, [tenant?.id]);
+  // proactiveEnabled reads directly from staff session — no API call needed
 
   useEffect(() => {
     const id = searchParams.get('id');
