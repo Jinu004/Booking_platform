@@ -24,7 +24,8 @@ async function login(req, res) {
               t.plan AS tenant_plan,
               t.status AS tenant_status,
               t.industry AS tenant_industry,
-              t.whatsapp_number AS whatsapp_number
+              t.whatsapp_number AS whatsapp_number,
+              (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'proactive_templates_enabled') AS proactive_templates_enabled
        FROM staff s
        JOIN tenants t ON t.id = s.tenant_id
        WHERE LOWER(s.email) = LOWER($1)
@@ -102,8 +103,9 @@ async function login(req, res) {
         tenantPlan: staff.tenant_plan,
         tenantStatus: staff.tenant_status,
         tenantIndustry: staff.tenant_industry,
-tenantWhatsapp: staff.whatsapp_number,
-      doctor_id: staff.doctor_id || null
+        tenantWhatsapp: staff.whatsapp_number,
+        doctor_id: staff.doctor_id || null,
+        proactiveTemplatesEnabled: staff.proactive_templates_enabled === 'true'
       }
     })
   } catch (err) {
