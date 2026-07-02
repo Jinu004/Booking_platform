@@ -122,7 +122,8 @@ async function sendTemplate(req, res) {
 
     return res.json({ success: true })
   } catch (err) {
-    logger.error('sendTemplate failed — message:', err.message, '| stack:', err.stack, '| response:', err.response?.data)
+    console.error('sendTemplate raw error type:', typeof err, 'value:', err, 'message:', err?.message, 'stack:', err?.stack)
+    logger.error('sendTemplate failed — message:', err?.message, '| stack:', err?.stack, '| response:', err?.response?.data)
     return res.status(500).json({ error: 'Failed to send template' })
   }
 }
