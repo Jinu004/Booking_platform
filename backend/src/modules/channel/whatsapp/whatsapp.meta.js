@@ -299,7 +299,7 @@ async function sendContact(to, clinicName, phoneNumber, wabaId, accessToken) {
   }
 }
 
-async function sendTemplateMessage(to, templateName, languageCode = 'en') {
+async function sendTemplateMessage(to, templateName, languageCode = 'en', components = []) {
   try {
     const response = await axios.post(
       `${META_API_URL}/${META_PHONE_ID}/messages`,
@@ -311,7 +311,7 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en') {
         template: {
           name: templateName,
           language: { code: languageCode },
-          components: []
+          components
         }
       },
       {
