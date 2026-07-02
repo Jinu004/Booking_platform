@@ -101,7 +101,6 @@ function sseStream(req, res) {
 }
 
 async function sendTemplate(req, res) {
-  logger.info(`sendTemplate called — tenantId: ${req.tenantId}, conversationId: ${req.params.id}, body: ${JSON.stringify(req.body)}`)
   try {
     const { id: conversationId } = req.params
     const { templateName, languageCode = 'en', components = [] } = req.body
@@ -122,8 +121,7 @@ async function sendTemplate(req, res) {
 
     return res.json({ success: true })
   } catch (err) {
-    console.error('sendTemplate raw error type:', typeof err, 'value:', err, 'message:', err?.message, 'stack:', err?.stack)
-    logger.error('sendTemplate failed — message:', err?.message, '| stack:', err?.stack, '| response:', err?.response?.data)
+    logger.error('sendTemplate failed:', err?.response?.data || err?.message)
     return res.status(500).json({ error: 'Failed to send template' })
   }
 }
