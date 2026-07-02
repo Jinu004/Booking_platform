@@ -13,7 +13,8 @@ async function getAllTenants(req, res) {
       SELECT t.id, t.name, t.plan, t.status, t.industry, t.whatsapp_number, t.created_at, t.ai_model,
              (SELECT COUNT(*) FROM bookings b WHERE b.tenant_id = t.id AND b.created_at >= DATE_TRUNC('month', NOW())) AS booking_count,
              (SELECT COUNT(*) FROM conversations c WHERE c.tenant_id = t.id AND c.started_at >= DATE_TRUNC('month', NOW())) AS conversation_count,
-             (SELECT COUNT(*) FROM customers cu WHERE cu.tenant_id = t.id) AS customer_count
+             (SELECT COUNT(*) FROM customers cu WHERE cu.tenant_id = t.id) AS customer_count,
+             (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'proactive_templates_enabled') AS proactive_templates_enabled
       FROM tenants t
       ORDER BY t.created_at DESC
     `;
