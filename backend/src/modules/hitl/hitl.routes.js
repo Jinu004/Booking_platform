@@ -17,6 +17,7 @@ router.get('/events', sseAuth, requireAuth, HITLController.sseStream);
 // All other routes use requireAuth directly
 router.get('/conversations', requireAuth, HITLController.getConversations);
 router.get('/conversations/:id/messages', requireAuth, HITLController.getMessages);
+router.post('/conversations/:id/send-template', requireAuth, HITLController.sendTemplate);
 router.post('/conversations/:id/reply', requireAuth, HITLController.reply);
 router.patch('/conversations/:id/mode', requireAuth, HITLController.toggleMode);
 
