@@ -4,7 +4,8 @@ import {
   getHITLConversations,
   getConversationMessages,
   sendStaffReply,
-  toggleConversationMode
+  toggleConversationMode,
+  sendTemplate
 } from '../services/conversation.service';
 import { Badge, Button, Input, Spinner, PageHeader } from '../components/shared';
 import { CardSkeleton } from '../components/shared/Skeleton';
@@ -63,13 +64,17 @@ function getAvatarColor(str) {
 }
 
 export default function Conversations() {
-  const { addToast, clearHandoffs } = useStore()
+  const { addToast, clearHandoffs, tenant } = useStore()
 
   useEffect(() => {
     clearHandoffs()
   }, []);
   const [conversations, setConversations] = useState([]);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateSending, setTemplateSending] = useState(false);
+  const [templateError, setTemplateError] = useState('');
+  const [proactiveEnabled, setProactiveEnabled] = useState(false);
   const [messages, setMessages] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
@@ -101,6 +106,19 @@ export default function Conversations() {
   useEffect(() => {
     fetchConversations();
   }, []);
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await api.get(`/tenants/${tenant?.id}/config`);
+        setProactiveEnabled(res.data?.proactive_templates_enabled === 'true');
+      } catch (err) {
+        // silently fail — feature just won't show
+      }
+    };
+    if (tenant?.id) fetchConfig();
+  }, [tenant?.id]);
+
   useEffect(() => {
     const id = searchParams.get('id');
     if (id && conversations.length > 0) {
@@ -297,6 +315,7 @@ export default function Conversations() {
   });
 
   return (
+    <>
     <div className="flex flex-col h-[calc(100vh-130px)] bg-gray-50 overflow-hidden rounded-xl border border-gray-200">
 
       <div className="flex flex-1 overflow-hidden h-full">
@@ -539,6 +558,14 @@ export default function Conversations() {
                       <p className="text-xs text-amber-700">
                         24-hour window closed — last customer message was over 24 hours ago. Free-form replies may not be delivered.
                       </p>
+                      {proactiveEnabled && (
+                        <button
+                          onClick={() => { setShowTemplateModal(true); setTemplateError(''); }}
+                          className="ml-auto flex-shrink-0 px-3 py-1 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 transition"
+                        >
+                          Send Template
+                        </button>
+                      )}
                     </div>
                   ) : null;
                 })()}
@@ -664,5 +691,58 @@ export default function Conversations() {
         </div>
       </div>
     </div>
+
+    {/* Template Message Modal */}
+    {showTemplateModal && (
+      <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+          <h3 className="text-base font-semibold text-gray-900 mb-1">Send Template Message</h3>
+          <p className="text-xs text-gray-500 mb-4">Select a template to send to {selectedConversation?.customer_name || selectedConversation?.customer_phone}</p>
+          {templateError && (
+            <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-xs text-red-700">{templateError}</p>
+            </div>
+          )}
+          <div className="space-y-2 mb-6">
+            {[
+              { name: 'follow_up', label: 'Follow Up', description: 'We have received your earlier message. Please reply here so our staff can assist you.' },
+              { name: 'appointment_confirmation', label: 'Appointment Confirmation', description: 'Your appointment has been confirmed. Thank you for choosing our clinic.' },
+              { name: 'out_of_hours', label: 'Out of Hours', description: 'Thank you for reaching out. Our clinic is currently closed.' }
+            ].map(template => (
+              <button
+                key={template.name}
+                disabled={templateSending}
+                onClick={async () => {
+                  setTemplateSending(true);
+                  setTemplateError('');
+                  try {
+                    await sendTemplate(selectedConversationId, template.name, 'en', []);
+                    setShowTemplateModal(false);
+                  } catch (err) {
+                    setTemplateError(err?.response?.data?.error || 'Failed to send template. Please try again.');
+                  } finally {
+                    setTemplateSending(false);
+                  }
+                }}
+                className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:border-teal-400 hover:bg-teal-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <p className="text-sm font-medium text-gray-800">{template.label}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{template.description}</p>
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowTemplateModal(false)}
+              disabled={templateSending}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
