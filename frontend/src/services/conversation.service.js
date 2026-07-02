@@ -33,3 +33,6 @@ export const sendStaffReply = (conversationId, content) =>
 
 export const toggleConversationMode = (conversationId) =>
   api.patch(`/hitl/conversations/${conversationId}/mode`);
+
+export const sendTemplate = (conversationId, templateName, languageCode = 'en', components = []) =>
+  api.post(`/hitl/conversations/${conversationId}/send-template`, { templateName, languageCode, components });

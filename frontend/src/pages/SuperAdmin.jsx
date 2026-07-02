@@ -53,7 +53,7 @@ export default function SuperAdmin() {
 
   // Edit modal
   const [editTenant, setEditTenant] = useState(null);
-  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', industry: 'clinic', aiModel: '' });
+  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', industry: 'clinic', aiModel: '', proactiveTemplates: false });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -127,7 +127,7 @@ export default function SuperAdmin() {
 
   const openEdit = (t) => {
     setEditTenant(t);
-    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', industry: t.industry || 'clinic', aiModel: t.ai_model || '' });
+    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', industry: t.industry || 'clinic', aiModel: t.ai_model || '', proactiveTemplates: t.proactive_templates_enabled === 'true' });
     setEditError('');
   };
 
@@ -141,7 +141,12 @@ export default function SuperAdmin() {
     }
     try {
       setEditLoading(true);
-      await updateTenant(editTenant.id, editForm);
+      const { proactiveTemplates, ...tenantForm } = editForm;
+      await updateTenant(editTenant.id, tenantForm);
+      await api.patch(`/superadmin/tenants/${editTenant.id}/config`, {
+        key: 'proactive_templates_enabled',
+        value: String(proactiveTemplates)
+      });
       await fetchData();
       closeEditModal();
     } catch (err) {
@@ -493,6 +498,21 @@ export default function SuperAdmin() {
                 <option value="gemini-2.5-flash">gemini-2.5-flash (Balanced)</option>
                 <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Fast)</option>
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Proactive Template Messaging</label>
+              <div className="flex items-center gap-3 mt-1">
+                <input
+                  type="checkbox"
+                  id="proactiveTemplates"
+                  checked={editForm.proactiveTemplates}
+                  onChange={e => setEditForm(f => ({ ...f, proactiveTemplates: e.target.checked }))}
+                  className="w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
+                />
+                <label htmlFor="proactiveTemplates" className="text-sm text-gray-600">
+                  Allow staff to send template messages when 24-hour window is closed
+                </label>
+              </div>
             </div>
 
             {/* WhatsApp WABA Registration */}
