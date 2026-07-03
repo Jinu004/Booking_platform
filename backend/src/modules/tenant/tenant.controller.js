@@ -50,13 +50,23 @@ const getTenantBySlug = async (req, res) => {
  * PUT /:id — Update tenant
  * Only super_admin may update a different tenant's record.
  */
+const STAFF_ALLOWED_FIELDS = new Set(['name']);
+const SUPER_ADMIN_ALLOWED_FIELDS = new Set(['name', 'slug', 'plan', 'status', 'industry', 'whatsapp_number']);
+
 const updateTenant = async (req, res) => {
   try {
     const { id } = req.params;
     if (req.staff?.role !== 'super_admin' && id !== req.tenantId) {
       return errorResponse(res, 'Forbidden', 403);
     }
-    const updateData = req.body;
+    const allowedFields = req.staff?.role === 'super_admin' ? SUPER_ADMIN_ALLOWED_FIELDS : STAFF_ALLOWED_FIELDS;
+    const updateData = {};
+    for (const key of Object.keys(req.body)) {
+      if (allowedFields.has(key)) updateData[key] = req.body[key];
+    }
+    if (Object.keys(updateData).length === 0) {
+      return errorResponse(res, 'No valid fields to update', 400);
+    }
     const tenant = await tenantService.updateTenant(id, updateData);
     return successResponse(res, tenant, 200);
   } catch (error) {
