@@ -144,6 +144,12 @@ app.use(errorHandler);
 
 const PORT = env.PORT || 3001;
 
+// Safety check — refuse to start if auth bypass is enabled outside development
+if (env.BYPASS_AUTH === 'true' && env.NODE_ENV !== 'development') {
+  logger.error('FATAL: BYPASS_AUTH=true is not allowed outside NODE_ENV=development. Refusing to start.');
+  process.exit(1);
+}
+
 // Initialize Scheduled Jobs
 const { initializeSchedulers } = require('./modules/notification/notification.scheduler');
 initializeSchedulers();
