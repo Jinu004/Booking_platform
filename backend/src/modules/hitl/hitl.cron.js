@@ -7,7 +7,7 @@ function startHITLCron(pool, broadcastToTenant) {
       const result = await pool.query(`
         SELECT id, tenant_id FROM conversations
         WHERE mode = 'human'
-        AND mode_changed_at < NOW() - INTERVAL '30 minutes'
+        AND mode_changed_at < NOW() - INTERVAL '1 minute'
       `);
       if (result.rows.length === 0) return;
       logger.info(`HITL cron: auto-resetting ${result.rows.length} idle conversations to AI mode`);

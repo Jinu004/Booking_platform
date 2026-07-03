@@ -132,7 +132,7 @@ async function staffReply(conversationId, tenantId, staffId, content) {
     }
     try {
       await pool.query(
-        `UPDATE conversations SET needs_attention = false WHERE id = $1`,
+        `UPDATE conversations SET needs_attention = false, mode_changed_at = NOW() WHERE id = $1`,
         [conversationId]
       );
     } catch (err) {
