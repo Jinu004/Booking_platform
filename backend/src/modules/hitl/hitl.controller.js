@@ -104,6 +104,7 @@ function sseStream(req, res) {
 async function sendTemplate(req, res) {
   try {
     const { id: conversationId } = req.params
+    if (!isUUID(conversationId)) return res.status(400).json({ error: 'Invalid conversation ID' })
     const { templateName, languageCode = 'en', components = [] } = req.body
     if (!templateName) return res.status(400).json({ error: 'templateName is required' })
 
