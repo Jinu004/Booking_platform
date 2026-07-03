@@ -1,3 +1,4 @@
+const crypto = require('crypto')
 const pool = require('../../config/database')
 const logger = require('../../utils/logger')
 const { successResponse, errorResponse } = require('../../utils/response')
@@ -73,9 +74,10 @@ async function login(req, res) {
     })
 
     // Store session in database
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     await pool.query(
       `INSERT INTO auth_sessions
-       (id, staff_id, tenant_id, token,
+       (id, staff_id, tenant_id, token_hash,
         expires_at, ip_address, user_agent)
        VALUES (
          gen_random_uuid(), $1, $2, $3,
@@ -85,7 +87,7 @@ async function login(req, res) {
       [
         staff.id,
         staff.tenant_id,
-        token,
+        tokenHash,
         req.ip,
         req.headers['user-agent']
       ]
@@ -124,10 +126,11 @@ async function logout(req, res) {
       ?.replace('Bearer ', '')
 
     if (token) {
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
       await pool.query(
         `DELETE FROM auth_sessions
-         WHERE token = $1`,
-        [token]
+         WHERE token_hash = $1`,
+        [tokenHash]
       )
     }
 
