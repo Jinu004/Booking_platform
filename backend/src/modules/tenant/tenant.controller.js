@@ -78,6 +78,12 @@ const updateTenant = async (req, res) => {
  * POST /:id/config — Set single config value
  * Only super_admin may write config for a different tenant.
  */
+const RESERVED_CONFIG_KEYS = new Set([
+  'proactive_templates_enabled',
+  'plan_override',
+  'quota_override'
+]);
+
 const setConfig = async (req, res) => {
   try {
     const { id } = req.params;
@@ -85,6 +91,9 @@ const setConfig = async (req, res) => {
       return errorResponse(res, 'Forbidden', 403);
     }
     const { key, value } = req.body;
+    if (req.staff?.role !== 'super_admin' && RESERVED_CONFIG_KEYS.has(key)) {
+      return errorResponse(res, 'Forbidden — this config key can only be set by a super admin', 403);
+    }
     const config = await tenantService.setConfig(id, key, value);
     return successResponse(res, config, 200);
   } catch (error) {
