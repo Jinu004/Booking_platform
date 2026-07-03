@@ -35,7 +35,7 @@ cron.schedule('0 8 * * *', async () => {
           const appointmentTime = booking.slot_time
             ? `${booking.slot_time} session, Token #${booking.token_number}`
             : `Token #${booking.token_number}`
-          await sendTemplateMessage(booking.phone, 'appointment_reminder_v2', 'en', [
+          await sendTemplateMessage(booking.phone, 'appointment_reminder_v2_', 'en', [
             {
               type: 'body',
               parameters: [
