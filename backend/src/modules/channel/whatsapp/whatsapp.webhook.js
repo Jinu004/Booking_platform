@@ -59,7 +59,7 @@ router.post('/', async (req, res) => {
         await redisClient.set(`msg_dedup:${message.messageId}`, '1', { EX: 300 })
       }
 
-      logger.info(`Incoming ${source} message from ${message.from}`)
+      logger.info(`Incoming ${source} message from ${message.from.toString().slice(0, 2)}XXXXXX${message.from.toString().slice(-3)}`)
 
       const TenantService = require('../../tenant/tenant.service')
       let tenant = null

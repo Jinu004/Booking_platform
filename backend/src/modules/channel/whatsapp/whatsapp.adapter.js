@@ -29,7 +29,7 @@ async function sendMessage(to, message) {
   await randomDelay(3000, 8000)
 
   const provider = getProvider()
-  logger.info(`Sending via ${provider} to ${to}`)
+  logger.info(`Sending via ${provider} to ${to.toString().slice(0, 2)}XXXXXX${to.toString().slice(-3)}`)
 
   if (provider === 'meta') {
     return meta.sendTextMessage(to, message)
