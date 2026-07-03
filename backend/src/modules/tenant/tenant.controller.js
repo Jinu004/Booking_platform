@@ -25,6 +25,9 @@ const createTenant = async (req, res) => {
 const getTenantById = async (req, res) => {
   try {
     const { id } = req.params;
+    if (req.staff?.role !== 'super_admin' && id !== req.tenantId) {
+      return errorResponse(res, 'Forbidden', 403);
+    }
     const tenant = await tenantService.getTenantById(id);
     return successResponse(res, tenant, 200);
   } catch (error) {
@@ -40,6 +43,9 @@ const getTenantBySlug = async (req, res) => {
     const { slug } = req.params;
     const tenant = await tenantModel.getTenantBySlug(pool, slug);
     if (!tenant) throw new Error('Tenant not found');
+    if (req.staff?.role !== 'super_admin' && tenant.id !== req.tenantId) {
+      return errorResponse(res, 'Forbidden', 403);
+    }
     return successResponse(res, tenant, 200);
   } catch (error) {
     return errorResponse(res, error.message, 404);
