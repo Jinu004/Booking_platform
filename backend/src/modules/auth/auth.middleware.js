@@ -1,4 +1,5 @@
 const { verifyToken } = require('../../config/auth')
+const crypto = require('crypto')
 const pool = require('../../config/database')
 const logger = require('../../utils/logger')
 const {
@@ -70,9 +71,9 @@ async function requireAuth(req, res, next) {
        FROM auth_sessions ses
        JOIN staff s ON s.id = ses.staff_id
        JOIN tenants t ON t.id = ses.tenant_id
-       WHERE ses.token = $1
+       WHERE ses.token_hash = $1
        AND ses.expires_at > NOW()`,
-      [token]
+      [crypto.createHash('sha256').update(token).digest('hex')]
     )
 
     if (!sessionResult.rows.length) {
