@@ -116,7 +116,7 @@ router.post('/', async (req, res) => {
       }
 
       // Intercept button replies before Gemini — direct function calls (skip Please wait for these)
-      const isButtonReply = ['Book Another Day', 'Talk to Staff', 'Check My Booking'].includes(message.message)
+      const isButtonReply = ['Book Another Day', 'Talk to Staff', 'Check My Booking', 'Reschedule'].includes(message.message)
       const greetings = ['hi', 'hello', 'hey', 'hii', 'helo', 'hai', 'hiya', 'start', 'menu']
       const isGreeting = greetings.includes(message.message?.toLowerCase().trim())
 
@@ -162,6 +162,35 @@ router.post('/', async (req, res) => {
         } catch (err) {
           logger.error('show_all_doctors direct call failed:', err.message)
           await sendMessage(message.from, 'Sorry, I could not load the doctor list. Please try again.')
+        }
+        return
+      }
+
+      if (message.message === 'Reschedule') {
+        try {
+          const result = await executeFunction('show_welcome', {}, {
+            tenant,
+            customer: context.customer,
+            conversation: context.conversation,
+            latestMessage: message.message,
+            interactiveId: null,
+            doctorProfiles: []
+          })
+          if (typeof result === 'string' && result.startsWith('DIRECT:')) {
+            const directContent = result.slice(7).trim()
+            if (directContent.startsWith('__INTERACTIVE_SENT__::')) {
+              const textContent = directContent.slice('__INTERACTIVE_SENT__::'.length)
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              await ConversationService.saveOutboundMessage(context.conversation.id, textContent, 'assistant')
+            } else {
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              await sendMessage(message.from, directContent)
+              await ConversationService.saveOutboundMessage(context.conversation.id, directContent, 'assistant')
+            }
+          }
+        } catch (err) {
+          logger.error('Reschedule direct call failed:', err.message)
+          await sendMessage(message.from, 'Sorry, I could not load available doctors. Please say Hi to try again.')
         }
         return
       }
