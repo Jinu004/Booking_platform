@@ -4,6 +4,7 @@ const logger = require('../../utils/logger');
 const pool = require('../../config/database');
 const { sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter');
 const ConversationService = require('../conversation/conversation.service');
+const { broadcastToTenant } = require('./sse');
 
 // UUID v4 format validation helper
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -117,7 +118,16 @@ async function sendTemplate(req, res) {
     const phone = convRow.rows[0].phone
 
     await sendTemplateMessage(phone, templateName, languageCode, components)
-    await ConversationService.saveOutboundMessage(conversationId, `[Template sent: ${templateName}]`, 'staff')
+    const savedMessage = await ConversationService.saveOutboundMessage(conversationId, `[Template sent: ${templateName}]`, 'staff')
+    broadcastToTenant(req.tenantId, 'new_message', {
+      conversationId,
+      message: {
+        id: savedMessage.id,
+        content: `[Template sent: ${templateName}]`,
+        role: 'staff',
+        created_at: savedMessage.created_at || new Date().toISOString()
+      }
+    })
 
     return res.json({ success: true })
   } catch (err) {
