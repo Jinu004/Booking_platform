@@ -21,12 +21,20 @@ router.post('/', async (req, res) => {
   // Verify X-Hub-Signature-256 for Meta webhooks only
   const signature = req.headers['x-hub-signature-256'];
   const appSecret = process.env.META_APP_SECRET;
-  if (appSecret && signature) {
+  if (appSecret) {
+    if (!signature) {
+      logger.warn('Webhook request missing signature header — rejected');
+      return res.status(403).json({ success: false, error: 'Missing signature' });
+    }
     const expectedSignature = 'sha256=' + crypto
       .createHmac('sha256', appSecret)
       .update(req.rawBody)
       .digest('hex');
-    if (signature !== expectedSignature) {
+    const sigBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expectedSignature);
+    const valid = sigBuffer.length === expectedBuffer.length &&
+      crypto.timingSafeEqual(sigBuffer, expectedBuffer);
+    if (!valid) {
       logger.warn('Webhook signature mismatch — possible forged request rejected');
       return res.status(403).json({ success: false, error: 'Invalid signature' });
     }
