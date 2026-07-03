@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const pool = require('../../config/database');
-const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter');
+const { sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter');
 const logger = require('../../utils/logger');
 
 /**
@@ -31,30 +31,35 @@ cron.schedule('0 8 * * *', async () => {
       );
 
       for (const booking of bookings.rows) {
-        const message =
-          `Hi ${booking.patient_name}! 🏥\n\n` +
-          `Reminder: You have an appointment today ` +
-          `with ${booking.doctor_name} at ` +
-          `${booking.clinic_name}.\n\n` +
-          `Token number: ${booking.token_number}\n\n` +
-          `Reply CANCEL to cancel your appointment.`;
-
-        await sendMessage(booking.phone, message);
-
-        await pool.query(
-          `INSERT INTO notifications
-           (tenant_id, booking_id, customer_id,
-            type, channel, status, scheduled_at, sent_at)
-           VALUES ($1, $2, $3, 'reminder_24h',
-            'whatsapp', 'sent', NOW(), NOW())`,
-          [
-            booking.tenant_id,
-            booking.id,
-            booking.customer_id
-          ]
-        );
-
-        logger.info(`24hr reminder sent to ${booking.phone}`);
+        try {
+          const appointmentTime = booking.slot_time
+            ? `${booking.slot_time} session, Token #${booking.token_number}`
+            : `Token #${booking.token_number}`
+          await sendTemplateMessage(booking.phone, 'appointment_reminder_v2', 'en', [
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: booking.clinic_name },
+                { type: 'text', text: appointmentTime }
+              ]
+            }
+          ])
+          await pool.query(
+            `INSERT INTO notifications
+             (tenant_id, booking_id, customer_id,
+              type, channel, status, scheduled_at, sent_at)
+             VALUES ($1, $2, $3, 'reminder_24h',
+              'whatsapp', 'sent', NOW(), NOW())`,
+            [
+              booking.tenant_id,
+              booking.id,
+              booking.customer_id
+            ]
+          )
+          logger.info(`Appointment reminder sent to ${booking.phone} for booking ${booking.id}`)
+        } catch (err) {
+          logger.error(`Appointment reminder failed for booking ${booking.id}:`, err.response?.data || err.message)
+        }
       }
 
       logger.info(`24hr reminders sent: ${bookings.rows.length}`);
