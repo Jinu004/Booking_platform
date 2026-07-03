@@ -155,7 +155,13 @@ const updateTenant = async (id, updateData) => {
  * Sets a single config value
  */
 const setConfig = async (tenantId, key, value) => {
-  return await tenantModel.setTenantConfig(pool, tenantId, key, String(value));
+  const result = await tenantModel.setTenantConfig(pool, tenantId, key, String(value));
+  try {
+    await redisClient.del(`tenant_configs:${tenantId}`);
+  } catch (err) {
+    logger.warn('Redis cache invalidation failed after setConfig:', err.message);
+  }
+  return result;
 };
 
 /**
