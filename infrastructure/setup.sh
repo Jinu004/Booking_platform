@@ -12,7 +12,10 @@ rm /tmp/receptionai_baseline.sql
 echo "2. Running incremental migrations..."
 for f in $(ls "$REPO_DIR/backend/src/database/migrations/"*.sql | sort); do
   echo "   Running: $(basename $f)"
-  sudo -u postgres psql -d "$DB_NAME" -f "$f" 2>&1 | grep -v "already exists" || true
+  cp "$f" /tmp/receptionai_migration.sql
+  chmod 644 /tmp/receptionai_migration.sql
+  sudo -u postgres psql -d "$DB_NAME" -f /tmp/receptionai_migration.sql 2>&1 | grep -v "already exists" || true
+  rm /tmp/receptionai_migration.sql
 done
 echo "3. Granting DB permissions..."
 sudo -u postgres psql -d "$DB_NAME" -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DB_USER; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $DB_USER;"
