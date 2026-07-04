@@ -163,6 +163,25 @@ async function getHITLSettings(req, res, next) {
  * Updates tenant_settings
  * Body: { working_hours, handoff_message, out_of_hours_message }
  */
+const KNOWLEDGE_BASE_MAX_LENGTH = 2000;
+const INJECTION_PATTERNS = [
+  /ignore\s+(all\s+)?previous\s+instructions?/gi,
+  /you\s+are\s+now/gi,
+  /new\s+instructions?:/gi,
+  /system\s*:/gi,
+  /\[system\]/gi,
+  /forget\s+(everything|all)/gi,
+  /disregard\s+(all\s+)?previous/gi,
+];
+const sanitizeKnowledgeBase = (text) => {
+  if (!text) return text;
+  let sanitized = text.slice(0, KNOWLEDGE_BASE_MAX_LENGTH);
+  for (const pattern of INJECTION_PATTERNS) {
+    sanitized = sanitized.replace(pattern, '[removed]');
+  }
+  return sanitized;
+};
+
 async function updateHITLSettings(req, res, next) {
   try {
     const { working_hours, handoff_message, out_of_hours_message, ai_knowledge_base, business_address, business_phone, business_email, payment_upi, payment_phone } = req.body
@@ -185,7 +204,7 @@ async function updateHITLSettings(req, res, next) {
         handoff_message || null,
         out_of_hours_message || null,
         req.tenantId,
-        ai_knowledge_base !== undefined ? ai_knowledge_base : null,
+        ai_knowledge_base !== undefined ? sanitizeKnowledgeBase(ai_knowledge_base) : null,
         business_address !== undefined ? business_address : null,
         business_phone !== undefined ? business_phone : null,
         business_email !== undefined ? business_email : null,
