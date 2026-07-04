@@ -5,7 +5,10 @@ DB_USER="receptionai"
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 echo "=== ReceptionAI Server Setup ==="
 echo "1. Applying baseline schema..."
-sudo -u postgres psql -d "$DB_NAME" -f "$REPO_DIR/infrastructure/baseline.sql"
+cp "$REPO_DIR/infrastructure/baseline.sql" /tmp/receptionai_baseline.sql
+chmod 644 /tmp/receptionai_baseline.sql
+sudo -u postgres psql -d "$DB_NAME" -f /tmp/receptionai_baseline.sql
+rm /tmp/receptionai_baseline.sql
 echo "2. Running incremental migrations..."
 for f in $(ls "$REPO_DIR/backend/src/database/migrations/"*.sql | sort); do
   echo "   Running: $(basename $f)"
