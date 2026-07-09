@@ -60,6 +60,7 @@ async function getPatient(req, res, next) {
     );
     if (!patientRes.rows.length) return errorResponse(res, 'Patient not found', 404);
     const patientId = patientRes.rows[0].id;
+    const customerIdForBookings = patientRes.rows[0].customer_id || rawId;
     const [conditionsRes, visitNotesRes, bookingsRes] = await Promise.all([
       pool.query(`SELECT * FROM patient_conditions WHERE patient_id = $1 AND tenant_id = $2 ORDER BY created_at DESC`, [patientId, req.tenantId]),
       pool.query(`
@@ -82,7 +83,7 @@ async function getPatient(req, res, next) {
     LEFT JOIN procedures p ON p.id = b.procedure_id
         WHERE (b.patient_id = $1 OR b.customer_id = $1) AND b.tenant_id = $2
         ORDER BY b.booking_date DESC
-      `, [patientId, req.tenantId])
+      `, [patientId, customerIdForBookings, req.tenantId])
     ]);
     const patientRow = patientRes.rows[0];
     return successResponse(res, {
