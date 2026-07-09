@@ -345,6 +345,11 @@ export default function PatientProfile() {
     (b.status === 'pending' || b.status === 'confirmed') &&
     b.booking_date?.startsWith(todayStr)
   )
+  const nextProcedure = bookings.find(b =>
+    b.booking_type === 'procedure' &&
+    (b.status === 'pending' || b.status === 'confirmed') &&
+    b.booking_date > todayStr
+  )
   const fmtSessionTime = (t) => {
     if (!t) return ''
     const [h, m] = t.split(':')
@@ -720,6 +725,15 @@ export default function PatientProfile() {
               >
                 Schedule Procedure
               </button>
+            </div>
+          </div>
+        )}
+        {nextProcedure && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Procedure Scheduled</span>
+              <span className="text-xs text-gray-600 font-medium">{nextProcedure.procedure_name || 'Procedure'}</span>
+              <span className="text-xs text-gray-400">· {new Date(nextProcedure.booking_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} at {nextProcedure.slot_time}</span>
             </div>
           </div>
         )}
