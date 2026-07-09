@@ -79,7 +79,8 @@ async function getPatient(req, res, next) {
                 ORDER BY ds.start_time ASC LIMIT 1) as session_start_time
         FROM bookings b
         LEFT JOIN clinic_doctors d ON d.id = b.doctor_id
-        WHERE b.patient_id = $1 AND b.tenant_id = $2
+    LEFT JOIN procedures p ON p.id = b.procedure_id
+        WHERE (b.patient_id = $1 OR b.customer_id = $1) AND b.tenant_id = $2
         ORDER BY b.booking_date DESC
       `, [patientId, req.tenantId])
     ]);
