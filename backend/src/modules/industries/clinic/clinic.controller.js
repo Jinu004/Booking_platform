@@ -1,6 +1,7 @@
 const ClinicModel = require('./clinic.model');
 const pool = require('../../../config/database');
 const { successResponse, errorResponse } = require('../../../utils/response');
+const { sendTemplateMessage, sendMessage } = require('../../channel/whatsapp/whatsapp.adapter');
 
 // Sentinel value used to soft-delete doctors from token queues
 // clinic.model.js getDoctors filters out records where leave_days equals this value
@@ -338,6 +339,40 @@ async function createProcedureBooking(req, res, next) {
     }
     if (!isISODate(date)) return errorResponse(res, 'Valid date (YYYY-MM-DD) is required', 400);
     const booking = await ClinicModel.createProcedureBooking(pool, tenantId, id, procedure_id, customer_id, patient_name, date, start_time, end_time);
+
+    // Send WhatsApp notification to patient
+    setImmediate(async () => {
+      try {
+        const phoneRes = await pool.query(`SELECT phone FROM customers WHERE id = $1`, [customer_id]);
+        const procRes = await pool.query(`SELECT name FROM procedures WHERE id = $1`, [procedure_id]);
+        if (phoneRes.rows.length && procRes.rows.length) {
+          const phone = phoneRes.rows[0].phone;
+          const procedureName = procRes.rows[0].name;
+          const formattedDate = new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+          const formattedTime = (() => { const [h, m] = start_time.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; })();
+          const confirmationMsg = `Hi ${patient_name}! 🏥 Your ${procedureName} has been scheduled for ${formattedDate} at ${formattedTime}. Please arrive a few minutes early and contact us if you need to reschedule.`;
+          try {
+            await sendMessage(phone, confirmationMsg);
+          } catch (msgErr) {
+            const metaCode = msgErr.response?.data?.error?.code;
+            if (metaCode === 131026) {
+              await sendTemplateMessage(phone, 'procedure_scheduled', 'en', [
+                { type: 'body', parameters: [
+                  { type: 'text', text: procedureName },
+                  { type: 'text', text: formattedDate },
+                  { type: 'text', text: formattedTime }
+                ]}
+              ]);
+            } else {
+              throw msgErr;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Procedure WhatsApp notification failed:', err.message);
+      }
+    });
+
     return successResponse(res, booking, 201);
   } catch (err) { next(err); }
 }

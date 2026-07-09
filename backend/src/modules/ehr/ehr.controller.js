@@ -71,7 +71,7 @@ async function getPatient(req, res, next) {
         ORDER BY vn.visit_date DESC
       `, [patientId, req.tenantId]),
       pool.query(`
-        SELECT b.*, d.name as doctor_name, p.name as procedure_name, p.duration_minutes as procedure_duration,
+        SELECT b.*, d.name as doctor_name,
                (SELECT ds.start_time FROM doctor_schedules ds
                 WHERE ds.doctor_id = b.doctor_id
                 AND ds.day_of_week = EXTRACT(DOW FROM b.booking_date)::integer
@@ -80,7 +80,6 @@ async function getPatient(req, res, next) {
                 ORDER BY ds.start_time ASC LIMIT 1) as session_start_time
         FROM bookings b
         LEFT JOIN clinic_doctors d ON d.id = b.doctor_id
-    LEFT JOIN procedures p ON p.id = b.procedure_id
         WHERE (b.patient_id = $1 OR b.customer_id = $2) AND b.tenant_id = $3
         ORDER BY b.booking_date DESC
       `, [patientId, customerIdForBookings, req.tenantId])
