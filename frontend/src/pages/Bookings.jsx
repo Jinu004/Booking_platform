@@ -321,10 +321,19 @@ const Bookings = () => {
                       </tr>
                       {dayBookings.map(b => (
                         <tr key={b.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-indigo-700">
-                            <div className="bg-indigo-50 w-10 h-10 flex items-center justify-center rounded-full">
-                              {b.token_number || '-'}
-                            </div>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {b.booking_type === 'procedure' ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Procedure</span>
+                                <span className="text-xs text-gray-600 font-medium">{b.procedure_name || 'Procedure'}</span>
+                                <span className="text-xs text-gray-400">{b.slot_time} – {b.end_time}</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700">Token</span>
+                                <span className="text-sm font-black text-teal-700">{b.token_number || '-'}</span>
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-bold text-gray-900">{b.patient_name || 'Unknown'}</div>
@@ -369,10 +378,19 @@ const Bookings = () => {
                 })()
               ) : filteredBookings.map(b => (
                 <tr key={b.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-indigo-700">
-                    <div className="bg-indigo-50 w-10 h-10 flex items-center justify-center rounded-full">
-                      {b.token_number || '-'}
-                    </div>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {b.booking_type === 'procedure' ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Procedure</span>
+                        <span className="text-xs text-gray-600 font-medium">{b.procedure_name || 'Procedure'}</span>
+                        <span className="text-xs text-gray-400">{b.slot_time} – {b.end_time}</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700">Token</span>
+                        <span className="text-sm font-black text-teal-700">{b.token_number || '-'}</span>
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-bold text-gray-900">{b.patient_name || 'Unknown'}</div>
