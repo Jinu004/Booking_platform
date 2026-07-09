@@ -1334,7 +1334,7 @@ export default function PatientProfile() {
                     const endM = (endMins % 60).toString().padStart(2, '0');
                     await scheduleProcedureBooking(activeBooking.doctor_id, {
                       procedure_id: selectedProcedure.id,
-                      customer_id: customer.id,
+                      customer_id: customer.customer_id,
                       patient_name: customer.name,
                       date: procedureDate,
                       start_time: selectedSlot,
