@@ -81,7 +81,7 @@ async function getPatient(req, res, next) {
         FROM bookings b
         LEFT JOIN clinic_doctors d ON d.id = b.doctor_id
     LEFT JOIN procedures p ON p.id = b.procedure_id
-        WHERE (b.patient_id = $1 OR b.customer_id = $1) AND b.tenant_id = $2
+        WHERE (b.patient_id = $1 OR b.customer_id = $2) AND b.tenant_id = $3
         ORDER BY b.booking_date DESC
       `, [patientId, customerIdForBookings, req.tenantId])
     ]);
