@@ -62,10 +62,11 @@ async function getBookingById(pool, tenantId, bookingId) {
  */
 async function getBookings(pool, tenantId, filters = {}) {
   let sql = `
-    SELECT b.*, COALESCE(b.patient_name, c.name) AS patient_name, c.phone AS patient_phone, cd.name AS doctor_name
+    SELECT b.*, COALESCE(b.patient_name, c.name) AS patient_name, c.phone AS patient_phone, cd.name AS doctor_name, p.name AS procedure_name, p.duration_minutes AS procedure_duration
     FROM bookings b
     LEFT JOIN customers c ON c.id = b.customer_id
     LEFT JOIN clinic_doctors cd ON cd.id = b.doctor_id
+    LEFT JOIN procedures p ON p.id = b.procedure_id
     WHERE b.tenant_id = $1
   `;
   const params = [];
