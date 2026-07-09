@@ -70,7 +70,7 @@ async function getPatient(req, res, next) {
         ORDER BY vn.visit_date DESC
       `, [patientId, req.tenantId]),
       pool.query(`
-        SELECT b.*, d.name as doctor_name,
+        SELECT b.*, d.name as doctor_name, p.name as procedure_name, p.duration_minutes as procedure_duration,
                (SELECT ds.start_time FROM doctor_schedules ds
                 WHERE ds.doctor_id = b.doctor_id
                 AND ds.day_of_week = EXTRACT(DOW FROM b.booking_date)::integer
