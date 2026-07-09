@@ -281,6 +281,77 @@ async function saveDoctorSchedule(req, res, next) {
   }
 }
 
+async function getProcedures(req, res, next) {
+  try {
+    const tenantId = req.tenantId || req.tenant?.id;
+    const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
+    const procedures = await ClinicModel.getProcedures(pool, tenantId, id);
+    return successResponse(res, procedures);
+  } catch (err) { next(err); }
+}
+
+async function createProcedure(req, res, next) {
+  try {
+    const tenantId = req.tenantId || req.tenant?.id;
+    const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
+    const { name, duration_minutes } = req.body;
+    if (!name || !duration_minutes) return errorResponse(res, 'name and duration_minutes are required', 400);
+    const procedure = await ClinicModel.createProcedure(pool, tenantId, id, name, duration_minutes);
+    return successResponse(res, procedure, 201);
+  } catch (err) { next(err); }
+}
+
+async function deleteProcedure(req, res, next) {
+  try {
+    const tenantId = req.tenantId || req.tenant?.id;
+    const { procedureId } = req.params;
+    if (!isUUID(procedureId)) return errorResponse(res, 'Invalid procedure ID', 400);
+    const deleted = await ClinicModel.deleteProcedure(pool, tenantId, procedureId);
+    if (!deleted) return errorResponse(res, 'Procedure not found', 404);
+    return successResponse(res, deleted);
+  } catch (err) { next(err); }
+}
+
+async function getAvailableSlots(req, res, next) {
+  try {
+    const tenantId = req.tenantId || req.tenant?.id;
+    const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
+    const { date, duration } = req.query;
+    if (!date || !isISODate(date)) return errorResponse(res, 'Valid date (YYYY-MM-DD) is required', 400);
+    if (!duration || isNaN(parseInt(duration))) return errorResponse(res, 'duration (minutes) is required', 400);
+    const slots = await ClinicModel.getAvailableSlots(pool, tenantId, id, date, parseInt(duration));
+    return successResponse(res, slots);
+  } catch (err) { next(err); }
+}
+
+async function createProcedureBooking(req, res, next) {
+  try {
+    const tenantId = req.tenantId || req.tenant?.id;
+    const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
+    const { procedure_id, customer_id, patient_name, date, start_time, end_time } = req.body;
+    if (!procedure_id || !patient_name || !date || !start_time || !end_time) {
+      return errorResponse(res, 'procedure_id, patient_name, date, start_time and end_time are required', 400);
+    }
+    if (!isISODate(date)) return errorResponse(res, 'Valid date (YYYY-MM-DD) is required', 400);
+    const booking = await ClinicModel.createProcedureBooking(pool, tenantId, id, procedure_id, customer_id, patient_name, date, start_time, end_time);
+    return successResponse(res, booking, 201);
+  } catch (err) { next(err); }
+}
+
+async function cancelProcedureBooking(req, res, next) {
+  try {
+    const tenantId = req.tenantId || req.tenant?.id;
+    const { bookingId } = req.params;
+    if (!isUUID(bookingId)) return errorResponse(res, 'Invalid booking ID', 400);
+    const booking = await ClinicModel.cancelProcedureBooking(pool, tenantId, bookingId);
+    return successResponse(res, booking);
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   getDoctors,
   getDoctorById,
@@ -292,5 +363,11 @@ module.exports = {
   updateDoctor,
   deleteDoctor,
   getDoctorSchedule,
-  saveDoctorSchedule
+  saveDoctorSchedule,
+  getProcedures,
+  createProcedure,
+  deleteProcedure,
+  getAvailableSlots,
+  createProcedureBooking,
+  cancelProcedureBooking
 };
