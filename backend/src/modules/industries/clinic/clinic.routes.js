@@ -11,7 +11,13 @@ const {
   updateDoctor,
   deleteDoctor,
   getDoctorSchedule,
-  saveDoctorSchedule
+  saveDoctorSchedule,
+  getProcedures,
+  createProcedure,
+  deleteProcedure,
+  getAvailableSlots,
+  createProcedureBooking,
+  cancelProcedureBooking
 } = require('./clinic.controller');
 
 const router = express.Router();
@@ -30,5 +36,12 @@ router.post('/doctors/:id/schedule', requireAuth, saveDoctorSchedule);
 
 router.get('/tokens', getTokenQueue);
 router.patch('/tokens/:id/status', updateTokenStatus);
+
+router.get('/doctors/:id/procedures', getProcedures);
+router.post('/doctors/:id/procedures', createProcedure);
+router.delete('/procedures/:procedureId', deleteProcedure);
+router.get('/doctors/:id/available-slots', getAvailableSlots);
+router.post('/doctors/:id/procedure-booking', createProcedureBooking);
+router.delete('/bookings/:bookingId/procedure', cancelProcedureBooking);
 
 module.exports = router;
