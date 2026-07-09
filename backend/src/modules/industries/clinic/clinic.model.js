@@ -162,6 +162,126 @@ async function updateTokenStatus(pool, tenantId, tokenId, status) {
   return result.rows.length ? result.rows[0] : null;
 }
 
+async function getProcedures(pool, tenantId, doctorId) {
+  const result = await pool.query(`SELECT * FROM procedures WHERE tenant_id = $1 AND doctor_id = $2 ORDER BY name ASC`, [tenantId, doctorId]);
+  return result.rows;
+}
+
+async function createProcedure(pool, tenantId, doctorId, name, durationMinutes) {
+  const result = await pool.query(`INSERT INTO procedures (tenant_id, doctor_id, name, duration_minutes) VALUES ($1, $2, $3, $4) RETURNING *`, [tenantId, doctorId, name, durationMinutes]);
+  return result.rows[0];
+}
+
+async function deleteProcedure(pool, tenantId, procedureId) {
+  const result = await pool.query(`DELETE FROM procedures WHERE id = $1 AND tenant_id = $2 RETURNING *`, [procedureId, tenantId]);
+  return result.rows[0];
+}
+
+async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes) {
+  const toMinutes = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
+  const toTimeStr = (mins) => { const h = Math.floor(mins / 60).toString().padStart(2, '0'); const m = (mins % 60).toString().padStart(2, '0'); return `${h}:${m}`; };
+
+  const overrideRes = await pool.query(`SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`, [tenantId, doctorId, date]);
+  let sessions = [];
+  if (overrideRes.rows.length > 0) {
+    sessions = overrideRes.rows[0].sessions;
+  } else {
+    const dow = new Date(date).getDay();
+    const schedRes = await pool.query(`SELECT start_time, end_time FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true ORDER BY start_time ASC`, [tenantId, doctorId, dow]);
+    sessions = schedRes.rows.map(r => ({ start_time: r.start_time, end_time: r.end_time }));
+  }
+  if (sessions.length === 0) return [];
+
+  const bookingsRes = await pool.query(`SELECT slot_time, end_time, booking_type FROM bookings WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3 AND status NOT IN ('cancelled', 'noshow') ORDER BY slot_time ASC`, [tenantId, doctorId, date]);
+  const bookedSlots = bookingsRes.rows;
+
+  const availableSlots = [];
+  for (const session of sessions) {
+    let cursor = toMinutes(session.start_time);
+    const sessionEnd = toMinutes(session.end_time);
+    const bookedInSession = bookedSlots
+      .filter(b => b.slot_time && toMinutes(b.slot_time) >= cursor && toMinutes(b.slot_time) < sessionEnd)
+      .map(b => ({ start: toMinutes(b.slot_time), end: b.end_time ? toMinutes(b.end_time) : toMinutes(b.slot_time) + 10 }))
+      .sort((a, b) => a.start - b.start);
+    for (const booked of bookedInSession) {
+      if (booked.start - cursor >= durationMinutes) availableSlots.push(toTimeStr(cursor));
+      cursor = Math.max(cursor, booked.end);
+    }
+    if (sessionEnd - cursor >= durationMinutes) availableSlots.push(toTimeStr(cursor));
+  }
+  return availableSlots;
+}
+
+async function createProcedureBooking(pool, tenantId, doctorId, procedureId, customerId, patientName, date, startTime, endTime) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const bookingRes = await client.query(
+      `INSERT INTO bookings (tenant_id, doctor_id, customer_id, patient_name, booking_date, slot_time, end_time, booking_type, procedure_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, 'procedure', $8, 'confirmed') RETURNING *`,
+      [tenantId, doctorId, customerId, patientName, date, startTime, endTime, procedureId]
+    );
+    const booking = bookingRes.rows[0];
+
+    const overrideRes = await client.query(`SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`, [tenantId, doctorId, date]);
+    let sessions = [];
+    if (overrideRes.rows.length > 0) {
+      sessions = overrideRes.rows[0].sessions;
+    } else {
+      const dow = new Date(date).getDay();
+      const schedRes = await client.query(`SELECT start_time, end_time FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true ORDER BY start_time ASC`, [tenantId, doctorId, dow]);
+      sessions = schedRes.rows.map(r => ({ start_time: r.start_time, end_time: r.end_time }));
+    }
+
+    const toMinutes = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
+    const toTimeStr = (mins) => { const h = Math.floor(mins / 60).toString().padStart(2, '0'); const m = (mins % 60).toString().padStart(2, '0'); return `${h}:${m}`; };
+    const procStart = toMinutes(startTime);
+    const procEnd = toMinutes(endTime);
+
+    const newSessions = [];
+    for (const s of sessions) {
+      const sStart = toMinutes(s.start_time);
+      const sEnd = toMinutes(s.end_time);
+      if (sEnd <= procStart || sStart >= procEnd) {
+        newSessions.push(s);
+      } else {
+        if (sStart < procStart) newSessions.push({ start_time: toTimeStr(sStart), end_time: toTimeStr(procStart) });
+        if (sEnd > procEnd) newSessions.push({ start_time: toTimeStr(procEnd), end_time: toTimeStr(sEnd) });
+      }
+    }
+
+    await client.query(
+      `INSERT INTO schedule_overrides (tenant_id, doctor_id, override_date, sessions) VALUES ($1, $2, $3, $4) ON CONFLICT (doctor_id, override_date) DO UPDATE SET sessions = $4`,
+      [tenantId, doctorId, date, JSON.stringify(newSessions)]
+    );
+
+    await client.query('COMMIT');
+    return booking;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function cancelProcedureBooking(pool, tenantId, bookingId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const bookingRes = await client.query(`UPDATE bookings SET status = 'cancelled' WHERE id = $1 AND tenant_id = $2 AND booking_type = 'procedure' RETURNING *`, [bookingId, tenantId]);
+    if (!bookingRes.rows.length) throw new Error('Procedure booking not found');
+    const booking = bookingRes.rows[0];
+    await client.query(`DELETE FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`, [tenantId, booking.doctor_id, booking.booking_date]);
+    await client.query('COMMIT');
+    return booking;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   getDoctors,
   getDoctorById,
@@ -171,5 +291,11 @@ module.exports = {
   saveDoctorSchedule,
   addDoctorLeave,
   getTokenQueue,
-  updateTokenStatus
+  updateTokenStatus,
+  getProcedures,
+  createProcedure,
+  deleteProcedure,
+  getAvailableSlots,
+  createProcedureBooking,
+  cancelProcedureBooking
 };
