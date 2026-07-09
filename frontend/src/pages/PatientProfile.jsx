@@ -280,6 +280,17 @@ export default function PatientProfile() {
   const [procedureLoading, setProcedureLoading] = useState(false);
   const [procedureError, setProcedureError] = useState('');
   const [slotsLoading, setSlotsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedProcedure || !procedureDate || !activeBooking) return;
+    setSlotsLoading(true);
+    setAvailableSlots([]);
+    setSelectedSlot(null);
+    getAvailableSlots(activeBooking.doctor_id, procedureDate, selectedProcedure.duration_minutes)
+      .then(res => setAvailableSlots(res.data || []))
+      .catch(() => setAvailableSlots([]))
+      .finally(() => setSlotsLoading(false));
+  }, [selectedProcedure, procedureDate]);
   const isPro = staff?.tenantPlan === 'pro';
 
   // Data state
@@ -1224,6 +1235,122 @@ export default function PatientProfile() {
                 className="px-5 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition"
               >
                 {savingNote ? 'Saving…' : 'Save Note'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Procedure Modal */}
+      {showProcedureModal && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+            <h3 className="text-base font-semibold text-gray-900 mb-1">Schedule Procedure</h3>
+            <p className="text-xs text-gray-500 mb-4">Patient: {customer?.name}</p>
+
+            {procedureError && (
+              <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-xs text-red-700">{procedureError}</p>
+              </div>
+            )}
+
+            {/* Procedure selector */}
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Procedure Type</label>
+              {procedures.length === 0 ? (
+                <p className="text-xs text-gray-400">No procedures configured for this doctor. Add procedures in Settings.</p>
+              ) : (
+                <div className="space-y-2">
+                  {procedures.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => { setSelectedProcedure(p); setSelectedSlot(null); }}
+                      className={`w-full text-left px-3 py-2 border rounded-lg text-sm transition ${selectedProcedure?.id === p.id ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-purple-300'}`}
+                    >
+                      <span className="font-medium text-gray-800">{p.name}</span>
+                      <span className="text-xs text-gray-500 ml-2">· {p.duration_minutes} min</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Date picker */}
+            {selectedProcedure && (
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={procedureDate}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={e => setProcedureDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+              </div>
+            )}
+
+            {/* Available slots */}
+            {selectedProcedure && procedureDate && (
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Available Time Slots</label>
+                {slotsLoading ? (
+                  <p className="text-xs text-gray-400">Loading slots...</p>
+                ) : availableSlots.length === 0 ? (
+                  <p className="text-xs text-gray-400">No available slots for this date. Try another date.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {availableSlots.map(slot => (
+                      <button
+                        key={slot}
+                        onClick={() => setSelectedSlot(slot)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition ${selectedSlot === slot ? 'bg-purple-600 text-white border-purple-600' : 'border-gray-200 text-gray-700 hover:border-purple-400'}`}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setShowProcedureModal(false)}
+                disabled={procedureLoading}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!selectedProcedure || !procedureDate || !selectedSlot || procedureLoading}
+                onClick={async () => {
+                  setProcedureLoading(true);
+                  setProcedureError('');
+                  try {
+                    const [h, m] = selectedSlot.split(':').map(Number);
+                    const endMins = h * 60 + m + selectedProcedure.duration_minutes;
+                    const endH = Math.floor(endMins / 60).toString().padStart(2, '0');
+                    const endM = (endMins % 60).toString().padStart(2, '0');
+                    await scheduleProcedureBooking(activeBooking.doctor_id, {
+                      procedure_id: selectedProcedure.id,
+                      customer_id: customer.id,
+                      patient_name: customer.name,
+                      date: procedureDate,
+                      start_time: selectedSlot,
+                      end_time: `${endH}:${endM}`
+                    });
+                    setShowProcedureModal(false);
+                    alert(`Procedure scheduled: ${selectedProcedure.name} on ${procedureDate} at ${selectedSlot}`);
+                  } catch (err) {
+                    setProcedureError(err?.response?.data?.error || 'Failed to schedule procedure. Please try again.');
+                  } finally {
+                    setProcedureLoading(false);
+                  }
+                }}
+                className="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
+              >
+                {procedureLoading ? 'Scheduling...' : 'Confirm Procedure'}
               </button>
             </div>
           </div>
