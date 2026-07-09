@@ -1028,11 +1028,16 @@ export default function PatientProfile() {
                       <td className="px-6 py-4">
                         <p className="text-sm font-semibold text-gray-900">{fmtDate(b.booking_date)}</p>
                         <p className="text-xs text-gray-400">{fmtWeekday(b.booking_date)}</p>
+                        {b.booking_type === 'procedure' && (
+                          <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">{b.procedure_name || 'Procedure'}</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {b.session_start_time
-                          ? (() => { const [h, m] = b.session_start_time.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` })()
-                          : '—'}
+                        {b.booking_type === 'procedure'
+                          ? `${b.slot_time || '—'} – ${b.end_time || '—'}`
+                          : b.session_start_time
+                            ? (() => { const [h, m] = b.session_start_time.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` })()
+                            : '—'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700">{b.doctor_name || '—'}</td>
                       <td className="px-6 py-4">
