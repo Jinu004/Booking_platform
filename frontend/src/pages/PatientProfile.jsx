@@ -8,7 +8,7 @@ import {
   addVisitNote,
   updateVisitNote,
 } from '../services/ehr.service';
-import { getDoctors } from '../services/clinic.service';
+import { getDoctors, getProcedures, getAvailableSlots, scheduleProcedureBooking } from '../services/clinic.service';
 import { createManualBooking, completeBooking, cancelBooking } from '../services/booking.service';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
@@ -271,6 +271,15 @@ export default function PatientProfile() {
   const [scheduleForm, setScheduleForm] = useState({ doctorId: '', bookingDate: '', notes: '' })
   const [scheduleSaving, setScheduleSaving] = useState(false)
   const [scheduleError, setScheduleError] = useState('')
+  const [showProcedureModal, setShowProcedureModal] = useState(false);
+  const [procedures, setProcedures] = useState([]);
+  const [selectedProcedure, setSelectedProcedure] = useState(null);
+  const [procedureDate, setProcedureDate] = useState('');
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [procedureLoading, setProcedureLoading] = useState(false);
+  const [procedureError, setProcedureError] = useState('');
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const isPro = staff?.tenantPlan === 'pro';
 
   // Data state
@@ -680,6 +689,25 @@ export default function PatientProfile() {
                 className="px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition"
               >
                 Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setProcedureError('');
+                  setSelectedProcedure(null);
+                  setProcedureDate('');
+                  setAvailableSlots([]);
+                  setSelectedSlot(null);
+                  try {
+                    const res = await getProcedures(activeBooking.doctor_id);
+                    setProcedures(res.data || []);
+                  } catch {
+                    setProcedures([]);
+                  }
+                  setShowProcedureModal(true);
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition"
+              >
+                Schedule Procedure
               </button>
             </div>
           </div>
