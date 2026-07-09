@@ -203,11 +203,23 @@ async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes
       .filter(b => b.slot_time && toMinutes(b.slot_time) >= cursor && toMinutes(b.slot_time) < sessionEnd)
       .map(b => ({ start: toMinutes(b.slot_time), end: b.end_time ? toMinutes(b.end_time) : toMinutes(b.slot_time) + 10 }))
       .sort((a, b) => a.start - b.start);
+
+    // Generate all possible start times at 30-min intervals within free windows
+    const freeWindows = [];
+    let windowStart = cursor;
     for (const booked of bookedInSession) {
-      if (booked.start - cursor >= durationMinutes) availableSlots.push(toTimeStr(cursor));
-      cursor = Math.max(cursor, booked.end);
+      if (booked.start > windowStart) freeWindows.push({ start: windowStart, end: booked.start });
+      windowStart = Math.max(windowStart, booked.end);
     }
-    if (sessionEnd - cursor >= durationMinutes) availableSlots.push(toTimeStr(cursor));
+    if (sessionEnd > windowStart) freeWindows.push({ start: windowStart, end: sessionEnd });
+
+    for (const window of freeWindows) {
+      let t = window.start;
+      while (t + durationMinutes <= window.end) {
+        availableSlots.push(toTimeStr(t));
+        t += 30;
+      }
+    }
   }
   return availableSlots;
 }
