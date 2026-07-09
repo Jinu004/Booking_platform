@@ -40,3 +40,27 @@ export async function getDoctorSchedule(doctorId) {
 export async function saveDoctorSchedule(doctorId, schedules) {
   return api.post(`/clinic/doctors/${doctorId}/schedule`, { schedules });
 }
+
+export async function getProcedures(doctorId) {
+  return api.get(`/clinic/doctors/${doctorId}/procedures`);
+}
+
+export async function createProcedure(doctorId, name, durationMinutes) {
+  return api.post(`/clinic/doctors/${doctorId}/procedures`, { name, duration_minutes: durationMinutes });
+}
+
+export async function deleteProcedure(procedureId) {
+  return api.delete(`/clinic/procedures/${procedureId}`);
+}
+
+export async function getAvailableSlots(doctorId, date, duration) {
+  return api.get(`/clinic/doctors/${doctorId}/available-slots`, { params: { date, duration } });
+}
+
+export async function scheduleProcedureBooking(doctorId, data) {
+  return api.post(`/clinic/doctors/${doctorId}/procedure-booking`, data);
+}
+
+export async function cancelProcedureBooking(bookingId) {
+  return api.delete(`/clinic/bookings/${bookingId}/procedure`);
+}
