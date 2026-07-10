@@ -1354,6 +1354,7 @@ export default function PatientProfile() {
                     await scheduleProcedureBooking(activeBooking.doctor_id, {
                       procedure_id: selectedProcedure.id,
                       customer_id: customer.customer_id,
+                      patient_id: customer.id,
                       patient_name: customer.name,
                       date: procedureDate,
                       start_time: selectedSlot,
