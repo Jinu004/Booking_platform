@@ -348,7 +348,8 @@ export default function PatientProfile() {
   const nextProcedure = bookings.find(b =>
     b.booking_type === 'procedure' &&
     (b.status === 'pending' || b.status === 'confirmed') &&
-    b.booking_date > todayStr
+    b.booking_date > todayStr &&
+    (!b.patient_id || b.patient_id === customer?.id)
   )
   const fmtSessionTime = (t) => {
     if (!t) return ''
