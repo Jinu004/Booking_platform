@@ -224,13 +224,13 @@ async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes
   return availableSlots;
 }
 
-async function createProcedureBooking(pool, tenantId, doctorId, procedureId, customerId, patientName, date, startTime, endTime) {
+async function createProcedureBooking(pool, tenantId, doctorId, procedureId, customerId, patientId, patientName, date, startTime, endTime) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const bookingRes = await client.query(
-      `INSERT INTO bookings (tenant_id, doctor_id, customer_id, patient_name, booking_date, slot_time, end_time, booking_type, procedure_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, 'procedure', $8, 'confirmed') RETURNING *`,
-      [tenantId, doctorId, customerId, patientName, date, startTime, endTime, procedureId]
+      `INSERT INTO bookings (tenant_id, doctor_id, customer_id, patient_id, patient_name, booking_date, slot_time, end_time, booking_type, procedure_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'procedure', $9, 'confirmed') RETURNING *`,
+      [tenantId, doctorId, customerId, patientId || null, patientName, date, startTime, endTime, procedureId]
     );
     const booking = bookingRes.rows[0];
 

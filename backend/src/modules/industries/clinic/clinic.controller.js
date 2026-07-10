@@ -333,12 +333,12 @@ async function createProcedureBooking(req, res, next) {
     const tenantId = req.tenantId || req.tenant?.id;
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
-    const { procedure_id, customer_id, patient_name, date, start_time, end_time } = req.body;
+    const { procedure_id, customer_id, patient_id, patient_name, date, start_time, end_time } = req.body;
     if (!procedure_id || !patient_name || !date || !start_time || !end_time) {
       return errorResponse(res, 'procedure_id, patient_name, date, start_time and end_time are required', 400);
     }
     if (!isISODate(date)) return errorResponse(res, 'Valid date (YYYY-MM-DD) is required', 400);
-    const booking = await ClinicModel.createProcedureBooking(pool, tenantId, id, procedure_id, customer_id, patient_name, date, start_time, end_time);
+    const booking = await ClinicModel.createProcedureBooking(pool, tenantId, id, procedure_id, customer_id, patient_id, patient_name, date, start_time, end_time);
 
     // Send WhatsApp notification to patient
     setImmediate(async () => {
