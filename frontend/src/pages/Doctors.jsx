@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getDoctors, createDoctor, updateDoctor, deleteDoctor, updateAvailability, addLeave, getTokenQueue, updateTokenStatus, getDoctorSchedule, saveDoctorSchedule } from '../services/clinic.service';
+import { getDoctors, createDoctor, updateDoctor, deleteDoctor, updateAvailability, addLeave, getTokenQueue, updateTokenStatus, getDoctorSchedule, saveDoctorSchedule, getProcedures, createProcedure, deleteProcedure } from '../services/clinic.service';
 import useStore from '../store/useStore';
 import { CardSkeleton } from '../components/shared/Skeleton';
 
@@ -119,6 +119,40 @@ const Doctors = () => {
   const [scheduleModalDoc, setScheduleModalDoc] = useState(null);
   const [doctorSchedule, setDoctorSchedule] = useState([]);
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [procedureModalDoc, setProcedureModalDoc] = useState(null);
+  const [procedures, setProcedures] = useState([]);
+  const [newProcedureName, setNewProcedureName] = useState('');
+  const [newProcedureDuration, setNewProcedureDuration] = useState('');
+  const [savingProcedure, setSavingProcedure] = useState(false);
+
+  const openProcedureModal = async (doc) => {
+    setProcedureModalDoc(doc);
+    setProcedures([]);
+    setNewProcedureName('');
+    setNewProcedureDuration('');
+    try {
+      const res = await getProcedures(doc.id);
+      setProcedures(res.data || []);
+    } catch { setProcedures([]); }
+  };
+
+  const handleAddProcedure = async () => {
+    if (!newProcedureName.trim() || !newProcedureDuration) return;
+    setSavingProcedure(true);
+    try {
+      const res = await createProcedure(procedureModalDoc.id, newProcedureName.trim(), parseInt(newProcedureDuration));
+      setProcedures(prev => [...prev, res.data]);
+      setNewProcedureName('');
+      setNewProcedureDuration('');
+    } catch { } finally { setSavingProcedure(false); }
+  };
+
+  const handleDeleteProcedure = async (procedureId) => {
+    try {
+      await deleteProcedure(procedureId);
+      setProcedures(prev => prev.filter(p => p.id !== procedureId));
+    } catch { }
+  };
 
   const DAYS = [
     { key: 0, label: 'Sunday' },
@@ -465,6 +499,9 @@ const Doctors = () => {
 
                 {/* Action icons */}
                 <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-4">
+                  <button onClick={() => openProcedureModal(doc)} title="Manage Procedures" className="p-2 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                  </button>
                   <button
                     onClick={() => openScheduleModal(doc)}
                     title="Set Schedule"
@@ -918,6 +955,66 @@ const Doctors = () => {
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium disabled:opacity-50"
               >
                 {savingSchedule ? 'Saving...' : 'Save Schedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Procedures Modal */}
+      {procedureModalDoc && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full shadow-xl overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Procedures</h2>
+                <p className="text-sm text-gray-500">{procedureModalDoc.name}</p>
+              </div>
+              <button onClick={() => setProcedureModalDoc(null)} className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="space-y-2 mb-6">
+              {procedures.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">No procedures added yet</p>
+              ) : (
+                procedures.map(p => (
+                  <div key={p.id} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{p.name}</p>
+                      <p className="text-xs text-gray-500">{p.duration_minutes} min</p>
+                    </div>
+                    <button onClick={() => handleDeleteProcedure(p.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-sm font-semibold text-gray-700 mb-3">Add Procedure</p>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  placeholder="Procedure name"
+                  value={newProcedureName}
+                  onChange={e => setNewProcedureName(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+                <input
+                  type="number"
+                  placeholder="Min"
+                  value={newProcedureDuration}
+                  onChange={e => setNewProcedureDuration(e.target.value)}
+                  className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+              </div>
+              <button
+                onClick={handleAddProcedure}
+                disabled={savingProcedure || !newProcedureName.trim() || !newProcedureDuration}
+                className="w-full py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
+              >
+                {savingProcedure ? 'Adding...' : '+ Add Procedure'}
               </button>
             </div>
           </div>
