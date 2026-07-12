@@ -96,10 +96,10 @@ async function getBookings(pool, tenantId, filters = {}) {
   }
   
   if (filters.page && filters.limit) {
-    sql += ` ORDER BY b.booking_date DESC, b.token_number ASC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    sql += ` ORDER BY b.booking_date DESC, b.slot_time ASC NULLS LAST, b.token_number ASC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
     params.push(filters.limit, (filters.page - 1) * filters.limit);
   } else {
-    sql += ` ORDER BY b.booking_date DESC, b.token_number ASC`;
+    sql += ` ORDER BY b.booking_date DESC, b.slot_time ASC NULLS LAST, b.token_number ASC`;
   }
 
   const result = await tenantQuery(tenantId, pool, sql, params);
