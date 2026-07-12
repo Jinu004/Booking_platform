@@ -1076,13 +1076,15 @@ Reply CANCEL to cancel your booking.`
           await sendDoctorList(customerPhone, 'Who is this booking for?', listItems, 'Select Patient')
           sentGPP = true
         } catch (sendErr1) {
-          logger.warn('get_patient_profiles send attempt 1 failed, retrying:', sendErr1.message)
-          await new Promise(r => setTimeout(r, 500))
+          const code1 = sendErr1.response?.data?.error?.code;
+          logger.warn(`get_patient_profiles send attempt 1 failed (Meta code: ${code1 || 'unknown'}), retrying:`, sendErr1.message)
+          await new Promise(r => setTimeout(r, 1000))
           try {
             await sendDoctorList(customerPhone, 'Who is this booking for?', listItems, 'Select Patient')
             sentGPP = true
           } catch (sendErr2) {
-            logger.warn('get_patient_profiles send attempt 2 failed, falling back to text:', sendErr2.message)
+            const code2 = sendErr2.response?.data?.error?.code;
+            logger.warn(`get_patient_profiles send attempt 2 failed (Meta code: ${code2 || 'unknown'}), falling back to text:`, sendErr2.message)
           }
         }
         if (sentGPP) return `DIRECT:__INTERACTIVE_SENT__::${contextText}`
