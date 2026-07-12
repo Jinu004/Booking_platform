@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getBookingStats, getBookings } from '../services/booking.service';
 import { getDoctors, getTokenQueue } from '../services/clinic.service';
-import { getConversations } from '../services/conversation.service';
+import { getHITLConversations } from '../services/conversation.service';
 import { StatCardSkeleton, TableRowSkeleton, CardSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
@@ -33,7 +33,7 @@ const Dashboard = () => {
     try {
       const [statsRes, convRes, docsRes, allDocsRes, tokensRes, bookingsRes] = await Promise.all([
         getBookingStats().catch(() => ({ data: { total: 0 } })),
-        getConversations({ status: 'active' }).catch(() => ({ data: { conversations: [] } })),
+        getHITLConversations().catch(() => ({ data: { conversations: [] } })),
         getDoctors(true).catch(() => ({ data: [] })),
         getDoctors().catch(() => ({ data: [] })),
         getTokenQueue().catch(() => ({ data: [] })),
@@ -298,17 +298,17 @@ const Dashboard = () => {
               >
                 <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
                   <span className="text-xs font-bold text-indigo-700">
-                    {(c.patientPhone || '?')[0].toUpperCase()}
+                    {(c.customer_name || c.customer_phone || '?')[0].toUpperCase()}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{c.patientPhone}</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{c.customer_name || c.customer_phone}</p>
                     <p className="text-xs text-gray-400 flex-shrink-0 ml-2">
-                      {new Date(c.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(c.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
-                  <p className="text-xs text-gray-500 truncate mt-0.5">{c.lastMessage || 'New conversation'}</p>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{c.last_message || 'New conversation'}</p>
                   {c.mode === 'human' && (
                     <span className="text-xs text-orange-600 font-medium">● Handoff requested</span>
                   )}
