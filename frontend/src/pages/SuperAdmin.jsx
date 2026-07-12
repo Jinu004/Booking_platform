@@ -305,15 +305,15 @@ export default function SuperAdmin() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Industry</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WhatsApp</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bookings (30d)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Convs (30d)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Industry</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WhatsApp</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bookings (30d)</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Convs (30d)</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -325,17 +325,17 @@ export default function SuperAdmin() {
                 </tr>
               ) : filteredTenants.map(t => (
                 <tr key={t.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{t.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{industryBadge(t.industry)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{t.name}</td>
+                  <td className="px-3 py-3 whitespace-nowrap">{industryBadge(t.industry)}</td>
+                  <td className="px-3 py-3 whitespace-nowrap">
                     <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 capitalize">{t.plan}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{statusBadge(t.status)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.whatsapp_number || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.booking_count}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.conversation_count}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                  <td className="px-3 py-3 whitespace-nowrap">{statusBadge(t.status)}</td>
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.whatsapp_number || <span className="text-gray-300">—</span>}</td>
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.booking_count}</td>
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.conversation_count}</td>
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
+                  <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium space-x-3">
                     <button onClick={() => openEdit(t)} className="text-blue-600 hover:text-blue-900">Edit</button>
                     {t.id === ownTenantId && (
                       <span className="inline-flex text-xs leading-5 font-semibold text-gray-400">(You)</span>
