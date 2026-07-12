@@ -120,10 +120,12 @@ async function onboardClinic(req, res) {
     });
 
     // 6. Store session
+    const crypto = require('crypto');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     await client.query(
-      `INSERT INTO auth_sessions (id, staff_id, tenant_id, token, expires_at)
+      `INSERT INTO auth_sessions (id, staff_id, tenant_id, token_hash, expires_at)
        VALUES (gen_random_uuid(), $1, $2, $3, NOW() + INTERVAL '7 days')`,
-      [newStaff.id, newStaff.tenant_id, token]
+      [newStaff.id, newStaff.tenant_id, tokenHash]
     );
 
     await client.query('COMMIT');
