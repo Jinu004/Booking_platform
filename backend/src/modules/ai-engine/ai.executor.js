@@ -118,6 +118,18 @@ async function executeFunction(name, args, ctx) {
       }
 
       if (!hasDoctors) {
+        if (customerPhone) {
+          try {
+            await sendButtons(customerPhone, `Hello! Welcome to ${tenant.name} 👋\n\nNo doctors are available today.`, [
+              { id: 'book_other_day', title: 'Book Another Day' },
+              { id: 'talk_to_staff', title: 'Talk to Staff' },
+              { id: 'check_booking', title: 'Check My Booking' }
+            ])
+            return `DIRECT:__INTERACTIVE_SENT__::Hello! Welcome to ${tenant.name} 👋\n\nNo doctors are available today.\n\nOptions: Book Another Day | Talk to Staff | Check My Booking`
+          } catch (err) {
+            logger.warn('show_welcome no-doctors interactive failed, falling back to text:', err.message)
+          }
+        }
         return `DIRECT:Hello! Welcome to ${tenant.name} 👋\n\nNo doctors are available today.\n\nPlease choose an option:\n1️⃣ Book Another Day\n2️⃣ Talk to Staff\n3️⃣ Check My Booking`
       }
       return `DIRECT:Hello! Welcome to ${tenant.name} 👋\n\nPlease choose an option:\n1️⃣ Book Appointment — Today\n2️⃣ Book Tomorrow\n3️⃣ Talk to Staff\n4️⃣ Check My Booking`
