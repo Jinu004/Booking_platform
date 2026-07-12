@@ -872,7 +872,7 @@ Doctor: ${doctor.name}
 ${doctor.specialization}
 🕘 Consultation starts at ${sessionStart}
 Please arrive before session begins.
-Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if you would like to also book for tomorrow.' : ''}`
+For queries, contact us: ${tenant.whatsapp_number}`
 }
 
       case 'create_tomorrow_booking': {
@@ -1025,7 +1025,7 @@ ${doctor.specialization}
 📅 ${dayNames[tomorrowDow]}, ${new Date(tomorrowDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
 🕘 Session: ${sessionTime}
 Please arrive before session begins.
-Reply CANCEL to cancel your booking.`
+For queries, contact us: ${tenant.whatsapp_number}`
       }
 
       case 'get_patient_profiles': {
