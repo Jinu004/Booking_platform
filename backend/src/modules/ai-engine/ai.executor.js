@@ -1243,10 +1243,13 @@ Reply CANCEL to cancel your booking.`
           return { bookings: [], message: 'No bookings found for this number.' }
         }
         const result = await pool.query(
-          `SELECT b.id, b.token_number, b.booking_date, b.status,
-                  cd.name AS doctor_name, cd.specialization
+          `SELECT b.id, b.token_number, b.booking_date, b.status, b.booking_type,
+                  b.slot_time, b.end_time, b.patient_name,
+                  cd.name AS doctor_name, cd.specialization,
+                  p.name AS procedure_name
            FROM bookings b
            LEFT JOIN clinic_doctors cd ON cd.id = b.doctor_id
+           LEFT JOIN procedures p ON p.id = b.procedure_id
            WHERE b.customer_id = $1
              AND b.booking_date >= CURRENT_DATE
              AND b.status != 'cancelled'
@@ -1257,9 +1260,16 @@ Reply CANCEL to cancel your booking.`
         if (!result.rows.length) {
           return { bookings: [], message: 'No upcoming bookings found.' }
         }
-        const bookings = result.rows.map(b =>
-          `• Token #${b.token_number} with ${b.doctor_name} on ${new Date(b.booking_date).toLocaleDateString('en-IN')} (${b.status})`
-        )
+        const bookings = result.rows.map(b => {
+          const date = new Date(b.booking_date).toLocaleDateString('en-IN');
+          const patientLabel = b.patient_name ? ` for ${b.patient_name}` : '';
+          if (b.booking_type === 'procedure' && b.procedure_name) {
+            const time = b.slot_time ? ` at ${b.slot_time}` : '';
+            return `• ${b.procedure_name}${patientLabel} with ${b.doctor_name} on ${date}${time} (${b.status})`;
+          }
+          const session = b.slot_time ? ` at ${b.slot_time}` : '';
+          return `• Token #${b.token_number}${patientLabel} with ${b.doctor_name} on ${date}${session} (${b.status})`;
+        })
         return {
           bookings: result.rows,
           message: `Your upcoming bookings:\n${bookings.join('\n')}`
