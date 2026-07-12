@@ -802,7 +802,7 @@ Please reply with your name to confirm booking.`
          (tenant_id, customer_id, conversation_id, doctor_id,
           source, status, booking_date, token_number, notes, patient_name, patient_id, slot_time)
        VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE,
-         (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled'),
+         (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled' AND ($8 IS NULL OR slot_time = $8)),
          $5, $6, $7, $8)
        RETURNING id, token_number`,
       [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
