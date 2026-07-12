@@ -1233,6 +1233,11 @@ For queries, contact us: ${contactPhoneTmr}`
 
       const bookingDayName = targetDate.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' })
 
+      let contactPhoneFB = tenant.whatsapp_number
+      try {
+        const bpResFB = await pool.query(`SELECT business_phone FROM tenant_settings WHERE tenant_id = $1`, [tenant.id])
+        contactPhoneFB = bpResFB.rows[0]?.business_phone || tenant.whatsapp_number
+      } catch {}
       return `DIRECT:Booking confirmed! 🏥
 Token Number: ${tokenNumberFB}
 Doctor: ${doctorFB.name}
@@ -1240,7 +1245,7 @@ ${doctorFB.specialization}
 Date: ${bookingDayName}, ${bookingDateFB}
 🕘 Session starts at ${sessionFilterFB ? fmtFB(sessionStartFB) : fmtFB(doctorFB.start_time)}
 Please arrive before session begins.
-Reply CANCEL to cancel your booking.`
+For queries, contact us: ${contactPhoneFB}`
     }
 
       case 'cancel_booking': {
