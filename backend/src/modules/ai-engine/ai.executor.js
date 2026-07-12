@@ -705,6 +705,11 @@ Please reply with your name to confirm booking.`
   const HITLModel = require('../hitl/hitl.model')
   const settings = await HITLModel.getTenantSettings(tenant.id)
   const withinHours = settings ? HITLService.isWithinWorkingHours(settings.working_hours) : true
+  let contactPhone = tenant.whatsapp_number
+  try {
+    const bpRes = await pool.query(`SELECT business_phone FROM tenant_settings WHERE tenant_id = $1`, [tenant.id])
+    contactPhone = bpRes.rows[0]?.business_phone || tenant.whatsapp_number
+  } catch {}
 
   // Find doctor
   const doctorRes = await pool.query(
@@ -872,7 +877,7 @@ Doctor: ${doctor.name}
 ${doctor.specialization}
 🕘 Consultation starts at ${sessionStart}
 Please arrive before session begins.
-For queries, contact us: ${tenant.whatsapp_number}`
+For queries, contact us: ${contactPhone}`
 }
 
       case 'create_tomorrow_booking': {
@@ -1018,14 +1023,19 @@ For queries, contact us: ${tenant.whatsapp_number}`
           tomorrowClient.release()
         }
 
-        return `DIRECT:Booking confirmed for tomorrow! 🏥
+        let contactPhoneTmr = tenant.whatsapp_number
+      try {
+        const bpResTmr = await pool.query(`SELECT business_phone FROM tenant_settings WHERE tenant_id = $1`, [tenant.id])
+        contactPhoneTmr = bpResTmr.rows[0]?.business_phone || tenant.whatsapp_number
+      } catch {}
+      return `DIRECT:Booking confirmed for tomorrow! 🏥
 Token Number: ${tokenNumber}
 Doctor: ${doctor.name}
 ${doctor.specialization}
 📅 ${dayNames[tomorrowDow]}, ${new Date(tomorrowDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
 🕘 Session: ${sessionTime}
 Please arrive before session begins.
-For queries, contact us: ${tenant.whatsapp_number}`
+For queries, contact us: ${contactPhoneTmr}`
       }
 
       case 'get_patient_profiles': {
