@@ -149,7 +149,7 @@ async function onboardClinic(req, res) {
     });
   } catch (err) {
     await client.query('ROLLBACK');
-    logger.error('Error during clinic onboarding:', err.message);
+    logger.error('Error during clinic onboarding:', err.message || err.code || String(err));
     if (err.message.includes('already registered')) {
       return errorResponse(res, err.message, 400);
     }
