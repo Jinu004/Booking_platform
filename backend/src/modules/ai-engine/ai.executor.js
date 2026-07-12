@@ -1264,10 +1264,12 @@ Reply CANCEL to cancel your booking.`
           const date = new Date(b.booking_date).toLocaleDateString('en-IN');
           const patientLabel = b.patient_name ? ` for ${b.patient_name}` : '';
           if (b.booking_type === 'procedure' && b.procedure_name) {
-            const time = b.slot_time ? ` at ${b.slot_time}` : '';
+            const fmtTimeProcedure = (t) => { if (!t) return ''; const [h, m] = t.toString().split(':').map(Number); return ` at ${h > 12 ? h - 12 : h || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`; };
+            const time = fmtTimeProcedure(b.slot_time);
             return `• ${b.procedure_name}${patientLabel} with ${b.doctor_name} on ${date}${time} (${b.status})`;
           }
-          const session = b.slot_time ? ` at ${b.slot_time}` : '';
+          const fmtTime = (t) => { if (!t) return ''; const [h, m] = t.toString().split(':').map(Number); return ` at ${h > 12 ? h - 12 : h || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`; };
+          const session = fmtTime(b.slot_time);
           return `• Token #${b.token_number}${patientLabel} with ${b.doctor_name} on ${date}${session} (${b.status})`;
         })
         return {
