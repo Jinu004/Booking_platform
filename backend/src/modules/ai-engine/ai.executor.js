@@ -802,14 +802,25 @@ Please reply with your name to confirm booking.`
          (tenant_id, customer_id, conversation_id, doctor_id,
           source, status, booking_date, token_number, notes, patient_name, patient_id, slot_time)
        VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE,
-         (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled' AND ($8 IS NULL OR slot_time = $8)),
+         0,
          $5, $6, $7, $8)
-       RETURNING id, token_number`,
+       RETURNING id`,
       [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
        `Booked via WhatsApp for ${formattedName}`, formattedName, patientId, slotTimeValue]
     )
-    tokenNumber = bookingRes.rows[0].token_number
     booking = bookingRes.rows[0]
+    const tokenRes = await bookingClient.query(
+      `UPDATE bookings SET token_number = (
+         SELECT COUNT(*) FROM bookings
+         WHERE doctor_id = $1 AND booking_date = CURRENT_DATE
+         AND status != 'cancelled'
+         AND ($2::varchar IS NULL OR slot_time = $2)
+       )
+       WHERE id = $3
+       RETURNING token_number`,
+      [doctor.id, slotTimeValue, booking.id]
+    )
+    tokenNumber = tokenRes.rows[0].token_number
     await bookingClient.query(
       `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
        VALUES ($1, $2, $3, $4, 'waiting')`,
