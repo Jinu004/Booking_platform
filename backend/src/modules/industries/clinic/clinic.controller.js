@@ -165,6 +165,9 @@ async function updateTokenStatus(req, res, next) {
     }
     return successResponse(res, token);
   } catch (error) {
+    if (error.code === 'DOCTOR_BUSY') {
+      return errorResponse(res, error.message, 409);
+    }
     next(error);
   }
 }
