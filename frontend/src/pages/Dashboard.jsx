@@ -97,7 +97,7 @@ const Dashboard = () => {
   };
 
   const filteredTokens = activeFilter === 'all' ? tokenQueue
-    : activeFilter === 'waiting' ? tokenQueue.filter(t => t.status === 'waiting' || t.status === 'pending')
+    : activeFilter === 'arrived' ? tokenQueue.filter(t => t.status === 'arrived')
       : activeFilter === 'in_consult' ? tokenQueue.filter(t => t.status === 'in_progress')
         : tokenQueue.filter(t => t.status === 'done' || t.status === 'completed');
 
@@ -105,6 +105,8 @@ const Dashboard = () => {
     switch (status) {
       case 'waiting':
       case 'pending':
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Booked</span>;
+      case 'arrived':
         return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Waiting</span>;
       case 'in_progress':
         return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">In Consult</span>;
@@ -236,7 +238,7 @@ const Dashboard = () => {
           <div className="px-4 py-2 flex gap-1 border-b border-gray-100">
             {[
               { key: 'all', label: 'All' },
-              { key: 'waiting', label: 'Waiting' },
+              { key: 'arrived', label: 'Waiting' },
               { key: 'in_consult', label: 'In Consult' },
               { key: 'done', label: 'Done' },
             ].map(tab => (
@@ -268,7 +270,15 @@ const Dashboard = () => {
                     <p className="text-sm font-semibold text-indigo-600">{t.doctor_name}</p>
                   </div>
                 </div>
-                {getStatusPill(t.status)}
+                <div className="flex items-center gap-2">
+                  {getStatusPill(t.status)}
+                  {t.status === 'arrived' && (
+                    <button onClick={async () => { try { await updateTokenStatus(t.id, 'in_progress'); } catch {} }} className="px-3 py-1 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition">Call</button>
+                  )}
+                  {t.status === 'in_progress' && (
+                    <button onClick={async () => { try { await updateTokenStatus(t.id, 'completed'); } catch {} }} className="px-3 py-1 text-xs font-semibold text-white bg-green-500 rounded-lg hover:bg-green-600 transition">Done</button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
