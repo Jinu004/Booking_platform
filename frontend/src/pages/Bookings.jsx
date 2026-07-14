@@ -4,7 +4,7 @@ import {
   getBookings, getBookingStats, 
   completeBooking, cancelBooking, markNoShow, createBooking 
 } from '../services/booking.service';
-import { getDoctors } from '../services/clinic.service';
+import { getDoctors, updateTokenStatus } from '../services/clinic.service';
 import api from '../utils/api';
 import TokenReceipt from '../components/shared/TokenReceipt';
 import useStore from '../store/useStore';
@@ -362,6 +362,9 @@ const Bookings = () => {
                             {(b.status === 'confirmed' || b.status === 'pending') && (
                               <>
                                 <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
+                                {b.token_id && b.token_status === 'waiting' && (
+                                  <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-blue-500 hover:text-blue-700 transition">Arrived</button>
+                                )}
                                 <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
                               </>
                             )}
@@ -419,6 +422,9 @@ const Bookings = () => {
                     {(b.status === 'confirmed' || b.status === 'pending') && (
                       <>
                         <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
+                        {b.token_id && b.token_status === 'waiting' && (
+                          <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-blue-500 hover:text-blue-700 transition">Arrived</button>
+                        )}
                         <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
                       </>
                     )}
