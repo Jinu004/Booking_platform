@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getBookingStats, getBookings } from '../services/booking.service';
-import { getDoctors, getTokenQueue } from '../services/clinic.service';
+import { getDoctors, getTokenQueue, updateTokenStatus } from '../services/clinic.service';
 import { getHITLConversations } from '../services/conversation.service';
 import { StatCardSkeleton, TableRowSkeleton, CardSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
