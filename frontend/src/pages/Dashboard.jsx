@@ -58,7 +58,7 @@ const Dashboard = () => {
           bookingsToday: isDoctor ? filteredByDoctor.length : totalBookings,
           activeConversations: activeConvs.length,
           availableDoctors: availableDocsArray.length,
-          pendingTokens: filteredByDoctor.filter(t => t.status === 'waiting' || t.status === 'pending').length
+          pendingTokens: filteredByDoctor.filter(t => t.status === 'arrived').length
         },
         tokenQueue: filteredByDoctor,
         recentConversations: activeConvs.slice(0, 5),
