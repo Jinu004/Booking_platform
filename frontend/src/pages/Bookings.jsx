@@ -361,7 +361,9 @@ const Bookings = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold space-x-3">
                             {(b.status === 'confirmed' || b.status === 'pending') && (
                               <>
-                                <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
+                                {(!b.token_id || b.token_status === 'arrived') && (
+                                  <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
+                                )}
                                 {b.token_id && b.token_status === 'waiting' && (
                                   <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-blue-500 hover:text-blue-700 transition">Arrived</button>
                                 )}
@@ -421,7 +423,9 @@ const Bookings = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold space-x-3">
                     {(b.status === 'confirmed' || b.status === 'pending') && (
                       <>
-                        <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
+                        {(!b.token_id || b.token_status === 'arrived') && (
+                          <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
+                        )}
                         {b.token_id && b.token_status === 'waiting' && (
                           <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-blue-500 hover:text-blue-700 transition">Arrived</button>
                         )}
