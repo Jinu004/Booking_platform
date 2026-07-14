@@ -20,6 +20,7 @@ const Dashboard = () => {
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
   const [isOffline, setIsOffline] = useState(false);
+  const [loadingToken, setLoadingToken] = useState(null);
   const staff = getStoredStaff();
   const isDoctor = staff?.role === 'doctor';
   const staffDoctorId = isDoctor ? staff?.doctor_id : null;
@@ -273,10 +274,36 @@ const Dashboard = () => {
                 <div className="flex items-center gap-2">
                   {getStatusPill(t.status)}
                   {t.status === 'arrived' && (
-                    <button onClick={async () => { try { await updateTokenStatus(t.id, 'in_progress'); } catch {} }} className="px-3 py-1 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition">Call</button>
+                    <button
+                      disabled={loadingToken === t.id}
+                      onClick={async () => {
+                        setLoadingToken(t.id);
+                        try {
+                          await updateTokenStatus(t.id, 'in_progress');
+                          const res = await getTokenQueue();
+                          const tokens = res?.data || [];
+                          setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
+                        } catch {}
+                        finally { setLoadingToken(null); }
+                      }}
+                      className="px-3 py-1 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition"
+                    >{loadingToken === t.id ? '...' : 'Call'}</button>
                   )}
                   {t.status === 'in_progress' && (
-                    <button onClick={async () => { try { await updateTokenStatus(t.id, 'completed'); } catch {} }} className="px-3 py-1 text-xs font-semibold text-white bg-green-500 rounded-lg hover:bg-green-600 transition">Done</button>
+                    <button
+                      disabled={loadingToken === t.id}
+                      onClick={async () => {
+                        setLoadingToken(t.id);
+                        try {
+                          await updateTokenStatus(t.id, 'completed');
+                          const res = await getTokenQueue();
+                          const tokens = res?.data || [];
+                          setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
+                        } catch {}
+                        finally { setLoadingToken(null); }
+                      }}
+                      className="px-3 py-1 text-xs font-semibold text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
+                    >{loadingToken === t.id ? '...' : 'Done'}</button>
                   )}
                 </div>
               </div>
