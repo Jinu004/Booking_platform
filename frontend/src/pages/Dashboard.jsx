@@ -275,7 +275,7 @@ const Dashboard = () => {
                   {getStatusPill(t.status)}
                   {t.status === 'arrived' && (
                     <button
-                      disabled={loadingToken === t.id}
+                      disabled={loadingToken === t.id || tokenQueue.some(tk => tk.doctor_id === t.doctor_id && tk.status === 'in_progress')}
                       onClick={async () => {
                         setLoadingToken(t.id);
                         try {
@@ -283,8 +283,9 @@ const Dashboard = () => {
                           const res = await getTokenQueue();
                           const tokens = res?.data || [];
                           setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
-                        } catch {}
-                        finally { setLoadingToken(null); }
+                        } catch (err) {
+                          alert(err.response?.data?.error || 'Doctor already has a patient in consult');
+                        } finally { setLoadingToken(null); }
                       }}
                       className="px-3 py-1 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition"
                     >{loadingToken === t.id ? '...' : 'Call'}</button>
