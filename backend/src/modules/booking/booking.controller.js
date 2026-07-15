@@ -242,7 +242,7 @@ async function exportBookings(req, res, next) {
  */
 async function createManualBooking(req, res, next) {
   const tenantId = req.tenant.id;
-  const { patientName, patientPhone, notes, bookingDate, sendWhatsapp } = req.body
+  const { patientName, patientPhone, notes, bookingDate, sendWhatsapp, isPresent } = req.body
   const doctorId = req.staff?.role === 'doctor' && req.staff?.doctor_id
     ? req.staff.doctor_id
     : req.body.doctorId
@@ -353,8 +353,8 @@ async function createManualBooking(req, res, next) {
     // Insert clinic_token record
     await client.query(
       `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
-       VALUES ($1, $2, $3, $4, 'arrived')`,
-      [tenantId, booking.id, doctorId, tokenNumber]
+       VALUES ($1, $2, $3, $4, $5)`,
+      [tenantId, booking.id, doctorId, tokenNumber, isPresent ? 'arrived' : 'waiting']
     );
 
     await client.query('COMMIT');
