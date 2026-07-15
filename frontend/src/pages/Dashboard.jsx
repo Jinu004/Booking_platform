@@ -385,7 +385,6 @@ const Dashboard = () => {
         <div className="px-6 pb-6 mt-4">
           <div className="flex justify-between items-center mb-4">
             <span className="font-bold text-gray-900 text-lg">Doctor Availability</span>
-            <Link to="/doctors" className="text-sm text-indigo-600 font-semibold hover:text-indigo-800">Manage →</Link>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2">
             {doctors.length === 0 ? (
