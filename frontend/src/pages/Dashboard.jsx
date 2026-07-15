@@ -273,6 +273,23 @@ const Dashboard = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   {getStatusPill(t.status)}
+                  {t.status === 'waiting' && (
+                    <button
+                      disabled={loadingToken === t.id}
+                      onClick={async () => {
+                        setLoadingToken(t.id);
+                        try {
+                          await updateTokenStatus(t.id, 'arrived');
+                          const res = await getTokenQueue();
+                          const tokens = res?.data || [];
+                          setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
+                        } catch (err) {
+                          alert(err.response?.data?.error || 'Failed to mark arrived');
+                        } finally { setLoadingToken(null); }
+                      }}
+                      className="px-3 py-1 text-xs font-semibold text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition"
+                    >{loadingToken === t.id ? '...' : 'Arrived'}</button>
+                  )}
                   {t.status === 'arrived' && (
                     <button
                       disabled={loadingToken === t.id || tokenQueue.some(tk => tk.doctor_id === t.doctor_id && tk.status === 'in_progress')}
