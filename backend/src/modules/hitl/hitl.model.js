@@ -58,6 +58,7 @@ async function getConversationList(tenantId, limit = 40) {
      FROM conversations c
      LEFT JOIN customers cu ON cu.id = c.customer_id
      WHERE c.tenant_id = $1 AND c.status = 'active'
+     AND c.last_message_at >= NOW() - INTERVAL '24 hours'
      ORDER BY c.last_message_at DESC
      LIMIT $2`,
     [tenantId, limit]
