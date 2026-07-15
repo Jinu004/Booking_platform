@@ -353,7 +353,7 @@ async function createManualBooking(req, res, next) {
     // Insert clinic_token record
     await client.query(
       `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
-       VALUES ($1, $2, $3, $4, 'waiting')`,
+       VALUES ($1, $2, $3, $4, 'arrived')`,
       [tenantId, booking.id, doctorId, tokenNumber]
     );
 
@@ -371,8 +371,20 @@ async function createManualBooking(req, res, next) {
           const apptDate = new Date(bookingDate || new Date()).toLocaleDateString('en-IN', {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata'
           })
-          const msg = `Hi ${patientNameClean}, your next appointment has been scheduled with ${doctorName} on ${apptDate}. Token: ${tokenNumber}. Please arrive on time. Reply CANCEL to cancel.`
-          await sendMessage(normalizedPhone, msg)
+          let contactPhone = req.tenant.whatsapp_number
+          try {
+            const bpRes = await pool.query(`SELECT business_phone FROM tenant_settings WHERE tenant_id = $1`, [tenantId])
+            contactPhone = bpRes.rows[0]?.business_phone || req.tenant.whatsapp_number
+          } catch {}
+          const msg = `Hi ${cleanPatientName}! Your appointment with ${doctorName} on ${apptDate} has been confirmed. Token Number: ${tokenNumber}. Please arrive on time. For queries, contact us: ${contactPhone}`
+          try {
+            await sendMessage(normalizedPhone, msg)
+          } catch (msgErr) {
+            if (msgErr.response?.data?.error?.code === 131026) {
+              const { sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter')
+              await sendTemplateMessage(normalizedPhone, 'appointment_confirmation', 'en', [])
+            }
+          }
         } catch (waErr) {
           logger.warn('WhatsApp confirmation failed for manual booking:', waErr.message)
         }
