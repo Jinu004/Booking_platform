@@ -22,8 +22,8 @@ export async function sendManualMessage(id, message) {
 
 // ── HITL API calls ───────────────────────────────────────────────────────
 
-export const getHITLConversations = () =>
-  api.get('/hitl/conversations');
+export const getHITLConversations = (params) =>
+  api.get('/hitl/conversations', { params });
 
 export const getConversationMessages = (conversationId) =>
   api.get(`/hitl/conversations/${conversationId}/messages`);
