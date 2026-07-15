@@ -379,7 +379,6 @@ const Dashboard = () => {
             </Link>
           </div>
         </div>
-        </div>
         {!isDoctor && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <div className="flex justify-between items-center mb-3">
@@ -409,8 +408,8 @@ const Dashboard = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
-
 
     </div>
   );
