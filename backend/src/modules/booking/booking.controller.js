@@ -284,6 +284,21 @@ async function createManualBooking(req, res, next) {
       return errorResponse(res, 'Doctor not found', 404);
     }
 
+    // Check for duplicate booking — same phone, same doctor, same day
+    const targetDate = bookingDate || new Date().toISOString().split('T')[0];
+    const dupCheck = await client.query(
+      `SELECT b.id, b.token_number FROM bookings b
+       JOIN customers c ON c.id = b.customer_id
+       WHERE b.tenant_id = $1 AND b.doctor_id = $2 AND b.booking_date = $3
+       AND c.phone = $4 AND b.status != 'cancelled'
+       LIMIT 1`,
+      [tenantId, doctorId, targetDate, normalizedPhone]
+    );
+    if (dupCheck.rows.length) {
+      await client.query('ROLLBACK');
+      return errorResponse(res, `This patient already has Token #${dupCheck.rows[0].token_number} with this doctor today`, 409);
+    }
+
     // Find or create customer
     let cusRes = await client.query(
       'SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1',
