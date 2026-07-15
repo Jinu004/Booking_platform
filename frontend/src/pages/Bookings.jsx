@@ -151,7 +151,7 @@ const Bookings = () => {
       const { data } = await api.post('/bookings/manual', newBooking);
       setReceiptBooking(data.data);
       setIsModalOpen(false);
-      setNewBooking({ patientName: '', patientPhone: '', doctorId: '', notes: '' });
+      setNewBooking({ patientName: '', patientPhone: '', doctorId: '', notes: '', isPresent: true, sendWhatsapp: true });
       fetchData();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to create booking');
