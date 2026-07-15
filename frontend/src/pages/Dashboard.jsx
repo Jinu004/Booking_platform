@@ -334,7 +334,7 @@ const Dashboard = () => {
         </div>
 
         {/* Right — Active Chats */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col self-start">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
             <span className="font-bold text-gray-900">Active Chats</span>
             <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
