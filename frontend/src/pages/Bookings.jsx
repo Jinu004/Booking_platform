@@ -154,7 +154,7 @@ const Bookings = () => {
       setNewBooking({ patientName: '', patientPhone: '', doctorId: '', notes: '', isPresent: true, sendWhatsapp: true });
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to create booking');
+      alert(err?.error || err?.message || 'Failed to create booking');
     } finally {
       setIsSubmitting(false);
     }
