@@ -290,7 +290,7 @@ async function createManualBooking(req, res, next) {
       `SELECT b.id, b.token_number FROM bookings b
        JOIN customers c ON c.id = b.customer_id
        WHERE b.tenant_id = $1 AND b.doctor_id = $2 AND b.booking_date = $3
-       AND c.phone = $4 AND b.status != 'cancelled'
+       AND c.phone = $4 AND b.status NOT IN ('cancelled', 'completed')
        LIMIT 1`,
       [tenantId, doctorId, targetDate, normalizedPhone]
     );
