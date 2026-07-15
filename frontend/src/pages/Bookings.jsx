@@ -33,7 +33,9 @@ const Bookings = () => {
     patientName: '',
     patientPhone: '',
     doctorId: '',
-    notes: ''
+    notes: '',
+    isPresent: true,
+    sendWhatsapp: true
   });
 
   const [receiptBooking, setReceiptBooking] = useState(null);
@@ -501,6 +503,16 @@ const Bookings = () => {
                 />
               </div>
 
+              <div className="flex flex-col gap-2 mb-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={newBooking.isPresent} onChange={e => setNewBooking({...newBooking, isPresent: e.target.checked})} className="w-4 h-4 rounded accent-teal-600" />
+                  <span className="text-sm font-medium text-gray-700">Patient is here now</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={newBooking.sendWhatsapp} onChange={e => setNewBooking({...newBooking, sendWhatsapp: e.target.checked})} className="w-4 h-4 rounded accent-teal-600" />
+                  <span className="text-sm font-medium text-gray-700">Send WhatsApp confirmation</span>
+                </label>
+              </div>
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 rounded-lg text-gray-700 font-bold hover:bg-gray-100 transition">Cancel</button>
                 <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-indigo-600 font-bold text-white rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
