@@ -333,7 +333,8 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Right — Active Chats */}
+        {/* Right column */}
+        <div className="flex flex-col gap-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
             <span className="font-bold text-gray-900">Active Chats</span>
@@ -378,8 +379,9 @@ const Dashboard = () => {
             </Link>
           </div>
         </div>
+        </div>
         {!isDoctor && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mt-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-base font-semibold text-gray-900">Doctor Availability</h2>
               <Link to="/doctors" className="text-sm text-indigo-600 font-semibold hover:text-indigo-800">Manage →</Link>
