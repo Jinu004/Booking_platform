@@ -378,49 +378,37 @@ const Dashboard = () => {
             </Link>
           </div>
         </div>
+        {!isDoctor && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4 mt-4">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-base font-semibold text-gray-900">Doctor Availability</h2>
+              <Link to="/doctors" className="text-sm text-indigo-600 font-semibold hover:text-indigo-800">Manage →</Link>
+            </div>
+            <div className="flex flex-col gap-3 max-h-60 overflow-y-auto">
+              {doctors.length === 0 ? (
+                <p className="text-sm text-gray-500">No doctors added yet</p>
+              ) : doctors.map(d => (
+                <div key={d.id} className="flex items-center justify-between py-1">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${d.available_now && !d.leave_days ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {(d.name || '?').split(' ').filter(w => w.toLowerCase() !== 'dr.' && w.toLowerCase() !== 'dr')[0]?.[0]?.toUpperCase() || '?'}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 truncate max-w-[100px]">{d.name}</p>
+                      <p className="text-xs text-gray-400">{d.available_now && !d.leave_days ? '● Available' : '● Off Duty'}</p>
+                    </div>
+                  </div>
+                  <div className="text-right text-xs text-gray-500 flex-shrink-0">
+                    <p>Seen: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'done' || t.status === 'completed')).length}</p>
+                    <p>Queue: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'arrived' || t.status === 'in_progress')).length}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Section 4 — Doctor Availability Strip */}
-      {!isDoctor && (
-        <div className="px-6 pb-6 mt-4">
-          <div className="flex justify-between items-center mb-4">
-            <span className="font-bold text-gray-900 text-lg">Doctor Availability</span>
-            <Link to="/doctors" className="text-sm text-indigo-600 font-semibold hover:text-indigo-800">Manage →</Link>
-          </div>
-          <div className="flex gap-4 overflow-x-auto pb-2">
-            {doctors.length === 0 ? (
-              <p className="text-sm text-gray-500">No doctors added yet</p>
-            ) : doctors.map(d => (
-              <div key={d.id} className="min-w-[160px] bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex-shrink-0">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-3 ${d.available_now && !d.leave_days ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                  {(d.name || '?').split(' ').filter(w => w.toLowerCase() !== 'dr.' && w.toLowerCase() !== 'dr')[0]?.[0]?.toUpperCase() || '?'}
-                </div>
-                <p className="font-semibold text-sm text-gray-900 truncate">{d.name}</p>
-                <p className="text-xs text-gray-500 truncate mb-2">{d.specialization}</p>
-                {d.available_now && !d.leave_days ? (
-                  <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-                    Available
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block"></span>
-                    Off Duty
-                  </span>
-                )}
-                <div className="flex gap-3 mt-2">
-                  <span className="text-xs text-gray-500">
-                    Seen: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'done' || t.status === 'completed')).length}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    Queue: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'waiting' || t.status === 'in_progress')).length}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
     </div>
   );
