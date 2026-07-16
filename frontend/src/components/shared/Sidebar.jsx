@@ -123,7 +123,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     { name: 'Analytics', path: '/analytics' },
     { name: 'Settings', path: '/settings' },
   ].filter(link => {
-    if (link.name === 'Doctors') return can('admin', 'manager');
+    if (link.name === 'Doctors') return can('admin', 'manager', 'receptionist');
     if (link.name === 'Staff') return can('admin', 'manager');
     if (link.name === 'Analytics') return can('admin', 'manager', 'doctor');
     if (link.name === 'Settings') return can('admin');
