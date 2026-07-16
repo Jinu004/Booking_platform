@@ -106,7 +106,7 @@ function LockScreen() {
 
 // ── Condition Section ─────────────────────────────────────────────────────────
 
-function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, saving }) {
+function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, saving, isReadOnly }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
 
@@ -124,12 +124,12 @@ function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, savi
           {title}{' '}
           <span className="text-gray-400 font-normal">({items.length})</span>
         </h3>
-        <button
+        {!isReadOnly && <button
           onClick={() => { setAdding(true); setName(''); }}
           className="text-xs text-teal-600 font-semibold hover:text-teal-800"
         >
           + Add
-        </button>
+        </button>}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -139,12 +139,12 @@ function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, savi
             className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${chipClass}`}
           >
             {item.name}
-            <button
+            {!isReadOnly && <button
               onClick={() => onDelete(item.id)}
               className="ml-0.5 hover:opacity-60 transition font-bold leading-none"
             >
               ×
-            </button>
+            </button>}
           </span>
         ))}
         {items.length === 0 && !adding && (
@@ -801,7 +801,7 @@ export default function PatientProfile() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-semibold text-gray-900">Basic Information</h2>
-              {!editingBasic && (
+              {!editingBasic && staff?.role !== 'receptionist' && (
                 <button onClick={startEditBasic} className="text-xs text-teal-600 font-semibold hover:text-teal-800">
                   Edit
                 </button>
@@ -875,7 +875,7 @@ export default function PatientProfile() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-semibold text-gray-900">Emergency Contact</h2>
-              {!editingEmergency && (
+              {!editingEmergency && staff?.role !== 'receptionist' && (
                 <button onClick={startEditEmergency} className="text-xs text-teal-600 font-semibold hover:text-teal-800">
                   Edit
                 </button>
@@ -950,6 +950,7 @@ export default function PatientProfile() {
             onAdd={handleAddCondition}
             onDelete={handleDeleteCondition}
             saving={savingCondition}
+            isReadOnly={staff?.role === 'receptionist'}
           />
           <div className="border-t border-gray-100 pt-6">
             <ConditionSection
@@ -960,6 +961,7 @@ export default function PatientProfile() {
               onAdd={handleAddCondition}
               onDelete={handleDeleteCondition}
               saving={savingCondition}
+              isReadOnly={staff?.role === 'receptionist'}
             />
           </div>
           <div className="border-t border-gray-100 pt-6">
@@ -971,6 +973,7 @@ export default function PatientProfile() {
               onAdd={handleAddCondition}
               onDelete={handleDeleteCondition}
               saving={savingCondition}
+              isReadOnly={staff?.role === 'receptionist'}
             />
           </div>
         </div>
