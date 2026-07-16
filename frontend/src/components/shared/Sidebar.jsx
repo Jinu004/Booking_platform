@@ -113,7 +113,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     { name: 'Conversations', path: '/conversations' },
     { name: 'Patients', path: '/patients' },
   ].filter(link => {
-    if (link.name === 'Conversations') return can('admin', 'manager', 'receptionist', 'doctor');
+    if (link.name === 'Conversations') return can('admin', 'manager', 'receptionist');
     return true;
   });
 
