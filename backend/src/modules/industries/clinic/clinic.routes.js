@@ -29,7 +29,7 @@ router.get('/doctors/:id', getDoctorById);
 router.post('/doctors', requireRole('admin', 'manager'), createDoctor);
 router.patch('/doctors/:id', requireRole('admin', 'manager'), updateDoctor);
 router.delete('/doctors/:id', requireRole('admin', 'manager'), deleteDoctor);
-router.patch('/doctors/:id/availability', requireRole('admin', 'manager'), updateAvailability);
+router.patch('/doctors/:id/availability', requireRole('admin', 'manager', 'receptionist'), updateAvailability);
 router.post('/doctors/:id/leave', requireRole('admin', 'manager', 'receptionist'), addLeave);
 router.get('/doctors/:id/schedule', getDoctorSchedule);
 router.post('/doctors/:id/schedule', requireRole('admin', 'manager'), saveDoctorSchedule);
