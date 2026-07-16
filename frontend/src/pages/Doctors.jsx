@@ -475,7 +475,7 @@ const Doctors = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {doctors.map(doc => (
+            {(isDoctor ? doctors.filter(doc => doc.id === staff?.doctor_id) : doctors).map(doc => (
               <div key={doc.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition p-6 flex flex-col">
 
                 {/* Avatar + name */}
