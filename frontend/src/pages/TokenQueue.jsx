@@ -24,6 +24,8 @@ const TokenQueue = () => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [loadingToken, setLoadingToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [doctorFilter, setDoctorFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const staff = getStoredStaff();
   const isDoctor = staff?.role === 'doctor';
@@ -44,10 +46,12 @@ const TokenQueue = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const filteredTokens = activeFilter === 'all' ? tokenQueue
-    : activeFilter === 'arrived' ? tokenQueue.filter(t => t.status === 'arrived')
-      : activeFilter === 'in_consult' ? tokenQueue.filter(t => t.status === 'in_progress')
-        : tokenQueue.filter(t => t.status === 'done' || t.status === 'completed');
+  const doctors = [...new Set(tokenQueue.map(t => t.doctor_name))].filter(Boolean);
+
+  const filteredTokens = tokenQueue
+    .filter(t => activeFilter === 'all' || (activeFilter === 'arrived' ? t.status === 'arrived' : activeFilter === 'in_consult' ? t.status === 'in_progress' : t.status === 'done' || t.status === 'completed'))
+    .filter(t => doctorFilter === 'all' || t.doctor_name === doctorFilter)
+    .filter(t => !searchQuery || (t.patient_name || '').toLowerCase().includes(searchQuery.toLowerCase()) || (t.patient_phone || '').includes(searchQuery));
 
   const tabs = [
     { key: 'all', label: 'All', count: tokenQueue.length },
@@ -63,6 +67,25 @@ const TokenQueue = () => {
           <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse inline-block"></span>
           <h1 className="text-2xl font-bold text-gray-900">Live Token Queue</h1>
           <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">{tokenQueue.length}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Search patient..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 w-48"
+          />
+          {!isDoctor && doctors.length > 1 && (
+            <select
+              value={doctorFilter}
+              onChange={e => setDoctorFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            >
+              <option value="all">All Doctors</option>
+              {doctors.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          )}
         </div>
       </div>
 
@@ -96,7 +119,14 @@ const TokenQueue = () => {
                   <div>
                     <p className="font-semibold text-gray-900 text-base">{t.patient_name || 'Walk-in'}</p>
                     <p className="text-sm text-indigo-600 font-medium">{t.doctor_name}</p>
-                    {t.slot_time && <p className="text-xs text-gray-400 mt-0.5">{t.slot_time}</p>}
+                    <div className="flex items-center gap-2 mt-1">
+                      {t.slot_time && <span className="text-xs text-gray-400">🕘 {t.slot_time}</span>}
+                      {t.source === 'walkin' ? (
+                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">Walk-in</span>
+                      ) : t.source === 'whatsapp' ? (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">WhatsApp</span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
