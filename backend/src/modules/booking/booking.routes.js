@@ -1,7 +1,7 @@
 const express = require('express');
 const { validationResult } = require('express-validator');
 const { validationErrorResponse } = require('../../utils/response');
-const { requireAuth } = require('../auth/auth.middleware');
+const { requireAuth, requireRole } = require('../auth/auth.middleware');
 const {
   getBookings,
   getBookingStats,
@@ -35,7 +35,7 @@ router.use(requireAuth);
 
 router.get('/', getBookings);
 router.get('/today', getTodayBookings);
-router.get('/export', exportBookings);
+router.get('/export', requireRole('admin', 'manager'), exportBookings);
 router.get('/stats', getBookingStats);
 router.get('/:id', getBookingById);
 router.post('/', validateCreateBooking, validate, createBooking);
