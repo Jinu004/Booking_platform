@@ -115,6 +115,7 @@ const Doctors = () => {
   const { addToast } = useStore();
   const staff = getStoredStaff();
   const isReadOnly = staff?.role === 'receptionist';
+  const isDoctor = staff?.role === 'doctor';
   const [doctors, setDoctors] = useState([]);
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -455,7 +456,7 @@ const Doctors = () => {
             <h2 className="text-2xl font-bold text-gray-900">Doctors</h2>
             <p className="text-sm text-gray-400 mt-0.5">{doctors.length} registered</p>
           </div>
-          {!isReadOnly && <button
+          {!isReadOnly && !isDoctor && <button
             onClick={openAddDoctor}
             className="bg-teal-600 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-teal-700 transition text-sm"
           >
