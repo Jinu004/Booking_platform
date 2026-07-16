@@ -132,8 +132,9 @@ async function addDoctorLeave(pool, tenantId, doctorId, leaveDate, reason) {
  */
 async function getTokenQueue(pool, tenantId) {
   const sql = `
-SELECT ct.*, b.notes,
+SELECT ct.*, b.notes, b.slot_time, b.source,
        COALESCE(b.patient_name, c.name) AS patient_name,
+       c.phone AS patient_phone,
        cd.name AS doctor_name,
        ct.doctor_id AS doctor_id
     FROM clinic_tokens ct
