@@ -707,6 +707,7 @@ export default function PatientProfile() {
               >
                 Cancel
               </button>
+              {staff?.role !== 'receptionist' && (
               <button
                 onClick={async () => {
                   setProcedureError('');
@@ -726,6 +727,7 @@ export default function PatientProfile() {
               >
                 Schedule Procedure
               </button>
+              )}
             </div>
           </div>
         )}
@@ -982,12 +984,14 @@ export default function PatientProfile() {
               Visit history{' '}
               <span className="text-gray-400 font-normal">({sortedNotes.length})</span>
             </h2>
+            {staff?.role !== 'receptionist' && (
             <button
               onClick={openAddNote}
               className="px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition"
             >
               + Add Visit Note
             </button>
+            )}
           </div>
 
           {/* Timeline */}
