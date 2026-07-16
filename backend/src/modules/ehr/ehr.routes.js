@@ -1,5 +1,5 @@
 const express = require('express');
-const { requireAuth } = require('../auth/auth.middleware');
+const { requireAuth, requireRole } = require('../auth/auth.middleware');
 const {
   getPatients,
   getPatient,
@@ -18,13 +18,13 @@ router.use(requireAuth);
 router.get('/patients', getPatients);
 router.post('/patients', requireAuth, createPatient);
 router.get('/patients/:patientId', getPatient);
-router.put('/patients/:patientId/profile', upsertProfile);
-router.post('/patients/:patientId/conditions', addCondition);
-router.delete('/patients/:patientId/conditions/:id', deleteCondition);
-router.post('/patients/:patientId/visit-notes', addVisitNote);
-router.put('/patients/:patientId/visit-notes/:id', updateVisitNote);
+router.put('/patients/:patientId/profile', requireRole('admin', 'manager', 'receptionist'), upsertProfile);
+router.post('/patients/:patientId/conditions', requireRole('admin', 'manager', 'doctor'), addCondition);
+router.delete('/patients/:patientId/conditions/:id', requireRole('admin', 'manager', 'doctor'), deleteCondition);
+router.post('/patients/:patientId/visit-notes', requireRole('admin', 'manager', 'doctor'), addVisitNote);
+router.put('/patients/:patientId/visit-notes/:id', requireRole('admin', 'manager', 'doctor'), updateVisitNote);
 
-router.get('/patients/:patientId/visit-notes/:noteId/prescription', downloadPrescription);
-router.post('/patients/:patientId/visit-notes/:noteId/prescription/send', sendPrescriptionToWhatsApp);
+router.get('/patients/:patientId/visit-notes/:noteId/prescription', requireRole('admin', 'manager', 'doctor'), downloadPrescription);
+router.post('/patients/:patientId/visit-notes/:noteId/prescription/send', requireRole('admin', 'manager', 'doctor'), sendPrescriptionToWhatsApp);
 
 module.exports = router;
