@@ -34,7 +34,7 @@ const Dashboard = () => {
     try {
       const [statsRes, convRes, docsRes, allDocsRes, tokensRes, bookingsRes] = await Promise.all([
         getBookingStats().catch(() => ({ data: { total: 0 } })),
-        getHITLConversations().catch(() => ({ data: { conversations: [] } })),
+        getHITLConversations({ since: '24h' }).catch(() => ({ data: { conversations: [] } })),
         getDoctors(true).catch(() => ({ data: [] })),
         getDoctors().catch(() => ({ data: [] })),
         getTokenQueue().catch(() => ({ data: [] })),
