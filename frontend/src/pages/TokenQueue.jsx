@@ -119,8 +119,9 @@ const TokenQueue = () => {
                   <div>
                     <p className="font-semibold text-gray-900 text-base">{t.patient_name || 'Walk-in'}</p>
                     <p className="text-sm text-indigo-600 font-medium">{t.doctor_name}</p>
+                    {t.patient_phone && <p className="text-xs text-gray-400">{t.patient_phone}</p>}
                     <div className="flex items-center gap-2 mt-1">
-                      {t.slot_time && <span className="text-xs text-gray-400">🕘 {t.slot_time}</span>}
+                      {t.slot_time && <span className="text-xs text-gray-400">🕘 {(() => { const [h,m] = t.slot_time.split(':').map(Number); return `${h>12?h-12:h||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`; })()}</span>}
                       {t.source === 'walkin' ? (
                         <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">Walk-in</span>
                       ) : t.source === 'whatsapp' ? (
