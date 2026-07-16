@@ -13,6 +13,7 @@ const Patients       = React.lazy(() => import('./pages/Patients'));
 const Doctors        = React.lazy(() => import('./pages/Doctors'));
 const Conversations  = React.lazy(() => import('./pages/Conversations'));
 const Analytics      = React.lazy(() => import('./pages/Analytics'));
+const TokenQueue     = React.lazy(() => import('./pages/TokenQueue'));
 const Settings       = React.lazy(() => import('./pages/Settings'));
 const Login          = React.lazy(() => import('./pages/Login'));
 const Staff          = React.lazy(() => import('./pages/Staff'));
@@ -59,6 +60,7 @@ const App = () => {
               <Route path="/patients" element={<Patients />} />
               <Route path="/patients/:customerId" element={<PatientProfile />} />
               <Route path="/doctors" element={<Doctors />} />
+              <Route path="/queue" element={<TokenQueue />} />
               <Route path="/staff" element={<Staff />} />
               <Route path="/conversations" element={<Conversations />} />
               <Route path="/analytics" element={<Analytics />} />
