@@ -68,13 +68,13 @@ const TokenQueue = () => {
           <h1 className="text-2xl font-bold text-gray-900">Live Token Queue</h1>
           <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">{tokenQueue.length}</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             type="text"
             placeholder="Search patient..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 w-48"
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 w-36 md:w-48"
           />
           {!isDoctor && doctors.length > 1 && (
             <select

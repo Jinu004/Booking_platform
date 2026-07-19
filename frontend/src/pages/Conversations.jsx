@@ -606,15 +606,15 @@ export default function Conversations() {
 
               {/* Stats row */}
               <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 md:p-5">
                   <p className="text-[10px] md:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Today's Chats</p>
                   <p className="text-3xl font-black text-indigo-600 mt-2">{conversations.filter(c => c.last_message_at && new Date(c.last_message_at).toDateString() === new Date().toDateString()).length}</p>
                 </div>
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 md:p-5">
                   <p className="text-[10px] md:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">AI Handled</p>
                   <p className="text-3xl font-black text-green-600 mt-2">{conversations.filter(c => c.mode === 'ai' && c.last_message_at && new Date(c.last_message_at).toDateString() === new Date().toDateString()).length}</p>
                 </div>
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 md:p-5">
                   <p className="text-[10px] md:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Needs Reply</p>
                   <p className="text-3xl font-black text-amber-500 mt-2">{conversations.filter(c => c.mode === 'human').length}</p>
                 </div>
