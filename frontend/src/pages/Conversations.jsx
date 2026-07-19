@@ -399,7 +399,7 @@ export default function Conversations() {
         </div>
 
         {/* Right Panel */}
-        <div className={`${showChat && selectedConversation ? 'flex' : 'hidden md:flex'} flex-1 flex-col bg-gray-200 h-full overflow-hidden`}>
+        <div className={`${showChat && selectedConversation ? 'flex' : 'hidden lg:flex'} flex-1 flex-col bg-gray-200 h-full overflow-hidden`}>
           {selectedConversation ? (
             <>
               {/* ── Header ── */}
@@ -596,7 +596,7 @@ export default function Conversations() {
               )}
             </>
           ) : (
-            <div className="hidden md:flex flex-1 flex-col bg-gray-50 p-8 overflow-y-auto">
+            <div className="hidden lg:flex flex-1 flex-col bg-gray-50 p-8 overflow-y-auto">
 
               {/* Header */}
               <div className="mb-6">
