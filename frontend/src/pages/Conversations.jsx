@@ -311,7 +311,7 @@ export default function Conversations() {
       <div className="flex flex-1 overflow-hidden h-full">
 
         {/* Left Panel */}
-        <div className={`${showChat && selectedConversation ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 border-r border-gray-200 bg-white h-full md:flex-shrink-0`}>
+        <div className={`${showChat && selectedConversation ? 'hidden lg:flex' : 'flex'} flex-col w-full md:w-80 border-r border-gray-200 bg-white h-full md:flex-shrink-0`}>
           {/* Header */}
           <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
             <h3 className="font-bold text-gray-900">Conversations</h3>
