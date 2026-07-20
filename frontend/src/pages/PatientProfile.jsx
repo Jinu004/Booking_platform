@@ -1032,10 +1032,12 @@ export default function PatientProfile() {
           {bookings.length === 0 ? (
             <div className="p-12 text-center text-gray-400 text-sm">No bookings found</div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-100">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Patient</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Doctor</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
@@ -1054,6 +1056,7 @@ export default function PatientProfile() {
                           <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">{b.procedure_name || 'Procedure'}</span>
                         )}
                       </td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{b.patient_name || '—'}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {b.booking_type === 'procedure'
                           ? `${b.slot_time || '—'} – ${b.end_time || '—'}`
@@ -1091,6 +1094,7 @@ export default function PatientProfile() {
                   ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}
