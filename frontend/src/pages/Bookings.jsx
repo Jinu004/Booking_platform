@@ -29,15 +29,13 @@ const Bookings = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [doctors, setDoctors] = useState([]);
   
-  const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).toISOString().split('T')[0];
   const [newBooking, setNewBooking] = useState({
     patientName: '',
     patientPhone: '',
     doctorId: '',
     notes: '',
     isPresent: true,
-    sendWhatsapp: true,
-    bookingDate: todayIST
+    sendWhatsapp: true
   });
 
   const [receiptBooking, setReceiptBooking] = useState(null);
@@ -153,7 +151,7 @@ const Bookings = () => {
       const { data } = await api.post('/bookings/manual', newBooking);
       setReceiptBooking(data.data);
       setIsModalOpen(false);
-      setNewBooking({ patientName: '', patientPhone: '', doctorId: '', notes: '', isPresent: true, sendWhatsapp: true, bookingDate: new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).toISOString().split('T')[0] });
+      setNewBooking({ patientName: '', patientPhone: '', doctorId: '', notes: '', isPresent: true, sendWhatsapp: true });
       fetchData();
     } catch (err) {
       alert(err?.error || err?.message || 'Failed to create booking');
@@ -493,20 +491,6 @@ const Bookings = () => {
                     <option key={d.id} value={d.id}>{d.name} ({d.specialization}) - max {d.max_tokens_daily} tokens</option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Booking Date</label>
-                <input
-                  type="date"
-                  value={newBooking.bookingDate}
-                  onChange={e => {
-                    const selectedDate = e.target.value;
-                    const isToday = selectedDate === new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).toISOString().split('T')[0];
-                    setNewBooking({...newBooking, bookingDate: selectedDate, isPresent: isToday});
-                  }}
-                  className="block w-full rounded-md border border-gray-300 p-2 bg-gray-50 font-bold"
-                />
               </div>
 
               <div>
