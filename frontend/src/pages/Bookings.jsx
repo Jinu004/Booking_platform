@@ -4,7 +4,7 @@ import {
   getBookings, getBookingStats, 
   completeBooking, cancelBooking, markNoShow, createBooking 
 } from '../services/booking.service';
-import { getDoctors, updateTokenStatus } from '../services/clinic.service';
+import { getDoctors, updateTokenStatus, getDoctorSchedule } from '../services/clinic.service';
 import api from '../utils/api';
 import TokenReceipt from '../components/shared/TokenReceipt';
 import useStore from '../store/useStore';
@@ -27,6 +27,12 @@ const Bookings = () => {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [scheduleBooking, setScheduleBooking] = useState({ patientName: '', patientPhone: '', doctorId: '', bookingDate: '', sessionTime: '', notes: '', sendWhatsapp: true });
+  const [doctorSessions, setDoctorSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [noSessions, setNoSessions] = useState(false);
+  const [isScheduleSubmitting, setIsScheduleSubmitting] = useState(false);
   const [doctors, setDoctors] = useState([]);
   
   const [newBooking, setNewBooking] = useState({
@@ -216,7 +222,19 @@ const Bookings = () => {
             <option value="completed">Completed</option>
           </select>
         </div>
-        <button 
+        <button
+          onClick={() => {
+            setScheduleBooking({ patientName: '', patientPhone: '', doctorId: '', bookingDate: '', sessionTime: '', notes: '', sendWhatsapp: true });
+            setDoctorSessions([]);
+            setNoSessions(false);
+            loadFormDependencies();
+            setIsScheduleModalOpen(true);
+          }}
+          className="bg-teal-600 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg shadow-teal-200 hover:bg-teal-700 transition transform hover:scale-105"
+        >
+          + Schedule Booking
+        </button>
+        <button
           onClick={() => {
             loadFormDependencies();
             setIsModalOpen(true);
@@ -446,6 +464,143 @@ const Bookings = () => {
           </tbody>
         </table>
       </div>
+
+      {isScheduleModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-xl font-bold text-gray-900">Schedule Booking</h2>
+              <button onClick={() => setIsScheduleModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl font-bold">×</button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Patient Phone <span className="text-red-500">*</span></label>
+                <div className="flex relative">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm font-bold">+91</span>
+                  <input type="tel" required value={scheduleBooking.patientPhone}
+                    onChange={e => setScheduleBooking({...scheduleBooking, patientPhone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
+                    className="flex-1 rounded-none rounded-r-md border border-gray-300 p-2 font-bold focus:ring-teal-500 focus:border-teal-500"
+                    placeholder="9876543210" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Patient Name</label>
+                <input type="text" value={scheduleBooking.patientName}
+                  onChange={e => setScheduleBooking({...scheduleBooking, patientName: e.target.value.replace(/\b\w/g, c => c.toUpperCase())})}
+                  className="block w-full rounded-md border border-gray-300 p-2 bg-gray-50"
+                  placeholder="Patient Name (Optional)" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Doctor <span className="text-red-500">*</span></label>
+                <select required value={scheduleBooking.doctorId}
+                  onChange={async e => {
+                    const doctorId = e.target.value;
+                    setScheduleBooking({...scheduleBooking, doctorId, sessionTime: ''});
+                    setDoctorSessions([]);
+                    setNoSessions(false);
+                    if (doctorId && scheduleBooking.bookingDate) {
+                      setSessionsLoading(true);
+                      try {
+                        const res = await getDoctorSchedule(doctorId);
+                        const date = new Date(scheduleBooking.bookingDate + 'T00:00:00');
+                        const dow = date.getDay();
+                        const sessions = (res?.data || []).filter(s => s.day_of_week === dow && s.is_available);
+                        setDoctorSessions(sessions);
+                        setNoSessions(sessions.length === 0);
+                      } catch {} finally { setSessionsLoading(false); }
+                    }
+                  }}
+                  className="block w-full rounded-md border border-gray-300 p-2 bg-gray-50 font-bold">
+                  <option value="">Select doctor</option>
+                  {doctors.map(d => <option key={d.id} value={d.id}>{d.name} — {d.specialization || 'General'}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Booking Date <span className="text-red-500">*</span></label>
+                <input type="date" required value={scheduleBooking.bookingDate}
+                  onChange={async e => {
+                    const bookingDate = e.target.value;
+                    setScheduleBooking({...scheduleBooking, bookingDate, sessionTime: ''});
+                    setDoctorSessions([]);
+                    setNoSessions(false);
+                    if (scheduleBooking.doctorId && bookingDate) {
+                      setSessionsLoading(true);
+                      try {
+                        const res = await getDoctorSchedule(scheduleBooking.doctorId);
+                        const date = new Date(bookingDate + 'T00:00:00');
+                        const dow = date.getDay();
+                        const sessions = (res?.data || []).filter(s => s.day_of_week === dow && s.is_available);
+                        setDoctorSessions(sessions);
+                        setNoSessions(sessions.length === 0);
+                      } catch {} finally { setSessionsLoading(false); }
+                    }
+                  }}
+                  className="block w-full rounded-md border border-gray-300 p-2 bg-gray-50 font-bold" />
+              </div>
+              {sessionsLoading && <p className="text-sm text-gray-400">Loading sessions...</p>}
+              {noSessions && <p className="text-sm text-red-500 font-medium">No sessions available on this date. Please select another date.</p>}
+              {doctorSessions.length > 0 && (
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Session <span className="text-red-500">*</span></label>
+                  <select required value={scheduleBooking.sessionTime}
+                    onChange={e => setScheduleBooking({...scheduleBooking, sessionTime: e.target.value})}
+                    className="block w-full rounded-md border border-gray-300 p-2 bg-gray-50 font-bold">
+                    <option value="">Select session</option>
+                    {doctorSessions.map((s, i) => {
+                      const fmt = t => { if (!t) return ''; const [h, m] = t.split(':').map(Number); return `${h > 12 ? h - 12 : h || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`; };
+                      return <option key={i} value={s.start_time}>{fmt(s.start_time)} – {fmt(s.end_time)}</option>;
+                    })}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Internal Notes</label>
+                <textarea value={scheduleBooking.notes}
+                  onChange={e => setScheduleBooking({...scheduleBooking, notes: e.target.value})}
+                  className="block w-full rounded-md border border-gray-300 p-2 bg-gray-50" rows="2" />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={scheduleBooking.sendWhatsapp}
+                  onChange={e => setScheduleBooking({...scheduleBooking, sendWhatsapp: e.target.checked})}
+                  className="w-4 h-4 rounded accent-teal-600" />
+                <span className="text-sm font-medium text-gray-700">Send WhatsApp confirmation</span>
+              </label>
+            </div>
+            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100 mt-4">
+              <button type="button" onClick={() => setIsScheduleModalOpen(false)} className="px-5 py-2.5 rounded-lg text-gray-700 font-bold hover:bg-gray-100 transition">Cancel</button>
+              <button
+                disabled={isScheduleSubmitting || !scheduleBooking.patientPhone || !scheduleBooking.doctorId || !scheduleBooking.bookingDate || (doctorSessions.length > 0 && !scheduleBooking.sessionTime) || noSessions}
+                onClick={async () => {
+                  setIsScheduleSubmitting(true);
+                  try {
+                    const phone = '+91' + scheduleBooking.patientPhone;
+                    await api.post('/bookings/manual', {
+                      patientPhone: phone,
+                      patientName: scheduleBooking.patientName,
+                      doctorId: scheduleBooking.doctorId,
+                      bookingDate: scheduleBooking.bookingDate,
+                      slot_time: scheduleBooking.sessionTime || null,
+                      notes: scheduleBooking.notes,
+                      isPresent: false,
+                      sendWhatsapp: scheduleBooking.sendWhatsapp
+                    });
+                    setIsScheduleModalOpen(false);
+                    setScheduleBooking({ patientName: '', patientPhone: '', doctorId: '', bookingDate: '', sessionTime: '', notes: '', sendWhatsapp: true });
+                    setDoctorSessions([]);
+                    setNoSessions(false);
+                    fetchData();
+                  } catch (err) {
+                    alert(err?.error || 'Failed to schedule booking');
+                  } finally {
+                    setIsScheduleSubmitting(false);
+                  }
+                }}
+                className="px-6 py-2.5 bg-teal-600 font-bold text-white rounded-lg hover:bg-teal-700 shadow-lg shadow-teal-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >{isScheduleSubmitting ? 'Scheduling...' : 'Schedule Booking'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50">
