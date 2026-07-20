@@ -242,7 +242,7 @@ async function exportBookings(req, res, next) {
  */
 async function createManualBooking(req, res, next) {
   const tenantId = req.tenant.id;
-  const { patientName, patientPhone, notes, bookingDate, sendWhatsapp, isPresent } = req.body
+  const { patientName, patientPhone, notes, bookingDate, sendWhatsapp, isPresent, slot_time } = req.body
   const doctorId = req.staff?.role === 'doctor' && req.staff?.doctor_id
     ? req.staff.doctor_id
     : req.body.doctorId
@@ -358,10 +358,10 @@ async function createManualBooking(req, res, next) {
     // Insert booking
     const bRes = await client.query(
       `INSERT INTO bookings
-         (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes, patient_name, patient_id)
-       VALUES ($1, $2, $3, 'walkin', 'pending', $8, $4, $5, $6, $7)
+         (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes, patient_name, patient_id, slot_time)
+       VALUES ($1, $2, $3, 'walkin', 'pending', $8, $4, $5, $6, $7, $9)
        RETURNING *`,
-      [tenantId, customerId, doctorId, tokenNumber, cleanNotes, patientNameClean, patientId, bookingDate || new Date().toISOString().split('T')[0]]
+      [tenantId, customerId, doctorId, tokenNumber, cleanNotes, patientNameClean, patientId, bookingDate || new Date().toISOString().split('T')[0], slot_time || null]
     );
     const booking = bRes.rows[0];
 
