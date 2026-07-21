@@ -15,6 +15,29 @@ const isPhone = (str) => /^\+?\d{7,15}$/.test(str);
  * Gets bookings list with filters
  * Query params: date, status, doctorId, page, limit
  */
+async function patientLookup(req, res, next) {
+  try {
+    const tenantId = req.tenant.id;
+    const { phone } = req.query;
+    if (!phone) return errorResponse(res, 'Phone is required', 400);
+    const digits = phone.replace(/\D/g, '');
+    const normalizedPhone = digits.length === 10 ? `+91${digits}` : `+${digits}`;
+    const customerRes = await pool.query(
+      `SELECT id, name, phone FROM customers WHERE phone = $1 AND tenant_id = $2 LIMIT 1`,
+      [normalizedPhone, tenantId]
+    );
+    if (!customerRes.rows.length) return successResponse(res, { customer: null, patients: [] });
+    const customer = customerRes.rows[0];
+    const patientsRes = await pool.query(
+      `SELECT id, name FROM patients WHERE customer_id = $1 AND tenant_id = $2 ORDER BY name ASC`,
+      [customer.id, tenantId]
+    );
+    return successResponse(res, { customer, patients: patientsRes.rows });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function getBookings(req, res, next) {
   try {
     const tenantId = req.tenant.id;
@@ -399,6 +422,7 @@ async function createManualBooking(req, res, next) {
 }
 
 module.exports = {
+  patientLookup,
   getBookings,
   getBookingStats,
   getBookingById,
