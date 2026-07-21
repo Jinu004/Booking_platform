@@ -223,14 +223,14 @@ const Bookings = () => {
           </select>
         </div>
         <button
-          onClick={() => {
+          onClick={async () => {
             setScheduleBooking({ patientName: '', patientPhone: '', doctorId: '', bookingDate: '', sessionTime: '', notes: '', sendWhatsapp: true });
             setDoctorSessions([]);
             setNoSessions(false);
-            loadFormDependencies();
+            try { const res = await getDoctors(); if (res?.data) setDoctors(res.data); } catch {}
             setIsScheduleModalOpen(true);
           }}
-          className="bg-teal-600 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg shadow-teal-200 hover:bg-teal-700 transition transform hover:scale-105"
+          className="bg-teal-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-teal-700 transition"
         >
           + Schedule Booking
         </button>
