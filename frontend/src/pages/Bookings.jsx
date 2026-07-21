@@ -5,6 +5,7 @@ import {
   completeBooking, cancelBooking, markNoShow, createBooking 
 } from '../services/booking.service';
 import { getDoctors, updateTokenStatus, getDoctorSchedule } from '../services/clinic.service';
+import { globalSearch } from '../services/patient.service';
 import api from '../utils/api';
 import TokenReceipt from '../components/shared/TokenReceipt';
 import useStore from '../store/useStore';
@@ -33,6 +34,9 @@ const Bookings = () => {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [noSessions, setNoSessions] = useState(false);
   const [isScheduleSubmitting, setIsScheduleSubmitting] = useState(false);
+  const [phoneSuggestions, setPhoneSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestionModal, setActiveSuggestionModal] = useState(null);
   const [doctors, setDoctors] = useState([]);
   
   const [newBooking, setNewBooking] = useState({
@@ -478,10 +482,32 @@ const Bookings = () => {
                 <div className="flex relative">
                   <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm font-bold">+91</span>
                   <input type="tel" required value={scheduleBooking.patientPhone}
-                    onChange={e => setScheduleBooking({...scheduleBooking, patientPhone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
+                    onChange={async e => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setScheduleBooking({...scheduleBooking, patientPhone: digits});
+                      if (digits.length === 10) {
+                        try {
+                          const res = await globalSearch(digits);
+                          const found = res?.data?.patients || [];
+                          if (found.length > 0) { setPhoneSuggestions(found); setShowSuggestions(true); setActiveSuggestionModal('schedule'); }
+                          else { setShowSuggestions(false); }
+                        } catch { setShowSuggestions(false); }
+                      } else { setShowSuggestions(false); }
+                    }}
                     className="flex-1 rounded-none rounded-r-md border border-gray-300 p-2 font-bold focus:ring-teal-500 focus:border-teal-500"
                     placeholder="9876543210" />
                 </div>
+                {showSuggestions && activeSuggestionModal === 'schedule' && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                    {phoneSuggestions.map(p => (
+                      <button key={p.id} type="button"
+                        onClick={() => { setScheduleBooking({...scheduleBooking, patientName: p.name}); setShowSuggestions(false); }}
+                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition">
+                        {p.name} <span className="text-gray-400 text-xs">{p.phone}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Patient Name</label>
@@ -611,14 +637,36 @@ const Bookings = () => {
                 <label className="block text-sm font-bold text-gray-700 mb-1">Patient Phone <span className="text-red-500">*</span></label>
                 <div className="flex relative">
                   <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm font-bold">+91</span>
-                  <input 
+                  <input
                     type="tel" required
                     value={newBooking.patientPhone}
-                    onChange={e => setNewBooking({...newBooking, patientPhone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
+                    onChange={async e => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setNewBooking({...newBooking, patientPhone: digits});
+                      if (digits.length === 10) {
+                        try {
+                          const res = await globalSearch(digits);
+                          const found = res?.data?.patients || [];
+                          if (found.length > 0) { setPhoneSuggestions(found); setShowSuggestions(true); setActiveSuggestionModal('new'); }
+                          else { setShowSuggestions(false); }
+                        } catch { setShowSuggestions(false); }
+                      } else { setShowSuggestions(false); }
+                    }}
                     className="flex-1 rounded-none rounded-r-md border border-gray-300 p-2 font-bold focus:ring-indigo-500 focus:border-indigo-500"
                     placeholder="9876543210"
                   />
                 </div>
+                {showSuggestions && activeSuggestionModal === 'new' && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                    {phoneSuggestions.map(p => (
+                      <button key={p.id} type="button"
+                        onClick={() => { setNewBooking({...newBooking, patientName: p.name}); setShowSuggestions(false); }}
+                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition">
+                        {p.name} <span className="text-gray-400 text-xs">{p.phone}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               
               <div>
