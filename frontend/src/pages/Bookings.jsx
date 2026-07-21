@@ -38,6 +38,7 @@ const Bookings = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestionModal, setActiveSuggestionModal] = useState(null);
   const [doctors, setDoctors] = useState([]);
+  const [modalDoctors, setModalDoctors] = useState([]);
   
   const [newBooking, setNewBooking] = useState({
     patientName: '',
@@ -135,8 +136,8 @@ const Bookings = () => {
 
   const loadFormDependencies = async () => {
     try {
-      const docRes = await getDoctors().catch(() => ({ data: [] }));
-      setDoctors(docRes.data || []);
+      const docRes = await getDoctors(true).catch(() => ({ data: [] }));
+      setModalDoctors(docRes.data || []);
     } catch(err) {
       addToast('Failed to load form data', 'error');
     }
@@ -690,7 +691,7 @@ const Bookings = () => {
                   className="block w-full rounded-md border border-gray-300 p-2 bg-gray-50 font-medium"
                 >
                   <option value="">Select Doctor...</option>
-                  {doctors.map(d => (
+                  {modalDoctors.map(d => (
                     <option key={d.id} value={d.id}>{d.name} ({d.specialization}) - max {d.max_tokens_daily} tokens</option>
                   ))}
                 </select>
