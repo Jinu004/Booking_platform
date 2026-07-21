@@ -5,7 +5,6 @@ import {
   completeBooking, cancelBooking, markNoShow, createBooking 
 } from '../services/booking.service';
 import { getDoctors, updateTokenStatus, getDoctorSchedule } from '../services/clinic.service';
-import { globalSearch } from '../services/patient.service';
 import api from '../utils/api';
 import TokenReceipt from '../components/shared/TokenReceipt';
 import useStore from '../store/useStore';
@@ -488,7 +487,7 @@ const Bookings = () => {
                       setScheduleBooking({...scheduleBooking, patientPhone: digits});
                       if (digits.length === 10) {
                         try {
-                          const res = await globalSearch(digits);
+                          const res = await api.get(`/bookings/lookup?phone=${digits}`);
                           const found = res?.data?.patients || [];
                           if (found.length > 0) { setPhoneSuggestions(found); setShowSuggestions(true); setActiveSuggestionModal('schedule'); }
                           else { setShowSuggestions(false); }
@@ -646,7 +645,7 @@ const Bookings = () => {
                       setNewBooking({...newBooking, patientPhone: digits});
                       if (digits.length === 10) {
                         try {
-                          const res = await globalSearch(digits);
+                          const res = await api.get(`/bookings/lookup?phone=${digits}`);
                           const found = res?.data?.patients || [];
                           if (found.length > 0) { setPhoneSuggestions(found); setShowSuggestions(true); setActiveSuggestionModal('new'); }
                           else { setShowSuggestions(false); }
