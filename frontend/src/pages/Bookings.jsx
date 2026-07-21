@@ -499,7 +499,7 @@ const Bookings = () => {
                     placeholder="9876543210" />
                 </div>
                 {showSuggestions && activeSuggestionModal === 'schedule' && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                  <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
                     {phoneSuggestions.map(p => (
                       <button key={p.id} type="button"
                         onClick={() => { setScheduleBooking({...scheduleBooking, patientName: p.name}); setShowSuggestions(false); }}
@@ -658,7 +658,7 @@ const Bookings = () => {
                   />
                 </div>
                 {showSuggestions && activeSuggestionModal === 'new' && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                  <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
                     {phoneSuggestions.map(p => (
                       <button key={p.id} type="button"
                         onClick={() => { setNewBooking({...newBooking, patientName: p.name}); setShowSuggestions(false); }}
