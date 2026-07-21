@@ -135,7 +135,7 @@ const Bookings = () => {
 
   const loadFormDependencies = async () => {
     try {
-      const docRes = await getDoctors(true).catch(() => ({ data: [] }));
+      const docRes = await getDoctors().catch(() => ({ data: [] }));
       setDoctors(docRes.data || []);
     } catch(err) {
       addToast('Failed to load form data', 'error');
@@ -633,9 +633,9 @@ const Bookings = () => {
           <div className="bg-white rounded-xl shadow-2xl p-8 max-w-lg w-full transform transition-all duration-300">
             <h2 className="text-2xl font-black text-gray-900 mb-6">Issue New Token</h2>
             <form onSubmit={handleCreateSubmit} className="space-y-5">
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-bold text-gray-700 mb-1">Patient Phone <span className="text-red-500">*</span></label>
-                <div className="flex relative">
+                <div className="flex">
                   <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm font-bold">+91</span>
                   <input
                     type="tel" required
