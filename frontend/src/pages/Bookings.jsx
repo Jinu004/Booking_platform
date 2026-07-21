@@ -499,11 +499,11 @@ const Bookings = () => {
                     placeholder="9876543210" />
                 </div>
                 {showSuggestions && activeSuggestionModal === 'schedule' && (
-                  <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                  <div className="mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-sm">
                     {phoneSuggestions.map(p => (
                       <button key={p.id} type="button"
                         onClick={() => { setScheduleBooking({...scheduleBooking, patientName: p.name}); setShowSuggestions(false); }}
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition">
+                        className="w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 transition rounded-lg">
                         {p.name} <span className="text-gray-400 text-xs">{p.phone}</span>
                       </button>
                     ))}
