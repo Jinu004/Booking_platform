@@ -503,7 +503,7 @@ const Bookings = () => {
                       <button key={p.id} type="button"
                         onClick={() => { setScheduleBooking({...scheduleBooking, patientName: p.name}); setShowSuggestions(false); }}
                         className="w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 transition rounded-lg">
-                        {p.name} <span className="text-gray-400 text-xs">{p.phone}</span>
+                        {p.name}{p.age ? ` (${p.age}${p.gender ? ', ' + p.gender : ''})` : ''} <span className="text-gray-400 text-xs">{p.phone}</span>
                       </button>
                     ))}
                   </div>
@@ -662,17 +662,17 @@ const Bookings = () => {
                       <button key={p.id} type="button"
                         onClick={() => { setNewBooking({...newBooking, patientName: p.name}); setShowSuggestions(false); }}
                         className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition">
-                        {p.name} <span className="text-gray-400 text-xs">{p.phone}</span>
+                        {p.name}{p.age ? ` (${p.age}${p.gender ? ', ' + p.gender : ''})` : ''} <span className="text-gray-400 text-xs">{p.phone}</span>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
-              
+
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Patient Name</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newBooking.patientName}
                   onChange={e => setNewBooking({...newBooking, patientName: e.target.value.replace(/\b\w/g, c => c.toUpperCase())})}
                   className="block w-full rounded-md border border-gray-300 p-2 focus:ring-indigo-500 focus:border-indigo-500"
