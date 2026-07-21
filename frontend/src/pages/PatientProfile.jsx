@@ -391,6 +391,7 @@ export default function PatientProfile() {
       date_of_birth: profile?.date_of_birth?.split('T')[0] || '',
       gender: profile?.gender || '',
       blood_group: profile?.blood_group || '',
+      age: profile?.age || '',
     });
     setEditingBasic(true);
   };
@@ -612,7 +613,7 @@ export default function PatientProfile() {
 
   // ── Derived data ───────────────────────────────────────────────────────────
 
-  const age = calcAge(profile?.date_of_birth);
+  const age = calcAge(profile?.date_of_birth) || profile?.age;
   const isNew = (customer.total_visits || 0) === 0;
   const bloodGroup = profile?.blood_group;
 
@@ -817,6 +818,18 @@ export default function PatientProfile() {
                     value={basicForm.date_of_birth || ''}
                     onChange={e => setBasicForm(p => ({ ...p, date_of_birth: e.target.value }))}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 font-medium mb-1">Age</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="120"
+                    value={basicForm.age || ''}
+                    onChange={e => setBasicForm(p => ({ ...p, age: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    placeholder="Age"
                   />
                 </div>
                 <div>
