@@ -29,7 +29,7 @@ async function patientLookup(req, res, next) {
     if (!customerRes.rows.length) return successResponse(res, { customer: null, patients: [] });
     const customer = customerRes.rows[0];
     const patientsRes = await pool.query(
-      `SELECT id, name FROM patients WHERE customer_id = $1 AND tenant_id = $2 ORDER BY name ASC`,
+      `SELECT id, name, age, gender FROM patients WHERE customer_id = $1 AND tenant_id = $2 ORDER BY name ASC`,
       [customer.id, tenantId]
     );
     return successResponse(res, { customer, patients: patientsRes.rows });
