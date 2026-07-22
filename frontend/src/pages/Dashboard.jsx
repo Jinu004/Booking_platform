@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getBookingStats, getBookings } from '../services/booking.service';
-import { getDoctors, getTokenQueue } from '../services/clinic.service';
-import { getConversations } from '../services/conversation.service';
+import { getDoctors, getTokenQueue, updateTokenStatus } from '../services/clinic.service';
+import { getHITLConversations } from '../services/conversation.service';
 import { StatCardSkeleton, TableRowSkeleton, CardSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
@@ -20,6 +20,7 @@ const Dashboard = () => {
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
   const [isOffline, setIsOffline] = useState(false);
+  const [loadingToken, setLoadingToken] = useState(null);
   const staff = getStoredStaff();
   const isDoctor = staff?.role === 'doctor';
   const staffDoctorId = isDoctor ? staff?.doctor_id : null;
@@ -33,7 +34,7 @@ const Dashboard = () => {
     try {
       const [statsRes, convRes, docsRes, allDocsRes, tokensRes, bookingsRes] = await Promise.all([
         getBookingStats().catch(() => ({ data: { total: 0 } })),
-        getConversations({ status: 'active' }).catch(() => ({ data: { conversations: [] } })),
+        isDoctor ? Promise.resolve({ data: [] }) : getHITLConversations({ since: '24h' }).catch(() => ({ data: { conversations: [] } })),
         getDoctors(true).catch(() => ({ data: [] })),
         getDoctors().catch(() => ({ data: [] })),
         getTokenQueue().catch(() => ({ data: [] })),
@@ -57,7 +58,7 @@ const Dashboard = () => {
           bookingsToday: isDoctor ? filteredByDoctor.length : totalBookings,
           activeConversations: activeConvs.length,
           availableDoctors: availableDocsArray.length,
-          pendingTokens: filteredByDoctor.filter(t => t.status === 'waiting' || t.status === 'pending').length
+          pendingTokens: filteredByDoctor.filter(t => t.status === 'arrived').length
         },
         tokenQueue: filteredByDoctor,
         recentConversations: activeConvs.slice(0, 5),
@@ -97,7 +98,7 @@ const Dashboard = () => {
   };
 
   const filteredTokens = activeFilter === 'all' ? tokenQueue
-    : activeFilter === 'waiting' ? tokenQueue.filter(t => t.status === 'waiting' || t.status === 'pending')
+    : activeFilter === 'arrived' ? tokenQueue.filter(t => t.status === 'arrived')
       : activeFilter === 'in_consult' ? tokenQueue.filter(t => t.status === 'in_progress')
         : tokenQueue.filter(t => t.status === 'done' || t.status === 'completed');
 
@@ -105,6 +106,8 @@ const Dashboard = () => {
     switch (status) {
       case 'waiting':
       case 'pending':
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Booked</span>;
+      case 'arrived':
         return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Waiting</span>;
       case 'in_progress':
         return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">In Consult</span>;
@@ -236,7 +239,7 @@ const Dashboard = () => {
           <div className="px-4 py-2 flex gap-1 border-b border-gray-100">
             {[
               { key: 'all', label: 'All' },
-              { key: 'waiting', label: 'Waiting' },
+              { key: 'arrived', label: 'Waiting' },
               { key: 'in_consult', label: 'In Consult' },
               { key: 'done', label: 'Done' },
             ].map(tab => (
@@ -268,7 +271,59 @@ const Dashboard = () => {
                     <p className="text-sm font-semibold text-indigo-600">{t.doctor_name}</p>
                   </div>
                 </div>
-                {getStatusPill(t.status)}
+                <div className="flex items-center gap-2">
+                  {getStatusPill(t.status)}
+                  {t.status === 'waiting' && (
+                    <button
+                      disabled={loadingToken === t.id}
+                      onClick={async () => {
+                        setLoadingToken(t.id);
+                        try {
+                          await updateTokenStatus(t.id, 'arrived');
+                          const res = await getTokenQueue();
+                          const tokens = res?.data || [];
+                          setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
+                        } catch (err) {
+                          alert(err.response?.data?.error || 'Failed to mark arrived');
+                        } finally { setLoadingToken(null); }
+                      }}
+                      className="px-3 py-1 text-xs font-semibold text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition"
+                    >{loadingToken === t.id ? '...' : 'Arrived'}</button>
+                  )}
+                  {t.status === 'arrived' && (
+                    <button
+                      disabled={loadingToken === t.id || tokenQueue.some(tk => tk.doctor_id === t.doctor_id && tk.status === 'in_progress')}
+                      onClick={async () => {
+                        setLoadingToken(t.id);
+                        try {
+                          await updateTokenStatus(t.id, 'in_progress');
+                          const res = await getTokenQueue();
+                          const tokens = res?.data || [];
+                          setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
+                        } catch (err) {
+                          alert(err.response?.data?.error || 'Doctor already has a patient in consult');
+                        } finally { setLoadingToken(null); }
+                      }}
+                      className="px-3 py-1 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition"
+                    >{loadingToken === t.id ? '...' : 'Call'}</button>
+                  )}
+                  {t.status === 'in_progress' && (
+                    <button
+                      disabled={loadingToken === t.id}
+                      onClick={async () => {
+                        setLoadingToken(t.id);
+                        try {
+                          await updateTokenStatus(t.id, 'completed');
+                          const res = await getTokenQueue();
+                          const tokens = res?.data || [];
+                          setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
+                        } catch {}
+                        finally { setLoadingToken(null); }
+                      }}
+                      className="px-3 py-1 text-xs font-semibold text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
+                    >{loadingToken === t.id ? '...' : 'Done'}</button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -279,7 +334,7 @@ const Dashboard = () => {
         </div>
 
         {/* Right — Active Chats */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col self-start">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
             <span className="font-bold text-gray-900">Active Chats</span>
             <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
@@ -298,17 +353,17 @@ const Dashboard = () => {
               >
                 <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
                   <span className="text-xs font-bold text-indigo-700">
-                    {(c.patientPhone || '?')[0].toUpperCase()}
+                    {(c.customer_name || c.customer_phone || '?')[0].toUpperCase()}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{c.patientPhone}</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{c.customer_name || c.customer_phone}</p>
                     <p className="text-xs text-gray-400 flex-shrink-0 ml-2">
-                      {new Date(c.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(c.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
-                  <p className="text-xs text-gray-500 truncate mt-0.5">{c.lastMessage || 'New conversation'}</p>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{c.last_message || 'New conversation'}</p>
                   {c.mode === 'human' && (
                     <span className="text-xs text-orange-600 font-medium">● Handoff requested</span>
                   )}
@@ -330,7 +385,6 @@ const Dashboard = () => {
         <div className="px-6 pb-6 mt-4">
           <div className="flex justify-between items-center mb-4">
             <span className="font-bold text-gray-900 text-lg">Doctor Availability</span>
-            <Link to="/doctors" className="text-sm text-indigo-600 font-semibold hover:text-indigo-800">Manage →</Link>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2">
             {doctors.length === 0 ? (

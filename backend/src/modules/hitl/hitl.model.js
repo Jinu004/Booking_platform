@@ -45,7 +45,7 @@ async function getMessages(conversationId, limit = 200) {
 }
 
 // Get all conversations for tenant with latest message preview
-async function getConversationList(tenantId, limit = 40) {
+async function getConversationList(tenantId, since, limit = 40) {
   const { rows } = await pool.query(
     `SELECT c.id, c.mode, c.status, c.last_message_at,c.needs_attention, c.assigned_to,
             cu.name AS customer_name, cu.phone AS customer_phone,
@@ -58,6 +58,7 @@ async function getConversationList(tenantId, limit = 40) {
      FROM conversations c
      LEFT JOIN customers cu ON cu.id = c.customer_id
      WHERE c.tenant_id = $1 AND c.status = 'active'
+     ${since === '24h' ? "AND c.last_message_at >= NOW() - INTERVAL '24 hours'" : ''}
      ORDER BY c.last_message_at DESC
      LIMIT $2`,
     [tenantId, limit]

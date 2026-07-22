@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getDoctors, createDoctor, updateDoctor, deleteDoctor, updateAvailability, addLeave, getTokenQueue, updateTokenStatus, getDoctorSchedule, saveDoctorSchedule, getProcedures, createProcedure, deleteProcedure } from '../services/clinic.service';
 import useStore from '../store/useStore';
+import { getStoredStaff } from '../services/auth.service';
 import { CardSkeleton } from '../components/shared/Skeleton';
 
 const AVATAR_COLORS = [
@@ -112,6 +113,9 @@ function SearchableSelect({
 
 const Doctors = () => {
   const { addToast } = useStore();
+  const staff = getStoredStaff();
+  const isReadOnly = staff?.role === 'receptionist';
+  const isDoctor = staff?.role === 'doctor';
   const [doctors, setDoctors] = useState([]);
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -452,12 +456,12 @@ const Doctors = () => {
             <h2 className="text-2xl font-bold text-gray-900">Doctors</h2>
             <p className="text-sm text-gray-400 mt-0.5">{doctors.length} registered</p>
           </div>
-          <button
+          {!isReadOnly && !isDoctor && <button
             onClick={openAddDoctor}
             className="bg-teal-600 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-teal-700 transition text-sm"
           >
             + Add Doctor
-          </button>
+          </button>}
         </div>
 
         {loading && doctors.length === 0 ? (
@@ -471,7 +475,7 @@ const Doctors = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {doctors.map(doc => (
+            {(isDoctor ? doctors.filter(doc => doc.id === staff?.doctor_id) : doctors).map(doc => (
               <div key={doc.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition p-6 flex flex-col">
 
                 {/* Avatar + name */}
@@ -498,7 +502,7 @@ const Doctors = () => {
                 </div>
 
                 {/* Action icons */}
-                <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-4">
+                {!isReadOnly && <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-4">
                   <button onClick={() => openProcedureModal(doc)} title="Manage Procedures" className="p-2 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                   </button>
@@ -529,7 +533,7 @@ const Doctors = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                   </button>
-                </div>
+                </div>}
               </div>
             ))}
           </div>

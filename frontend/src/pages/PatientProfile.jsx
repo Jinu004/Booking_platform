@@ -106,7 +106,7 @@ function LockScreen() {
 
 // ── Condition Section ─────────────────────────────────────────────────────────
 
-function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, saving }) {
+function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, saving, isReadOnly }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
 
@@ -124,12 +124,12 @@ function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, savi
           {title}{' '}
           <span className="text-gray-400 font-normal">({items.length})</span>
         </h3>
-        <button
+        {!isReadOnly && <button
           onClick={() => { setAdding(true); setName(''); }}
           className="text-xs text-teal-600 font-semibold hover:text-teal-800"
         >
           + Add
-        </button>
+        </button>}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -139,12 +139,12 @@ function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, savi
             className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${chipClass}`}
           >
             {item.name}
-            <button
+            {!isReadOnly && <button
               onClick={() => onDelete(item.id)}
               className="ml-0.5 hover:opacity-60 transition font-bold leading-none"
             >
               ×
-            </button>
+            </button>}
           </span>
         ))}
         {items.length === 0 && !adding && (
@@ -391,6 +391,7 @@ export default function PatientProfile() {
       date_of_birth: profile?.date_of_birth?.split('T')[0] || '',
       gender: profile?.gender || '',
       blood_group: profile?.blood_group || '',
+      age: profile?.age || '',
     });
     setEditingBasic(true);
   };
@@ -612,7 +613,7 @@ export default function PatientProfile() {
 
   // ── Derived data ───────────────────────────────────────────────────────────
 
-  const age = calcAge(profile?.date_of_birth);
+  const age = calcAge(profile?.date_of_birth) || profile?.age;
   const isNew = (customer.total_visits || 0) === 0;
   const bloodGroup = profile?.blood_group;
 
@@ -707,6 +708,7 @@ export default function PatientProfile() {
               >
                 Cancel
               </button>
+              {staff?.role !== 'receptionist' && (
               <button
                 onClick={async () => {
                   setProcedureError('');
@@ -726,6 +728,7 @@ export default function PatientProfile() {
               >
                 Schedule Procedure
               </button>
+              )}
             </div>
           </div>
         )}
@@ -799,7 +802,7 @@ export default function PatientProfile() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-semibold text-gray-900">Basic Information</h2>
-              {!editingBasic && (
+              {!editingBasic && staff?.role !== 'receptionist' && (
                 <button onClick={startEditBasic} className="text-xs text-teal-600 font-semibold hover:text-teal-800">
                   Edit
                 </button>
@@ -815,6 +818,18 @@ export default function PatientProfile() {
                     value={basicForm.date_of_birth || ''}
                     onChange={e => setBasicForm(p => ({ ...p, date_of_birth: e.target.value }))}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 font-medium mb-1">Age</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="120"
+                    value={basicForm.age || ''}
+                    onChange={e => setBasicForm(p => ({ ...p, age: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    placeholder="Age"
                   />
                 </div>
                 <div>
@@ -873,7 +888,7 @@ export default function PatientProfile() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-semibold text-gray-900">Emergency Contact</h2>
-              {!editingEmergency && (
+              {!editingEmergency && staff?.role !== 'receptionist' && (
                 <button onClick={startEditEmergency} className="text-xs text-teal-600 font-semibold hover:text-teal-800">
                   Edit
                 </button>
@@ -948,6 +963,7 @@ export default function PatientProfile() {
             onAdd={handleAddCondition}
             onDelete={handleDeleteCondition}
             saving={savingCondition}
+            isReadOnly={staff?.role === 'receptionist'}
           />
           <div className="border-t border-gray-100 pt-6">
             <ConditionSection
@@ -958,6 +974,7 @@ export default function PatientProfile() {
               onAdd={handleAddCondition}
               onDelete={handleDeleteCondition}
               saving={savingCondition}
+              isReadOnly={staff?.role === 'receptionist'}
             />
           </div>
           <div className="border-t border-gray-100 pt-6">
@@ -969,6 +986,7 @@ export default function PatientProfile() {
               onAdd={handleAddCondition}
               onDelete={handleDeleteCondition}
               saving={savingCondition}
+              isReadOnly={staff?.role === 'receptionist'}
             />
           </div>
         </div>
@@ -982,12 +1000,14 @@ export default function PatientProfile() {
               Visit history{' '}
               <span className="text-gray-400 font-normal">({sortedNotes.length})</span>
             </h2>
+            {staff?.role !== 'receptionist' && (
             <button
               onClick={openAddNote}
               className="px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition"
             >
               + Add Visit Note
             </button>
+            )}
           </div>
 
           {/* Timeline */}
@@ -1025,10 +1045,12 @@ export default function PatientProfile() {
           {bookings.length === 0 ? (
             <div className="p-12 text-center text-gray-400 text-sm">No bookings found</div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-100">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Patient</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Doctor</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
@@ -1047,6 +1069,7 @@ export default function PatientProfile() {
                           <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">{b.procedure_name || 'Procedure'}</span>
                         )}
                       </td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{b.patient_name || '—'}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {b.booking_type === 'procedure'
                           ? `${b.slot_time || '—'} – ${b.end_time || '—'}`
@@ -1084,6 +1107,7 @@ export default function PatientProfile() {
                   ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}

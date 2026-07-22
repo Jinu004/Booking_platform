@@ -15,6 +15,29 @@ const isPhone = (str) => /^\+?\d{7,15}$/.test(str);
  * Gets bookings list with filters
  * Query params: date, status, doctorId, page, limit
  */
+async function patientLookup(req, res, next) {
+  try {
+    const tenantId = req.tenant.id;
+    const { phone } = req.query;
+    if (!phone) return errorResponse(res, 'Phone is required', 400);
+    const digits = phone.replace(/\D/g, '');
+    const normalizedPhone = digits.length === 10 ? `+91${digits}` : `+${digits}`;
+    const customerRes = await pool.query(
+      `SELECT id, name, phone FROM customers WHERE phone = $1 AND tenant_id = $2 LIMIT 1`,
+      [normalizedPhone, tenantId]
+    );
+    if (!customerRes.rows.length) return successResponse(res, { customer: null, patients: [] });
+    const customer = customerRes.rows[0];
+    const patientsRes = await pool.query(
+      `SELECT id, name, age, gender FROM patients WHERE customer_id = $1 AND tenant_id = $2 ORDER BY name ASC`,
+      [customer.id, tenantId]
+    );
+    return successResponse(res, { customer, patients: patientsRes.rows });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function getBookings(req, res, next) {
   try {
     const tenantId = req.tenant.id;
@@ -242,7 +265,7 @@ async function exportBookings(req, res, next) {
  */
 async function createManualBooking(req, res, next) {
   const tenantId = req.tenant.id;
-  const { patientName, patientPhone, notes, bookingDate, sendWhatsapp } = req.body
+  const { patientName, patientPhone, notes, bookingDate, sendWhatsapp, isPresent, slot_time } = req.body
   const doctorId = req.staff?.role === 'doctor' && req.staff?.doctor_id
     ? req.staff.doctor_id
     : req.body.doctorId
@@ -282,6 +305,21 @@ async function createManualBooking(req, res, next) {
     if (!doctorCheck.rows.length) {
       await client.query('ROLLBACK');
       return errorResponse(res, 'Doctor not found', 404);
+    }
+
+    // Check for duplicate booking — same phone, same doctor, same day
+    const targetDate = bookingDate || new Date().toISOString().split('T')[0];
+    const dupCheck = await client.query(
+      `SELECT b.id, b.token_number FROM bookings b
+       JOIN customers c ON c.id = b.customer_id
+       WHERE b.tenant_id = $1 AND b.doctor_id = $2 AND b.booking_date = $3
+       AND c.phone = $4 AND b.status NOT IN ('cancelled', 'completed')
+       LIMIT 1`,
+      [tenantId, doctorId, targetDate, normalizedPhone]
+    );
+    if (dupCheck.rows.length) {
+      await client.query('ROLLBACK');
+      return errorResponse(res, `This patient already has Token #${dupCheck.rows[0].token_number} with this doctor today`, 409);
     }
 
     // Find or create customer
@@ -343,18 +381,18 @@ async function createManualBooking(req, res, next) {
     // Insert booking
     const bRes = await client.query(
       `INSERT INTO bookings
-         (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes, patient_name, patient_id)
-       VALUES ($1, $2, $3, 'walkin', 'pending', $8, $4, $5, $6, $7)
+         (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes, patient_name, patient_id, slot_time)
+       VALUES ($1, $2, $3, 'walkin', 'pending', $8, $4, $5, $6, $7, $9)
        RETURNING *`,
-      [tenantId, customerId, doctorId, tokenNumber, cleanNotes, patientNameClean, patientId, bookingDate || new Date().toISOString().split('T')[0]]
+      [tenantId, customerId, doctorId, tokenNumber, cleanNotes, patientNameClean, patientId, bookingDate || new Date().toISOString().split('T')[0], slot_time || null]
     );
     const booking = bRes.rows[0];
 
     // Insert clinic_token record
     await client.query(
       `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
-       VALUES ($1, $2, $3, $4, 'waiting')`,
-      [tenantId, booking.id, doctorId, tokenNumber]
+       VALUES ($1, $2, $3, $4, $5)`,
+      [tenantId, booking.id, doctorId, tokenNumber, isPresent ? 'arrived' : 'waiting']
     );
 
     await client.query('COMMIT');
@@ -367,12 +405,8 @@ async function createManualBooking(req, res, next) {
     if (sendWhatsapp) {
       setImmediate(async () => {
         try {
-          const doctorName = docRes.rows[0]?.name || 'your doctor'
-          const apptDate = new Date(bookingDate || new Date()).toLocaleDateString('en-IN', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata'
-          })
-          const msg = `Hi ${patientNameClean}, your next appointment has been scheduled with ${doctorName} on ${apptDate}. Token: ${tokenNumber}. Please arrive on time. Reply CANCEL to cancel.`
-          await sendMessage(normalizedPhone, msg)
+          const { sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter')
+          await sendTemplateMessage(normalizedPhone, 'appointment_confirmation', 'en', [])
         } catch (waErr) {
           logger.warn('WhatsApp confirmation failed for manual booking:', waErr.message)
         }
@@ -388,6 +422,7 @@ async function createManualBooking(req, res, next) {
 }
 
 module.exports = {
+  patientLookup,
   getBookings,
   getBookingStats,
   getBookingById,

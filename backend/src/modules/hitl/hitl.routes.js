@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const HITLController = require('./hitl.controller');
-const { requireAuth } = require('../auth/auth.middleware');
+const { requireAuth, requireRole } = require('../auth/auth.middleware');
 
 // For SSE route — EventSource cannot send headers, so token comes as query param
 const sseAuth = (req, res, next) => {
@@ -15,10 +15,10 @@ const sseAuth = (req, res, next) => {
 router.get('/events', sseAuth, requireAuth, HITLController.sseStream);
 
 // All other routes use requireAuth directly
-router.get('/conversations', requireAuth, HITLController.getConversations);
-router.get('/conversations/:id/messages', requireAuth, HITLController.getMessages);
-router.post('/conversations/:id/send-template', requireAuth, HITLController.sendTemplate);
-router.post('/conversations/:id/reply', requireAuth, HITLController.reply);
-router.patch('/conversations/:id/mode', requireAuth, HITLController.toggleMode);
+router.get('/conversations', requireAuth, requireRole('admin', 'manager', 'receptionist'), HITLController.getConversations);
+router.get('/conversations/:id/messages', requireAuth, requireRole('admin', 'manager', 'receptionist'), HITLController.getMessages);
+router.post('/conversations/:id/send-template', requireAuth, requireRole('admin', 'manager', 'receptionist'), HITLController.sendTemplate);
+router.post('/conversations/:id/reply', requireAuth, requireRole('admin', 'manager', 'receptionist'), HITLController.reply);
+router.patch('/conversations/:id/mode', requireAuth, requireRole('admin', 'manager', 'receptionist'), HITLController.toggleMode);
 
 module.exports = router;

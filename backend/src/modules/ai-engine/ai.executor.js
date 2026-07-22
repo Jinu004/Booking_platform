@@ -118,6 +118,18 @@ async function executeFunction(name, args, ctx) {
       }
 
       if (!hasDoctors) {
+        if (customerPhone) {
+          try {
+            await sendButtons(customerPhone, `Hello! Welcome to ${tenant.name} 👋\n\nNo doctors are available today.`, [
+              { id: 'book_other_day', title: 'Book Another Day' },
+              { id: 'talk_to_staff', title: 'Talk to Staff' },
+              { id: 'check_booking', title: 'Check My Booking' }
+            ])
+            return `DIRECT:__INTERACTIVE_SENT__::Hello! Welcome to ${tenant.name} 👋\n\nNo doctors are available today.\n\nOptions: Book Another Day | Talk to Staff | Check My Booking`
+          } catch (err) {
+            logger.warn('show_welcome no-doctors interactive failed, falling back to text:', err.message)
+          }
+        }
         return `DIRECT:Hello! Welcome to ${tenant.name} 👋\n\nNo doctors are available today.\n\nPlease choose an option:\n1️⃣ Book Another Day\n2️⃣ Talk to Staff\n3️⃣ Check My Booking`
       }
       return `DIRECT:Hello! Welcome to ${tenant.name} 👋\n\nPlease choose an option:\n1️⃣ Book Appointment — Today\n2️⃣ Book Tomorrow\n3️⃣ Talk to Staff\n4️⃣ Check My Booking`
@@ -693,6 +705,11 @@ Please reply with your name to confirm booking.`
   const HITLModel = require('../hitl/hitl.model')
   const settings = await HITLModel.getTenantSettings(tenant.id)
   const withinHours = settings ? HITLService.isWithinWorkingHours(settings.working_hours) : true
+  let contactPhone = tenant.whatsapp_number
+  try {
+    const bpRes = await pool.query(`SELECT business_phone FROM tenant_settings WHERE tenant_id = $1`, [tenant.id])
+    contactPhone = bpRes.rows[0]?.business_phone || tenant.whatsapp_number
+  } catch {}
 
   // Find doctor
   const doctorRes = await pool.query(
@@ -785,14 +802,25 @@ Please reply with your name to confirm booking.`
          (tenant_id, customer_id, conversation_id, doctor_id,
           source, status, booking_date, token_number, notes, patient_name, patient_id, slot_time)
        VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE,
-         (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = CURRENT_DATE AND status != 'cancelled'),
+         0,
          $5, $6, $7, $8)
-       RETURNING id, token_number`,
+       RETURNING id`,
       [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
        `Booked via WhatsApp for ${formattedName}`, formattedName, patientId, slotTimeValue]
     )
-    tokenNumber = bookingRes.rows[0].token_number
     booking = bookingRes.rows[0]
+    const tokenRes = await bookingClient.query(
+      `UPDATE bookings SET token_number = (
+         SELECT COUNT(*) FROM bookings
+         WHERE doctor_id = $1 AND booking_date = CURRENT_DATE
+         AND status != 'cancelled'
+         AND ($2::varchar IS NULL OR slot_time = $2)
+       )
+       WHERE id = $3
+       RETURNING token_number`,
+      [doctor.id, slotTimeValue, booking.id]
+    )
+    tokenNumber = tokenRes.rows[0].token_number
     await bookingClient.query(
       `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
        VALUES ($1, $2, $3, $4, 'waiting')`,
@@ -860,7 +888,7 @@ Doctor: ${doctor.name}
 ${doctor.specialization}
 🕘 Consultation starts at ${sessionStart}
 Please arrive before session begins.
-Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if you would like to also book for tomorrow.' : ''}`
+For queries, contact us: ${contactPhone}`
 }
 
       case 'create_tomorrow_booking': {
@@ -1006,14 +1034,19 @@ Reply CANCEL to cancel your booking.${!withinHours ? '\n\nReply *TOMORROW* if yo
           tomorrowClient.release()
         }
 
-        return `DIRECT:Booking confirmed for tomorrow! 🏥
+        let contactPhoneTmr = tenant.whatsapp_number
+      try {
+        const bpResTmr = await pool.query(`SELECT business_phone FROM tenant_settings WHERE tenant_id = $1`, [tenant.id])
+        contactPhoneTmr = bpResTmr.rows[0]?.business_phone || tenant.whatsapp_number
+      } catch {}
+      return `DIRECT:Booking confirmed for tomorrow! 🏥
 Token Number: ${tokenNumber}
 Doctor: ${doctor.name}
 ${doctor.specialization}
 📅 ${dayNames[tomorrowDow]}, ${new Date(tomorrowDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
 🕘 Session: ${sessionTime}
 Please arrive before session begins.
-Reply CANCEL to cancel your booking.`
+For queries, contact us: ${contactPhoneTmr}`
       }
 
       case 'get_patient_profiles': {
@@ -1064,13 +1097,15 @@ Reply CANCEL to cancel your booking.`
           await sendDoctorList(customerPhone, 'Who is this booking for?', listItems, 'Select Patient')
           sentGPP = true
         } catch (sendErr1) {
-          logger.warn('get_patient_profiles send attempt 1 failed, retrying:', sendErr1.message)
-          await new Promise(r => setTimeout(r, 500))
+          const code1 = sendErr1.response?.data?.error?.code;
+          logger.warn(`get_patient_profiles send attempt 1 failed (Meta code: ${code1 || 'unknown'}), retrying:`, sendErr1.message)
+          await new Promise(r => setTimeout(r, 1000))
           try {
             await sendDoctorList(customerPhone, 'Who is this booking for?', listItems, 'Select Patient')
             sentGPP = true
           } catch (sendErr2) {
-            logger.warn('get_patient_profiles send attempt 2 failed, falling back to text:', sendErr2.message)
+            const code2 = sendErr2.response?.data?.error?.code;
+            logger.warn(`get_patient_profiles send attempt 2 failed (Meta code: ${code2 || 'unknown'}), falling back to text:`, sendErr2.message)
           }
         }
         if (sentGPP) return `DIRECT:__INTERACTIVE_SENT__::${contextText}`
@@ -1209,6 +1244,11 @@ Reply CANCEL to cancel your booking.`
 
       const bookingDayName = targetDate.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' })
 
+      let contactPhoneFB = tenant.whatsapp_number
+      try {
+        const bpResFB = await pool.query(`SELECT business_phone FROM tenant_settings WHERE tenant_id = $1`, [tenant.id])
+        contactPhoneFB = bpResFB.rows[0]?.business_phone || tenant.whatsapp_number
+      } catch {}
       return `DIRECT:Booking confirmed! 🏥
 Token Number: ${tokenNumberFB}
 Doctor: ${doctorFB.name}
@@ -1216,7 +1256,7 @@ ${doctorFB.specialization}
 Date: ${bookingDayName}, ${bookingDateFB}
 🕘 Session starts at ${sessionFilterFB ? fmtFB(sessionStartFB) : fmtFB(doctorFB.start_time)}
 Please arrive before session begins.
-Reply CANCEL to cancel your booking.`
+For queries, contact us: ${contactPhoneFB}`
     }
 
       case 'cancel_booking': {
@@ -1243,10 +1283,13 @@ Reply CANCEL to cancel your booking.`
           return { bookings: [], message: 'No bookings found for this number.' }
         }
         const result = await pool.query(
-          `SELECT b.id, b.token_number, b.booking_date, b.status,
-                  cd.name AS doctor_name, cd.specialization
+          `SELECT b.id, b.token_number, b.booking_date, b.status, b.booking_type,
+                  b.slot_time, b.end_time, b.patient_name,
+                  cd.name AS doctor_name, cd.specialization,
+                  p.name AS procedure_name
            FROM bookings b
            LEFT JOIN clinic_doctors cd ON cd.id = b.doctor_id
+           LEFT JOIN procedures p ON p.id = b.procedure_id
            WHERE b.customer_id = $1
              AND b.booking_date >= CURRENT_DATE
              AND b.status != 'cancelled'
@@ -1257,9 +1300,18 @@ Reply CANCEL to cancel your booking.`
         if (!result.rows.length) {
           return { bookings: [], message: 'No upcoming bookings found.' }
         }
-        const bookings = result.rows.map(b =>
-          `• Token #${b.token_number} with ${b.doctor_name} on ${new Date(b.booking_date).toLocaleDateString('en-IN')} (${b.status})`
-        )
+        const bookings = result.rows.map(b => {
+          const date = new Date(b.booking_date).toLocaleDateString('en-IN');
+          const patientLabel = b.patient_name ? ` for ${b.patient_name}` : '';
+          if (b.booking_type === 'procedure' && b.procedure_name) {
+            const fmtTimeProcedure = (t) => { if (!t) return ''; const [h, m] = t.toString().split(':').map(Number); return ` at ${h > 12 ? h - 12 : h || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`; };
+            const time = fmtTimeProcedure(b.slot_time);
+            return `• ${b.procedure_name}${patientLabel} with ${b.doctor_name} on ${date}${time} (${b.status})`;
+          }
+          const fmtTime = (t) => { if (!t) return ''; const [h, m] = t.toString().split(':').map(Number); return ` at ${h > 12 ? h - 12 : h || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`; };
+          const session = fmtTime(b.slot_time);
+          return `• Token #${b.token_number}${patientLabel} with ${b.doctor_name} on ${date}${session} (${b.status})`;
+        })
         return {
           bookings: result.rows,
           message: `Your upcoming bookings:\n${bookings.join('\n')}`

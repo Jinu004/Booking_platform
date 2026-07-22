@@ -132,8 +132,9 @@ async function addDoctorLeave(pool, tenantId, doctorId, leaveDate, reason) {
  */
 async function getTokenQueue(pool, tenantId) {
   const sql = `
-SELECT ct.*, b.notes,
+SELECT ct.*, b.notes, b.slot_time, b.source,
        COALESCE(b.patient_name, c.name) AS patient_name,
+       c.phone AS patient_phone,
        cd.name AS doctor_name,
        ct.doctor_id AS doctor_id
     FROM clinic_tokens ct
@@ -152,14 +153,35 @@ SELECT ct.*, b.notes,
  * Updates token status
  */
 async function updateTokenStatus(pool, tenantId, tokenId, status) {
-  const sql = `
-    UPDATE clinic_tokens 
-    SET status = $2 
-    WHERE tenant_id = $1 AND id = $3
-    RETURNING *
-  `;
-  const result = await tenantQuery(tenantId, pool, sql, [status, tokenId]);
-  return result.rows.length ? result.rows[0] : null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const tokenRes = await client.query(
+      `UPDATE clinic_tokens SET status = $1 WHERE tenant_id = $2 AND id = $3 RETURNING *`,
+      [status, tenantId, tokenId]
+    );
+    if (!tokenRes.rows.length) { await client.query('ROLLBACK'); return null; }
+    const token = tokenRes.rows[0];
+    if (status === 'completed' && token.booking_id) {
+      await client.query(
+        `UPDATE bookings SET status = 'completed' WHERE id = $1 AND tenant_id = $2`,
+        [token.booking_id, tenantId]
+      );
+    }
+    if (status === 'in_progress' && token.booking_id) {
+      await client.query(
+        `UPDATE bookings SET status = 'confirmed' WHERE id = $1 AND tenant_id = $2`,
+        [token.booking_id, tenantId]
+      );
+    }
+    await client.query('COMMIT');
+    return token;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 async function getProcedures(pool, tenantId, doctorId) {

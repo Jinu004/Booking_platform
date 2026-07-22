@@ -13,7 +13,7 @@ const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 async function getConversations(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const conversations = await HITLModel.getConversationList(tenantId);
+    const conversations = await HITLModel.getConversationList(tenantId, req.query.since);
     return res.json({ success: true, data: conversations, error: null });
   } catch (err) {
     next(err);
