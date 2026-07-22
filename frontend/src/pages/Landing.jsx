@@ -947,7 +947,7 @@ function FinalCTA({ onNavigate }) {
         </p>
         <div className="rai-final-ctas">
           <button className="rai-btn rai-btn-accent rai-btn-lg" onClick={() => onNavigate('/onboarding')}>Get Started <span className="arr">→</span></button>
-          <button className="rai-btn rai-btn-ghost rai-btn-lg" onClick={() => window.open('https://wa.me/917306069303?text=Hi%2C%20I%27d%20like%20to%20know%20more%20about%20ReceptionAI')}>Book a Demo</button>
+          <button className="rai-btn rai-btn-ghost rai-btn-lg" onClick={() => window.open('mailto:support.receptionai@gmail.com')}>Get in Touch</button>
         </div>
       </div>
     </section>
