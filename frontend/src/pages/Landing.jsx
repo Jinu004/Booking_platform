@@ -528,9 +528,9 @@ function Hero({ onNavigate }) {
               </button>
             </div>
             <div className="rai-hero-microtrust">
-              <span className="rai-pulse">14-day free trial</span>
+              <span className="rai-pulse">Live in 24 hours</span>
               <span style={{ opacity: 0.4 }}>·</span>
-              <span>No credit card</span>
+              <span>WhatsApp setup included</span>
               <span style={{ opacity: 0.4 }}>·</span>
               <span>Setup in 20 min</span>
             </div>
@@ -577,13 +577,13 @@ function Trust() {
         <div style={{ maxWidth: 760, margin: '0 auto', textAlign: 'center' }}>
           <span className="rai-eyebrow" style={{ justifyContent: 'center', display: 'inline-flex' }}><span className="dot" />From the team</span>
           <p style={{ fontSize: 24, lineHeight: 1.4, letterSpacing: '-0.02em', fontWeight: 500, color: 'var(--fg)', marginTop: 24 }}>
-            "We built ReceptionAI after watching our own family clinic lose 30–40 calls a day after hours. The fix shouldn't be hiring a night receptionist — it should be software that just answers."
+            "Most patients try to book appointments after clinic hours — when they're finally free from work. They message on WhatsApp, get no reply, and move on by morning. We built ReceptionAI so clinics never miss that window."
           </p>
           <div style={{ marginTop: 28, display: 'inline-flex', alignItems: 'center', gap: 12, fontSize: 13, color: 'var(--fg-muted)' }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center', fontWeight: 600 }}>RM</div>
             <div style={{ textAlign: 'left' }}>
-              <div style={{ color: 'var(--fg)', fontWeight: 500 }}>Rahul Menon</div>
-              <div>Founder, ReceptionAI · Kochi</div>
+              <div style={{ color: 'var(--fg)', fontWeight: 500 }}>Jinu</div>
+              <div>Founder, ReceptionAI · Kerala</div>
             </div>
           </div>
         </div>
@@ -667,7 +667,7 @@ function Solution() {
           <div className="rai-flow-step">
             <div className="rai-flow-num">3</div>
             <h3>Queue runs itself</h3>
-            <p>Live token board on the clinic display. Patients get arrival nudges. Reception sees who's next.</p>
+            <p>Live token queue on the reception dashboard. Staff sees who's waiting, in consult, and done — in real time.</p>
             <div className="rai-glyph">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', padding: '0 12px' }}>
                 {[{ t: 'A-12', s: 'Done', c: 'var(--fg-faint)' }, { t: 'A-13', s: 'Now', c: 'var(--accent)', active: true }, { t: 'A-14', s: 'Next', c: 'var(--fg-muted)' }].map((r, i) => (
@@ -712,9 +712,9 @@ function FeatureWAPanel() {
 
 function Features() {
   const feats = [
-    { title: 'Live token queue', body: 'Wall display, patient nudges, no-show flags — auto-managed from the moment a booking lands.', icon: 'queue' },
+    { title: 'Live token queue', body: 'Reception dashboard shows live queue status — waiting, in consult, done. Staff manages tokens with one tap.', icon: 'queue' },
     { title: 'Always on, 24/7', body: 'Bookings come in at 2 AM. You wake up to a confirmed schedule, not a list of missed calls.', icon: 'clock' },
-    { title: 'Analytics that matter', body: 'Bookings, conversion rate, peak hours, no-show rate. One weekly email — no dashboard hunting.', icon: 'chart' },
+    { title: 'Analytics that matter', body: 'Bookings, completed visits, AI resolution rate and per-doctor performance — all in one clean dashboard.', icon: 'chart' },
     { title: 'Patient memory', body: 'Returning patients are recognised. Last visit, preferred doctor — surfaced automatically.', icon: 'user' },
     { title: 'Doctor schedule sync', body: 'Set weekly templates once. Daily sessions generate automatically. Override in 30 seconds.', icon: 'calendar' },
   ];
@@ -861,7 +861,7 @@ function HowItWorks() {
     { title: 'Patient sends a message', body: "On WhatsApp, any time. They don't install anything, don't sign up, don't learn a new tool." },
     { title: 'AI understands the request', body: 'Books, reschedules, cancels, answers FAQs. Knows your doctors, hours, and locations.' },
     { title: 'Slot is confirmed instantly', body: 'Calendar checked, slot locked, token issued, confirmation card sent — all in one turn.' },
-    { title: 'Reception sees the schedule', body: 'Your dashboard updates live. Wall display shows the queue. Reminders go out automatically.' },
+    { title: 'Reception sees the schedule', body: 'Your dashboard updates live. Reception sees the live token queue. Reminders go out automatically.' },
   ];
   return (
     <section id="how" className="rai-section">
@@ -899,9 +899,9 @@ function HowItWorks() {
 ───────────────────────────────────────────── */
 function Pricing({ onNavigate }) {
   const plans = [
-    { name: 'Starter', price: '2,999', period: '/month', sub: 'For solo practices and single-doctor clinics.', features: ['1 doctor', '1,000 AI conversations/month', 'Live token queue', 'Basic analytics', 'Email support'], cta: 'Get Started' },
-    { name: 'Growth', price: '5,999', period: '/month', sub: 'For busy clinics with 2–5 doctors.', features: ['Up to 5 doctors', '3,000 AI conversations/month', 'Advanced analytics', 'Priority support', 'Patient reminders'], cta: 'Get Started' },
-    { name: 'Pro', price: '9,999', period: '/month', sub: 'For multi-doctor clinics and growing practices.', features: ['Up to 10 doctors', 'Unlimited conversations', 'Full analytics & reports', '24/7 support', 'Dedicated success manager'], cta: 'Get Started', featured: true, pill: 'Most popular' },
+    { name: 'Starter', price: '2,999', period: '/month', sub: 'For solo practices and single-doctor clinics.', features: ['1 doctor', 'Up to 300 bookings/month', 'WhatsApp AI booking 24/7', '24hr appointment reminders', 'Live token queue', 'Analytics dashboard', 'Email support'], cta: 'Get Started' },
+    { name: 'Growth', price: '5,999', period: '/month', sub: 'For busy clinics with 2–5 doctors.', features: ['Up to 5 doctors', 'Up to 750 bookings/month', 'WhatsApp AI booking 24/7', '24hr appointment reminders', 'Live token queue', 'Analytics dashboard', 'Priority support'], cta: 'Get Started', featured: true, pill: 'Most popular' },
+    { name: 'Pro', price: '9,999', period: '/month', sub: 'For multi-doctor clinics and growing practices.', features: ['Up to 10 doctors', 'Up to 1,500 bookings/month', 'WhatsApp AI booking 24/7', '24hr appointment reminders', 'Live token queue', 'Analytics dashboard', '24/7 support', 'Dedicated success manager'], cta: 'Get Started' },
   ];
   return (
     <section id="pricing" className="rai-section">
@@ -911,7 +911,7 @@ function Pricing({ onNavigate }) {
             <span className="rai-eyebrow"><span className="dot" />Pricing</span>
             <h2 className="rai-h2" style={{ marginTop: 16 }}>Honest pricing for clinics, not enterprises.</h2>
           </div>
-          <p className="rai-lead">Pays for itself if it saves you a single missed booking a day. 14-day free trial. No card required.</p>
+          <p className="rai-lead">Pays for itself if it saves you a single missed booking a day. Setup fee covers your full WhatsApp onboarding.</p>
         </div>
         <div className="rai-pricing-grid">
           {plans.map(p => (
@@ -928,7 +928,7 @@ function Pricing({ onNavigate }) {
             </div>
           ))}
         </div>
-        <p className="rai-pricing-note">14-day free trial. No card required. Cancel anytime.</p>
+        <p className="rai-pricing-note">Extra bookings available at ₹500 per 100. Setup fee applies. Cancel anytime.</p>
       </div>
     </section>
   );
@@ -947,7 +947,7 @@ function FinalCTA({ onNavigate }) {
           Set up takes 20 minutes. Your first overnight booking arrives while you're asleep. That's the pitch.
         </p>
         <div className="rai-final-ctas">
-          <button className="rai-btn rai-btn-accent rai-btn-lg" onClick={() => onNavigate('/onboarding')}>Start free trial <span className="arr">→</span></button>
+          <button className="rai-btn rai-btn-accent rai-btn-lg" onClick={() => onNavigate('/onboarding')}>Get Started <span className="arr">→</span></button>
           <button className="rai-btn rai-btn-ghost rai-btn-lg" onClick={() => window.open('mailto:support@receptionai.in')}>Book a 15-min call</button>
         </div>
       </div>
