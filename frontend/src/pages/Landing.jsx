@@ -600,7 +600,6 @@ function Problem() {
     { num: '01', stat: '38', unit: '%', title: 'Missed calls', body: "Calls outside opening hours go unanswered. That's patients who book somewhere else." },
     { num: '02', stat: '6', unit: 'hrs', title: 'Receptionist overload', body: 'Front desk juggles walk-ins, calls, and WhatsApp at once. Something always slips.' },
     { num: '03', stat: '1 in 12', unit: '', title: 'Booking errors', body: 'Manual entry mistakes — wrong slot, wrong doctor, wrong patient. Then awkward calls back.' },
-    { num: '04', stat: '47', unit: 'min', title: 'Patient wait', body: 'No live token visibility means patients arrive too early, leave frustrated, or both.' },
   ];
   return (
     <section id="problem" className="rai-section">
