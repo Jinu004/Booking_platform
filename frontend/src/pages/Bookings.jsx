@@ -256,7 +256,7 @@ const Bookings = () => {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {['Total Today', 'Confirmed', 'Completed', 'No Shows'].map((s, i) => {
+        {['Total Today', 'In Consult', 'Completed', 'No Shows'].map((s, i) => {
           const vals = [stats.total, stats.confirmed, stats.completed, stats.noshow];
           if (loading) return <StatCardSkeleton key={i} />
           return (
