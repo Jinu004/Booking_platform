@@ -689,7 +689,7 @@ function Solution() {
 function FeatureWAPanel() {
   const bodyRef = useRef(null);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '420px', width: '100%', overflow: 'hidden' }}>
       <div className="rai-wa-header">
         <div className="rai-wa-avatar">M</div>
         <div className="rai-wa-name"><strong>Menon Family Clinic</strong><small>online</small></div>
