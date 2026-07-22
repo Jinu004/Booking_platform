@@ -256,8 +256,8 @@ const Bookings = () => {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {['Total Today', 'In Consult', 'Completed', 'No Shows'].map((s, i) => {
-          const vals = [stats.total, stats.confirmed, stats.completed, stats.noshow];
+        {['Total Today', 'In Consult', 'Completed', 'Cancelled'].map((s, i) => {
+          const vals = [stats.total, stats.confirmed, stats.completed, stats.cancelled];
           if (loading) return <StatCardSkeleton key={i} />
           return (
             <div key={i} className="bg-white p-4 rounded-lg shadow border border-gray-200 hover:border-indigo-200 transition-colors">

@@ -89,6 +89,12 @@ const TokenQueue = () => {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 mb-3 px-1">
+        <span>Today: <strong className="text-gray-900">{tokenQueue.length}</strong></span>
+        <span>· Waiting: <strong className="text-amber-600">{tokenQueue.filter(t => t.status === 'arrived').length}</strong></span>
+        <span>· In Consult: <strong className="text-blue-600">{tokenQueue.filter(t => t.status === 'in_progress').length}</strong></span>
+        <span>· Done: <strong className="text-green-600">{tokenQueue.filter(t => t.status === 'done' || t.status === 'completed').length}</strong></span>
+      </div>
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="flex gap-1 p-3 border-b border-gray-100">
           {tabs.map(tab => (
