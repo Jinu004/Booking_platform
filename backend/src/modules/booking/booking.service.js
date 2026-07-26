@@ -102,9 +102,9 @@ async function createBookingWithToken(tenantId, bookingData) {
  * @returns {Promise<object>} { bookings, total, page }
  */
 async function getBookingsDashboard(tenantId, options) {
-  const { date, status, doctorId, customerId, page, limit } = options;
+  const { date, status, doctorId, customerId, page, limit, upcoming } = options;
   const bookings = await BookingModel.getBookings(pool, tenantId, {
-    date, status, doctorId, customerId, page: parseInt(page), limit: parseInt(limit)
+    date, status, doctorId, customerId, page: parseInt(page), limit: parseInt(limit), upcoming
   });
 
   // Calculate total for pagination (simplistic here, a real count query is better)
