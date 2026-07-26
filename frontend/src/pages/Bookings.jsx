@@ -79,7 +79,7 @@ const Bookings = () => {
         stats: statsRes?.data || { total: 0, confirmed: 0, completed: 0, noshow: 0 },
         doctors: docsRes?.data || []
       };
-      await saveToCache(`bookings_${viewMode}`, bookingsData);
+      await saveToCache('bookings', bookingsData);
       setBookings(bookingsData.bookings);
       setStats(bookingsData.stats);
       setDoctors(bookingsData.doctors);
@@ -105,12 +105,12 @@ const Bookings = () => {
           stats: statsRes?.data || { total: 0, confirmed: 0, completed: 0, noshow: 0 },
           doctors: docsRes?.data || []
         }
-        await saveToCache(`bookings_${viewMode}`, bookingsData)
+        await saveToCache('bookings', bookingsData)
         setBookings(bookingsData.bookings)
         setStats(bookingsData.stats)
         setDoctors(bookingsData.doctors)
       } catch (retryErr) {
-        const cached = await loadFromCache(`bookings_${viewMode}`);
+        const cached = await loadFromCache('bookings');
         if (cached) {
           setBookings(cached.bookings);
           setStats(cached.stats);
