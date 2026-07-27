@@ -66,7 +66,7 @@ async function executeFunction(name, args, ctx) {
         SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
                MIN(ds.start_time) AS start_time, MAX(ds.end_time) AS end_time,
                COUNT(DISTINCT ds.id) AS session_count,
-               COUNT(b.id) FILTER (WHERE b.status != 'cancelled') AS booked_count
+               COUNT(b.id) FILTER (WHERE b.status != 'cancelled' AND (b.booking_type IS NULL OR b.booking_type != 'procedure')) AS booked_count
         FROM clinic_doctors cd
         JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
         LEFT JOIN bookings b ON b.doctor_id = cd.id AND b.booking_date = CURRENT_DATE AND b.tenant_id = $1
@@ -153,6 +153,7 @@ async function executeFunction(name, args, ctx) {
              ON b.doctor_id = cd.id
              AND b.booking_date = CURRENT_DATE
              AND b.status != 'cancelled'
+             AND (b.booking_type IS NULL OR b.booking_type != 'procedure')
            WHERE cd.tenant_id = $1
              AND cd.available_today = true AND cd.is_active = true
            GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily
@@ -298,6 +299,7 @@ async function executeFunction(name, args, ctx) {
              ON b.doctor_id = cd.id
              AND b.booking_date = $3
              AND b.status != 'cancelled'
+             AND (b.booking_type IS NULL OR b.booking_type != 'procedure')
            LEFT JOIN doctor_leaves dl
              ON dl.doctor_id = cd.id
              AND dl.leave_date = $3
