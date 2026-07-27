@@ -307,6 +307,40 @@ async function createManualBooking(req, res, next) {
       return errorResponse(res, 'Doctor not found', 404);
     }
 
+    // Check slot_time doesn't fall within a procedure window
+    if (slot_time && bookingDate) {
+      const toMinutes = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
+      const slotMins = toMinutes(slot_time);
+
+      const overrideRes = await client.query(
+        `SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`,
+        [tenantId, doctorId, bookingDate]
+      );
+      let availableSessions = [];
+      if (overrideRes.rows.length > 0) {
+        availableSessions = overrideRes.rows[0].sessions;
+      } else {
+        const dow = new Date(bookingDate).getDay();
+        const schedRes = await client.query(
+          `SELECT start_time, end_time FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true`,
+          [tenantId, doctorId, dow]
+        );
+        availableSessions = schedRes.rows.map(r => ({ start_time: r.start_time, end_time: r.end_time }));
+      }
+
+      if (availableSessions.length > 0) {
+        const isInSession = availableSessions.some(s => {
+          const sStart = toMinutes(s.start_time);
+          const sEnd = toMinutes(s.end_time);
+          return slotMins >= sStart && slotMins < sEnd;
+        });
+        if (!isInSession) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({ success: false, error: 'This time slot is blocked by a procedure booking or outside session hours', code: 'SLOT_BLOCKED' });
+        }
+      }
+    }
+
     // Check for duplicate booking — same phone, same doctor, same day
     const targetDate = bookingDate || new Date().toISOString().split('T')[0];
     const dupCheck = await client.query(
