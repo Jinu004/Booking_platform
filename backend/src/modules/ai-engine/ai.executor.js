@@ -85,7 +85,7 @@ async function executeFunction(name, args, ctx) {
             const sessionLabel = parseInt(doc.session_count) > 1
               ? `${doc.session_count} sessions today`
               : `${fmtW(doc.start_time)} - ${fmtW(doc.end_time)}`
-            return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel} — ${remaining} tokens available`
+            return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel}`
           }).join('\n\n')
         : 'No doctors available today.'
 
@@ -100,7 +100,7 @@ async function executeFunction(name, args, ctx) {
           return {
             id: doc.id,
             title: doc.name.slice(0, 24),
-            description: `${doc.specialization || 'General'} — ${sessionLabel} (${remaining} left)`.slice(0, 72)
+            description: `${doc.specialization || 'General'} — ${sessionLabel}`.slice(0, 72)
           }
         })
 
@@ -175,7 +175,7 @@ async function executeFunction(name, args, ctx) {
           const sessionLabel = parseInt(doc.session_count) > 1
             ? `${doc.session_count} sessions today`
             : `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
-          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel} — ${remaining} tokens available`
+          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel}`
         }).join('\n\n')
         // Pro plan — send interactive list message directly, bypass Gemini
         if (tenant.plan === 'pro') {
@@ -188,7 +188,7 @@ async function executeFunction(name, args, ctx) {
             return {
               id: doc.id,
               title: doc.name.slice(0, 24),
-              description: `${doc.specialization || 'General'} — ${sessionLabel} (${remaining} left)`.slice(0, 72)
+              description: `${doc.specialization || 'General'} — ${sessionLabel}`.slice(0, 72)
             }
           })
           const customerPhone = ctx.customer?.phone
@@ -326,7 +326,7 @@ async function executeFunction(name, args, ctx) {
         const doctorList = doctorsResult.rows.map(doc => {
           const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
           const sessionTime = `${fmtTd(doc.start_time)} - ${fmtTd(doc.end_time)}`
-          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime} — ${remaining} tokens available`
+          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime}`
         }).join('\n\n')
 
         return `DIRECT:Doctors available tomorrow (${dayNamesTd[tomorrowDowTd]}):\n\n${doctorList}\n\nReply with the doctor's name to book.`
