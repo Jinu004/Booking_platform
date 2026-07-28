@@ -811,17 +811,54 @@ Please reply with your name to confirm booking.`
        `Booked via WhatsApp for ${formattedName}`, formattedName, patientId, slotTimeValue]
     )
     booking = bookingRes.rows[0]
-    const tokenRes = await bookingClient.query(
-      `UPDATE bookings SET token_number = (
+    let sessionStart = null;
+    let sessionEnd = null;
+    try {
+      const toMins = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
+      const overRes = await bookingClient.query(
+        `SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date`,
+        [tenant.id, doctor.id]
+      );
+      let sess = [];
+      if (overRes.rows.length > 0) {
+        sess = overRes.rows[0].sessions;
+      } else {
+        const dow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
+        const schRes = await bookingClient.query(
+          `SELECT start_time, end_time FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true`,
+          [tenant.id, doctor.id, dow]
+        );
+        sess = schRes.rows;
+      }
+      const slotMins = slotTimeValue
+        ? toMins(slotTimeValue)
+        : (() => { const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return now.getHours() * 60 + now.getMinutes(); })();
+      const matched = sess.find(s => { const ss = toMins(s.start_time); const se = toMins(s.end_time); return slotMins >= ss && slotMins < se; });
+      if (matched) { sessionStart = matched.start_time.toString().slice(0, 5); sessionEnd = matched.end_time.toString().slice(0, 5); }
+    } catch {}
+
+    let tokenQuery, tokenParams;
+    if (sessionStart && sessionEnd) {
+      tokenQuery = `UPDATE bookings SET token_number = (
          SELECT COUNT(*) FROM bookings
-         WHERE doctor_id = $1 AND booking_date = CURRENT_DATE
+         WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
          AND status != 'cancelled'
-         AND ($2::varchar IS NULL OR slot_time = $2)
-       )
-       WHERE id = $3
-       RETURNING token_number`,
-      [doctor.id, slotTimeValue, booking.id]
-    )
+         AND (
+           (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
+           OR
+           (slot_time IS NULL AND (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
+         )
+       ) WHERE id = $5 RETURNING token_number`;
+      tokenParams = [tenant.id, doctor.id, sessionStart, sessionEnd, booking.id];
+    } else {
+      tokenQuery = `UPDATE bookings SET token_number = (
+         SELECT COUNT(*) FROM bookings
+         WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
+         AND status != 'cancelled'
+       ) WHERE id = $3 RETURNING token_number`;
+      tokenParams = [tenant.id, doctor.id, booking.id];
+    }
+    const tokenRes = await bookingClient.query(tokenQuery, tokenParams)
     tokenNumber = tokenRes.rows[0].token_number
     await bookingClient.query(
       `INSERT INTO clinic_tokens (tenant_id, booking_id, doctor_id, token_number, status)
