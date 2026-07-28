@@ -1215,7 +1215,8 @@ export default function PatientProfile() {
                   <select
                     value={noteForm.doctor_id}
                     onChange={e => setNoteForm(p => ({ ...p, doctor_id: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    disabled={staff?.role === 'doctor'}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {editingNote && noteForm._doctor_name ? noteForm._doctor_name : 'Select doctor'}
