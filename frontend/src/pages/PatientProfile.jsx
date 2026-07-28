@@ -184,7 +184,7 @@ function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, savi
 
 // ── Visit Note Card ───────────────────────────────────────────────────────────
 
-function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend }) {
+function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend, canEdit = true }) {
   return (
     <div className="flex-1 bg-white border border-gray-100 rounded-xl p-5 shadow-sm">
       <div className="flex items-start justify-between mb-4">
@@ -206,7 +206,7 @@ function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend }) {
             </span>
           )}
           <p className="text-xs text-gray-400">{fmtDate(note.visit_date)} · {relativeDate(note.visit_date)}</p>
-          <button
+          {canEdit && <button
             onClick={() => onEdit(note)}
             className="text-gray-300 hover:text-teal-600 transition"
             title="Edit note"
@@ -215,7 +215,7 @@ function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                 d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -1035,6 +1035,7 @@ export default function PatientProfile() {
                     onEdit={openEditNote}
                     onDownload={handleDownloadPrescription}
                     onSend={handleSendPrescription}
+                    canEdit={staff?.role !== 'receptionist' && (staff?.role !== 'doctor' || note.doctor_id === staff?.doctor_id)}
                   />
                 </div>
               ))}
