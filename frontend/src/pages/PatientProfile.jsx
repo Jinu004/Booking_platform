@@ -696,6 +696,8 @@ export default function PatientProfile() {
               <p className="text-xs text-gray-500">{fmtSessionTime(activeBooking.session_start_time)} · {activeBooking.status}</p>
             </div>
             <div className="flex gap-2">
+              {staff?.role !== 'receptionist' && (staff?.role !== 'doctor' || activeBooking.doctor_id === staff?.doctor_id) && (
+              <>
               <button
                 onClick={() => handleBookingAction(activeBooking.id, completeBooking, 'complete')}
                 className="px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition"
@@ -708,6 +710,8 @@ export default function PatientProfile() {
               >
                 Cancel
               </button>
+              </>
+              )}
               {staff?.role !== 'receptionist' && (
               <button
                 onClick={async () => {
