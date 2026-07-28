@@ -184,13 +184,14 @@ async function updateDoctor(req, res, next) {
 
     const result = await pool.query(
       `UPDATE clinic_doctors
-       SET name                = COALESCE($1, name),
-           specialization      = COALESCE($2, specialization),
-           phone               = COALESCE($3, phone),
-           qualification       = COALESCE($4, qualification),
-           max_tokens_daily    = COALESCE($5, max_tokens_daily),
-           consultation_fee    = COALESCE($6, consultation_fee),
-           profile_description = COALESCE($9, profile_description)
+       SET name                     = COALESCE($1, name),
+           specialization           = COALESCE($2, specialization),
+           phone                    = COALESCE($3, phone),
+           qualification            = COALESCE($4, qualification),
+           max_tokens_daily         = COALESCE($5, max_tokens_daily),
+           consultation_fee         = COALESCE($6, consultation_fee),
+           profile_description      = COALESCE($9, profile_description),
+           avg_consultation_minutes = COALESCE($10, avg_consultation_minutes)
        WHERE id = $7 AND tenant_id = $8
        RETURNING *`,
       [
@@ -202,7 +203,8 @@ async function updateDoctor(req, res, next) {
         req.body.consultationFee,
         id,
         tenantId,
-        req.body.profileDescription !== undefined ? req.body.profileDescription : null
+        req.body.profileDescription !== undefined ? req.body.profileDescription : null,
+        req.body.avgConsultationMinutes !== undefined ? parseInt(req.body.avgConsultationMinutes) : null
       ]
     );
 
@@ -341,6 +343,22 @@ async function createProcedureBooking(req, res, next) {
       return errorResponse(res, 'procedure_id, patient_name, date, start_time and end_time are required', 400);
     }
     if (!isISODate(date)) return errorResponse(res, 'Valid date (YYYY-MM-DD) is required', 400);
+
+    const toMinutes = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
+    const startMins = toMinutes(start_time);
+    const endMins = toMinutes(end_time);
+
+    if (isNaN(startMins) || isNaN(endMins)) return errorResponse(res, 'Invalid time format. Use HH:MM', 400);
+    if (endMins <= startMins) return errorResponse(res, 'End time must be after start time', 400);
+
+    const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const todayStr = todayIST.toISOString().split('T')[0];
+    if (date < todayStr) return errorResponse(res, 'Cannot book a procedure in the past', 400);
+    if (date === todayStr) {
+      const nowMins = todayIST.getHours() * 60 + todayIST.getMinutes();
+      if (startMins <= nowMins) return errorResponse(res, 'Cannot book a procedure at a time that has already passed', 400);
+    }
+
     const booking = await ClinicModel.createProcedureBooking(pool, tenantId, id, procedure_id, customer_id, patient_id, patient_name, date, start_time, end_time);
 
     // Send WhatsApp notification to patient

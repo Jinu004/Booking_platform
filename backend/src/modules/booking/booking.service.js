@@ -30,7 +30,7 @@ async function createBookingWithToken(tenantId, bookingData) {
   try {
     // 1. Check doctor availability
     const doctorRes = await pool.query(
-      `SELECT max_tokens_daily, available_today FROM clinic_doctors WHERE id = $1 AND tenant_id = $2`,
+      `SELECT max_tokens_daily, available_today, avg_consultation_minutes FROM clinic_doctors WHERE id = $1 AND tenant_id = $2`,
       [doctorId, tenantId]
     );
 
@@ -43,7 +43,29 @@ async function createBookingWithToken(tenantId, bookingData) {
       throw new Error('Doctor is not available today');
     }
 
-    const maxTokens = doctor.max_tokens_daily || 30;
+    // Calculate dynamic max tokens from session time / avg_consultation_minutes
+    const avgMins = doctor.avg_consultation_minutes || 10;
+    const targetDate = bookingDate || new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).toISOString().split('T')[0];
+    const overrideRes = await pool.query(
+      `SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`,
+      [tenantId, doctorId, targetDate]
+    );
+    let sessions = [];
+    if (overrideRes.rows.length > 0) {
+      sessions = overrideRes.rows[0].sessions;
+    } else {
+      const dow = new Date(targetDate + 'T00:00:00').getDay();
+      const schedRes = await pool.query(
+        `SELECT start_time, end_time FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true`,
+        [tenantId, doctorId, dow]
+      );
+      sessions = schedRes.rows;
+    }
+    const toMinutes = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
+    const totalMinutes = sessions.reduce((sum, s) => sum + (toMinutes(s.end_time) - toMinutes(s.start_time)), 0);
+    const dynamicMax = totalMinutes > 0 ? Math.floor(totalMinutes / avgMins) : (doctor.max_tokens_daily || 30);
+    const maxTokens = doctor.max_tokens_daily ? Math.min(dynamicMax, doctor.max_tokens_daily) : dynamicMax;
+
     const capacity = await ConflictEngine.checkDoctorCapacity(pool, tenantId, doctorId, maxTokens);
 
     if (!capacity.available) {
@@ -102,9 +124,9 @@ async function createBookingWithToken(tenantId, bookingData) {
  * @returns {Promise<object>} { bookings, total, page }
  */
 async function getBookingsDashboard(tenantId, options) {
-  const { date, status, doctorId, customerId, page, limit } = options;
+  const { date, status, doctorId, customerId, page, limit, upcoming } = options;
   const bookings = await BookingModel.getBookings(pool, tenantId, {
-    date, status, doctorId, customerId, page: parseInt(page), limit: parseInt(limit)
+    date, status, doctorId, customerId, page: parseInt(page), limit: parseInt(limit), upcoming
   });
 
   // Calculate total for pagination (simplistic here, a real count query is better)

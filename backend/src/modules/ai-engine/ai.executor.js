@@ -66,7 +66,7 @@ async function executeFunction(name, args, ctx) {
         SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
                MIN(ds.start_time) AS start_time, MAX(ds.end_time) AS end_time,
                COUNT(DISTINCT ds.id) AS session_count,
-               COUNT(b.id) FILTER (WHERE b.status != 'cancelled') AS booked_count
+               COUNT(b.id) FILTER (WHERE b.status != 'cancelled' AND (b.booking_type IS NULL OR b.booking_type != 'procedure')) AS booked_count
         FROM clinic_doctors cd
         JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
         LEFT JOIN bookings b ON b.doctor_id = cd.id AND b.booking_date = CURRENT_DATE AND b.tenant_id = $1
@@ -85,7 +85,7 @@ async function executeFunction(name, args, ctx) {
             const sessionLabel = parseInt(doc.session_count) > 1
               ? `${doc.session_count} sessions today`
               : `${fmtW(doc.start_time)} - ${fmtW(doc.end_time)}`
-            return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel} — ${remaining} tokens available`
+            return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel}`
           }).join('\n\n')
         : 'No doctors available today.'
 
@@ -100,7 +100,7 @@ async function executeFunction(name, args, ctx) {
           return {
             id: doc.id,
             title: doc.name.slice(0, 24),
-            description: `${doc.specialization || 'General'} — ${sessionLabel} (${remaining} left)`.slice(0, 72)
+            description: `${doc.specialization || 'General'} — ${sessionLabel}`.slice(0, 72)
           }
         })
 
@@ -153,6 +153,7 @@ async function executeFunction(name, args, ctx) {
              ON b.doctor_id = cd.id
              AND b.booking_date = CURRENT_DATE
              AND b.status != 'cancelled'
+             AND (b.booking_type IS NULL OR b.booking_type != 'procedure')
            WHERE cd.tenant_id = $1
              AND cd.available_today = true AND cd.is_active = true
            GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily
@@ -174,7 +175,7 @@ async function executeFunction(name, args, ctx) {
           const sessionLabel = parseInt(doc.session_count) > 1
             ? `${doc.session_count} sessions today`
             : `${fmtAD(doc.start_time)} - ${fmtAD(doc.end_time)}`
-          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel} — ${remaining} tokens available`
+          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionLabel}`
         }).join('\n\n')
         // Pro plan — send interactive list message directly, bypass Gemini
         if (tenant.plan === 'pro') {
@@ -187,7 +188,7 @@ async function executeFunction(name, args, ctx) {
             return {
               id: doc.id,
               title: doc.name.slice(0, 24),
-              description: `${doc.specialization || 'General'} — ${sessionLabel} (${remaining} left)`.slice(0, 72)
+              description: `${doc.specialization || 'General'} — ${sessionLabel}`.slice(0, 72)
             }
           })
           const customerPhone = ctx.customer?.phone
@@ -298,6 +299,7 @@ async function executeFunction(name, args, ctx) {
              ON b.doctor_id = cd.id
              AND b.booking_date = $3
              AND b.status != 'cancelled'
+             AND (b.booking_type IS NULL OR b.booking_type != 'procedure')
            LEFT JOIN doctor_leaves dl
              ON dl.doctor_id = cd.id
              AND dl.leave_date = $3
@@ -324,7 +326,7 @@ async function executeFunction(name, args, ctx) {
         const doctorList = doctorsResult.rows.map(doc => {
           const remaining = doc.max_tokens_daily - parseInt(doc.booked_count || 0)
           const sessionTime = `${fmtTd(doc.start_time)} - ${fmtTd(doc.end_time)}`
-          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime} — ${remaining} tokens available`
+          return `🩺 ${doc.name} (${doc.specialization})\n   🕘 ${sessionTime}`
         }).join('\n\n')
 
         return `DIRECT:Doctors available tomorrow (${dayNamesTd[tomorrowDowTd]}):\n\n${doctorList}\n\nReply with the doctor's name to book.`

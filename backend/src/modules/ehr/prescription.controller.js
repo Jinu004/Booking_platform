@@ -228,7 +228,7 @@ function generatePDF(data) {
     }
 
     // ── DOCTOR'S NOTES ────────────────────────────────────────────────────────
-    if (data.notes && y < CONTENT_LIMIT) {
+    if (false && data.notes && y < CONTENT_LIMIT) {
       y = sectionHeader("DOCTOR'S NOTES", y);
       const lineCount = Math.ceil(data.notes.length / 85);
       const nbH = Math.max(44, lineCount * 15 + 20);

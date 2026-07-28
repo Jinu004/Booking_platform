@@ -312,7 +312,7 @@ const Doctors = () => {
 
   const openAddDoctor = () => {
     setManageMode('add');
-    setManageDoctorForm({ id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: '' });
+    setManageDoctorForm({ id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: '', avgConsultationMinutes: 10 });
     setFormErrors({});
     setIsManageModalOpen(true);
   };
@@ -326,7 +326,8 @@ const Doctors = () => {
       phone: doc.phone || '',
       qualification: doc.qualification || '',
       maxTokensDaily: doc.max_tokens_daily || 30,
-      consultationFee: doc.consultation_fee || ''
+      consultationFee: doc.consultation_fee || '',
+      avgConsultationMinutes: doc.avg_consultation_minutes || 10
     });
     setFormErrors({});
     setIsManageModalOpen(true);
@@ -354,7 +355,8 @@ const Doctors = () => {
       const payload = {
         ...manageDoctorForm,
         maxTokensDaily: parseInt(manageDoctorForm.maxTokensDaily),
-        consultationFee: parseInt(manageDoctorForm.consultationFee)
+        consultationFee: parseInt(manageDoctorForm.consultationFee),
+        avgConsultationMinutes: parseInt(manageDoctorForm.avgConsultationMinutes) || 10
       };
       if (manageMode === 'add') {
         await createDoctor(payload);
@@ -796,6 +798,24 @@ const Doctors = () => {
                 <label className="block text-sm font-medium text-gray-700">Consultation Fee *</label>
                 <input type="text" placeholder="e.g. 300" value={manageDoctorForm.consultationFee} onChange={e => { const numericOnly = e.target.value.replace(/\D/g, ''); setManageDoctorForm({ ...manageDoctorForm, consultationFee: numericOnly }); }} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.consultationFee ? 'border-red-500' : ''}`} />
                 {formErrors.consultationFee && <p className="mt-1 text-xs text-red-600">{formErrors.consultationFee}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Avg. Consultation Time (minutes)</label>
+                <select
+                  value={manageDoctorForm.avgConsultationMinutes}
+                  onChange={e => setManageDoctorForm({ ...manageDoctorForm, avgConsultationMinutes: parseInt(e.target.value) })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border"
+                >
+                  <option value={5}>5 minutes</option>
+                  <option value={10}>10 minutes</option>
+                  <option value={15}>15 minutes</option>
+                  <option value={20}>20 minutes</option>
+                  <option value={30}>30 minutes</option>
+                  <option value={45}>45 minutes</option>
+                  <option value={60}>60 minutes</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-400">Used to calculate how many patients can be seen per session</p>
               </div>
 
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">

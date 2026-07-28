@@ -74,7 +74,7 @@ async function getBookings(pool, tenantId, filters = {}) {
   let paramCount = 2; // $1 is tenantId
 
   if (filters.upcoming) {
-    sql += ` AND b.booking_date >= CURRENT_DATE`;
+    sql += ` AND b.booking_date > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date`;
   } else if (filters.date) {
     sql += ` AND b.booking_date = $${paramCount}`;
     params.push(filters.date);
@@ -158,10 +158,11 @@ async function updateBookingStatus(pool, tenantId, bookingId, status) {
  */
 async function getDoctorTokenCount(pool, tenantId, doctorId) {
   const sql = `
-    SELECT COUNT(*) AS total 
-    FROM bookings 
-    WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE 
+    SELECT COUNT(*) AS total
+    FROM bookings
+    WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE
     AND status != 'cancelled'
+    AND (booking_type IS NULL OR booking_type != 'procedure')
   `;
   const result = await tenantQuery(tenantId, pool, sql, [doctorId]);
   return parseInt(result.rows[0].total || 0);

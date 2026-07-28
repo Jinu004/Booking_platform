@@ -85,16 +85,17 @@ async function checkDoctorCapacity(pool, tenantId, doctorId, maxTokens) {
  */
 async function getNextTokenNumber(tenantId, doctorId, date) {
   try {
-    const key = `token:${tenantId}:${doctorId}:${date}`;
-    const token = await redis.incr(key);
-    if (token === 1) {
-      // Set expiry to 24 hours (86400 seconds) for the first token
-      await redis.expire(key, 86400); 
-    }
-    return token;
+    const pool = require('../config/database');
+    const result = await pool.query(
+      `SELECT COALESCE(MAX(token_number), 0) + 1 AS next_token
+       FROM bookings
+       WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
+       AND status != 'cancelled'`,
+      [tenantId, doctorId, date]
+    );
+    return parseInt(result.rows[0].next_token);
   } catch (err) {
     logger.error(`Failed to generate token number: ${err.message}`);
-    // Fallback: throw error, will be handled by caller
     throw err;
   }
 }

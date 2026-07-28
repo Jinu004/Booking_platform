@@ -184,7 +184,7 @@ function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, savi
 
 // ── Visit Note Card ───────────────────────────────────────────────────────────
 
-function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend }) {
+function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend, canEdit = true }) {
   return (
     <div className="flex-1 bg-white border border-gray-100 rounded-xl p-5 shadow-sm">
       <div className="flex items-start justify-between mb-4">
@@ -206,7 +206,7 @@ function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend }) {
             </span>
           )}
           <p className="text-xs text-gray-400">{fmtDate(note.visit_date)} · {relativeDate(note.visit_date)}</p>
-          <button
+          {canEdit && <button
             onClick={() => onEdit(note)}
             className="text-gray-300 hover:text-teal-600 transition"
             title="Edit note"
@@ -215,7 +215,7 @@ function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                 d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -229,6 +229,12 @@ function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend }) {
         <div className="mb-3">
           <p className="text-xs text-gray-400 uppercase font-semibold tracking-wide mb-1">Prescription</p>
           <p className="text-sm text-gray-700 leading-relaxed">{note.prescription}</p>
+        </div>
+      )}
+      {note.notes && (
+        <div className="mb-3">
+          <p className="text-xs text-gray-400 uppercase font-semibold tracking-wide mb-1">Notes</p>
+          <p className="text-sm text-gray-700 leading-relaxed">{note.notes}</p>
         </div>
       )}
       {note.follow_up_date && (
@@ -631,7 +637,7 @@ export default function PatientProfile() {
   const TABS = [
     { key: 'overview', label: 'Overview' },
     { key: 'medical', label: 'Medical History' },
-    { key: 'notes', label: 'Visit Notes' },
+    { key: 'notes', label: 'Prescriptions' },
     { key: 'bookings', label: 'Bookings' },
   ];
 
@@ -696,6 +702,8 @@ export default function PatientProfile() {
               <p className="text-xs text-gray-500">{fmtSessionTime(activeBooking.session_start_time)} · {activeBooking.status}</p>
             </div>
             <div className="flex gap-2">
+              {staff?.role !== 'receptionist' && (staff?.role !== 'doctor' || activeBooking.doctor_id === staff?.doctor_id) && (
+              <>
               <button
                 onClick={() => handleBookingAction(activeBooking.id, completeBooking, 'complete')}
                 className="px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition"
@@ -708,6 +716,8 @@ export default function PatientProfile() {
               >
                 Cancel
               </button>
+              </>
+              )}
               {staff?.role !== 'receptionist' && (
               <button
                 onClick={async () => {
@@ -1031,6 +1041,7 @@ export default function PatientProfile() {
                     onEdit={openEditNote}
                     onDownload={handleDownloadPrescription}
                     onSend={handleSendPrescription}
+                    canEdit={staff?.role !== 'receptionist' && (staff?.role !== 'doctor' || note.doctor_id === staff?.doctor_id)}
                   />
                 </div>
               ))}
@@ -1086,7 +1097,7 @@ export default function PatientProfile() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        {(b.status === 'pending' || b.status === 'confirmed') && (
+                        {(b.status === 'pending' || b.status === 'confirmed') && staff?.role !== 'receptionist' && (staff?.role !== 'doctor' || b.doctor_id === staff?.doctor_id) && (
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleBookingAction(b.id, completeBooking, 'complete')}
@@ -1210,7 +1221,8 @@ export default function PatientProfile() {
                   <select
                     value={noteForm.doctor_id}
                     onChange={e => setNoteForm(p => ({ ...p, doctor_id: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    disabled={staff?.role === 'doctor'}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {editingNote && noteForm._doctor_name ? noteForm._doctor_name : 'Select doctor'}
