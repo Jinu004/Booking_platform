@@ -231,6 +231,12 @@ function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend, canEdit = t
           <p className="text-sm text-gray-700 leading-relaxed">{note.prescription}</p>
         </div>
       )}
+      {note.notes && (
+        <div className="mb-3">
+          <p className="text-xs text-gray-400 uppercase font-semibold tracking-wide mb-1">Notes</p>
+          <p className="text-sm text-gray-700 leading-relaxed">{note.notes}</p>
+        </div>
+      )}
       {note.follow_up_date && (
         <div className="mt-3 flex items-center gap-2 text-xs text-teal-700 bg-teal-50 rounded-lg px-3 py-2">
           <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
