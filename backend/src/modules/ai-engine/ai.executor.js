@@ -1052,7 +1052,7 @@ For queries, contact us: ${contactPhone}`
                (tenant_id, customer_id, conversation_id, doctor_id,
                 source, status, booking_date, token_number, notes, patient_name, patient_id)
              VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', $5,
-               (SELECT COUNT(*) + 1 FROM bookings WHERE doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
+               (SELECT COUNT(*) + 1 FROM bookings WHERE tenant_id = $1 AND doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
                $6, $7, $8)
              RETURNING id, token_number`,
             [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
