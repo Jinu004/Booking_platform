@@ -52,10 +52,10 @@ async function getDoctorById(pool, tenantId, doctorId) {
  * Creates a new doctor
  */
 async function createDoctor(pool, tenantId, doctorData) {
-  const { name, specialization, phone, email, qualification, maxTokensDaily, consultationFee } = doctorData;
+  const { name, specialization, phone, email, qualification, maxTokensDaily, consultationFee, avgConsultationMinutes } = doctorData;
   const sql = `
-    INSERT INTO clinic_doctors (tenant_id, name, specialization, phone, email, qualification, max_tokens_daily, consultation_fee)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    INSERT INTO clinic_doctors (tenant_id, name, specialization, phone, email, qualification, max_tokens_daily, consultation_fee, avg_consultation_minutes)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *
   `;
   const result = await tenantQuery(tenantId, pool, sql, [
@@ -65,7 +65,8 @@ async function createDoctor(pool, tenantId, doctorData) {
     email || null,
     qualification || null,
     maxTokensDaily || 30,
-    consultationFee || 0
+    consultationFee || 0,
+    avgConsultationMinutes || 10
   ]);
   return result.rows[0];
 }
