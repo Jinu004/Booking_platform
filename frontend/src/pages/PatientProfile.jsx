@@ -1090,7 +1090,7 @@ export default function PatientProfile() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        {(b.status === 'pending' || b.status === 'confirmed') && (
+                        {(b.status === 'pending' || b.status === 'confirmed') && staff?.role !== 'receptionist' && (staff?.role !== 'doctor' || b.doctor_id === staff?.doctor_id) && (
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleBookingAction(b.id, completeBooking, 'complete')}
