@@ -25,6 +25,7 @@ const TokenQueue = () => {
   const [loadingToken, setLoadingToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [doctorFilter, setDoctorFilter] = useState('all');
+  const [collapsedSessions, setCollapsedSessions] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
 
   const staff = getStoredStaff();
@@ -184,10 +185,18 @@ const TokenQueue = () => {
                 return slotKeys.map((key, ki) => {
                   const group = filteredTokens.filter(t => (t.slot_time || 'walkin') === key);
                   const label = key === 'walkin' ? 'Walk-ins' : `Session ${ki + 1} — ${fmtSlot(key)}`;
+                  const allDone = group.every(t => t.status === 'done' || t.status === 'completed' || t.status === 'cancelled');
+                  const isCollapsed = collapsedSessions[key] !== undefined ? collapsedSessions[key] : allDone;
                   return (
                     <React.Fragment key={key}>
-                      <div className="px-4 py-2 bg-indigo-50 text-xs font-semibold text-indigo-600 uppercase tracking-wider border-b border-indigo-100">{label}</div>
-                      {group.map(t => renderToken(t))}
+                      <div
+                        className="px-4 py-2 bg-indigo-50 text-xs font-semibold text-indigo-600 uppercase tracking-wider border-b border-indigo-100 flex items-center justify-between cursor-pointer select-none"
+                        onClick={() => setCollapsedSessions(prev => ({ ...prev, [key]: !isCollapsed }))}
+                      >
+                        <span>{label} <span className="ml-2 font-normal text-indigo-400">({group.length} tokens)</span></span>
+                        <span>{isCollapsed ? '▸' : '▾'}</span>
+                      </div>
+                      {!isCollapsed && group.map(t => renderToken(t))}
                     </React.Fragment>
                   );
                 });
