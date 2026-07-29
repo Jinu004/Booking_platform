@@ -178,7 +178,8 @@ const TokenQueue = () => {
                   </div>
                 </div>
               );
-              if (doctorFilter !== 'all' || isDoctor) {
+              const uniqueSlots = [...new Set(filteredTokens.map(t => t.slot_time).filter(Boolean))];
+              if (uniqueSlots.length > 1 || isDoctor) {
                 const slotKeys = [...new Set(filteredTokens.map(t => t.slot_time || 'walkin'))];
                 return slotKeys.map((key, ki) => {
                   const group = filteredTokens.filter(t => (t.slot_time || 'walkin') === key);
