@@ -1130,6 +1130,7 @@ For queries, contact us: ${contactPhoneTmr}`
       const nameList = patientRes.rows.map(p => `• ${p.name}`).join('\n')
       const sessionLabel = sessionMatch ? `\nSelected session: ${sessionMatch[2]}:${sessionMatch[3]}` : ''
       const contextText = `Who is this booking for?${sessionLabel}\n${nameList}\n• Book for someone else${sessionSuffix}`
+      const patientVisibleText = `Who is this booking for?${sessionLabel}\n${nameList}\n• Book for someone else`
       if (customerPhone) {
         let sentGPP = false
         try {
@@ -1149,7 +1150,7 @@ For queries, contact us: ${contactPhoneTmr}`
         }
         if (sentGPP) return `DIRECT:__INTERACTIVE_SENT__::${contextText}`
       }
-      return `DIRECT:${contextText}\n\nPlease reply with the name to book for, or type a new name.`
+      return `DIRECT:${patientVisibleText}\n\nPlease reply with the name to book for, or type a new name.`
     }
 
     case 'create_future_booking': {
