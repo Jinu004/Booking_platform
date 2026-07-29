@@ -244,6 +244,13 @@ async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes
       }
     }
   }
+  // Filter out past slots if booking is for today
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const todayStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth()+1).padStart(2,'0')}-${String(nowIST.getDate()).padStart(2,'0')}`;
+  if (date === todayStr) {
+    const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
+    return availableSlots.filter(s => toMinutes(s) > nowMins);
+  }
   return availableSlots;
 }
 
