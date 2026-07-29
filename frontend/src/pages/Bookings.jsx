@@ -128,7 +128,8 @@ const Bookings = () => {
 
   useEffect(() => {
     if (!selectedDoctor) { setDoctorScheduleSessions([]); return; }
-    const todayDow = new Date(date + 'T00:00:00').getDay();
+    const [y, m, d] = date.split('-').map(Number);
+    const todayDow = new Date(y, m - 1, d).getDay();
     getDoctorSchedule(selectedDoctor.id).then(res => {
       const sessions = (res?.data || []).filter(s => s.day_of_week === todayDow && s.is_available);
       setDoctorScheduleSessions(sessions);
