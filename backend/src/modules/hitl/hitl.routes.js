@@ -15,10 +15,10 @@ const sseAuth = (req, res, next) => {
 router.get('/events', sseAuth, requireAuth, HITLController.sseStream);
 
 // All other routes use requireAuth directly
-router.get('/conversations', requireAuth, requireRole('admin', 'manager', 'receptionist'), HITLController.getConversations);
-router.get('/conversations/:id/messages', requireAuth, requireRole('admin', 'manager', 'receptionist'), HITLController.getMessages);
-router.post('/conversations/:id/send-template', requireAuth, requireRole('admin', 'manager', 'receptionist'), HITLController.sendTemplate);
-router.post('/conversations/:id/reply', requireAuth, requireRole('admin', 'manager', 'receptionist'), HITLController.reply);
-router.patch('/conversations/:id/mode', requireAuth, requireRole('admin', 'manager', 'receptionist'), HITLController.toggleMode);
+router.get('/conversations', requireAuth, requireRole('admin', 'manager', 'receptionist', 'super_admin'), HITLController.getConversations);
+router.get('/conversations/:id/messages', requireAuth, requireRole('admin', 'manager', 'receptionist', 'super_admin'), HITLController.getMessages);
+router.post('/conversations/:id/send-template', requireAuth, requireRole('admin', 'manager', 'receptionist', 'super_admin'), HITLController.sendTemplate);
+router.post('/conversations/:id/reply', requireAuth, requireRole('admin', 'manager', 'receptionist', 'super_admin'), HITLController.reply);
+router.patch('/conversations/:id/mode', requireAuth, requireRole('admin', 'manager', 'receptionist', 'super_admin'), HITLController.toggleMode);
 
 module.exports = router;
