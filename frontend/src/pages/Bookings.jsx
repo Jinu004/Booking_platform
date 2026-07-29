@@ -25,6 +25,7 @@ const Bookings = () => {
   const [statusFilter, setStatusFilter] = useState('');
   
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [doctorScheduleSessions, setDoctorScheduleSessions] = useState([]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -125,6 +126,18 @@ const Bookings = () => {
     }
   };
 
+  useEffect(() => {
+    if (!selectedDoctor) { setDoctorScheduleSessions([]); return; }
+    const todayDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
+    getDoctorSchedule(selectedDoctor.id).then(res => {
+      const sessions = (res?.data || []).filter(s => s.day_of_week === todayDow && s.is_available);
+      setDoctorScheduleSessions(sessions);
+    }).catch(() => setDoctorScheduleSessions([]));
+  }, [selectedDoctor]);
+
+  const toSessionMins = t => { if (!t) return null; const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
+  const fmtSessionLabel = (s, e) => { const fmt = t => { const [h, m] = t.toString().split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; }; return `${fmt(s)} - ${fmt(e)}`; };
+
   const filteredBookings = bookings.filter(b => {
     const matchesDoctor = !selectedDoctor || b.doctor_name === selectedDoctor.name
     const matchesSearch = !searchQuery ||
@@ -132,6 +145,76 @@ const Bookings = () => {
       b.patient_phone?.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesDoctor && matchesSearch
   })
+
+  const sessionGroups = (selectedDoctor && doctorScheduleSessions.length > 0 && viewMode !== 'upcoming')
+    ? doctorScheduleSessions.map(s => ({
+        label: fmtSessionLabel(s.start_time, s.end_time),
+        bookings: filteredBookings.filter(b => {
+          const slotMins = toSessionMins(b.slot_time);
+          return slotMins !== null && slotMins >= toSessionMins(s.start_time) && slotMins < toSessionMins(s.end_time);
+        })
+      }))
+    : [];
+
+  const renderBookingRow = (b) => (
+    <tr key={b.id} className="hover:bg-gray-50 transition-colors">
+      <td className="px-6 py-4 whitespace-nowrap">
+        {b.booking_type === 'procedure' ? (
+          <div className="flex flex-col gap-0.5">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Procedure</span>
+            <span className="text-xs text-gray-600 font-medium">{b.procedure_name || 'Procedure'}</span>
+            <span className="text-xs text-gray-400">{b.slot_time} — {b.end_time}</span>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700">Token</span>
+            <span className="text-sm font-black text-teal-700">{b.token_number || '-'}</span>
+          </div>
+        )}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="text-sm font-bold text-gray-900">{b.patient_name || 'Unknown'}</div>
+        <div className="text-sm text-gray-500 font-medium">{b.patient_phone}</div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">
+        {b.doctor_name || 'Unassigned'}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+        {b.slot_time
+          ? (() => {
+              const [h, m] = b.slot_time.split(':')
+              const hr = parseInt(h)
+              return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
+            })()
+          : new Date(b.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        }
+        <span className="block text-[10px] uppercase font-bold tracking-widest text-gray-400 mt-1">{b.source}</span>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-bold uppercase tracking-wide rounded-full ${statusColors[b.status] || 'bg-gray-100 text-gray-800'}`}>
+          {b.status}
+        </span>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold space-x-3">
+        {(b.status === 'confirmed' || b.status === 'pending') && (
+          <>
+            {(!b.token_id || b.token_status === 'arrived') && (
+              <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
+            )}
+            {b.token_id && b.token_status === 'waiting' && (
+              <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-blue-500 hover:text-blue-700 transition">Arrived</button>
+            )}
+            <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
+          </>
+        )}
+        {(b.patient_id || b.customer_id) && (
+          <Link to={`/patients/${b.patient_id || b.customer_id}`} className="text-blue-600 hover:text-blue-900 text-sm font-medium">
+            View Profile
+          </Link>
+        )}
+      </td>
+    </tr>
+  );
 
   const loadFormDependencies = async () => {
     try {
@@ -411,65 +494,20 @@ const Bookings = () => {
                     </React.Fragment>
                   ))
                 })()
-              ) : filteredBookings.map(b => (
-                <tr key={b.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {b.booking_type === 'procedure' ? (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Procedure</span>
-                        <span className="text-xs text-gray-600 font-medium">{b.procedure_name || 'Procedure'}</span>
-                        <span className="text-xs text-gray-400">{b.slot_time} – {b.end_time}</span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700">Token</span>
-                        <span className="text-sm font-black text-teal-700">{b.token_number || '-'}</span>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-gray-900">{b.patient_name || 'Unknown'}</div>
-                    <div className="text-sm text-gray-500 font-medium">{b.patient_phone}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">
-                    {b.doctor_name || 'Unassigned'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
-                    {b.slot_time
-                      ? (() => {
-                          const [h, m] = b.slot_time.split(':')
-                          const hr = parseInt(h)
-                          return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
-                        })()
-                      : new Date(b.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-                    }
-                    <span className="block text-[10px] uppercase font-bold tracking-widest text-gray-400 mt-1">{b.source}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 inline-flex text-xs leading-5 font-bold uppercase tracking-wide rounded-full ${statusColors[b.status] || 'bg-gray-100 text-gray-800'}`}>
-                      {b.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold space-x-3">
-                    {(b.status === 'confirmed' || b.status === 'pending') && (
-                      <>
-                        {(!b.token_id || b.token_status === 'arrived') && (
-                          <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
-                        )}
-                        {b.token_id && b.token_status === 'waiting' && (
-                          <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-blue-500 hover:text-blue-700 transition">Arrived</button>
-                        )}
-                        <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
-                      </>
-                    )}
-                    {(b.patient_id || b.customer_id) && (
-                      <Link to={`/patients/${b.patient_id || b.customer_id}`} className="text-blue-600 hover:text-blue-900 text-sm font-medium">
-                        View Profile
-                      </Link>
-                    )}
-                  </td>
-                </tr>
-              ))
+              ) : sessionGroups.length > 0 ? (
+                <>
+                  {sessionGroups.map((g, gi) => (
+                    <React.Fragment key={gi}>
+                      <tr>
+                        <td colSpan="6" className="px-4 py-2 bg-indigo-50 text-xs font-semibold text-indigo-600 uppercase tracking-wider border-b border-indigo-100">
+                          Session {gi + 1} — {g.label}
+                        </td>
+                      </tr>
+                      {g.bookings.map(b => renderBookingRow(b))}
+                    </React.Fragment>
+                  ))}
+                </>
+              ) : filteredBookings.map(b => renderBookingRow(b))
             )}
           </tbody>
         </table>
