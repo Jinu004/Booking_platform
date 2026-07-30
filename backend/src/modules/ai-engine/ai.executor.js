@@ -734,6 +734,7 @@ Please reply with your name to confirm booking.`
   }
 
   // Session-scoped dynamic capacity check using session_start_time from args
+  logger.info(`CTB capacity check starting: doctor=${doctor.name} session_start_time=${session_start_time} avg_mins=${doctor.avg_consultation_minutes}`);
   const nowISTCTB = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
   const currentMinsCTB = nowISTCTB.getHours() * 60 + nowISTCTB.getMinutes();
   const toMinsCTB = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
