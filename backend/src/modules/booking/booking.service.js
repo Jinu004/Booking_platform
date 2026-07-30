@@ -95,7 +95,7 @@ async function createBookingWithToken(tenantId, bookingData) {
       totalMinutes = sessions.reduce((sum, s) => sum + (toMinutes(s.end_time) - toMinutes(s.start_time)), 0);
     }
 
-    const dynamicMax = totalMinutes > 0 ? Math.floor(totalMinutes / avgMins) : (doctor.max_tokens_daily || 30);
+    const dynamicMax = totalMinutes > 0 ? Math.floor(totalMinutes / avgMins) : (isToday && slotTime ? 0 : (doctor.max_tokens_daily || 30));
     const maxTokens = doctor.max_tokens_daily ? Math.min(dynamicMax, doctor.max_tokens_daily) : dynamicMax;
 
     const capacity = await ConflictEngine.checkDoctorCapacity(pool, tenantId, doctorId, maxTokens, sessionStart, sessionEnd);
