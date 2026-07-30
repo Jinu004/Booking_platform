@@ -105,6 +105,7 @@ export default function Settings() {
           handoff_message: hitlData?.handoff_message || prev.handoff_message,
           out_of_hours_message: hitlData?.out_of_hours_message || prev.out_of_hours_message,
           language: lang || prev.language || 'english',
+          business_phone: hitlData?.business_phone || prev.business_phone || '',
         }));
         if (hitlData?.ai_knowledge_base) {
           setKnowledgeBase(hitlData.ai_knowledge_base);
@@ -122,6 +123,9 @@ export default function Settings() {
   }, []);
 
   const handleSaveClinic = async () => {
+    if (hitl.business_phone !== undefined && hitl.business_phone !== '') {
+      await updateHITLSettings({ business_phone: hitl.business_phone }).catch(() => {});
+    }
     try {
       setSaving(true);
       await updateClinicSettings(clinic);
