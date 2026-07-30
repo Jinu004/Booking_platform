@@ -98,7 +98,7 @@ async function executeFunction(name, args, ctx) {
             ? `${doc.session_count} sessions today`
             : `${fmtW(doc.start_time)} - ${fmtW(doc.end_time)}`
           return {
-            id: doc.id,
+            id: 'booktoday_' + doc.id,
             title: doc.name.slice(0, 24),
             description: `${doc.specialization || 'General'} — ${sessionLabel}`.slice(0, 72)
           }

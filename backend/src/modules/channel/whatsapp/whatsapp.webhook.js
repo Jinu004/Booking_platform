@@ -237,6 +237,35 @@ router.post('/', async (req, res) => {
         return
       }
 
+      // Intercept doctor selection from Book Today list (id format: "booktoday_<uuid>")
+      if (message.interactiveId && /^booktoday_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(message.interactiveId)) {
+        try {
+          const { executeFunction } = require('../../ai-engine/ai.executor')
+          const result = await executeFunction('check_doctor_availability', { doctor_name: message.message }, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: message.interactiveId, doctorProfiles: [] })
+          if (typeof result === 'string' && result.startsWith('DIRECT:')) {
+            const directContent = result.slice(7).trim()
+            if (directContent.startsWith('__INTERACTIVE_SENT__::')) {
+              const textContent = directContent.slice('__INTERACTIVE_SENT__::'.length)
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              await ConversationService.saveOutboundMessage(context.conversation.id, textContent, 'assistant')
+            } else {
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              await sendMessage(message.from, directContent)
+              await ConversationService.saveOutboundMessage(context.conversation.id, directContent, 'assistant')
+            }
+          } else {
+            const responseText = result?.message || 'Sorry, something went wrong. Please say Hi to try again.'
+            await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+            await sendMessage(message.from, responseText)
+            await ConversationService.saveOutboundMessage(context.conversation.id, responseText, 'assistant')
+          }
+        } catch (err) {
+          logger.error('Book Today doctor selection failed:', err.message)
+          await sendMessage(message.from, 'Sorry, I could not process that. Please say Hi to try again.')
+        }
+        return
+      }
+
       // Intercept session selection button taps (id format: "session_<uuid>_HH-MM-SS")
       if (message.interactiveId && /^session_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_\d{2}-\d{2}-\d{2}$/.test(message.interactiveId)) {
         try {
