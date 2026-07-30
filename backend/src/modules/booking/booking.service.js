@@ -23,7 +23,7 @@ const tenantQuery = require('../../utils/tenantQuery');
  * @returns {Promise<object>} Created booking with token
  */
 async function createBookingWithToken(tenantId, bookingData) {
-  const { doctorId, bookingDate } = bookingData;
+  const { doctorId, bookingDate, slotTime } = bookingData;
   const requestId = uuidv4();
   let lockAcquired = false;
 
@@ -82,7 +82,7 @@ async function createBookingWithToken(tenantId, bookingData) {
     }
 
     // 3. Get next token number
-    const tokenNumber = await ConflictEngine.getNextTokenNumber(tenantId, doctorId, bookingDate);
+    const tokenNumber = await ConflictEngine.getNextTokenNumber(tenantId, doctorId, bookingDate, sessions, slotTime);
 
     // 4. Create booking record
     const booking = await BookingModel.createBooking(pool, tenantId, {

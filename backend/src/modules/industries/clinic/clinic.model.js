@@ -145,7 +145,7 @@ SELECT ct.*, b.notes, b.slot_time, b.source,
     WHERE ct.tenant_id = $1
     AND ct.status != 'cancelled'
     AND b.booking_date = CURRENT_DATE
-    ORDER BY ct.token_number ASC
+    ORDER BY b.slot_time ASC NULLS LAST, ct.token_number ASC
   `
   const result = await tenantQuery(tenantId, pool, sql, [])
   return result.rows
@@ -243,6 +243,13 @@ async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes
         t += 30;
       }
     }
+  }
+  // Filter out past slots if booking is for today
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const todayStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth()+1).padStart(2,'0')}-${String(nowIST.getDate()).padStart(2,'0')}`;
+  if (date === todayStr) {
+    const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
+    return availableSlots.filter(s => toMinutes(s) > nowMins);
   }
   return availableSlots;
 }

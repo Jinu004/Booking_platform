@@ -401,15 +401,54 @@ async function createManualBooking(req, res, next) {
     }
 
     // Count existing tokens inside the locked transaction — no race condition
-    const tokenCountResult = await client.query(
-      `SELECT COALESCE(MAX(token_number), 0) AS max_token
-       FROM bookings
-       WHERE doctor_id = $1
-       AND booking_date = $2
-       AND status != 'cancelled'
-       AND tenant_id = $3`,
-      [doctorId, bookingDate || new Date().toISOString().split('T')[0], tenantId]
-    );
+    const toMinutes = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
+
+    let sessionStart = null;
+    let sessionEnd = null;
+    try {
+      const overrideRes = await client.query(
+        `SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`,
+        [tenantId, doctorId, targetDate]
+      );
+      let sessions = [];
+      if (overrideRes.rows.length > 0) {
+        sessions = overrideRes.rows[0].sessions;
+      } else {
+        const dow = new Date(targetDate + 'T00:00:00').getDay();
+        const schedRes = await client.query(
+          `SELECT start_time, end_time FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true`,
+          [tenantId, doctorId, dow]
+        );
+        sessions = schedRes.rows;
+      }
+      const slotMins = slot_time
+        ? toMinutes(slot_time)
+        : (() => { const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return now.getHours() * 60 + now.getMinutes(); })();
+      const matched = sessions.find(s => { const sStart = toMinutes(s.start_time); const sEnd = toMinutes(s.end_time); return slotMins >= sStart && slotMins < sEnd; });
+      if (matched) { sessionStart = matched.start_time.toString().slice(0, 5); sessionEnd = matched.end_time.toString().slice(0, 5); }
+    } catch {}
+
+    let tokenCountResult;
+    if (sessionStart && sessionEnd) {
+      tokenCountResult = await client.query(
+        `SELECT COALESCE(MAX(token_number), 0) AS max_token
+         FROM bookings
+         WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3 AND status != 'cancelled'
+         AND (
+           (slot_time IS NOT NULL AND slot_time >= $4 AND slot_time < $5)
+           OR
+           (slot_time IS NULL AND (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $4::time AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $5::time)
+         )`,
+        [tenantId, doctorId, targetDate, sessionStart, sessionEnd]
+      );
+    } else {
+      tokenCountResult = await client.query(
+        `SELECT COALESCE(MAX(token_number), 0) AS max_token
+         FROM bookings
+         WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3 AND status != 'cancelled'`,
+        [tenantId, doctorId, targetDate]
+      );
+    }
     const tokenNumber = parseInt(tokenCountResult.rows[0].max_token) + 1;
 
     // Insert booking

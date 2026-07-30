@@ -831,7 +831,8 @@ const Doctors = () => {
       {/* Schedule Modal */}
       {scheduleModalDoc && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full shadow-xl overflow-y-auto max-h-[90vh]">
+          <div className="bg-white rounded-lg max-w-lg w-full shadow-xl flex flex-col max-h-[90vh]">
+            <div className="overflow-y-auto flex-1 p-6">
             <h2 className="text-xl font-bold mb-2">Weekly Schedule</h2>
             <p className="text-sm text-gray-500 mb-6">{scheduleModalDoc.name}</p>
 
@@ -966,7 +967,9 @@ const Doctors = () => {
               })}
             </div>
 
-            <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+            </div>
+
+            <div className="flex justify-end space-x-3 p-4 border-t bg-white rounded-b-lg flex-shrink-0">
               <button
                 onClick={() => setScheduleModalDoc(null)}
                 className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"

@@ -122,7 +122,6 @@ export default function Settings() {
   }, []);
 
   const handleSaveClinic = async () => {
-    await updateHITLSettings({ business_phone: hitl.business_phone })
     try {
       setSaving(true);
       await updateClinicSettings(clinic);
