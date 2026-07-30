@@ -767,7 +767,9 @@ Please reply with your name to confirm booking.`
       const effectiveStart = Math.max(toMinsCTB(targetSess.start_time), currentMinsCTB);
       totalMinutesCTB = Math.max(0, toMinsCTB(targetSess.end_time) - effectiveStart);
     }
-  } catch {}
+  } catch (sessErr) {
+    logger.warn('Session lookup failed in create_token_booking capacity check — falling back to zero capacity:', sessErr.message)
+  }
 
   const dynamicMaxCTB = totalMinutesCTB > 0
     ? Math.floor(totalMinutesCTB / avgMinsCTB)
