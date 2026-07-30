@@ -660,7 +660,7 @@ async function executeFunction(name, args, ctx) {
               { id: 'patient_new', title: 'Book for someone else', description: 'Add a new patient' }
             ]
             const nameListCDA = patResCDA.rows.map(p => `• ${p.name}`).join('\n')
-            const ctxCDA = `${doctor.name} (${doctor.specialization})\nSession: ${sessionTime}\n\nWho is this booking for?\n${nameListCDA}\n• Book for someone else`
+            const ctxCDA = `${doctor.name} (${doctor.specialization})\nSession: ${sessionTime} [session_start:${selectedSessionStart}]\n\nWho is this booking for?\n${nameListCDA}\n• Book for someone else`
             const bodyTextCDA = `${doctor.name} is available.\nWho is this booking for?`
             let sentCDA = false
             try {
