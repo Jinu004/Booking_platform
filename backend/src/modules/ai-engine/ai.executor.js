@@ -621,9 +621,6 @@ async function executeFunction(name, args, ctx) {
           const { start_time, end_time } = liveSessions[0]
           const [startH, startM] = start_time.split(':').map(Number)
           const startMinutes = startH * 60 + startM
-          if (currentMinutes < startMinutes) {
-            return { available: false, message: `${doctor.name}'s session starts at ${fmt(start_time)}. Please book after the session begins.` }
-          }
           sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
           selectedSessionStart = start_time
         } else {
