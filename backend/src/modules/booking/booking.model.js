@@ -156,15 +156,23 @@ async function updateBookingStatus(pool, tenantId, bookingId, status) {
  * @param {string} doctorId
  * @returns {Promise<number>}
  */
-async function getDoctorTokenCount(pool, tenantId, doctorId) {
-  const sql = `
+async function getDoctorTokenCount(pool, tenantId, doctorId, sessionStart = null, sessionEnd = null) {
+  let sql = `
     SELECT COUNT(*) AS total
     FROM bookings
     WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE
     AND status != 'cancelled'
-    AND (booking_type IS NULL OR booking_type != 'procedure')
-  `;
-  const result = await tenantQuery(tenantId, pool, sql, [doctorId]);
+    AND (booking_type IS NULL OR booking_type != 'procedure')`;
+  const params = [doctorId];
+  if (sessionStart && sessionEnd) {
+    sql += ` AND (
+      (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
+      OR
+      (slot_time IS NULL AND (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
+    )`;
+    params.push(sessionStart, sessionEnd);
+  }
+  const result = await tenantQuery(tenantId, pool, sql, params);
   return parseInt(result.rows[0].total || 0);
 }
 

@@ -62,11 +62,43 @@ async function createBookingWithToken(tenantId, bookingData) {
       sessions = schedRes.rows;
     }
     const toMinutes = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
-    const totalMinutes = sessions.reduce((sum, s) => sum + (toMinutes(s.end_time) - toMinutes(s.start_time)), 0);
+    const toTimeStr = (mins) => { const h = Math.floor(mins / 60).toString().padStart(2, '0'); const m = (mins % 60).toString().padStart(2, '0'); return `${h}:${m}`; };
+
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const todayIST = `${nowIST.getFullYear()}-${String(nowIST.getMonth()+1).padStart(2,'0')}-${String(nowIST.getDate()).padStart(2,'0')}`;
+    const isToday = targetDate === todayIST;
+    const currentMins = isToday ? nowIST.getHours() * 60 + nowIST.getMinutes() : 0;
+
+    let totalMinutes = 0;
+    let sessionStart = null;
+    let sessionEnd = null;
+
+    if (slotTime && isToday) {
+      const slotMins = toMinutes(slotTime);
+      const targetSession = sessions.find(s => slotMins >= toMinutes(s.start_time) && slotMins < toMinutes(s.end_time));
+      if (targetSession) {
+        const effectiveStart = Math.max(toMinutes(targetSession.start_time), currentMins);
+        const effectiveEnd = toMinutes(targetSession.end_time);
+        totalMinutes = Math.max(0, effectiveEnd - effectiveStart);
+        sessionStart = toTimeStr(toMinutes(targetSession.start_time));
+        sessionEnd = toTimeStr(toMinutes(targetSession.end_time));
+      } else {
+        totalMinutes = sessions.reduce((sum, s) => sum + (toMinutes(s.end_time) - toMinutes(s.start_time)), 0);
+      }
+    } else if (isToday) {
+      totalMinutes = sessions.reduce((sum, s) => {
+        const effectiveStart = Math.max(toMinutes(s.start_time), currentMins);
+        const effectiveEnd = toMinutes(s.end_time);
+        return sum + Math.max(0, effectiveEnd - effectiveStart);
+      }, 0);
+    } else {
+      totalMinutes = sessions.reduce((sum, s) => sum + (toMinutes(s.end_time) - toMinutes(s.start_time)), 0);
+    }
+
     const dynamicMax = totalMinutes > 0 ? Math.floor(totalMinutes / avgMins) : (doctor.max_tokens_daily || 30);
     const maxTokens = doctor.max_tokens_daily ? Math.min(dynamicMax, doctor.max_tokens_daily) : dynamicMax;
 
-    const capacity = await ConflictEngine.checkDoctorCapacity(pool, tenantId, doctorId, maxTokens);
+    const capacity = await ConflictEngine.checkDoctorCapacity(pool, tenantId, doctorId, maxTokens, sessionStart, sessionEnd);
 
     if (!capacity.available) {
       throw new Error('Doctor is fully booked for today');
