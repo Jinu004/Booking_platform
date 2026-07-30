@@ -98,7 +98,7 @@ async function executeFunction(name, args, ctx) {
             ? `${doc.session_count} sessions today`
             : `${fmtW(doc.start_time)} - ${fmtW(doc.end_time)}`
           return {
-            id: doc.id,
+            id: 'booktoday_' + doc.id,
             title: doc.name.slice(0, 24),
             description: `${doc.specialization || 'General'} — ${sessionLabel}`.slice(0, 72)
           }
@@ -621,9 +621,6 @@ async function executeFunction(name, args, ctx) {
           const { start_time, end_time } = liveSessions[0]
           const [startH, startM] = start_time.split(':').map(Number)
           const startMinutes = startH * 60 + startM
-          if (currentMinutes < startMinutes) {
-            return { available: false, message: `${doctor.name}'s session starts at ${fmt(start_time)}. Please book after the session begins.` }
-          }
           sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
           selectedSessionStart = start_time
         } else {
@@ -663,7 +660,7 @@ async function executeFunction(name, args, ctx) {
               { id: 'patient_new', title: 'Book for someone else', description: 'Add a new patient' }
             ]
             const nameListCDA = patResCDA.rows.map(p => `• ${p.name}`).join('\n')
-            const ctxCDA = `${doctor.name} (${doctor.specialization})\nSession: ${sessionTime}\n\nWho is this booking for?\n${nameListCDA}\n• Book for someone else`
+            const ctxCDA = `${doctor.name} (${doctor.specialization})\nSession: ${sessionTime} [session_start:${selectedSessionStart}]\n\nWho is this booking for?\n${nameListCDA}\n• Book for someone else`
             const bodyTextCDA = `${doctor.name} is available.\nWho is this booking for?`
             let sentCDA = false
             try {
@@ -715,7 +712,7 @@ Please reply with your name to confirm booking.`
 
   // Find doctor
   const doctorRes = await pool.query(
-    `SELECT id, name, specialization, max_tokens_daily FROM clinic_doctors
+    `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
      WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND available_today = true AND is_active = true
      LIMIT 1`,
     [tenant.id, `%${escapeLike(doctor_name)}%`]
@@ -736,14 +733,64 @@ Please reply with your name to confirm booking.`
     }
   }
 
-  // Check today's token count
-  const tokenRes = await pool.query(
-    `SELECT COUNT(*) AS count FROM bookings
-     WHERE doctor_id = $1 AND booking_date = CURRENT_DATE AND status != 'cancelled'`,
-    [doctor.id]
-  )
+  // Session-scoped dynamic capacity check using session_start_time from args
+  const nowISTCTB = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const currentMinsCTB = nowISTCTB.getHours() * 60 + nowISTCTB.getMinutes();
+  const toMinsCTB = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
+  const toTimeStrCTB = (mins) => { const h = Math.floor(mins/60).toString().padStart(2,'0'); const m = (mins%60).toString().padStart(2,'0'); return `${h}:${m}`; };
+  const avgMinsCTB = doctor.avg_consultation_minutes || 10;
+
+  let sessionStartCTB = null;
+  let sessionEndCTB = null;
+  let totalMinutesCTB = 0;
+  try {
+    const overResCTB = await pool.query(
+      `SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date`,
+      [tenant.id, doctor.id]
+    );
+    let sessionsCTB = [];
+    if (overResCTB.rows.length > 0) {
+      sessionsCTB = overResCTB.rows[0].sessions;
+    } else {
+      const dowCTB = nowISTCTB.getDay();
+      const schedResCTB = await pool.query(
+        `SELECT start_time, end_time FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true`,
+        [tenant.id, doctor.id, dowCTB]
+      );
+      sessionsCTB = schedResCTB.rows;
+    }
+    const slotAnchorMins = session_start_time ? toMinsCTB(session_start_time) : currentMinsCTB;
+    const targetSess = sessionsCTB.find(s => slotAnchorMins >= toMinsCTB(s.start_time) && slotAnchorMins < toMinsCTB(s.end_time));
+    if (targetSess) {
+      sessionStartCTB = toTimeStrCTB(toMinsCTB(targetSess.start_time));
+      sessionEndCTB = toTimeStrCTB(toMinsCTB(targetSess.end_time));
+      const effectiveStart = Math.max(toMinsCTB(targetSess.start_time), currentMinsCTB);
+      totalMinutesCTB = Math.max(0, toMinsCTB(targetSess.end_time) - effectiveStart);
+    }
+  } catch (sessErr) {
+    logger.warn('Session lookup failed in create_token_booking capacity check — falling back to zero capacity:', sessErr.message)
+  }
+
+  const dynamicMaxCTB = totalMinutesCTB > 0
+    ? Math.floor(totalMinutesCTB / avgMinsCTB)
+    : (session_start_time ? 0 : (doctor.max_tokens_daily || 30));
+  const maxTokensCTB = doctor.max_tokens_daily ? Math.min(dynamicMaxCTB, doctor.max_tokens_daily) : dynamicMaxCTB;
+
+  let countSqlCTB = `SELECT COUNT(*) AS count FROM bookings
+     WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE
+     AND status != 'cancelled' AND (booking_type IS NULL OR booking_type != 'procedure')`;
+  const countParamsCTB = [tenant.id, doctor.id];
+  if (sessionStartCTB && sessionEndCTB) {
+    countSqlCTB += ` AND (
+      (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
+      OR
+      (slot_time IS NULL AND (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
+    )`;
+    countParamsCTB.push(sessionStartCTB, sessionEndCTB);
+  }
+  const tokenRes = await pool.query(countSqlCTB, countParamsCTB);
   const currentCount = parseInt(tokenRes.rows[0].count || 0)
-  if (currentCount >= doctor.max_tokens_daily) {
+  if (currentCount >= maxTokensCTB) {
     // Today fully booked — store pending intent and offer tomorrow
     try {
       const redisClient = require('../../../config/redis')

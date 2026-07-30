@@ -152,7 +152,8 @@ async function sendInteractiveButtons(to, bodyText, buttons) {
     logger.info(`Meta interactive buttons sent to ${to}`)
     return response.data
   } catch (err) {
-    logger.error('Meta interactive buttons failed:', err.message)
+    const metaError = err.response?.data?.error;
+    logger.error(`Meta interactive buttons failed — code: ${metaError?.code || 'unknown'}, message: ${metaError?.message || err.message}`)
     throw err
   }
 }
@@ -169,7 +170,7 @@ async function sendInteractiveButtons(to, bodyText, buttons) {
  *   each item: { id, title, description }
  * @returns {Promise<object>}
  */
-async function sendListMessage(to, bodyText, buttonText, items) {
+async function sendListMessage(to, bodyText, buttonText, items, sectionTitle = 'Options') {
   try {
     const response = await axios.post(
       `${META_API_URL}/${META_PHONE_ID}/messages`,
@@ -185,7 +186,7 @@ async function sendListMessage(to, bodyText, buttonText, items) {
             button: buttonText,
             sections: [
               {
-                title: 'Available Doctors',
+                title: sectionTitle,
                 rows: items.map(item => ({
                   id: item.id,
                   title: item.title,

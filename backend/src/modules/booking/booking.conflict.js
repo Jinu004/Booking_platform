@@ -62,11 +62,11 @@ async function releaseSlotLock(tenantId, doctorId, date, requestId) {
  *   tokensRemaining: number
  * }
  */
-async function checkDoctorCapacity(pool, tenantId, doctorId, maxTokens) {
+async function checkDoctorCapacity(pool, tenantId, doctorId, maxTokens, sessionStart = null, sessionEnd = null) {
   const BookingModel = require('./booking.model');
-  const tokensIssued = await BookingModel.getDoctorTokenCount(pool, tenantId, doctorId);
+  const tokensIssued = await BookingModel.getDoctorTokenCount(pool, tenantId, doctorId, sessionStart, sessionEnd);
   const remaining = maxTokens - tokensIssued;
-  
+
   return {
     available: remaining > 0,
     tokensIssued,

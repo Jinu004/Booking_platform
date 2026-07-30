@@ -237,10 +237,11 @@ async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes
     if (sessionEnd > windowStart) freeWindows.push({ start: windowStart, end: sessionEnd });
 
     for (const window of freeWindows) {
-      let t = window.start;
+      const snap = Math.ceil(window.start / 15) * 15;
+      let t = snap;
       while (t + durationMinutes <= window.end) {
         availableSlots.push(toTimeStr(t));
-        t += 30;
+        t += 15;
       }
     }
   }
