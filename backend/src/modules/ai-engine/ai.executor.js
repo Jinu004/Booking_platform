@@ -518,6 +518,7 @@ async function executeFunction(name, args, ctx) {
              ON b.doctor_id = cd.id
              AND b.booking_date = CURRENT_DATE
              AND b.status != 'cancelled'
+             AND (b.booking_type IS NULL OR b.booking_type != 'procedure')
            WHERE cd.tenant_id = $1
              AND LOWER(cd.name) LIKE LOWER($2) AND cd.is_active = true
            GROUP BY cd.id`,
@@ -1348,20 +1349,35 @@ For queries, contact us: ${contactPhoneFB}`
 
       case 'cancel_booking': {
         const { booking_id } = args
-        // customer_id check prevents one patient from cancelling another's booking
-        const result = await pool.query(
-          `UPDATE bookings
-           SET status = 'cancelled', updated_at = NOW()
-           WHERE id = $1 AND tenant_id = $2 AND customer_id = $3
-           RETURNING id, token_number`,
+        const bookingCheck = await pool.query(
+          `SELECT booking_type, token_number FROM bookings WHERE id = $1 AND tenant_id = $2 AND customer_id = $3`,
           [booking_id, tenant.id, customer?.id || null]
         )
-        if (!result.rows.length) {
+        if (!bookingCheck.rows.length) {
           return { success: false, message: 'Booking not found or already cancelled.' }
+        }
+        const { booking_type, token_number } = bookingCheck.rows[0]
+        if (booking_type === 'procedure') {
+          const ClinicModel = require('../industries/clinic/clinic.model')
+          await ClinicModel.cancelProcedureBooking(pool, tenant.id, booking_id)
+        } else {
+          const result = await pool.query(
+            `UPDATE bookings SET status = 'cancelled', updated_at = NOW()
+             WHERE id = $1 AND tenant_id = $2 AND customer_id = $3
+             RETURNING id`,
+            [booking_id, tenant.id, customer?.id || null]
+          )
+          if (!result.rows.length) {
+            return { success: false, message: 'Booking not found or already cancelled.' }
+          }
+          await pool.query(
+            `UPDATE clinic_tokens SET status = 'cancelled' WHERE tenant_id = $1 AND booking_id = $2`,
+            [tenant.id, booking_id]
+          )
         }
         return {
           success: true,
-          message: `Token #${result.rows[0].token_number} has been cancelled successfully.`
+          message: `Token #${token_number} has been cancelled successfully.`
         }
       }
 
