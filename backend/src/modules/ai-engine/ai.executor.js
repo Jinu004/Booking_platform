@@ -526,12 +526,23 @@ async function executeFunction(name, args, ctx) {
         }
         // Get today's day of week (0=Sunday, 1=Monday, etc.)
         const todayDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
-        const scheduleRes = await pool.query(
-          `SELECT start_time, end_time FROM doctor_schedules
-           WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
-           ORDER BY start_time ASC`,
-          [tenant.id, doctor.id, todayDow]
+        // Check schedule_overrides first (procedure carve-outs), fall back to doctor_schedules
+        const overrideResCDA = await pool.query(
+          `SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date`,
+          [tenant.id, doctor.id]
         )
+        let scheduleRes
+        if (overrideResCDA.rows.length > 0) {
+          const overrideSessions = overrideResCDA.rows[0].sessions
+          scheduleRes = { rows: overrideSessions.map(s => ({ start_time: s.start_time, end_time: s.end_time })) }
+        } else {
+          scheduleRes = await pool.query(
+            `SELECT start_time, end_time FROM doctor_schedules
+             WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
+             ORDER BY start_time ASC`,
+            [tenant.id, doctor.id, todayDow]
+          )
+        }
 
         if (scheduleRes.rows.length === 0) {
           // Find next working day
