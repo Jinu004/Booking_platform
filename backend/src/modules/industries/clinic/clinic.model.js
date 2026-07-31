@@ -215,16 +215,17 @@ async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes
   }
   if (sessions.length === 0) return [];
 
-  const bookingsRes = await pool.query(`SELECT slot_time, end_time, booking_type FROM bookings WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3 AND status NOT IN ('cancelled', 'noshow') ORDER BY slot_time ASC`, [tenantId, doctorId, date]);
+  const bookingsRes = await pool.query(`SELECT b.slot_time, b.end_time, b.booking_type, cd.avg_consultation_minutes FROM bookings b JOIN clinic_doctors cd ON cd.id = b.doctor_id WHERE b.tenant_id = $1 AND b.doctor_id = $2 AND b.booking_date = $3 AND b.status NOT IN ('cancelled', 'noshow') ORDER BY b.slot_time ASC`, [tenantId, doctorId, date]);
   const bookedSlots = bookingsRes.rows;
 
   const availableSlots = [];
   for (const session of sessions) {
     let cursor = toMinutes(session.start_time);
     const sessionEnd = toMinutes(session.end_time);
+    const avgMins = bookedSlots.length > 0 ? (parseInt(bookedSlots[0].avg_consultation_minutes) || 20) : 20;
     const bookedInSession = bookedSlots
       .filter(b => b.slot_time && toMinutes(b.slot_time) >= cursor && toMinutes(b.slot_time) < sessionEnd)
-      .map(b => ({ start: toMinutes(b.slot_time), end: b.end_time ? toMinutes(b.end_time) : toMinutes(b.slot_time) + 10 }))
+      .map(b => ({ start: toMinutes(b.slot_time), end: b.end_time ? toMinutes(b.end_time) : toMinutes(b.slot_time) + avgMins }))
       .sort((a, b) => a.start - b.start);
 
     // Generate all possible start times at 30-min intervals within free windows
