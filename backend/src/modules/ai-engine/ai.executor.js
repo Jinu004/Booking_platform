@@ -637,20 +637,13 @@ async function executeFunction(name, args, ctx) {
           const sessCount = parseInt(countRes.rows[0].count || 0);
           if (sessCount < maxCap) availableSessions.push(sess);
         }
-        logger.info(`[CDA DEBUG] liveSessions=${JSON.stringify(liveSessions)} availableSessions=${JSON.stringify(availableSessions)} avgMinsCDA=${avgMinsCDA} currentMinutes=${currentMinutes}`)
         if (availableSessions.length === 0) {
           return { available: false, message: `${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply TOMORROW to confirm tomorrow's booking or ignore to cancel.` }
         }
 
         var sessionTime, selectedSessionStart
 
-        if (availableSessions.length === 1) {
-          const { start_time, end_time } = availableSessions[0]
-          const [startH, startM] = start_time.split(':').map(Number)
-          const startMinutes = startH * 60 + startM
-          sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
-          selectedSessionStart = start_time
-        } else {
+        {
           const { sendButtons: sendBtnsCDA } = require('../channel/whatsapp/whatsapp.adapter')
           const custPhoneSel = ctx.customer?.phone
           if (custPhoneSel) {
@@ -660,7 +653,7 @@ async function executeFunction(name, args, ctx) {
             }))
             const sessionListText = availableSessions.map(sess => `${fmt(sess.start_time)} - ${fmt(sess.end_time)}`).join(' or ')
             try {
-              await sendBtnsCDA(custPhoneSel, `${doctor.name} has multiple sessions today. Select one:`, sessionButtonsCDA)
+              await sendBtnsCDA(custPhoneSel, `${doctor.name} has session(s) available today. Select one:`, sessionButtonsCDA)
               return `DIRECT:__INTERACTIVE_SENT__::${doctor.name} (${doctor.specialization}) has sessions: ${sessionListText}\n\nPlease select a session above.`
             } catch (sendErrSel) {
               logger.warn('Session selection sendButtons failed:', sendErrSel.message)
@@ -788,7 +781,7 @@ Please reply with your name to confirm booking.`
     }
     const slotAnchorMins = session_start_time ? toMinsCTB(session_start_time) : currentMinsCTB;
     const targetSess = sessionsCTB.find(s => slotAnchorMins >= toMinsCTB(s.start_time) && slotAnchorMins < toMinsCTB(s.end_time));
-    logger.info(`[CTB DEBUG] session_start_time=${session_start_time} slotAnchorMins=${slotAnchorMins} currentMinsCTB=${currentMinsCTB} sessionsCTB=${JSON.stringify(sessionsCTB)} targetSess=${JSON.stringify(targetSess)}`)
+
 
     if (targetSess) {
       sessionStartCTB = toTimeStrCTB(toMinsCTB(targetSess.start_time));
