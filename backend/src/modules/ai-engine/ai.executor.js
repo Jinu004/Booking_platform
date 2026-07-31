@@ -637,7 +637,6 @@ async function executeFunction(name, args, ctx) {
           const sessCount = parseInt(countRes.rows[0].count || 0);
           if (sessCount < maxCap) availableSessions.push(sess);
         }
-        logger.info(`[CDA DEBUG] liveSessions=${JSON.stringify(liveSessions)} availableSessions=${JSON.stringify(availableSessions)} avgMinsCDA=${avgMinsCDA} currentMinutes=${currentMinutes}`)
         if (availableSessions.length === 0) {
           return { available: false, message: `${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply TOMORROW to confirm tomorrow's booking or ignore to cancel.` }
         }
@@ -788,7 +787,7 @@ Please reply with your name to confirm booking.`
     }
     const slotAnchorMins = session_start_time ? toMinsCTB(session_start_time) : currentMinsCTB;
     const targetSess = sessionsCTB.find(s => slotAnchorMins >= toMinsCTB(s.start_time) && slotAnchorMins < toMinsCTB(s.end_time));
-    logger.info(`[CTB DEBUG] session_start_time=${session_start_time} slotAnchorMins=${slotAnchorMins} currentMinsCTB=${currentMinsCTB} sessionsCTB=${JSON.stringify(sessionsCTB)} targetSess=${JSON.stringify(targetSess)}`)
+
     if (targetSess) {
       sessionStartCTB = toTimeStrCTB(toMinsCTB(targetSess.start_time));
       sessionEndCTB = toTimeStrCTB(toMinsCTB(targetSess.end_time));
