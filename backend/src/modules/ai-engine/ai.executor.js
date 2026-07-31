@@ -511,8 +511,7 @@ async function executeFunction(name, args, ctx) {
         const { doctor_name } = args
         const result = await pool.query(
           `SELECT cd.id, cd.name, cd.specialization,
-                  cd.available_today, cd.max_tokens_daily,
-                  COUNT(b.id) AS booked_count
+                  cd.available_today, cd.max_tokens_daily, cd.avg_consultation_minutes
            FROM clinic_doctors cd
            LEFT JOIN bookings b
              ON b.doctor_id = cd.id
@@ -531,11 +530,6 @@ async function executeFunction(name, args, ctx) {
         if (!doctor.available_today) {
           return { available: false, message: `${doctor.name} is not available today.` }
         }
-        const remaining = doctor.max_tokens_daily - parseInt(doctor.booked_count || 0)
-        if (remaining <= 0) {
-          return { available: false, message: `${doctor.name} is fully booked for today.` }
-        }
-
         // Get today's day of week (0=Sunday, 1=Monday, etc.)
         const todayDow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
         const scheduleRes = await pool.query(
@@ -616,10 +610,41 @@ async function executeFunction(name, args, ctx) {
           return { available: false, message: `${doctor.name}'s session has ended for today.` }
         }
 
+        const toMinsCDA = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; }
+        const toTimeStrCDA = (mins) => { const h = Math.floor(mins / 60).toString().padStart(2, '0'); const m = (mins % 60).toString().padStart(2, '0'); return `${h}:${m}`; }
+        const avgMinsCDA = doctor.avg_consultation_minutes || 10;
+        const availableSessions = [];
+        for (const sess of liveSessions) {
+          const effectiveStart = Math.max(toMinsCDA(sess.start_time), currentMinutes);
+          const totalMins = Math.max(0, toMinsCDA(sess.end_time) - effectiveStart);
+          const dynamicMax = totalMins > 0 ? Math.floor(totalMins / avgMinsCDA) : 0;
+          const maxCap = doctor.max_tokens_daily ? Math.min(dynamicMax, doctor.max_tokens_daily) : dynamicMax;
+          const sessStart = toTimeStrCDA(toMinsCDA(sess.start_time));
+          const sessEnd = toTimeStrCDA(toMinsCDA(sess.end_time));
+          const countRes = await pool.query(
+            `SELECT COUNT(*) AS count FROM bookings
+             WHERE tenant_id = $1 AND doctor_id = $2
+             AND booking_date = CURRENT_DATE AND status != 'cancelled'
+             AND (booking_type IS NULL OR booking_type != 'procedure')
+             AND (
+               (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
+               OR (slot_time IS NULL AND
+                   (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $3::time
+                   AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
+             )`,
+            [tenant.id, doctor.id, sessStart, sessEnd]
+          );
+          const sessCount = parseInt(countRes.rows[0].count || 0);
+          if (sessCount < maxCap) availableSessions.push(sess);
+        }
+        if (availableSessions.length === 0) {
+          return { available: false, message: `${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply TOMORROW to confirm tomorrow's booking or ignore to cancel.` }
+        }
+
         var sessionTime, selectedSessionStart
 
-        if (liveSessions.length === 1) {
-          const { start_time, end_time } = liveSessions[0]
+        if (availableSessions.length === 1) {
+          const { start_time, end_time } = availableSessions[0]
           const [startH, startM] = start_time.split(':').map(Number)
           const startMinutes = startH * 60 + startM
           sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
@@ -628,11 +653,11 @@ async function executeFunction(name, args, ctx) {
           const { sendButtons: sendBtnsCDA } = require('../channel/whatsapp/whatsapp.adapter')
           const custPhoneSel = ctx.customer?.phone
           if (custPhoneSel) {
-            const sessionButtonsCDA = liveSessions.slice(0, 3).map(sess => ({
+            const sessionButtonsCDA = availableSessions.slice(0, 3).map(sess => ({
               id: `session_${doctor.id}_${sess.start_time.replace(/:/g, '-')}`,
               title: `${fmt(sess.start_time)} - ${fmt(sess.end_time)}`.slice(0, 20)
             }))
-            const sessionListText = liveSessions.map(sess => `${fmt(sess.start_time)} - ${fmt(sess.end_time)}`).join(' or ')
+            const sessionListText = availableSessions.map(sess => `${fmt(sess.start_time)} - ${fmt(sess.end_time)}`).join(' or ')
             try {
               await sendBtnsCDA(custPhoneSel, `${doctor.name} has multiple sessions today. Select one:`, sessionButtonsCDA)
               return `DIRECT:__INTERACTIVE_SENT__::${doctor.name} (${doctor.specialization}) has sessions: ${sessionListText}\n\nPlease select a session above.`
@@ -640,8 +665,8 @@ async function executeFunction(name, args, ctx) {
               logger.warn('Session selection sendButtons failed:', sendErrSel.message)
             }
           }
-          // Fallback — use earliest live session if send failed
-          const { start_time, end_time } = liveSessions[0]
+          // Fallback — use earliest available session if send failed
+          const { start_time, end_time } = availableSessions[0]
           sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
           selectedSessionStart = start_time
         }
