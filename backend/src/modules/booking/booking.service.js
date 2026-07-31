@@ -4,6 +4,7 @@ const ConflictEngine = require('./booking.conflict');
 const logger = require('../../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const tenantQuery = require('../../utils/tenantQuery');
+const { rebuildScheduleOverridesAfterCancel } = require('../industries/clinic/clinic.model');
 
 /**
  * Creates a booking with conflict prevention
@@ -198,7 +199,9 @@ async function cancelBookingWithRules(tenantId, bookingId, cancelledBy) {
   }
 
   const cancelledBooking = await BookingModel.cancelBooking(pool, tenantId, bookingId);
-  
+  if (cancelledBooking && cancelledBooking.booking_type === 'procedure') {
+    await rebuildScheduleOverridesAfterCancel(pool, tenantId, cancelledBooking.doctor_id, cancelledBooking.booking_date, null);
+  }
   // TODO: Sprint 5 notification logic here
   logger.info(`Booking ${bookingId} cancelled by ${cancelledBy}`);
 
