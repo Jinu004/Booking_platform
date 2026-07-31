@@ -134,7 +134,7 @@ const Bookings = () => {
       const sessions = (res?.data || []).filter(s => s.day_of_week === todayDow && s.is_available);
       setDoctorScheduleSessions(sessions);
     }).catch(() => setDoctorScheduleSessions([]));
-  }, [selectedDoctor]);
+  }, [selectedDoctor, date]);
 
   const toSessionMins = t => { if (!t) return null; const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
   const fmtSessionLabel = (s, e) => { const fmt = t => { const [h, m] = t.toString().split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; }; return `${fmt(s)} - ${fmt(e)}`; };
@@ -507,6 +507,20 @@ const Bookings = () => {
                       {g.bookings.map(b => renderBookingRow(b))}
                     </React.Fragment>
                   ))}
+                  {(() => {
+                    const slottedIds = new Set(sessionGroups.flatMap(g => g.bookings.map(b => b.id)));
+                    const walkins = filteredBookings.filter(b => !slottedIds.has(b.id));
+                    return walkins.length > 0 ? (
+                      <React.Fragment key="walkins">
+                        <tr>
+                          <td colSpan="6" className="px-4 py-2 bg-orange-50 text-xs font-semibold text-orange-600 uppercase tracking-wider border-b border-orange-100">
+                            Walk-ins / Unscheduled
+                          </td>
+                        </tr>
+                        {walkins.map(b => renderBookingRow(b))}
+                      </React.Fragment>
+                    ) : null;
+                  })()}
                 </>
               ) : filteredBookings.map(b => renderBookingRow(b))
             )}
