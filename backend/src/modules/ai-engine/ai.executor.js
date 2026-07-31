@@ -513,14 +513,8 @@ async function executeFunction(name, args, ctx) {
           `SELECT cd.id, cd.name, cd.specialization,
                   cd.available_today, cd.max_tokens_daily, cd.avg_consultation_minutes
            FROM clinic_doctors cd
-           LEFT JOIN bookings b
-             ON b.doctor_id = cd.id
-             AND b.booking_date = CURRENT_DATE
-             AND b.status != 'cancelled'
-             AND (b.booking_type IS NULL OR b.booking_type != 'procedure')
            WHERE cd.tenant_id = $1
-             AND LOWER(cd.name) LIKE LOWER($2) AND cd.is_active = true
-           GROUP BY cd.id`,
+             AND LOWER(cd.name) LIKE LOWER($2) AND cd.is_active = true`,
           [tenant.id, `%${escapeLike(doctor_name)}%`]
         )
         if (!result.rows.length) {
