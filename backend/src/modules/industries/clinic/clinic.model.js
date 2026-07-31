@@ -259,6 +259,19 @@ async function createProcedureBooking(pool, tenantId, doctorId, procedureId, cus
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // Check for normal token bookings overlapping the procedure slot
+    const conflictRes = await client.query(
+      `SELECT id FROM bookings
+       WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
+       AND status != 'cancelled'
+       AND (booking_type IS NULL OR booking_type != 'procedure')
+       AND slot_time IS NOT NULL
+       AND slot_time >= $4 AND slot_time < $5`,
+      [tenantId, doctorId, date, startTime, endTime]
+    );
+    if (conflictRes.rows.length > 0) {
+      throw new Error('A patient appointment already exists in this time slot. Please choose a different time.');
+    }
     const bookingRes = await client.query(
       `INSERT INTO bookings (tenant_id, doctor_id, customer_id, patient_id, patient_name, booking_date, slot_time, end_time, booking_type, procedure_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'procedure', $9, 'confirmed') RETURNING *`,
       [tenantId, doctorId, customerId, patientId || null, patientName, date, startTime, endTime, procedureId]
