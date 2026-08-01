@@ -194,7 +194,7 @@ async function createTenant(req, res) {
 async function updateTenant(req, res) {
   try {
     const { id } = req.params;
-    const { clinicName, plan, whatsappNumber, industry, aiModel } = req.body;
+    const { clinicName, plan, whatsappNumber, industry, aiModel, email } = req.body;
     const VALID_AI_MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
     if (aiModel && !VALID_AI_MODELS.includes(aiModel)) {
       return errorResponse(res, 'Invalid AI model. Must be one of: ' + VALID_AI_MODELS.join(', '), 400)
@@ -214,6 +214,12 @@ async function updateTenant(req, res) {
 
     if (result.rows.length === 0) {
       return errorResponse(res, 'Tenant not found', 404);
+    }
+    if (email) {
+      await pool.query(
+        `UPDATE staff SET email = $1 WHERE tenant_id = $2 AND role = 'admin'`,
+        [email, id]
+      );
     }
 
     try {
