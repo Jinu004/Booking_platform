@@ -229,7 +229,7 @@ export default function Patients() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto hidden md:block">
         {loading ? (
           <TableRowSkeleton rows={6} />
         ) : filtered.length === 0 ? (
@@ -300,6 +300,47 @@ export default function Patients() {
               })}
             </tbody>
           </table>
+        )}
+      </div>
+
+      {/* Mobile patient list */}
+      <div className="block md:hidden bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+        {!loading && filtered.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-gray-400">No patients found.</div>
+        ) : (
+          filtered.map(p => {
+            const isNew = parseInt(p.total_visits || 0) === 0;
+            return (
+              <div
+                key={p.id}
+                onClick={() => navigate(`/patients/${p.id}`)}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 active:bg-gray-100 cursor-pointer"
+              >
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0"
+                  style={{ backgroundColor: `hsl(${(p.name?.charCodeAt(0) || 65) * 37 % 360}, 60%, 55%)` }}
+                >
+                  {p.name?.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900 text-sm truncate">{p.name}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${isNew ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {isNew ? 'New' : 'Returning'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{p.phone}</div>
+                  <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+                    {p.last_seen && <span>Last: {relativeDate(p.last_seen)}</span>}
+                    <span>{parseInt(p.total_visits || 0)} visits</span>
+                  </div>
+                </div>
+                <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            );
+          })
         )}
       </div>
 
