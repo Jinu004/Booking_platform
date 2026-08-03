@@ -786,8 +786,8 @@ export default function PatientProfile() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="flex space-x-6">
+      <div className="border-b border-gray-200 overflow-x-auto">
+        <nav className="flex space-x-6 min-w-max">
           {TABS.map(t => (
             <button
               key={t.key}
@@ -806,7 +806,7 @@ export default function PatientProfile() {
 
       {/* ── OVERVIEW ── */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
           {/* Basic Information */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
