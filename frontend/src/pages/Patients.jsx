@@ -308,7 +308,7 @@ export default function Patients() {
         {!loading && filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-gray-400">No patients found.</div>
         ) : (
-          filtered.map(p => {
+          paginatedPatients.map(p => {
             const isNew = parseInt(p.total_visits || 0) === 0;
             return (
               <div
@@ -346,7 +346,7 @@ export default function Patients() {
 
       {/* Pagination */}
       {!loading && filtered.length > 0 && (
-        <div className="flex items-center justify-between px-1">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1">
           <p className="text-sm text-gray-500">
             Showing{' '}
             <span className="font-medium text-gray-700">
@@ -360,9 +360,9 @@ export default function Patients() {
             <button
               onClick={() => setCurrentPage(p => p - 1)}
               disabled={currentPage === 1}
-              className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="px-3 py-1.5 text-sm font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
-              ← Previous
+              ← Prev
             </button>
             <span className="text-sm font-medium text-gray-600 px-1">
               {currentPage} / {totalPages}
