@@ -174,9 +174,9 @@ export default function Patients() {
   );
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Patients</h1>
           <div className="flex items-center gap-3 mt-1">
@@ -229,7 +229,7 @@ export default function Patients() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         {loading ? (
           <TableRowSkeleton rows={6} />
         ) : filtered.length === 0 ? (

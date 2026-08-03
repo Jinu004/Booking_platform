@@ -263,7 +263,7 @@ const Bookings = () => {
   };
 
   return (
-    <div className="p-8 space-y-6 relative">
+    <div className="p-4 md:p-8 space-y-6 relative">
       {isOffline && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800 flex items-center gap-2">
           <span>⚠️</span>

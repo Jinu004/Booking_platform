@@ -602,10 +602,10 @@ export default function PatientProfile() {
 
   if (loading) {
     return (
-      <div className="p-8 space-y-6 max-w-5xl mx-auto">
+      <div className="p-4 md:p-8 space-y-6 max-w-5xl mx-auto">
         <div className="h-5 w-28 bg-gray-200 rounded animate-pulse" />
         <CardSkeleton />
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <CardSkeleton /><CardSkeleton /><CardSkeleton />
         </div>
         <CardSkeleton />
@@ -651,7 +651,7 @@ export default function PatientProfile() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
 
       {/* Back button */}
       <button
@@ -754,7 +754,7 @@ export default function PatientProfile() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider mb-2">Total Visits</p>
           <p className="text-3xl font-black text-teal-600">{customer.total_visits ?? visitNotes.length}</p>
