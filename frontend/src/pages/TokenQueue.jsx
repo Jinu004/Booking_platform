@@ -62,7 +62,7 @@ const TokenQueue = () => {
   ];
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-3 md:p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse inline-block"></span>
@@ -121,12 +121,12 @@ const TokenQueue = () => {
               const fmtSlot = t => { if (!t) return null; const [h,m] = t.split(':').map(Number); return `${h>12?h-12:h||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`; };
               const renderToken = (t) => (
                 <div key={t.id} className="flex items-center justify-between px-3 md:px-6 py-4 md:py-5 hover:bg-gray-50 transition">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-indigo-50 rounded-xl flex items-center justify-center font-black text-indigo-600 text-base flex-shrink-0">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="w-10 h-10 md:w-14 md:h-14 bg-indigo-50 rounded-xl flex items-center justify-center font-black text-indigo-600 text-base flex-shrink-0">
                       {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
                     </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 text-base">{t.patient_name || 'Walk-in'}</p>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 text-base truncate">{t.patient_name || 'Walk-in'}</p>
                       <p className="text-sm text-indigo-600 font-medium">{t.doctor_name}</p>
                       {t.patient_phone && <p className="text-xs text-gray-400">{t.patient_phone}</p>}
                       <div className="flex items-center gap-2 mt-1">
@@ -139,7 +139,7 @@ const TokenQueue = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-shrink-0">
                     {getStatusPill(t.status)}
                     {t.status === 'waiting' && (
                       <button

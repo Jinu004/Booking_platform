@@ -14,7 +14,8 @@ async function getAllTenants(req, res) {
              (SELECT COUNT(*) FROM bookings b WHERE b.tenant_id = t.id AND b.created_at >= DATE_TRUNC('month', NOW())) AS booking_count,
              (SELECT COUNT(*) FROM conversations c WHERE c.tenant_id = t.id AND c.started_at >= DATE_TRUNC('month', NOW())) AS conversation_count,
              (SELECT COUNT(*) FROM customers cu WHERE cu.tenant_id = t.id) AS customer_count,
-             (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'proactive_templates_enabled') AS proactive_templates_enabled
+             (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'proactive_templates_enabled') AS proactive_templates_enabled,
+             (SELECT email FROM staff s WHERE s.tenant_id = t.id AND s.role = 'admin' LIMIT 1) AS email
       FROM tenants t
       ORDER BY t.created_at DESC
     `;
@@ -194,7 +195,7 @@ async function createTenant(req, res) {
 async function updateTenant(req, res) {
   try {
     const { id } = req.params;
-    const { clinicName, plan, whatsappNumber, industry, aiModel } = req.body;
+    const { clinicName, plan, whatsappNumber, industry, aiModel, email } = req.body;
     const VALID_AI_MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
     if (aiModel && !VALID_AI_MODELS.includes(aiModel)) {
       return errorResponse(res, 'Invalid AI model. Must be one of: ' + VALID_AI_MODELS.join(', '), 400)
@@ -214,6 +215,12 @@ async function updateTenant(req, res) {
 
     if (result.rows.length === 0) {
       return errorResponse(res, 'Tenant not found', 404);
+    }
+    if (email) {
+      await pool.query(
+        `UPDATE staff SET email = $1 WHERE tenant_id = $2 AND role = 'admin'`,
+        [email, id]
+      );
     }
 
     try {

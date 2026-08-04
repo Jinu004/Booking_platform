@@ -134,7 +134,7 @@ const Bookings = () => {
       const sessions = (res?.data || []).filter(s => s.day_of_week === todayDow && s.is_available);
       setDoctorScheduleSessions(sessions);
     }).catch(() => setDoctorScheduleSessions([]));
-  }, [selectedDoctor]);
+  }, [selectedDoctor, date]);
 
   const toSessionMins = t => { if (!t) return null; const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
   const fmtSessionLabel = (s, e) => { const fmt = t => { const [h, m] = t.toString().split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; }; return `${fmt(s)} - ${fmt(e)}`; };
@@ -263,7 +263,7 @@ const Bookings = () => {
   };
 
   return (
-    <div className="p-8 space-y-6 relative">
+    <div className="p-4 md:p-8 space-y-6 relative">
       {isOffline && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800 flex items-center gap-2">
           <span>⚠️</span>
@@ -316,6 +316,7 @@ const Bookings = () => {
             <option value="completed">Completed</option>
           </select>
         </div>
+        <div className="flex gap-2 w-full md:w-auto">
         <button
           onClick={async () => {
             setScheduleBooking({ patientName: '', patientPhone: '', doctorId: '', bookingDate: '', sessionTime: '', notes: '', sendWhatsapp: true });
@@ -324,7 +325,7 @@ const Bookings = () => {
             try { const res = await getDoctors(); if (res?.data) setDoctors(res.data); } catch {}
             setIsScheduleModalOpen(true);
           }}
-          className="bg-teal-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-teal-700 transition"
+          className="bg-teal-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-teal-700 transition flex-1 md:flex-none"
         >
           + Schedule Booking
         </button>
@@ -333,10 +334,11 @@ const Bookings = () => {
             loadFormDependencies();
             setIsModalOpen(true);
           }}
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition transform hover:scale-105"
+          className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition transform hover:scale-105 flex-1 md:flex-none"
         >
           + New Booking
         </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -384,7 +386,7 @@ const Bookings = () => {
           })}
       </div>
 
-      <div className="bg-white shadow overflow-x-auto -mx-4 px-4 sm:rounded-lg">
+      <div className="bg-white shadow overflow-x-auto -mx-4 px-4 sm:rounded-lg hidden md:block">
         <table className="min-w-[600px] w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -507,11 +509,90 @@ const Bookings = () => {
                       {g.bookings.map(b => renderBookingRow(b))}
                     </React.Fragment>
                   ))}
+                  {(() => {
+                    const slottedIds = new Set(sessionGroups.flatMap(g => g.bookings.map(b => b.id)));
+                    const walkins = filteredBookings.filter(b => !slottedIds.has(b.id));
+                    return walkins.length > 0 ? (
+                      <React.Fragment key="walkins">
+                        <tr>
+                          <td colSpan="6" className="px-4 py-2 bg-orange-50 text-xs font-semibold text-orange-600 uppercase tracking-wider border-b border-orange-100">
+                            Walk-ins / Unscheduled
+                          </td>
+                        </tr>
+                        {walkins.map(b => renderBookingRow(b))}
+                      </React.Fragment>
+                    ) : null;
+                  })()}
                 </>
               ) : filteredBookings.map(b => renderBookingRow(b))
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile booking list */}
+      <div className="block md:hidden bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+        {filteredBookings.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-gray-400">No bookings found.</div>
+        ) : (
+          filteredBookings.map(b => (
+            <div key={b.id} className="px-4 py-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 text-center">
+                  {b.booking_type === 'procedure' ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Proc</span>
+                  ) : (
+                    <div className="flex flex-col items-center">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700">Token</span>
+                      <span className="text-sm font-black text-teal-700">{b.token_number || '-'}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-gray-900 text-sm truncate">{b.patient_name || 'Unknown'}</span>
+                    <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded-full flex-shrink-0 ${statusColors[b.status] || 'bg-gray-100 text-gray-800'}`}>
+                      {b.status}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{b.patient_phone}</div>
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
+                    <span>{b.doctor_name}</span>
+                    <span>·</span>
+                    <span>
+                      {b.slot_time ? (() => {
+                        const [h, m] = b.slot_time.split(':');
+                        const hr = parseInt(h);
+                        return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`;
+                      })() : new Date(b.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </span>
+                    <span>·</span>
+                    <span className="uppercase font-semibold">{b.source}</span>
+                  </div>
+                </div>
+              </div>
+              {(b.status === 'confirmed' || b.status === 'pending') && (
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                  {(!b.token_id || b.token_status === 'arrived') && (
+                    <button onClick={() => handleAction(b.id, completeBooking)} className="flex-1 py-1.5 text-xs font-bold text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition">Complete</button>
+                  )}
+                  {b.token_id && b.token_status === 'waiting' && (
+                    <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed'); } }} className="flex-1 py-1.5 text-xs font-bold text-blue-500 border border-blue-200 rounded-lg hover:bg-blue-50 transition">Arrived</button>
+                  )}
+                  <button onClick={() => handleAction(b.id, cancelBooking)} className="flex-1 py-1.5 text-xs font-bold text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition">Cancel</button>
+                  {(b.patient_id || b.customer_id) && (
+                    <Link to={`/patients/${b.patient_id || b.customer_id}`} className="flex-1 py-1.5 text-xs font-bold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition text-center">Profile</Link>
+                  )}
+                </div>
+              )}
+              {b.status !== 'confirmed' && b.status !== 'pending' && (b.patient_id || b.customer_id) && (
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  <Link to={`/patients/${b.patient_id || b.customer_id}`} className="text-xs font-bold text-blue-600 hover:text-blue-900">View Profile →</Link>
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
       {isScheduleModalOpen && (

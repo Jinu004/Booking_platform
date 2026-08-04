@@ -53,7 +53,7 @@ export default function SuperAdmin() {
 
   // Edit modal
   const [editTenant, setEditTenant] = useState(null);
-  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', industry: 'clinic', aiModel: '', proactiveTemplates: false });
+  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', industry: 'clinic', aiModel: '', proactiveTemplates: false, email: '' });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -127,7 +127,7 @@ export default function SuperAdmin() {
 
   const openEdit = (t) => {
     setEditTenant(t);
-    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', industry: t.industry || 'clinic', aiModel: t.ai_model || '', proactiveTemplates: t.proactive_templates_enabled === 'true' });
+    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', industry: t.industry || 'clinic', aiModel: t.ai_model || '', proactiveTemplates: t.proactive_templates_enabled === 'true', email: t.email || '' });
     setEditError('');
   };
 
@@ -484,6 +484,16 @@ export default function SuperAdmin() {
                 onChange={e => setEditForm(f => ({ ...f, whatsappNumber: e.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 placeholder="+919876543210"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Email</label>
+              <input
+                type="email"
+                value={editForm.email}
+                onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                placeholder="clinic@example.com"
               />
             </div>
             <div>

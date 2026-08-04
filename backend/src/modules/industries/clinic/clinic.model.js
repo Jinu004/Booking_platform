@@ -215,16 +215,17 @@ async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes
   }
   if (sessions.length === 0) return [];
 
-  const bookingsRes = await pool.query(`SELECT slot_time, end_time, booking_type FROM bookings WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3 AND status NOT IN ('cancelled', 'noshow') ORDER BY slot_time ASC`, [tenantId, doctorId, date]);
+  const bookingsRes = await pool.query(`SELECT b.slot_time, b.end_time, b.booking_type, cd.avg_consultation_minutes FROM bookings b JOIN clinic_doctors cd ON cd.id = b.doctor_id WHERE b.tenant_id = $1 AND b.doctor_id = $2 AND b.booking_date = $3 AND b.status NOT IN ('cancelled', 'noshow') ORDER BY b.slot_time ASC`, [tenantId, doctorId, date]);
   const bookedSlots = bookingsRes.rows;
 
   const availableSlots = [];
   for (const session of sessions) {
     let cursor = toMinutes(session.start_time);
     const sessionEnd = toMinutes(session.end_time);
+    const avgMins = bookedSlots.length > 0 ? (parseInt(bookedSlots[0].avg_consultation_minutes) || 20) : 20;
     const bookedInSession = bookedSlots
       .filter(b => b.slot_time && toMinutes(b.slot_time) >= cursor && toMinutes(b.slot_time) < sessionEnd)
-      .map(b => ({ start: toMinutes(b.slot_time), end: b.end_time ? toMinutes(b.end_time) : toMinutes(b.slot_time) + 10 }))
+      .map(b => ({ start: toMinutes(b.slot_time), end: b.end_time ? toMinutes(b.end_time) : toMinutes(b.slot_time) + avgMins }))
       .sort((a, b) => a.start - b.start);
 
     // Generate all possible start times at 30-min intervals within free windows
@@ -259,6 +260,19 @@ async function createProcedureBooking(pool, tenantId, doctorId, procedureId, cus
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // Check for normal token bookings overlapping the procedure slot
+    const conflictRes = await client.query(
+      `SELECT id FROM bookings
+       WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
+       AND status != 'cancelled'
+       AND (booking_type IS NULL OR booking_type != 'procedure')
+       AND slot_time IS NOT NULL
+       AND slot_time >= $4 AND slot_time < $5`,
+      [tenantId, doctorId, date, startTime, endTime]
+    );
+    if (conflictRes.rows.length > 0) {
+      throw new Error('A patient appointment already exists in this time slot. Please choose a different time.');
+    }
     const bookingRes = await client.query(
       `INSERT INTO bookings (tenant_id, doctor_id, customer_id, patient_id, patient_name, booking_date, slot_time, end_time, booking_type, procedure_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'procedure', $9, 'confirmed') RETURNING *`,
       [tenantId, doctorId, customerId, patientId || null, patientName, date, startTime, endTime, procedureId]
@@ -307,6 +321,56 @@ async function createProcedureBooking(pool, tenantId, doctorId, procedureId, cus
   }
 }
 
+async function rebuildScheduleOverridesAfterCancel(pool, tenantId, doctorId, bookingDate, excludeBookingId) {
+  const toMinutes = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
+  const toTimeStr = (mins) => { const h = Math.floor(mins / 60).toString().padStart(2, '0'); const m = (mins % 60).toString().padStart(2, '0'); return `${h}:${m}`; };
+  const remainingRes = await pool.query(
+    `SELECT slot_time, end_time FROM bookings
+     WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
+     AND booking_type = 'procedure' AND status != 'cancelled'
+     ${excludeBookingId ? 'AND id != $4' : ''}
+     ORDER BY slot_time ASC`,
+    excludeBookingId ? [tenantId, doctorId, bookingDate, excludeBookingId] : [tenantId, doctorId, bookingDate]
+  );
+  const remaining = remainingRes.rows;
+  if (remaining.length === 0) {
+    await pool.query(
+      `DELETE FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`,
+      [tenantId, doctorId, bookingDate]
+    );
+  } else {
+    const dow = new Date(bookingDate).getDay();
+    const schedRes = await pool.query(
+      `SELECT start_time, end_time FROM doctor_schedules
+       WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
+       ORDER BY start_time ASC`,
+      [tenantId, doctorId, dow]
+    );
+    let sessions = schedRes.rows.map(r => ({ start_time: r.start_time, end_time: r.end_time }));
+    for (const proc of remaining) {
+      const procStart = toMinutes(proc.slot_time);
+      const procEnd = toMinutes(proc.end_time);
+      const newSessions = [];
+      for (const s of sessions) {
+        const sStart = toMinutes(s.start_time);
+        const sEnd = toMinutes(s.end_time);
+        if (sEnd <= procStart || sStart >= procEnd) {
+          newSessions.push(s);
+        } else {
+          if (sStart < procStart) newSessions.push({ start_time: toTimeStr(sStart), end_time: toTimeStr(procStart) });
+          if (sEnd > procEnd) newSessions.push({ start_time: toTimeStr(procEnd), end_time: toTimeStr(sEnd) });
+        }
+      }
+      sessions = newSessions;
+    }
+    await pool.query(
+      `INSERT INTO schedule_overrides (tenant_id, doctor_id, override_date, sessions) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (doctor_id, override_date) DO UPDATE SET sessions = $4`,
+      [tenantId, doctorId, bookingDate, JSON.stringify(sessions)]
+    );
+  }
+}
+
 async function cancelProcedureBooking(pool, tenantId, bookingId) {
   const client = await pool.connect();
   try {
@@ -318,59 +382,7 @@ async function cancelProcedureBooking(pool, tenantId, bookingId) {
     if (!bookingRes.rows.length) throw new Error('Procedure booking not found');
     const booking = bookingRes.rows[0];
     const { doctor_id, booking_date } = booking;
-
-    // Fetch remaining non-cancelled procedures for this doctor on this date
-    const remainingRes = await client.query(
-      `SELECT slot_time, end_time FROM bookings
-       WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
-       AND booking_type = 'procedure' AND status != 'cancelled' AND id != $4
-       ORDER BY slot_time ASC`,
-      [tenantId, doctor_id, booking_date, bookingId]
-    );
-    const remaining = remainingRes.rows;
-
-    if (remaining.length === 0) {
-      // No remaining procedures — restore full schedule by deleting override
-      await client.query(
-        `DELETE FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`,
-        [tenantId, doctor_id, booking_date]
-      );
-    } else {
-      // Rebuild sessions from base doctor_schedules, re-applying remaining procedures
-      const dow = new Date(booking_date).getDay();
-      const schedRes = await client.query(
-        `SELECT start_time, end_time FROM doctor_schedules
-         WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
-         ORDER BY start_time ASC`,
-        [tenantId, doctor_id, dow]
-      );
-      const toMinutes = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
-      const toTimeStr = (mins) => { const h = Math.floor(mins / 60).toString().padStart(2, '0'); const m = (mins % 60).toString().padStart(2, '0'); return `${h}:${m}`; };
-
-      let sessions = schedRes.rows.map(r => ({ start_time: r.start_time, end_time: r.end_time }));
-      for (const proc of remaining) {
-        const procStart = toMinutes(proc.slot_time);
-        const procEnd = toMinutes(proc.end_time);
-        const newSessions = [];
-        for (const s of sessions) {
-          const sStart = toMinutes(s.start_time);
-          const sEnd = toMinutes(s.end_time);
-          if (sEnd <= procStart || sStart >= procEnd) {
-            newSessions.push(s);
-          } else {
-            if (sStart < procStart) newSessions.push({ start_time: toTimeStr(sStart), end_time: toTimeStr(procStart) });
-            if (sEnd > procEnd) newSessions.push({ start_time: toTimeStr(procEnd), end_time: toTimeStr(sEnd) });
-          }
-        }
-        sessions = newSessions;
-      }
-      await client.query(
-        `INSERT INTO schedule_overrides (tenant_id, doctor_id, override_date, sessions) VALUES ($1, $2, $3, $4)
-         ON CONFLICT (doctor_id, override_date) DO UPDATE SET sessions = $4`,
-        [tenantId, doctor_id, booking_date, JSON.stringify(sessions)]
-      );
-    }
-
+    await rebuildScheduleOverridesAfterCancel(pool, tenantId, doctor_id, booking_date, bookingId);
     await client.query('COMMIT');
     return booking;
   } catch (err) {
@@ -396,5 +408,6 @@ module.exports = {
   deleteProcedure,
   getAvailableSlots,
   createProcedureBooking,
-  cancelProcedureBooking
+  cancelProcedureBooking,
+  rebuildScheduleOverridesAfterCancel
 };
