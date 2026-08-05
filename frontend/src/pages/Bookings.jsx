@@ -638,15 +638,38 @@ const Bookings = () => {
             </div>
             <div className="space-y-4">
               {procedureError && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{procedureError}</div>}
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Patient Phone</label>
                 <div className="flex">
                   <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+91</span>
                   <input type="tel" maxLength={10} value={procedureForm.patientPhone}
-                    onChange={e => setProcedureForm(f => ({ ...f, patientPhone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                    onChange={async e => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setProcedureForm(f => ({ ...f, patientPhone: digits }));
+                      if (digits.length === 10) {
+                        try {
+                          const res = await api.get(`/bookings/lookup?phone=${digits}`);
+                          setPhoneSuggestions(res.data?.patients || res.data || []);
+                          setShowSuggestions(true);
+                          setActiveSuggestionModal('procedure');
+                        } catch { setShowSuggestions(false); }
+                      } else { setShowSuggestions(false); }
+                    }}
                     className="flex-1 border border-gray-300 rounded-r-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                     placeholder="9876543210" />
                 </div>
+                {showSuggestions && activeSuggestionModal === 'procedure' && phoneSuggestions.length > 0 && (
+                  <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto">
+                    {phoneSuggestions.map(p => (
+                      <button key={p.id} type="button"
+                        onClick={() => { setProcedureForm(f => ({ ...f, patientName: p.name })); setShowSuggestions(false); }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm">
+                        <span className="font-medium">{p.name}</span>
+                        <span className="text-gray-400 ml-2">{p.phone}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
