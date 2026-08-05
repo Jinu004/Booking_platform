@@ -50,6 +50,7 @@ function parseIncomingMessage(payload) {
   try {
     const entry = payload.entry?.[0]
     const changes = entry?.changes?.[0]
+    if (changes?.field && changes.field !== 'messages') return null
     const value = changes?.value
     const message = value?.messages?.[0]
 
