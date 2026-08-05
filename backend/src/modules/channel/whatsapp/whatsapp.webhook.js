@@ -412,7 +412,7 @@ if (!isEscalated && !isInteractiveSent && aiResponse) {
 }
 
       // Send clinic contact card after booking confirmation (Meta only)
-      const isBookingConfirmation = aiResponse && (aiResponse.includes('Token #') || aiResponse.includes('confirmed successfully'))
+      const isBookingConfirmation = aiResponse && aiResponse.includes('Booking confirmed')
       if (source === 'meta' && tenant.whatsapp_number && isBookingConfirmation) {
         try {
           const pool = require('../../../config/database')
