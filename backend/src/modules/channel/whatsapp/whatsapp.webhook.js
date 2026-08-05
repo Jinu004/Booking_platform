@@ -411,8 +411,9 @@ if (!isEscalated && !isInteractiveSent && aiResponse) {
   await sendMessage(message.from, aiResponse)
 }
 
-      // Send clinic contact card on patient's very first message (Meta only)
-      if (source === 'meta' && tenant.whatsapp_number) {
+      // Send clinic contact card after booking confirmation (Meta only)
+      const isBookingConfirmation = aiResponse && (aiResponse.includes('Token #') || aiResponse.includes('confirmed successfully'))
+      if (source === 'meta' && tenant.whatsapp_number && isBookingConfirmation) {
         try {
           const pool = require('../../../config/database')
           const flagResult = await pool.query(
