@@ -254,13 +254,13 @@ async function executeFunction(name, args, ctx) {
         return {
           id: doc.id,
           title: doc.name.slice(0, 24),
-          description: `${doc.specialization || 'General'} — ${daysCount} day${daysCount > 1 ? 's' : ''} this week`.slice(0, 72)
+          description: `${doc.specialization || 'General'} — ${daysCount} session${daysCount > 1 ? 's' : ''} this week`.slice(0, 72)
         }
       })
 
       const textList = doctors.map(doc => {
         const daysCount = doctorDaysCount.get(doc.id) || 1
-        return `🩺 ${doc.name} (${doc.specialization}) — ${daysCount} day${daysCount > 1 ? 's' : ''} this week`
+        return `🩺 ${doc.name} (${doc.specialization}) — ${daysCount} session${daysCount > 1 ? 's' : ''} this week`
       }).join('\n')
 
       const customerPhone = ctx.customer?.phone
