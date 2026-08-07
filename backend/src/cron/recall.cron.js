@@ -5,25 +5,23 @@ const { sendTemplateMessage } = require('../modules/channel/whatsapp/whatsapp.ad
 
 function startRecallCron() {
   // Runs every Monday at 10:00 AM IST
-  cron.schedule('*/2 * * * *', async () => {
+  cron.schedule('0 10 * * 1', async () => {
     logger.info('Running recall checkup cron...')
     try {
       const result = await pool.query(`
         SELECT
-          p.id AS patient_id,
-          p.name AS patient_name,
-          c.phone,
           c.id AS customer_id,
+          COALESCE(c.name, 'there') AS patient_name,
+          c.phone,
           t.id AS tenant_id,
           t.name AS clinic_name,
           GREATEST(1, EXTRACT(MONTH FROM AGE(NOW(), c.last_seen))::int) AS months_since_visit
-        FROM patients p
-        JOIN customers c ON c.id = p.customer_id
-        JOIN tenants t ON t.id = p.tenant_id
+        FROM customers c
+        JOIN tenants t ON t.id = c.tenant_id
         WHERE c.last_seen < NOW() - INTERVAL '90 days'
           AND t.status = 'active'
           AND c.phone IS NOT NULL
-          AND p.name IS NOT NULL
+          AND c.name IS NOT NULL
           AND NOT EXISTS (
             SELECT 1 FROM notifications n
             WHERE n.customer_id = c.id
@@ -53,7 +51,7 @@ function startRecallCron() {
           `, [row.tenant_id, row.customer_id])
           logger.info(`Recall sent to ${row.patient_name} (${row.phone}) for ${row.clinic_name}`)
         } catch (msgErr) {
-          logger.warn(`Recall failed for patient ${row.patient_id}: ${msgErr.message}`)
+          logger.warn(`Recall failed for customer ${row.customer_id}: ${msgErr.message}`)
         }
       }
 
