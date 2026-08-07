@@ -23,6 +23,12 @@ function startRecallCron() {
           AND c.phone IS NOT NULL
           AND c.name IS NOT NULL
           AND NOT EXISTS (
+            SELECT 1 FROM tenant_configs tc
+            WHERE tc.tenant_id = t.id
+              AND tc.key = 'recall_enabled'
+              AND tc.value = 'false'
+          )
+          AND NOT EXISTS (
             SELECT 1 FROM notifications n
             WHERE n.customer_id = c.id
               AND n.type = 'recall_checkup'
