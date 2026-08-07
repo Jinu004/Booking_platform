@@ -127,7 +127,16 @@ const getTenantById = async (id) => {
  */
 const getTenantByWhatsapp = async (number) => {
   const normalizedNumber = normalizeNumber(number);
-  return await tenantModel.getTenantByWhatsapp(pool, normalizedNumber);
+  const cacheKey = `tenant_wa:${normalizedNumber}`;
+  try {
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch {}
+  const tenant = await tenantModel.getTenantByWhatsapp(pool, normalizedNumber);
+  if (tenant) {
+    try { await redisClient.setEx(cacheKey, 300, JSON.stringify(tenant)); } catch {}
+  }
+  return tenant;
 };
 
 /**
@@ -140,6 +149,10 @@ const updateTenant = async (id, updateData) => {
   delete safeData.slug;
 
   if (safeData.whatsappNumber) {
+    const oldTenant = await tenantModel.getTenantById(pool, id);
+    if (oldTenant?.whatsapp_number) {
+      try { await redisClient.del(`tenant_wa:${oldTenant.whatsapp_number}`); } catch {}
+    }
     safeData.whatsapp_number = normalizeNumber(safeData.whatsappNumber);
     delete safeData.whatsappNumber;
   }
