@@ -119,7 +119,8 @@ router.post('/', async (req, res) => {
       const isButtonReply = ['Book Another Day', 'Talk to Staff', 'Check My Booking', 'Reschedule'].includes(message.message)
       const greetings = ['hi', 'hello', 'hey', 'hii', 'helo', 'hai', 'hiya', 'start', 'menu']
       const isReschedule = message.message?.trim() === 'Reschedule'
-      const isGreeting = greetings.includes(message.message?.toLowerCase().trim()) || isReschedule
+      const isBookAppointment = message.message?.trim() === 'Book Appointment'
+      const isGreeting = greetings.includes(message.message?.toLowerCase().trim()) || isReschedule || isBookAppointment
 
       if (isGreeting) {
         try {
