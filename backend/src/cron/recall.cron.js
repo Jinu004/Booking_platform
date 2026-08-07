@@ -5,7 +5,7 @@ const { sendTemplateMessage } = require('../modules/channel/whatsapp/whatsapp.ad
 
 function startRecallCron() {
   // Runs every Monday at 10:00 AM IST
-  cron.schedule('0 10 * * 1', async () => {
+  cron.schedule('*/2 * * * *', async () => {
     logger.info('Running recall checkup cron...')
     try {
       const result = await pool.query(`
