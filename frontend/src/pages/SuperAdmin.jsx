@@ -53,7 +53,7 @@ export default function SuperAdmin() {
 
   // Edit modal
   const [editTenant, setEditTenant] = useState(null);
-  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', industry: 'clinic', aiModel: '', proactiveTemplates: false, email: '' });
+  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', industry: 'clinic', aiModel: '', proactiveTemplates: false, recallEnabled: true, email: '' });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -127,7 +127,8 @@ export default function SuperAdmin() {
 
   const openEdit = (t) => {
     setEditTenant(t);
-    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', industry: t.industry || 'clinic', aiModel: t.ai_model || '', proactiveTemplates: t.proactive_templates_enabled === 'true', email: t.email || '' });
+    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', industry: t.industry || 'clinic', aiModel: t.ai_model || '', proactiveTemplates: t.proactive_templates_enabled === 'true',
+    recallEnabled: t.recall_enabled !== 'false', email: t.email || '' });
     setEditError('');
   };
 
@@ -147,6 +148,7 @@ export default function SuperAdmin() {
         key: 'proactive_templates_enabled',
         value: String(proactiveTemplates)
       });
+      await api.patch(`/superadmin/tenants/${editTenant.id}/config`, { key: 'recall_enabled', value: String(editForm.recallEnabled) });
       await fetchData();
       closeEditModal();
     } catch (err) {
@@ -521,6 +523,21 @@ export default function SuperAdmin() {
                 />
                 <label htmlFor="proactiveTemplates" className="text-sm text-gray-600">
                   Allow staff to send template messages when 24-hour window is closed
+                </label>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Recall Checkup Messages</label>
+              <div className="flex items-center gap-3 mt-1">
+                <input
+                  type="checkbox"
+                  id="recallEnabled"
+                  checked={editForm.recallEnabled}
+                  onChange={e => setEditForm(f => ({ ...f, recallEnabled: e.target.checked }))}
+                  className="w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
+                />
+                <label htmlFor="recallEnabled" className="text-sm text-gray-600">
+                  Send recall checkup WhatsApp reminders to patients not seen in 90 days (every Monday)
                 </label>
               </div>
             </div>
