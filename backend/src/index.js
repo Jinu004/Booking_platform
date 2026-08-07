@@ -157,6 +157,7 @@ initializeSchedulers();
 const { startHITLCron } = require('./modules/hitl/hitl.cron');
 const { startRetentionCron } = require('./cron/retention.cron');
 const { startNoShowCron } = require('./cron/noshow.cron');
+const { startRecallCron } = require('./cron/recall.cron');
 const { broadcastToTenant } = require('./modules/hitl/hitl.service');
 
 setTimeout(() => {
@@ -166,6 +167,8 @@ setTimeout(() => {
   startNoShowCron();
   console.log('Starting No-show cron...');
   startRetentionCron();
+  console.log('Starting Recall cron...');
+  startRecallCron();
 }, 5000);
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
