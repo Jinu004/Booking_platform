@@ -23,6 +23,7 @@ function isWithinWorkingHours(workingHours) {
 
   const dayConfig = workingHours[weekday];
   if (!dayConfig || !dayConfig.enabled) return false;
+  if (!dayConfig.open || !dayConfig.close) return true;
 
   return currentTime >= dayConfig.open && currentTime < dayConfig.close;
 }
