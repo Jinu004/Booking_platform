@@ -56,7 +56,7 @@ function parseIncomingMessage(payload) {
     const message = value?.messages?.[0]
 
     if (!message) return null
-    if (message.type !== 'text' && message.type !== 'interactive') return null
+    if (message.type !== 'text' && message.type !== 'interactive' && message.type !== 'button') return null
 
     let messageText = ''
     let interactiveId = null
@@ -67,6 +67,8 @@ function parseIncomingMessage(payload) {
         || message.interactive?.list_reply?.title
         || ''
       interactiveId = message.interactive?.list_reply?.id || message.interactive?.button_reply?.id || null
+    } else if (message.type === 'button') {
+      messageText = message.button?.text || ''
     }
 
     const contact = value?.contacts?.[0]
