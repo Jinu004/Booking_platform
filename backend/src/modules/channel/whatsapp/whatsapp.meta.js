@@ -50,7 +50,6 @@ function parseIncomingMessage(payload) {
   try {
     const entry = payload.entry?.[0]
     const changes = entry?.changes?.[0]
-    logger.info(`[WEBHOOK DEBUG] field=${changes?.field} type=${changes?.value?.messages?.[0]?.type} msg=${changes?.value?.messages?.[0]?.button?.text || changes?.value?.messages?.[0]?.interactive?.button_reply?.title}`)
     if (changes?.field && changes.field !== 'messages') return null
     const value = changes?.value
     const message = value?.messages?.[0]
