@@ -996,13 +996,43 @@ Please reply with your name to confirm booking.`
   }
 
   const avgMinsCTB2 = doctor.avg_consultation_minutes || 20
-  const [ctbH, ctbM] = (slotTimeValue || '09:00').split(':').map(Number)
-  const ctbEstMins = ctbH * 60 + ctbM + (tokenNumber - 1) * avgMinsCTB2
-  const ctbEstH = Math.floor(ctbEstMins / 60) % 24
-  const ctbEstM = ctbEstMins % 60
-  const ctbEstAmPm = ctbEstH >= 12 ? 'PM' : 'AM'
-  const ctbEstH12 = ctbEstH % 12 || 12
-  const ctbEstTime = `${ctbEstH12}:${String(ctbEstM).padStart(2, '0')} ${ctbEstAmPm}`
+  let ctbEstTime
+  try {
+    const waitResParams = [tenant.id, doctor.id, tokenNumber]
+    let waitQuery = `
+      SELECT COUNT(*) AS waiting_ahead
+      FROM clinic_tokens ct
+      JOIN bookings b ON b.id = ct.booking_id
+      WHERE ct.tenant_id = $1
+        AND ct.doctor_id = $2
+        AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
+        AND ct.status IN ('waiting', 'in_consult')
+        AND ct.token_number < $3`
+    if (sessionStart && sessionEnd) {
+      waitQuery += ` AND (b.slot_time IS NULL OR (b.slot_time >= $4 AND b.slot_time < $5))`
+      waitResParams.push(sessionStart, sessionEnd)
+    }
+    const waitRes = await pool.query(waitQuery, waitResParams)
+    const waitingAhead = parseInt(waitRes.rows[0]?.waiting_ahead || 0)
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+    const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes()
+    const [ctbH, ctbM] = (slotTimeValue || '09:00').split(':').map(Number)
+    const sessionMins = ctbH * 60 + ctbM
+    const ctbEstMins = Math.max(nowMins, sessionMins) + waitingAhead * avgMinsCTB2
+    const ctbEstH = Math.floor(ctbEstMins / 60) % 24
+    const ctbEstM = ctbEstMins % 60
+    const ctbEstAmPm = ctbEstH >= 12 ? 'PM' : 'AM'
+    const ctbEstH12 = ctbEstH % 12 || 12
+    ctbEstTime = `${ctbEstH12}:${String(ctbEstM).padStart(2, '0')} ${ctbEstAmPm}`
+  } catch {
+    const [ctbH, ctbM] = (slotTimeValue || '09:00').split(':').map(Number)
+    const ctbEstMins = ctbH * 60 + ctbM + (tokenNumber - 1) * avgMinsCTB2
+    const ctbEstH = Math.floor(ctbEstMins / 60) % 24
+    const ctbEstM = ctbEstMins % 60
+    const ctbEstAmPm = ctbEstH >= 12 ? 'PM' : 'AM'
+    const ctbEstH12 = ctbEstH % 12 || 12
+    ctbEstTime = `${ctbEstH12}:${String(ctbEstM).padStart(2, '0')} ${ctbEstAmPm}`
+  }
   return `DIRECT:Booking confirmed! 🏥
 Token Number: ${tokenNumber}
 Doctor: ${doctor.name}
