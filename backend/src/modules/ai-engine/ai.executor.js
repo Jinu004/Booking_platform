@@ -1009,7 +1009,7 @@ Please reply with your name to confirm booking.`
         AND ct.status IN ('waiting', 'in_consult')
         AND ct.token_number < $3`
     const rawSessionStart = slotTimeValue || null
-    const rawSessionEnd = sessionEnd || null
+    const rawSessionEnd = sessionEndCTB || null
     if (rawSessionStart && rawSessionEnd) {
       waitQuery += ` AND (b.slot_time IS NULL OR (b.slot_time >= $4 AND b.slot_time < $5))`
       waitResParams.push(rawSessionStart, rawSessionEnd)
