@@ -1008,9 +1008,11 @@ Please reply with your name to confirm booking.`
         AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
         AND ct.status IN ('waiting', 'in_consult')
         AND ct.token_number < $3`
-    if (sessionStart && sessionEnd) {
+    const rawSessionStart = slotTimeValue || null
+    const rawSessionEnd = sessionEnd || null
+    if (rawSessionStart && rawSessionEnd) {
       waitQuery += ` AND (b.slot_time IS NULL OR (b.slot_time >= $4 AND b.slot_time < $5))`
-      waitResParams.push(sessionStart, sessionEnd)
+      waitResParams.push(rawSessionStart, rawSessionEnd)
     }
     const waitRes = await pool.query(waitQuery, waitResParams)
     const waitingAhead = parseInt(waitRes.rows[0]?.waiting_ahead || 0)
