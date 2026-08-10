@@ -995,12 +995,21 @@ Please reply with your name to confirm booking.`
     }
   }
 
+  const avgMinsCTB2 = doctor.avg_consultation_minutes || 20
+  const [ctbH, ctbM] = (slotTimeValue || '09:00').split(':').map(Number)
+  const ctbEstMins = ctbH * 60 + ctbM + (tokenNumber - 1) * avgMinsCTB2
+  const ctbEstH = Math.floor(ctbEstMins / 60) % 24
+  const ctbEstM = ctbEstMins % 60
+  const ctbEstAmPm = ctbEstH >= 12 ? 'PM' : 'AM'
+  const ctbEstH12 = ctbEstH % 12 || 12
+  const ctbEstTime = `${ctbEstH12}:${String(ctbEstM).padStart(2, '0')} ${ctbEstAmPm}`
   return `DIRECT:Booking confirmed! 🏥
 Token Number: ${tokenNumber}
 Doctor: ${doctor.name}
 ${doctor.specialization}
-🕘 Consultation starts at ${sessionStart}
-Please arrive before session begins.
+🕘 Session starts at ${sessionStart}
+⏱ Estimated call time: ~${ctbEstTime}
+Please arrive 10 minutes before your estimated time.
 For queries, contact us: ${contactPhone}`
 }
 
@@ -1024,7 +1033,7 @@ For queries, contact us: ${contactPhone}`
 
         // Find doctor
         const doctorRes = await pool.query(
-          `SELECT id, name, specialization, max_tokens_daily FROM clinic_doctors
+          `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
            WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND is_active = true
            LIMIT 1`,
           [tenant.id, `%${escapeLike(doctor_name)}%`]
@@ -1152,13 +1161,23 @@ For queries, contact us: ${contactPhone}`
         const bpResTmr = await pool.query(`SELECT business_phone FROM tenant_settings WHERE tenant_id = $1`, [tenant.id])
         contactPhoneTmr = bpResTmr.rows[0]?.business_phone || tenant.whatsapp_number
       } catch {}
+      const avgMinsCTmB = doctor.avg_consultation_minutes || 20
+      const ctmbSlot = (start_time || '09:00:00').toString().slice(0, 5)
+      const [ctmbH, ctmbM] = ctmbSlot.split(':').map(Number)
+      const ctmbEstMins = ctmbH * 60 + ctmbM + (tokenNumber - 1) * avgMinsCTmB
+      const ctmbEstH = Math.floor(ctmbEstMins / 60) % 24
+      const ctmbEstM = ctmbEstMins % 60
+      const ctmbEstAmPm = ctmbEstH >= 12 ? 'PM' : 'AM'
+      const ctmbEstH12 = ctmbEstH % 12 || 12
+      const ctmbEstTime = `${ctmbEstH12}:${String(ctmbEstM).padStart(2, '0')} ${ctmbEstAmPm}`
       return `DIRECT:Booking confirmed for tomorrow! 🏥
 Token Number: ${tokenNumber}
 Doctor: ${doctor.name}
 ${doctor.specialization}
 📅 ${dayNames[tomorrowDow]}, ${new Date(tomorrowDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
 🕘 Session: ${sessionTime}
-Please arrive before session begins.
+⏱ Estimated call time: ~${ctmbEstTime}
+Please arrive 10 minutes before your estimated time.
 For queries, contact us: ${contactPhoneTmr}`
       }
 
@@ -1246,7 +1265,7 @@ For queries, contact us: ${contactPhoneTmr}`
       const sessionFilterFB = sessionStartFB && /^\d{2}:\d{2}(:\d{2})?$/.test(sessionStartFB)
       const docResFB = sessionFilterFB
         ? await pool.query(
-            `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+            `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily, cd.avg_consultation_minutes,
                     ds.start_time, ds.end_time
              FROM clinic_doctors cd
              JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
@@ -1256,7 +1275,7 @@ For queries, contact us: ${contactPhoneTmr}`
             [tenant.id, targetDow, `%${doctorNameFB}%`, sessionStartFB]
           )
         : await pool.query(
-            `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
+            `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily, cd.avg_consultation_minutes,
                     ds.start_time, ds.end_time
              FROM clinic_doctors cd
              JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
@@ -1363,13 +1382,23 @@ For queries, contact us: ${contactPhoneTmr}`
         const bpResFB = await pool.query(`SELECT business_phone FROM tenant_settings WHERE tenant_id = $1`, [tenant.id])
         contactPhoneFB = bpResFB.rows[0]?.business_phone || tenant.whatsapp_number
       } catch {}
+      const avgMinsFB = doctorFB.avg_consultation_minutes || 20
+      const fbSlot = (sessionStartFB || doctorFB.start_time || '09:00:00').toString().slice(0, 5)
+      const [fbH, fbM] = fbSlot.split(':').map(Number)
+      const fbEstMins = fbH * 60 + fbM + (tokenNumberFB - 1) * avgMinsFB
+      const fbEstH = Math.floor(fbEstMins / 60) % 24
+      const fbEstM = fbEstMins % 60
+      const fbEstAmPm = fbEstH >= 12 ? 'PM' : 'AM'
+      const fbEstH12 = fbEstH % 12 || 12
+      const fbEstTime = `${fbEstH12}:${String(fbEstM).padStart(2, '0')} ${fbEstAmPm}`
       return `DIRECT:Booking confirmed! 🏥
 Token Number: ${tokenNumberFB}
 Doctor: ${doctorFB.name}
 ${doctorFB.specialization}
 Date: ${bookingDayName}, ${bookingDateFB}
 🕘 Session starts at ${sessionFilterFB ? fmtFB(sessionStartFB) : fmtFB(doctorFB.start_time)}
-Please arrive before session begins.
+⏱ Estimated call time: ~${fbEstTime}
+Please arrive 10 minutes before your estimated time.
 For queries, contact us: ${contactPhoneFB}`
     }
 
