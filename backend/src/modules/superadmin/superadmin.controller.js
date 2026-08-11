@@ -261,14 +261,12 @@ async function clearTenantConversations(req, res) {
   try {
     const { id } = req.params
     const result = await pool.query(`
-      DELETE FROM conversations
-      WHERE tenant_id = $1
-      AND status IN ('resolved', 'inactive')
-      AND started_at < NOW() - INTERVAL '30 days'
+      DELETE FROM messages
+      WHERE conversation_id IN (SELECT id FROM conversations WHERE tenant_id = $1)
     `, [id])
     return successResponse(res, {
       deleted: result.rowCount,
-      message: `Deleted ${result.rowCount} old conversations`
+      message: `Cleared ${result.rowCount} messages for tenant`
     })
   } catch (err) {
     logger.error('Error clearing tenant conversations:', err.message)

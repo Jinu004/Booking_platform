@@ -10,5 +10,6 @@ router.get('/:id', controller.getConversationById);
 router.post('/:id/takeover', controller.takeoverConversation);
 router.post('/:id/resolve', controller.resolveConversation);
 router.post('/:id/message', controller.sendManualMessage);
+router.delete('/:id/messages', controller.clearConversationMessages);
 
 module.exports = router;
