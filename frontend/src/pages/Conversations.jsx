@@ -455,6 +455,23 @@ export default function Conversations() {
                   >
                     {selectedConversation.mode === 'human' ? 'Hand back to AI' : 'Take Over'}
                   </button>
+                  {staff?.role === 'admin' && (
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm('Clear all messages in this conversation? This cannot be undone.')) return;
+                        try {
+                          await api.delete(`/conversations/${selectedConversationId}/messages`);
+                          setMessages([]);
+                          alert('Chat cleared successfully.');
+                        } catch {
+                          alert('Failed to clear chat. Please try again.');
+                        }
+                      }}
+                      className="hidden md:block px-4 py-1.5 rounded-lg text-sm font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition"
+                    >
+                      Clear Chat
+                    </button>
+                  )}
                 </div>
               </div>
 
