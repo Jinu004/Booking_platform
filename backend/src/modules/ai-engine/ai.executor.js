@@ -1039,9 +1039,9 @@ Please reply with your name to confirm booking.`
 Token Number: ${tokenNumber}
 Doctor: ${doctor.name}
 ${doctor.specialization}
-🕘 Session starts at ${sessionStart}
-⏱ Estimated call time: ~${ctbEstTime}
-Please arrive 10 minutes before your estimated time.
+🕘 Session: ${sessionStart}
+📍 Please arrive at the clinic and show your token number to reception.
+Your turn will be called after you check in.
 For queries, contact us: ${contactPhone}`
 }
 
@@ -1208,8 +1208,8 @@ Doctor: ${doctor.name}
 ${doctor.specialization}
 📅 ${dayNames[tomorrowDow]}, ${new Date(tomorrowDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
 🕘 Session: ${sessionTime}
-⏱ Estimated call time: ~${ctmbEstTime}
-Please arrive 10 minutes before your estimated time.
+📍 Please arrive at the clinic and show your token number to reception.
+Your turn will be called after you check in.
 For queries, contact us: ${contactPhoneTmr}`
       }
 
@@ -1429,8 +1429,8 @@ Doctor: ${doctorFB.name}
 ${doctorFB.specialization}
 Date: ${bookingDayName}, ${bookingDateFB}
 🕘 Session starts at ${sessionFilterFB ? fmtFB(sessionStartFB) : fmtFB(doctorFB.start_time)}
-⏱ Estimated call time: ~${fbEstTime}
-Please arrive 10 minutes before your estimated time.
+📍 Please arrive at the clinic and show your token number to reception.
+Your turn will be called after you check in.
 For queries, contact us: ${contactPhoneFB}`
     }
 
