@@ -137,7 +137,9 @@ SELECT ct.*, b.notes, b.slot_time, b.source,
        COALESCE(b.patient_name, c.name) AS patient_name,
        c.phone AS patient_phone,
        cd.name AS doctor_name,
-       ct.doctor_id AS doctor_id
+       ct.doctor_id AS doctor_id,
+       b.patient_id AS patient_id,
+       b.customer_id AS customer_id
     FROM clinic_tokens ct
     JOIN bookings b ON b.id = ct.booking_id
     LEFT JOIN customers c ON c.id = b.customer_id
