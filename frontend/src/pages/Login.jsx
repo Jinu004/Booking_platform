@@ -51,7 +51,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-cyan-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-teal-100 via-cyan-50 to-teal-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-4">
           <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
@@ -64,12 +64,12 @@ export default function Login() {
           ReceptionAI
         </h2>
         <p className="mt-2 text-center text-sm text-gray-500">
-          Welcome back 👋 Sign in to your clinic dashboard
+          Sign in to your clinic dashboard
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-xl rounded-2xl sm:px-10 border border-gray-100">
+        <div className="bg-white py-8 px-4 shadow-2xl rounded-2xl sm:px-10 border border-gray-200">
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
               {error}
