@@ -27,7 +27,7 @@ export default function Login() {
           navigate('/dashboard')
         }
       } else {
-        setError(result.error || 'Invalid email or password')
+        setError(result.error || 'The email or password you entered is incorrect. Please try again.')
       }
     } catch (err) {
       setError('Login failed. Please try again.')
@@ -78,8 +78,8 @@ export default function Login() {
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                    className={`appearance-none block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${error ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   />
                 </div>
               </div>
@@ -91,8 +91,8 @@ export default function Login() {
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                    className={`appearance-none block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${error ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   />
                   <button
                     type="button"
