@@ -55,7 +55,7 @@ async function getPatient(req, res, next) {
     if (!isUUID(rawId)) return errorResponse(res, 'Invalid patient ID', 400);
     // Resolve real patient.id — accepts either patient.id or customer_id
     const patientRes = await pool.query(
-      `SELECT * FROM patients WHERE (id = $1 OR customer_id = $1) AND tenant_id = $2 LIMIT 1`,
+      `SELECT * FROM patients WHERE (id = $1 OR customer_id = $1) AND tenant_id = $2 ORDER BY created_at ASC LIMIT 1`,
       [rawId, req.tenantId]
     );
     if (!patientRes.rows.length) return errorResponse(res, 'Patient not found', 404);
