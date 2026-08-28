@@ -4,7 +4,7 @@ import {
   getBookings, getBookingStats, 
   completeBooking, cancelBooking, markNoShow, createBooking 
 } from '../services/booking.service';
-import { getDoctors, updateTokenStatus, getDoctorSchedule } from '../services/clinic.service';
+import { getDoctors, updateTokenStatus, getDoctorSchedule, getProcedures, getAvailableSlots, scheduleProcedureBooking } from '../services/clinic.service';
 import api from '../utils/api';
 import TokenReceipt from '../components/shared/TokenReceipt';
 import useStore from '../store/useStore';
@@ -29,6 +29,14 @@ const Bookings = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isProcedureModalOpen, setIsProcedureModalOpen] = useState(false);
+  const [procedureForm, setProcedureForm] = useState({ patientPhone: '', patientName: '', doctorId: '', date: '', procedureId: '', slot: '' });
+  const [procedureDoctors, setProcedureDoctors] = useState([]);
+  const [procedureList, setProcedureList] = useState([]);
+  const [procedureSlots, setProcedureSlots] = useState([]);
+  const [procedureSlotsLoading, setProcedureSlotsLoading] = useState(false);
+  const [procedureSubmitting, setProcedureSubmitting] = useState(false);
+  const [procedureError, setProcedureError] = useState('');
   const [scheduleBooking, setScheduleBooking] = useState({ patientName: '', patientPhone: '', doctorId: '', bookingDate: '', sessionTime: '', notes: '', sendWhatsapp: true });
   const [doctorSessions, setDoctorSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -135,6 +143,19 @@ const Bookings = () => {
       setDoctorScheduleSessions(sessions);
     }).catch(() => setDoctorScheduleSessions([]));
   }, [selectedDoctor, date]);
+
+  useEffect(() => {
+    if (!procedureForm.doctorId || !procedureForm.procedureId || !procedureForm.date) return;
+    const proc = procedureList.find(p => p.id === procedureForm.procedureId);
+    if (!proc) return;
+    setProcedureSlotsLoading(true);
+    setProcedureSlots([]);
+    setProcedureForm(f => ({ ...f, slot: '' }));
+    getAvailableSlots(procedureForm.doctorId, procedureForm.date, proc.duration_minutes)
+      .then(res => setProcedureSlots(res.data || []))
+      .catch(() => setProcedureSlots([]))
+      .finally(() => setProcedureSlotsLoading(false));
+  }, [procedureForm.doctorId, procedureForm.procedureId, procedureForm.date]);
 
   const toSessionMins = t => { if (!t) return null; const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
   const fmtSessionLabel = (s, e) => { const fmt = t => { const [h, m] = t.toString().split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; }; return `${fmt(s)} - ${fmt(e)}`; };
@@ -316,7 +337,7 @@ const Bookings = () => {
             <option value="completed">Completed</option>
           </select>
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex gap-2 w-full md:w-auto flex-wrap">
         <button
           onClick={async () => {
             setScheduleBooking({ patientName: '', patientPhone: '', doctorId: '', bookingDate: '', sessionTime: '', notes: '', sendWhatsapp: true });
@@ -328,6 +349,19 @@ const Bookings = () => {
           className="bg-teal-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-teal-700 transition flex-1 md:flex-none"
         >
           + Schedule Booking
+        </button>
+        <button
+          onClick={async () => {
+            setProcedureForm({ patientPhone: '', patientName: '', doctorId: '', date: '', procedureId: '', slot: '' });
+            setProcedureList([]);
+            setProcedureSlots([]);
+            setProcedureError('');
+            try { const res = await getDoctors(); if (res?.data) setProcedureDoctors(res.data); } catch {}
+            setIsProcedureModalOpen(true);
+          }}
+          className="bg-purple-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-purple-700 transition flex-1 md:flex-none"
+        >
+          + Procedure
         </button>
         <button
           onClick={() => {
@@ -594,6 +628,146 @@ const Bookings = () => {
           ))
         )}
       </div>
+
+      {isProcedureModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-xl font-bold text-gray-900">Schedule Procedure</h2>
+              <button onClick={() => setIsProcedureModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl font-bold">×</button>
+            </div>
+            <div className="space-y-4">
+              {procedureError && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{procedureError}</div>}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Patient Phone</label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+91</span>
+                  <input type="tel" maxLength={10} value={procedureForm.patientPhone}
+                    onChange={async e => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setProcedureForm(f => ({ ...f, patientPhone: digits }));
+                      if (digits.length === 10) {
+                        try {
+                          const res = await api.get(`/bookings/lookup?phone=${digits}`);
+                          setPhoneSuggestions(res.data?.patients || res.data || []);
+                          setShowSuggestions(true);
+                          setActiveSuggestionModal('procedure');
+                        } catch { setShowSuggestions(false); }
+                      } else { setShowSuggestions(false); }
+                    }}
+                    className="flex-1 border border-gray-300 rounded-r-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="9876543210" />
+                </div>
+                {showSuggestions && activeSuggestionModal === 'procedure' && phoneSuggestions.length > 0 && (
+                  <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto">
+                    {phoneSuggestions.map(p => (
+                      <button key={p.id} type="button"
+                        onClick={() => { setProcedureForm(f => ({ ...f, patientName: p.name })); setShowSuggestions(false); }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm">
+                        <span className="font-medium">{p.name}</span>
+                        <span className="text-gray-400 ml-2">{p.phone}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
+                <input type="text" value={procedureForm.patientName}
+                  onChange={e => setProcedureForm(f => ({ ...f, patientName: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Patient name" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Doctor</label>
+                <select value={procedureForm.doctorId}
+                  onChange={async e => {
+                    const doctorId = e.target.value;
+                    setProcedureForm(f => ({ ...f, doctorId, procedureId: '', slot: '' }));
+                    setProcedureSlots([]);
+                    if (doctorId) {
+                      try { const res = await getProcedures(doctorId); setProcedureList(res.data || []); } catch { setProcedureList([]); }
+                    } else { setProcedureList([]); }
+                  }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                  <option value="">Select doctor</option>
+                  {procedureDoctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+              {procedureList.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Procedure</label>
+                  <select value={procedureForm.procedureId}
+                    onChange={e => setProcedureForm(f => ({ ...f, procedureId: e.target.value, slot: '' }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="">Select procedure</option>
+                    {procedureList.map(p => <option key={p.id} value={p.id}>{p.name} ({p.duration_minutes} min)</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <input type="date" value={procedureForm.date}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={e => setProcedureForm(f => ({ ...f, date: e.target.value, slot: '' }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+              </div>
+              {procedureSlotsLoading && <p className="text-sm text-gray-400">Loading available slots...</p>}
+              {procedureSlots.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Available Slot</label>
+                  <select value={procedureForm.slot}
+                    onChange={e => setProcedureForm(f => ({ ...f, slot: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="">Select slot</option>
+                    {procedureSlots.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              )}
+              {procedureForm.date && procedureForm.doctorId && procedureForm.procedureId && !procedureSlotsLoading && procedureSlots.length === 0 && (
+                <p className="text-sm text-red-500">No available slots for this date.</p>
+              )}
+              <button
+                onClick={async () => {
+                  setProcedureError('');
+                  if (!procedureForm.patientPhone || !procedureForm.doctorId || !procedureForm.procedureId || !procedureForm.date || !procedureForm.slot) {
+                    setProcedureError('Please fill in all required fields and select a slot.');
+                    return;
+                  }
+                  const proc = procedureList.find(p => p.id === procedureForm.procedureId);
+                  if (!proc) return;
+                  const [h, m] = procedureForm.slot.split(':').map(Number);
+                  const endMins = h * 60 + m + proc.duration_minutes;
+                  const endH = Math.floor(endMins / 60).toString().padStart(2, '0');
+                  const endM = (endMins % 60).toString().padStart(2, '0');
+                  setProcedureSubmitting(true);
+                  try {
+                    await scheduleProcedureBooking(procedureForm.doctorId, {
+                      procedure_id: procedureForm.procedureId,
+                      customer_id: null,
+                      patient_id: null,
+                      patient_name: procedureForm.patientName || procedureForm.patientPhone,
+                      date: procedureForm.date,
+                      start_time: procedureForm.slot,
+                      end_time: `${endH}:${endM}`
+                    });
+                    setIsProcedureModalOpen(false);
+                    fetchData();
+                  } catch (err) {
+                    setProcedureError(err?.response?.data?.error || 'Failed to schedule procedure.');
+                  } finally {
+                    setProcedureSubmitting(false);
+                  }
+                }}
+                disabled={procedureSubmitting || !procedureForm.patientPhone || !procedureForm.doctorId || !procedureForm.procedureId || !procedureForm.date || !procedureForm.slot}
+                className="w-full bg-purple-600 text-white py-2.5 rounded-lg font-bold hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {procedureSubmitting ? 'Scheduling...' : 'Schedule Procedure'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isScheduleModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">

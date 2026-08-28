@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getTokenQueue, updateTokenStatus } from '../services/clinic.service';
 import { getStoredStaff } from '../services/auth.service';
 
@@ -175,6 +176,12 @@ const TokenQueue = () => {
                         }}
                         className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
                       >{loadingToken === t.id ? '...' : 'Done'}</button>
+                    )}
+                    {(t.patient_id || t.customer_id) && (
+                      <Link
+                        to={`/patients/${t.patient_id || t.customer_id}`}
+                        className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition"
+                      >Profile</Link>
                     )}
                   </div>
                 </div>

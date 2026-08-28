@@ -27,7 +27,7 @@ export default function Login() {
           navigate('/dashboard')
         }
       } else {
-        setError(result.error || 'Invalid email or password')
+        setError(result.error || 'The email or password you entered is incorrect. Please try again.')
       }
     } catch (err) {
       setError('Login failed. Please try again.')
@@ -51,18 +51,25 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="flex justify-center mb-4">
+          <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-9 h-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          </div>
+        </div>
+        <h2 className="text-center text-3xl font-extrabold text-gray-900">
           ReceptionAI
         </h2>
-        <p className="mt-2 text-center text-sm text-slate-400">
-          Sign in to your account
+        <p className="mt-2 text-center text-sm text-gray-500">
+          Sign in to your clinic dashboard
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <div className="bg-white py-8 px-4 shadow-2xl rounded-2xl sm:px-10 border border-gray-200">
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
               {error}
@@ -78,8 +85,8 @@ export default function Login() {
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                    className={`appearance-none block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${error ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   />
                 </div>
               </div>
@@ -91,8 +98,8 @@ export default function Login() {
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                    className={`appearance-none block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${error ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   />
                   <button
                     type="button"
@@ -116,7 +123,7 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
                   {loading ? 'Signing in...' : 'Sign in'}
                 </button>
@@ -150,7 +157,7 @@ export default function Login() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
                     >
                       {loading ? 'Sending...' : 'Send Reset Link'}
                     </button>
@@ -165,13 +172,7 @@ export default function Login() {
             </div>
           )}
         </div>
-        <p className="text-center text-sm text-gray-500 mt-4">
-          Don't have an account?{' '}
-          <a href="/onboarding" className="text-blue-600 hover:underline font-medium">
-            Start free trial
-          </a>
-        </p>
-        <p className="text-center text-slate-500 text-xs mt-6">Powered by AI</p>
+        <p className="text-center text-gray-400 text-xs mt-6">ReceptionAI · WhatsApp AI for clinics</p>
       </div>
     </div>
   )

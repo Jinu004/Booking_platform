@@ -121,6 +121,21 @@ async function takeoverConversation(req, res, next) {
  * POST /conversations/:id/resolve
  * Marks conversation as resolved
  */
+async function clearConversationMessages(req, res, next) {
+  try {
+    const tenantId = req.tenant.id;
+    const { id } = req.params;
+    const conversation = await ConversationModel.getConversationById(pool, tenantId, id);
+    if (!conversation) return errorResponse(res, 'Conversation not found', 404);
+    await pool.query(`DELETE FROM messages WHERE conversation_id = $1`, [id]);
+    await pool.query(
+      `UPDATE conversations SET mode = 'ai', contact_card_sent = false, needs_attention = false WHERE id = $1`,
+      [id]
+    );
+    return successResponse(res, { message: 'Chat cleared successfully' });
+  } catch (err) { next(err); }
+}
+
 async function resolveConversation(req, res, next) {
   try {
     const tenantId = req.tenant.id;
@@ -195,5 +210,6 @@ module.exports = {
   getConversationById,
   takeoverConversation,
   resolveConversation,
-  sendManualMessage
+  sendManualMessage,
+  clearConversationMessages
 };

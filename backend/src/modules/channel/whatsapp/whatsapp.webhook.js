@@ -118,7 +118,9 @@ router.post('/', async (req, res) => {
       // Intercept button replies before Gemini — direct function calls (skip Please wait for these)
       const isButtonReply = ['Book Another Day', 'Talk to Staff', 'Check My Booking', 'Reschedule'].includes(message.message)
       const greetings = ['hi', 'hello', 'hey', 'hii', 'helo', 'hai', 'hiya', 'start', 'menu']
-      const isGreeting = greetings.includes(message.message?.toLowerCase().trim())
+      const isReschedule = message.message?.trim() === 'Reschedule'
+      const isBookAppointment = message.message?.trim() === 'Book Appointment'
+      const isGreeting = greetings.includes(message.message?.toLowerCase().trim()) || isBookAppointment
 
       if (isGreeting) {
         try {
@@ -411,8 +413,9 @@ if (!isEscalated && !isInteractiveSent && aiResponse) {
   await sendMessage(message.from, aiResponse)
 }
 
-      // Send clinic contact card on patient's very first message (Meta only)
-      if (source === 'meta' && tenant.whatsapp_number) {
+      // Send clinic contact card after booking confirmation (Meta only)
+      const isBookingConfirmation = aiResponse && aiResponse.includes('Booking confirmed')
+      if (source === 'meta' && tenant.whatsapp_number && isBookingConfirmation) {
         try {
           const pool = require('../../../config/database')
           const flagResult = await pool.query(
