@@ -299,7 +299,7 @@ async function getBookingStats(tenantId, doctorId = null) {
   let sql = `
     SELECT status, COUNT(*) as count
     FROM bookings
-    WHERE tenant_id = $1 AND booking_date = CURRENT_DATE
+    WHERE tenant_id = $1 AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
   `;
   if (doctorId) {
     params.push(doctorId);

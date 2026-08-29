@@ -146,7 +146,7 @@ SELECT ct.*, b.notes, b.slot_time, b.source,
     JOIN clinic_doctors cd ON cd.id = ct.doctor_id
     WHERE ct.tenant_id = $1
     AND ct.status != 'cancelled'
-    AND b.booking_date = CURRENT_DATE
+    AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
     ORDER BY b.slot_time ASC NULLS LAST, ct.token_number ASC
   `
   const result = await tenantQuery(tenantId, pool, sql, [])

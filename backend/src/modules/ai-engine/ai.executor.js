@@ -69,7 +69,7 @@ async function executeFunction(name, args, ctx) {
                COUNT(b.id) FILTER (WHERE b.status != 'cancelled' AND (b.booking_type IS NULL OR b.booking_type != 'procedure')) AS booked_count
         FROM clinic_doctors cd
         JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
-        LEFT JOIN bookings b ON b.doctor_id = cd.id AND b.booking_date = CURRENT_DATE AND b.tenant_id = $1
+        LEFT JOIN bookings b ON b.doctor_id = cd.id AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date AND b.tenant_id = $1
         WHERE cd.tenant_id = $1 AND cd.available_today = true AND cd.is_active = true
           AND (EXTRACT(HOUR FROM ds.end_time) * 60 + EXTRACT(MINUTE FROM ds.end_time)) > $3
         GROUP BY cd.id, cd.name, cd.specialization, cd.max_tokens_daily
@@ -151,7 +151,7 @@ async function executeFunction(name, args, ctx) {
              AND ds.end_time > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::time
            LEFT JOIN bookings b
              ON b.doctor_id = cd.id
-             AND b.booking_date = CURRENT_DATE
+             AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
              AND b.status != 'cancelled'
              AND (b.booking_type IS NULL OR b.booking_type != 'procedure')
            WHERE cd.tenant_id = $1
@@ -629,7 +629,7 @@ async function executeFunction(name, args, ctx) {
           const countRes = await pool.query(
             `SELECT COUNT(*) AS count FROM bookings
              WHERE tenant_id = $1 AND doctor_id = $2
-             AND booking_date = CURRENT_DATE AND status != 'cancelled'
+             AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date AND status != 'cancelled'
              AND (booking_type IS NULL OR booking_type != 'procedure')
              AND (
                (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
@@ -750,7 +750,7 @@ Please reply with your name to confirm booking.`
   // Check duplicate booking for today — scoped to patient name so family members sharing a number can each book
   if (customer?.id) {
     const activeBookingRes = await pool.query(
-      `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE AND LOWER(patient_name) = LOWER($3) AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
+      `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date AND LOWER(patient_name) = LOWER($3) AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
       [customer.id, doctor.id, formattedName]
     )
     if (activeBookingRes.rows.length > 0) {

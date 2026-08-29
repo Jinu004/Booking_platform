@@ -43,7 +43,7 @@ async function getStaffWithStats(tenantId) {
     SELECT d.email, COUNT(*) as count
     FROM bookings b
     JOIN clinic_doctors d ON d.id = b.doctor_id
-    WHERE b.tenant_id = $1 AND b.booking_date = CURRENT_DATE
+    WHERE b.tenant_id = $1 AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
     GROUP BY d.email
   `, [tenantId])
   const countByEmail = {}

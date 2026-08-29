@@ -160,7 +160,7 @@ async function getDoctorTokenCount(pool, tenantId, doctorId, sessionStart = null
   let sql = `
     SELECT COUNT(*) AS total
     FROM bookings
-    WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE
+    WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
     AND status != 'cancelled'
     AND (booking_type IS NULL OR booking_type != 'procedure')`;
   const params = [doctorId];
