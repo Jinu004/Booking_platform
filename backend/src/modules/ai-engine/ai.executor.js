@@ -785,8 +785,8 @@ Please reply with your name to confirm booking.`
       sessionsCTB = schedResCTB.rows;
     }
     const slotAnchorMins = session_start_time ? toMinsCTB(session_start_time) : currentMinsCTB;
-    const targetSess = sessionsCTB.find(s => slotAnchorMins >= toMinsCTB(s.start_time) && slotAnchorMins < toMinsCTB(s.end_time));
-
+    const targetSess = sessionsCTB.find(s => slotAnchorMins >= toMinsCTB(s.start_time) && slotAnchorMins < toMinsCTB(s.end_time))
+      || (session_start_time ? sessionsCTB.find(s => currentMinsCTB >= toMinsCTB(s.start_time) && currentMinsCTB < toMinsCTB(s.end_time)) : null);
 
     if (targetSess) {
       sessionStartCTB = toTimeStrCTB(toMinsCTB(targetSess.start_time));
@@ -800,7 +800,7 @@ Please reply with your name to confirm booking.`
 
   const dynamicMaxCTB = totalMinutesCTB > 0
     ? Math.floor(totalMinutesCTB / avgMinsCTB)
-    : (session_start_time ? 0 : (doctor.max_tokens_daily || 30));
+    : (doctor.max_tokens_daily || 30);
   const maxTokensCTB = doctor.max_tokens_daily ? Math.min(dynamicMaxCTB, doctor.max_tokens_daily) : dynamicMaxCTB;
 
   let countSqlCTB = `SELECT COUNT(*) AS count FROM bookings
