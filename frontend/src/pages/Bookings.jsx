@@ -19,7 +19,10 @@ const Bookings = () => {
   const [stats, setStats] = useState({ total: 0, confirmed: 0, completed: 0, noshow: 0 });
   const [loading, setLoading] = useState(true);
   
-  const [date, setDate] = useState(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).toISOString().split('T')[0]);
+  const [date, setDate] = useState(() => {
+    const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+    return `${istNow.getFullYear()}-${String(istNow.getMonth() + 1).padStart(2, '0')}-${String(istNow.getDate()).padStart(2, '0')}`
+  });
   const [viewMode, setViewMode] = useState('today')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('');
