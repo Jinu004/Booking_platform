@@ -201,7 +201,7 @@ async function getTodayBookings(req, res, next) {
       FROM bookings b
       LEFT JOIN customers c ON b.customer_id = c.id
       LEFT JOIN clinic_doctors d ON b.doctor_id = d.id
-      WHERE b.tenant_id = $1 AND b.booking_date = CURRENT_DATE
+      WHERE b.tenant_id = $1 AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
       ORDER BY b.token_number ASC
     `;
     const result = await pool.query(sql, [tenantId]);
