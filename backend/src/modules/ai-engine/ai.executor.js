@@ -804,7 +804,7 @@ Please reply with your name to confirm booking.`
   const maxTokensCTB = doctor.max_tokens_daily ? Math.min(dynamicMaxCTB, doctor.max_tokens_daily) : dynamicMaxCTB;
 
   let countSqlCTB = `SELECT COUNT(*) AS count FROM bookings
-     WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = CURRENT_DATE
+     WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
      AND status != 'cancelled' AND (booking_type IS NULL OR booking_type != 'procedure')`;
   const countParamsCTB = [tenant.id, doctor.id];
   if (sessionStartCTB && sessionEndCTB) {
