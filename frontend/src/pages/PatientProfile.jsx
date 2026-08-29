@@ -346,7 +346,8 @@ export default function PatientProfile() {
     }
   }
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const _todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  const todayStr = `${_todayIST.getFullYear()}-${String(_todayIST.getMonth()+1).padStart(2,'0')}-${String(_todayIST.getDate()).padStart(2,'0')}`
   const activeBooking = bookings.find(b =>
     (b.status === 'pending' || b.status === 'confirmed') &&
     b.booking_date?.startsWith(todayStr)
@@ -506,7 +507,7 @@ export default function PatientProfile() {
     await loadDoctors();
     setEditingNote(null);
     setNoteForm({
-      visit_date: new Date().toISOString().split('T')[0],
+      visit_date: (() => { const _d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`; })(),
       doctor_id: defaultDoctorId, diagnosis: '', prescription: '', notes: '', follow_up_date: '',
       _doctor_name: '', _doctor_specialization: '',
     });
@@ -1150,7 +1151,7 @@ export default function PatientProfile() {
                   type="date"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                   value={scheduleForm.bookingDate}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={(() => { const _d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`; })()}
                   onChange={e => setScheduleForm(f => ({ ...f, bookingDate: e.target.value }))}
                 />
               </div>
@@ -1338,7 +1339,7 @@ export default function PatientProfile() {
                 <input
                   type="date"
                   value={procedureDate}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={(() => { const _d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`; })()}
                   onChange={e => setProcedureDate(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                 />

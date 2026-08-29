@@ -711,7 +711,7 @@ const Bookings = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                 <input type="date" value={procedureForm.date}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={(() => { const _d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`; })()}
                   onChange={e => setProcedureForm(f => ({ ...f, date: e.target.value, slot: '' }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
               </div>
