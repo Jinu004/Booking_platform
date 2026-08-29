@@ -77,7 +77,7 @@ const Bookings = () => {
       const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
       const tomorrowIST = new Date(istNow)
       tomorrowIST.setDate(tomorrowIST.getDate() + 1)
-      const tomorrowDate = tomorrowIST.toISOString().split('T')[0]
+      const tomorrowDate = `${tomorrowIST.getFullYear()}-${String(tomorrowIST.getMonth()+1).padStart(2,'0')}-${String(tomorrowIST.getDate()).padStart(2,'0')}`
       const [bookingsRes, statsRes, docsRes] = await Promise.all([
         getBookings(viewMode === 'upcoming'
           ? { upcoming: true, status: statusFilter }
@@ -103,7 +103,7 @@ const Bookings = () => {
         const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
         const tomorrowIST = new Date(istNow)
         tomorrowIST.setDate(tomorrowIST.getDate() + 1)
-        const tomorrowDate = tomorrowIST.toISOString().split('T')[0]
+        const tomorrowDate = `${tomorrowIST.getFullYear()}-${String(tomorrowIST.getMonth()+1).padStart(2,'0')}-${String(tomorrowIST.getDate()).padStart(2,'0')}`
         const [bookingsRes, statsRes, docsRes] = await Promise.all([
           getBookings(viewMode === 'upcoming'
             ? { upcoming: true, status: statusFilter }
