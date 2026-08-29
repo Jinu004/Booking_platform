@@ -188,12 +188,10 @@ const Doctors = () => {
   const formatDoctorName = (value) => {
     // Remove all Dr. prefixes from start
     const cleaned = value
-      .replace(/^(Dr\.?\s*)*/i, '')
-      .trim();
+      .replace(/^(Dr\.?\s*)*/i, ''); // don't trim — preserves trailing space mid-typing
 
     // If nothing left after removing Dr.
-    // return empty string — let user clear field
-    if (!cleaned) return '';
+    if (!cleaned.trim()) return '';
 
     // Apply title case
     const titled = cleaned.replace(

@@ -877,7 +877,7 @@ Please reply with your name to confirm booking.`
       `INSERT INTO bookings
          (tenant_id, customer_id, conversation_id, doctor_id,
           source, status, booking_date, token_number, notes, patient_name, patient_id, slot_time)
-       VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', CURRENT_DATE,
+       VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date,
          0,
          $5, $6, $7, $8)
        RETURNING id`,
