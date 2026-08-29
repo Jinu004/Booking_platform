@@ -352,7 +352,7 @@ async function createProcedureBooking(req, res, next) {
     if (endMins <= startMins) return errorResponse(res, 'End time must be after start time', 400);
 
     const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    const todayStr = todayIST.toISOString().split('T')[0];
+    const todayStr = `${todayIST.getFullYear()}-${String(todayIST.getMonth()+1).padStart(2,'0')}-${String(todayIST.getDate()).padStart(2,'0')}`;
     if (date < todayStr) return errorResponse(res, 'Cannot book a procedure in the past', 400);
     if (date === todayStr) {
       const nowMins = todayIST.getHours() * 60 + todayIST.getMinutes();

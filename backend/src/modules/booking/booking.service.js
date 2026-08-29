@@ -46,7 +46,7 @@ async function createBookingWithToken(tenantId, bookingData) {
 
     // Calculate dynamic max tokens from session time / avg_consultation_minutes
     const avgMins = doctor.avg_consultation_minutes || 10;
-    const targetDate = bookingDate || new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).toISOString().split('T')[0];
+    const targetDate = bookingDate || (() => { const _d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`; })();
     const overrideRes = await pool.query(
       `SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`,
       [tenantId, doctorId, targetDate]

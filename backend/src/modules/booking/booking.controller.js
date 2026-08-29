@@ -342,7 +342,7 @@ async function createManualBooking(req, res, next) {
     }
 
     // Check for duplicate booking — same phone, same doctor, same day
-    const targetDate = bookingDate || new Date().toISOString().split('T')[0];
+    const targetDate = bookingDate || (() => { const _d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`; })();
     const dupCheck = await client.query(
       `SELECT b.id, b.token_number FROM bookings b
        JOIN customers c ON c.id = b.customer_id
@@ -457,7 +457,7 @@ async function createManualBooking(req, res, next) {
          (tenant_id, customer_id, doctor_id, source, status, booking_date, token_number, notes, patient_name, patient_id, slot_time)
        VALUES ($1, $2, $3, 'walkin', 'pending', $8, $4, $5, $6, $7, $9)
        RETURNING *`,
-      [tenantId, customerId, doctorId, tokenNumber, cleanNotes, patientNameClean, patientId, bookingDate || new Date().toISOString().split('T')[0], slot_time || null]
+      [tenantId, customerId, doctorId, tokenNumber, cleanNotes, patientNameClean, patientId, bookingDate || (() => { const _d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`; })(), slot_time || null]
     );
     const booking = bRes.rows[0];
 
