@@ -304,13 +304,13 @@ const Bookings = () => {
           />
           <div className="flex rounded-lg border border-gray-300 overflow-hidden">
             <button
-              onClick={() => { setViewMode('today'); setDate(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).toISOString().split('T')[0]); }}
+              onClick={() => { setViewMode('today'); const _ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); setDate(`${_ist.getFullYear()}-${String(_ist.getMonth()+1).padStart(2,'0')}-${String(_ist.getDate()).padStart(2,'0')}`); }}
               className={`px-3 py-2 text-sm font-medium transition ${viewMode === 'today' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               Today
             </button>
             <button
-              onClick={() => { setViewMode('tomorrow'); setDate(new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]) }}
+              onClick={() => { setViewMode('tomorrow'); const _ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); _ist.setDate(_ist.getDate() + 1); setDate(`${_ist.getFullYear()}-${String(_ist.getMonth()+1).padStart(2,'0')}-${String(_ist.getDate()).padStart(2,'0')}`); }}
               className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${viewMode === 'tomorrow' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               Tomorrow
