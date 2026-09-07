@@ -19,7 +19,10 @@ const Bookings = () => {
   const [stats, setStats] = useState({ total: 0, confirmed: 0, completed: 0, noshow: 0 });
   const [loading, setLoading] = useState(true);
   
-  const [date, setDate] = useState(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).toISOString().split('T')[0]);
+  const [date, setDate] = useState(() => {
+    const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+    return `${istNow.getFullYear()}-${String(istNow.getMonth() + 1).padStart(2, '0')}-${String(istNow.getDate()).padStart(2, '0')}`
+  });
   const [viewMode, setViewMode] = useState('today')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('');
@@ -74,7 +77,7 @@ const Bookings = () => {
       const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
       const tomorrowIST = new Date(istNow)
       tomorrowIST.setDate(tomorrowIST.getDate() + 1)
-      const tomorrowDate = tomorrowIST.toISOString().split('T')[0]
+      const tomorrowDate = `${tomorrowIST.getFullYear()}-${String(tomorrowIST.getMonth()+1).padStart(2,'0')}-${String(tomorrowIST.getDate()).padStart(2,'0')}`
       const [bookingsRes, statsRes, docsRes] = await Promise.all([
         getBookings(viewMode === 'upcoming'
           ? { upcoming: true, status: statusFilter }
@@ -100,7 +103,7 @@ const Bookings = () => {
         const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
         const tomorrowIST = new Date(istNow)
         tomorrowIST.setDate(tomorrowIST.getDate() + 1)
-        const tomorrowDate = tomorrowIST.toISOString().split('T')[0]
+        const tomorrowDate = `${tomorrowIST.getFullYear()}-${String(tomorrowIST.getMonth()+1).padStart(2,'0')}-${String(tomorrowIST.getDate()).padStart(2,'0')}`
         const [bookingsRes, statsRes, docsRes] = await Promise.all([
           getBookings(viewMode === 'upcoming'
             ? { upcoming: true, status: statusFilter }
@@ -301,13 +304,13 @@ const Bookings = () => {
           />
           <div className="flex rounded-lg border border-gray-300 overflow-hidden">
             <button
-              onClick={() => { setViewMode('today'); setDate(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).toISOString().split('T')[0]); }}
+              onClick={() => { setViewMode('today'); const _ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); setDate(`${_ist.getFullYear()}-${String(_ist.getMonth()+1).padStart(2,'0')}-${String(_ist.getDate()).padStart(2,'0')}`); }}
               className={`px-3 py-2 text-sm font-medium transition ${viewMode === 'today' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               Today
             </button>
             <button
-              onClick={() => { setViewMode('tomorrow'); setDate(new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]) }}
+              onClick={() => { setViewMode('tomorrow'); const _ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); _ist.setDate(_ist.getDate() + 1); setDate(`${_ist.getFullYear()}-${String(_ist.getMonth()+1).padStart(2,'0')}-${String(_ist.getDate()).padStart(2,'0')}`); }}
               className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${viewMode === 'tomorrow' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               Tomorrow
@@ -708,7 +711,7 @@ const Bookings = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                 <input type="date" value={procedureForm.date}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={(() => { const _d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`; })()}
                   onChange={e => setProcedureForm(f => ({ ...f, date: e.target.value, slot: '' }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
               </div>

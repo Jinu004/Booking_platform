@@ -179,7 +179,12 @@ async function processMessage(context) {
         const model = client.getGenerativeModel({
           model: currentModel,
           systemInstruction: systemPrompt,
-          tools: [{ functionDeclarations }]
+          tools: [{ functionDeclarations }],
+          generationConfig: {
+            thinkingConfig: {
+              thinkingBudget: 0
+            }
+          }
         })
 
         // Build conversation history for Gemini
