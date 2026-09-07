@@ -105,27 +105,32 @@ async function getDoctorStats(tenantId, period, doctorId = null) {
   const interval = getInterval(period)
   const params = [tenantId, interval]
   let sql = `
-    SELECT d.name as "doctorName",
+    SELECT d.id as "doctorId",
+           d.name as "doctorName",
+           d.consultation_fee as "consultationFee",
            count(b.id) as "totalBookings",
            sum(case when b.status = 'completed' then 1 else 0 end) as completed,
            sum(case when b.status = 'cancelled' then 1 else 0 end) as cancelled,
-           0 as revenue
+           sum(case when b.status = 'completed' then COALESCE(d.consultation_fee, 0) else 0 end) as revenue
     FROM clinic_doctors d
-    LEFT JOIN clinic_tokens t ON t.doctor_id = d.id
-    LEFT JOIN bookings b ON b.id = t.booking_id AND b.created_at >= NOW() - $2::interval
-    WHERE d.tenant_id = $1`
+    LEFT JOIN bookings b ON b.doctor_id = d.id
+      AND b.created_at AT TIME ZONE 'Asia/Kolkata' >= (NOW() AT TIME ZONE 'Asia/Kolkata') - $2::interval
+    WHERE d.tenant_id = $1
+      AND d.is_active = true`
   if (doctorId) {
     params.push(doctorId)
     sql += ` AND d.id = $3`
   }
-  sql += ` GROUP BY d.name`
+  sql += ` GROUP BY d.id, d.name, d.consultation_fee`
   const res = await pool.query(sql, params)
   return res.rows.map(row => ({
+    doctorId: row.doctorId,
     doctorName: row.doctorName,
+    consultationFee: parseFloat(row.consultationFee) || 0,
     totalBookings: parseInt(row.totalBookings) || 0,
     completed: parseInt(row.completed) || 0,
     cancelled: parseInt(row.cancelled) || 0,
-    revenue: parseInt(row.revenue) || 0
+    revenue: parseFloat(row.revenue) || 0
   }))
 }
 
