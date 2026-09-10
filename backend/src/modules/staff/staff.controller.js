@@ -160,6 +160,7 @@ async function deleteStaffPermanent(req, res, next) {
       return errorResponse(res, 'Cannot delete your own account', 400)
     }
     const target = await StaffModel.getStaffById(pool, req.tenantId, req.params.id)
+    if (!target) return errorResponse(res, 'Staff not found', 404)
     if (target?.role === 'admin') {
       const adminCount = await pool.query(
         'SELECT COUNT(*) FROM staff WHERE tenant_id = $1 AND role = $2 AND is_active = true',
