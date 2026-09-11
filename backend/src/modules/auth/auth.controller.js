@@ -188,8 +188,8 @@ async function forgotPassword(req, res) {
     const staff = result.rows[0]
 
     // Generate reset token
-    const resetToken = require('crypto')
-      .randomBytes(32).toString('hex')
+    const resetToken = crypto.randomBytes(32).toString('hex')
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex')
 
     // Invalidate any existing unused tokens for this staff member so only
     // one active reset token exists at a time (prevents token replay attacks)
@@ -203,7 +203,7 @@ async function forgotPassword(req, res) {
       `INSERT INTO auth_password_resets
        (staff_id, token, expires_at)
        VALUES ($1, $2, NOW() + INTERVAL '1 hour')`,
-      [staff.id, resetToken]
+      [staff.id, resetTokenHash]
     )
 
     // Send reset email via Resend
@@ -246,12 +246,13 @@ async function resetPassword(req, res) {
     }
 
     // Find valid reset token
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
     const result = await pool.query(
       `SELECT staff_id FROM auth_password_resets
        WHERE token = $1
        AND expires_at > NOW()
        AND used = false`,
-      [token]
+      [tokenHash]
     )
 
     if (!result.rows.length) {
@@ -279,7 +280,7 @@ async function resetPassword(req, res) {
 
       await client.query(
         `UPDATE auth_password_resets SET used = true WHERE token = $1`,
-        [token]
+        [tokenHash]
       )
 
       await client.query(
