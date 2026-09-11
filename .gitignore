@@ -31,3 +31,7 @@ backend/src/database/migrations/010_booking_patient_name.sql
 backend/.env.save
 backend/cloudflared.deb
 *.deb
+
+oracle_final_backup.sql
+*.sql
+frontend/.env.production
