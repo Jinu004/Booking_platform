@@ -21,7 +21,12 @@ router.post('/', async (req, res) => {
   // Verify X-Hub-Signature-256 for Meta webhooks only
   const signature = req.headers['x-hub-signature-256'];
   const appSecret = process.env.META_APP_SECRET;
-  if (appSecret) {
+  const isMetaPayload = req.body?.object === 'whatsapp_business_account';
+  if (isMetaPayload && !appSecret && process.env.NODE_ENV === 'production') {
+    logger.error('META_APP_SECRET not set — rejecting Meta webhook');
+    return res.status(503).json({ success: false, error: 'Webhook not configured' });
+  }
+  if (appSecret && isMetaPayload) {
     if (!signature) {
       logger.warn('Webhook request missing signature header — rejected');
       return res.status(403).json({ success: false, error: 'Missing signature' });
