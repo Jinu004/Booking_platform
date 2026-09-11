@@ -51,6 +51,12 @@ async function inviteStaff(req, res, next) {
     if (!staffData.name || !staffData.role || !staffData.email) {
       return errorResponse(res, 'Name, role, and email are required', 400)
     }
+    if (staffData.role === 'admin' && req.staff.role !== 'admin') {
+      return errorResponse(res, 'Only admins can create admin accounts', 403)
+    }
+    if (req.body.password && req.body.password.length < 8) {
+      return errorResponse(res, 'Password must be at least 8 characters', 400)
+    }
 
     const password = req.body.password || generateTempPassword()
     const password_hash = await bcrypt.hash(password, 12)
@@ -80,6 +86,12 @@ async function updateStaff(req, res, next) {
     let staff;
     
     if (updates.role) {
+      if (req.params.id === req.staff.id) {
+        return errorResponse(res, 'You cannot change your own role', 400)
+      }
+      if (updates.role === 'admin' && req.staff.role !== 'admin') {
+        return errorResponse(res, 'Only admins can grant the admin role', 403)
+      }
       if (updates.role !== 'admin') {
         const targetStaff = await StaffModel.getStaffById(pool, req.tenantId, req.params.id)
         if (targetStaff?.role === 'admin') {
