@@ -88,10 +88,10 @@ const Dashboard = () => {
         setDoctors(cached.doctors);
         setAvailableDoctors(cached.availableDoctors);
         setHasDoctors(cached.hasDoctors);
-        setIsOffline(true);
       } else {
         addToast('Failed to load dashboard data', 'error');
       }
+      setIsOffline(true);
     } finally {
       setLoading(false);
     }
