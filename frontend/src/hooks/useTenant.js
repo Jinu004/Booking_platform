@@ -31,7 +31,9 @@ const useTenant = () => {
       await loadConfigs(tenant.id);
       setError(null);
     } catch (err) {
-      setError(err?.error || 'Failed to refresh tenant');
+      if (err?.error !== 'Cannot connect to server') {
+        setError(err?.error || 'Failed to refresh tenant');
+      }
     } finally {
       setLoading(false);
     }
