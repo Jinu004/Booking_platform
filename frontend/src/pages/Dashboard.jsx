@@ -32,17 +32,14 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const results = await Promise.allSettled([
-        getBookingStats(),
-        isDoctor ? Promise.resolve({ data: [] }) : getHITLConversations({ since: '24h' }),
-        getDoctors(true),
-        getDoctors(),
-        getTokenQueue(),
-        getBookings({ limit: 5 })
+      const [statsRes, convRes, docsRes, allDocsRes, tokensRes, bookingsRes] = await Promise.all([
+        getBookingStats().catch(() => ({ data: { total: 0 } })),
+        isDoctor ? Promise.resolve({ data: [] }) : getHITLConversations({ since: '24h' }).catch(() => ({ data: { conversations: [] } })),
+        getDoctors(true).catch(() => ({ data: [] })),
+        getDoctors().catch(() => ({ data: [] })),
+        getTokenQueue().catch(() => ({ data: [] })),
+        getBookings({ limit: 5 }).catch(() => ({ data: { bookings: [] } }))
       ]);
-      const allFailed = results.every(r => r.status === 'rejected');
-      if (allFailed) throw new Error('All requests failed');
-      const [statsRes, convRes, docsRes, allDocsRes, tokensRes, bookingsRes] = results.map(r => r.status === 'fulfilled' ? r.value : null);
 
       const docsArray = allDocsRes?.data || [];
       const availableDocsArray = docsRes?.data || [];
