@@ -278,7 +278,7 @@ export default function Patients() {
                         <span className="text-gray-300 text-sm">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{relativeDate(p.last_seen)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{relativeDate(p.last_visit)}</td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-700">{parseInt(p.total_visits || 0)}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
@@ -331,7 +331,7 @@ export default function Patients() {
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">{p.phone}</div>
                   <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
-                    {p.last_seen && <span>Last: {relativeDate(p.last_seen)}</span>}
+                    {p.last_visit && <span>Last: {relativeDate(p.last_visit)}</span>}
                     <span>{parseInt(p.total_visits || 0)} visits</span>
                   </div>
                 </div>
