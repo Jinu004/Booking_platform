@@ -638,7 +638,7 @@ export default function PatientProfile() {
   const TABS = [
     { key: 'overview', label: 'Overview' },
     { key: 'medical', label: 'Medical History' },
-    { key: 'notes', label: 'Prescriptions' },
+    { key: 'notes', label: 'Notes' },
     { key: 'bookings', label: 'Bookings' },
   ];
 
