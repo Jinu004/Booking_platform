@@ -250,7 +250,7 @@ export default function Patients() {
             <tbody className="divide-y divide-gray-100">
               {paginatedPatients.map(p => {
                 const isNew = (parseInt(p.total_visits || 0)) === 0;
-                const bloodGroup = p.profile?.blood_group;
+                const bloodGroup = p.blood_group;
                 const age = calcAge(p.profile?.date_of_birth);
                 const gender = p.profile?.gender;
                 return (

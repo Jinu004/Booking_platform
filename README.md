@@ -38,9 +38,10 @@ cd ~/receptionai/backend && git pull origin develop && pm2 restart receptionai-b
 
 **Frontend** (PowerShell — from `d:\Appointment Automation\frontend`):
 ```
+cd "d:\Appointment Automation\frontend"
+$env:VITE_API_URL="https://receptionai.in/api/v1"
 npm run build
-```
-```
+ssh -i "C:\Users\jinuj\Downloads\receptionai_new.key" jinujoee9633@35.234.212.43 "rm -rf /var/www/booking-platform/frontend/assets/*"
 scp -i "C:\Users\jinuj\Downloads\receptionai_new.key" -r "d:\Appointment Automation\frontend\dist\*" jinujoee9633@35.234.212.43:/var/www/booking-platform/frontend/
 ```
 
