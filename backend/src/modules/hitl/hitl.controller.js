@@ -137,4 +137,16 @@ async function sendTemplate(req, res) {
   }
 }
 
-module.exports = { getConversations, getMessages, reply, toggleMode, sseStream, sendTemplate };
+// PATCH /api/hitl/conversations/:id/acknowledge
+async function acknowledgeConversation(req, res, next) {
+  try {
+    const { id } = req.params;
+    if (!isUUID(id)) return res.status(400).json({ success: false, data: null, error: 'Invalid conversation ID' });
+    await HITLService.acknowledgeConversation(id, req.tenant.id);
+    return res.json({ success: true, data: null, error: null });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getConversations, getMessages, reply, toggleMode, sseStream, sendTemplate, acknowledgeConversation };

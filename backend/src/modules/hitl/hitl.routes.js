@@ -20,5 +20,6 @@ router.get('/conversations/:id/messages', requireAuth, requireRole('admin', 'man
 router.post('/conversations/:id/send-template', requireAuth, requireRole('admin', 'manager', 'receptionist', 'super_admin'), HITLController.sendTemplate);
 router.post('/conversations/:id/reply', requireAuth, requireRole('admin', 'manager', 'receptionist', 'super_admin'), HITLController.reply);
 router.patch('/conversations/:id/mode', requireAuth, requireRole('admin', 'manager', 'receptionist', 'super_admin'), HITLController.toggleMode);
+router.patch('/conversations/:id/acknowledge', requireAuth, requireRole('admin', 'manager', 'receptionist', 'super_admin'), HITLController.acknowledgeConversation);
 
 module.exports = router;
