@@ -228,6 +228,7 @@ export default function Conversations() {
     setConversations(prev => prev.map(c =>
       c.id === selectedConversationId ? { ...c, needs_attention: false } : c
     ));
+    api.patch(`/hitl/conversations/${selectedConversationId}/acknowledge`).catch(() => {});
     const loadMessages = async () => {
       try {
         setLoadingThread(true);
