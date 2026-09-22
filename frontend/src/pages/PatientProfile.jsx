@@ -621,19 +621,22 @@ export default function PatientProfile() {
   // ── Derived data ───────────────────────────────────────────────────────────
 
   const age = calcAge(profile?.date_of_birth) || profile?.age;
-  const isNew = (customer.total_visits || 0) === 0;
   const bloodGroup = profile?.blood_group;
 
   const sortedNotes = [...visitNotes].sort(
     (a, b) => new Date(b.created_at) - new Date(a.created_at)
   );
+  const lastNote = sortedNotes[0];
+
+  const completedBookings = bookings?.filter(b => b.status === 'completed') || [];
+  const totalVisits = completedBookings.length;
+  const isNew = totalVisits === 0;
+  const lastVisitDate = lastNote?.visit_date || completedBookings[0]?.booking_date;
 
   const now = new Date();
   const nextAppt = [...bookings]
     .filter(b => (b.status === 'upcoming' || b.status === 'pending') && new Date(b.booking_date) >= now)
     .sort((a, b) => new Date(a.booking_date) - new Date(b.booking_date))[0];
-
-  const lastNote = sortedNotes[0];
 
   const TABS = [
     { key: 'overview', label: 'Overview' },
@@ -758,12 +761,12 @@ export default function PatientProfile() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider mb-2">Total Visits</p>
-          <p className="text-3xl font-black text-teal-600">{customer.total_visits ?? visitNotes.length}</p>
+          <p className="text-3xl font-black text-teal-600">{totalVisits}</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider mb-2">Last Visit</p>
-          <p className="text-xl font-bold text-gray-800">{lastNote ? fmtDate(lastNote.visit_date) : '—'}</p>
-          {lastNote && <p className="text-xs text-gray-400 mt-0.5">{relativeDate(lastNote.visit_date)}</p>}
+          <p className="text-xl font-bold text-gray-800">{lastVisitDate ? fmtDate(lastVisitDate) : '—'}</p>
+          {lastVisitDate && <p className="text-xs text-gray-400 mt-0.5">{relativeDate(lastVisitDate)}</p>}
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-2">
