@@ -341,7 +341,11 @@ async function processMessage(context) {
           throw new Error('Empty text response from Gemini');
         }
 
-        return text.trim()
+        // Output filter — strip any leaked UUIDs or phone numbers before sending to patient
+        let cleanText = text.trim();
+        cleanText = cleanText.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '[ref]');
+        cleanText = cleanText.replace(/\b(\+91[\s-]?)?[6-9]\d{9}\b/g, '[number]');
+        return cleanText;
 
       } catch (err) {
         lastError = err;
