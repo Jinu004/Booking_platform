@@ -188,7 +188,7 @@ const Bookings = () => {
           <div className="flex flex-col gap-0.5">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Procedure</span>
             <span className="text-xs text-gray-600 font-medium">{b.procedure_name || 'Procedure'}</span>
-            <span className="text-xs text-gray-400">{b.slot_time} — {b.end_time}</span>
+            <span className="text-xs text-gray-400">{b.slot_time || '—'} — {b.end_time}</span>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-0.5">
@@ -479,7 +479,7 @@ const Bookings = () => {
                               <div className="flex flex-col gap-0.5">
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Procedure</span>
                                 <span className="text-xs text-gray-600 font-medium">{b.procedure_name || 'Procedure'}</span>
-                                <span className="text-xs text-gray-400">{b.slot_time} – {b.end_time}</span>
+                                <span className="text-xs text-gray-400">{b.slot_time || '—'} – {b.end_time}</span>
                               </div>
                             ) : (
                               <div className="flex flex-col items-center gap-0.5">
