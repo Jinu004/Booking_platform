@@ -51,6 +51,9 @@ async function inviteStaff(req, res, next) {
     if (!staffData.name || !staffData.role || !staffData.email) {
       return errorResponse(res, 'Name, role, and email are required', 400)
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffData.email)) {
+      return errorResponse(res, 'Invalid email address', 400)
+    }
     if (staffData.role === 'admin' && req.staff.role !== 'admin') {
       return errorResponse(res, 'Only admins can create admin accounts', 403)
     }
