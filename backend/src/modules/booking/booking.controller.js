@@ -221,7 +221,14 @@ async function exportBookings(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { startDate, endDate } = req.query;
-    
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (startDate && !dateRegex.test(startDate)) {
+      return res.status(400).json({ error: 'Invalid startDate format. Use YYYY-MM-DD.' });
+    }
+    if (endDate && !dateRegex.test(endDate)) {
+      return res.status(400).json({ error: 'Invalid endDate format. Use YYYY-MM-DD.' });
+    }
+
     let sql = `
       SELECT b.token_number, c.name as patient_name, c.phone, d.name as doctor_name, b.status, b.booking_date
       FROM bookings b

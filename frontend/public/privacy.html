@@ -1,197 +1,549 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Policy - ReceptionAI</title>
-    <style>
-        :root {
-            --primary-color: #4f46e5;
-            --text-color: #6b7280;
-            --heading-color: #111827;
-            --border-color: #e5e7eb;
-            --bg-color: #ffffff;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - ReceptionAI</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Inter:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --bg: #F7F9FA;
+      --bg-secondary: #EEF2F5;
+      --surface: #FFFFFF;
+      --border: #D6DFE5;
+      --text-primary: #0F2027;
+      --text-secondary: #4A5E6A;
+      --text-muted: #6B7E8A;
+      --accent: #2A7F8F;
+      --accent-light: #E8F4F6;
+      --heading-font: 'Crimson Pro', Georgia, serif;
+      --body-font: 'Inter', system-ui, sans-serif;
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            color: var(--text-color);
-            background-color: var(--bg-color);
-            margin: 0;
-            padding: 0;
-        }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0A1A22;
+        --bg-secondary: #0F2230;
+        --surface: #132330;
+        --border: #1E3445;
+        --text-primary: #E8EFF3;
+        --text-secondary: #9BB0BB;
+        --text-muted: #6B8494;
+        --accent: #3A9DB0;
+        --accent-light: #0F2A33;
+      }
+    }
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 2rem 1.5rem;
-        }
+    * { box-sizing: border-box; }
 
-        header {
-            text-align: center;
-            margin-bottom: 3rem;
-            padding-bottom: 2rem;
-            border-bottom: 1px solid var(--border-color);
-        }
+    body {
+      font-family: var(--body-font);
+      background: var(--bg);
+      color: var(--text-primary);
+      margin: 0;
+      padding: 0 16px;
+    }
 
-        .logo {
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--primary-color);
-            text-decoration: none;
-            letter-spacing: -0.025em;
-        }
+    .page-wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 48px 0 80px;
+    }
 
-        h1 {
-            color: var(--heading-color);
-            font-size: 2.25rem;
-            font-weight: 700;
-            margin-top: 1.5rem;
-            margin-bottom: 0.5rem;
-        }
+    .doc-header {
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 28px;
+      margin-bottom: 40px;
+    }
 
-        .last-updated {
-            font-size: 0.875rem;
-            color: var(--text-color);
-        }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      text-decoration: none;
+    }
 
-        section {
-            margin-bottom: 2.5rem;
-        }
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-        h2 {
-            color: var(--primary-color);
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border-color);
-        }
+    .brand-mark svg {
+      width: 18px;
+      height: 18px;
+      fill: white;
+    }
 
-        ul {
-            padding-left: 1.5rem;
-            margin-top: 0.5rem;
-        }
+    .brand-name {
+      font-family: var(--body-font);
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
 
-        li {
-            margin-bottom: 0.5rem;
-        }
+    .doc-title {
+      font-family: var(--heading-font);
+      font-size: clamp(2rem, 5vw, 2.8rem);
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0 0 12px;
+      line-height: 1.15;
+    }
 
-        a {
-            color: var(--primary-color);
-            text-decoration: none;
-        }
+    .doc-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
 
-        a:hover {
-            text-decoration: underline;
-        }
+    .toc {
+      background: var(--accent-light);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
+      padding: 20px 24px;
+      margin-bottom: 48px;
+    }
 
-        footer {
-            margin-top: 4rem;
-            padding-top: 2rem;
-            border-top: 1px solid var(--border-color);
-            text-align: center;
-            font-size: 0.875rem;
-        }
+    .toc-title {
+      font-family: var(--body-font);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin: 0 0 12px;
+    }
 
-        @media (max-width: 640px) {
-            h1 {
-                font-size: 1.875rem;
-            }
-            h2 {
-                font-size: 1.25rem;
-            }
-            .container {
-                padding: 1.5rem 1rem;
-            }
-        }
-    </style>
+    .toc ol {
+      margin: 0;
+      padding-left: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 4px 24px;
+    }
+
+    .toc li {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .toc a:hover { text-decoration: underline; }
+
+    .section {
+      margin-bottom: 48px;
+      scroll-margin-top: 24px;
+    }
+
+    .section-number {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    h2 {
+      font-family: var(--heading-font);
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0 0 16px;
+      line-height: 1.25;
+    }
+
+    p {
+      font-size: 0.9375rem;
+      line-height: 1.75;
+      color: var(--text-secondary);
+      margin: 0 0 14px;
+    }
+
+    p:last-child { margin-bottom: 0; }
+
+    .data-table-wrap { overflow-x: auto; margin: 20px 0; }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    .data-table th {
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      padding: 10px 14px;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .data-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+      vertical-align: top;
+      line-height: 1.55;
+    }
+
+    .data-table tr:last-child td { border-bottom: none; }
+
+    .data-table td:first-child {
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .highlight-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 18px 20px;
+      margin: 20px 0;
+    }
+
+    .highlight-box p { font-size: 0.875rem; margin: 0; }
+
+    .rights-list {
+      list-style: none;
+      padding: 0;
+      margin: 16px 0 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .rights-list li {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    .rights-list .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-top: 8px;
+      flex-shrink: 0;
+    }
+
+    .contact-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px 28px;
+      margin-top: 20px;
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .contact-box .label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .contact-box .value {
+      font-size: 0.9375rem;
+      color: var(--text-primary);
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .contact-box .sub {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+
+    .doc-footer {
+      border-top: 1px solid var(--border);
+      padding-top: 28px;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    @media (max-width: 540px) {
+      .toc ol { grid-template-columns: 1fr; }
+      .contact-grid { grid-template-columns: 1fr; }
+      .doc-footer { flex-direction: column; gap: 4px; }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <a href="https://receptionai.in" class="logo">ReceptionAI</a>
-            <h1>Privacy Policy</h1>
-            <div class="last-updated">Last updated: May 2026</div>
-        </header>
+  <div class="page-wrap">
 
-        <main>
-            <section>
-                <h2>1. Introduction</h2>
-                <p>Welcome to ReceptionAI. We are a conversational booking platform that helps clinics manage appointments seamlessly via WhatsApp.</p>
-                <p>This Privacy Policy explains how ReceptionAI (operated at <a href="https://receptionai.in">receptionai.in</a>) collects, uses, and protects your information when you use our services.</p>
-            </section>
+    <header class="doc-header">
+      <a href="https://receptionai.in" class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+        </div>
+        <span class="brand-name">ReceptionAI</span>
+      </a>
+      <h1 class="doc-title">Privacy Policy</h1>
+      <div class="doc-meta">
+        <span>Effective date: 23 September 2026</span>
+        <span>Last updated: 23 September 2026</span>
+        <span>Version 1.0</span>
+      </div>
+    </header>
 
-            <section>
-                <h2>2. Information We Collect</h2>
-                <p>We only collect the information necessary to provide our appointment booking services:</p>
-                <ul>
-                    <li><strong>Personal Information:</strong> Name and phone number (provided by the patient during the booking process).</li>
-                    <li><strong>Appointment Details:</strong> Specific details related to your booking, such as the selected doctor, date, and token number.</li>
-                    <li><strong>Communications:</strong> WhatsApp messages sent to and from clinic numbers managed by ReceptionAI.</li>
-                </ul>
-                <p><em>Note: We do not collect or store any payment information.</em></p>
-            </section>
+    <nav class="toc">
+      <div class="toc-title">Contents</div>
+      <ol>
+        <li><a href="#s1">Who We Are</a></li>
+        <li><a href="#s2">Information We Collect</a></li>
+        <li><a href="#s3">How We Use Your Information</a></li>
+        <li><a href="#s4">WhatsApp Messaging</a></li>
+        <li><a href="#s5">Third-Party Services</a></li>
+        <li><a href="#s6">Data Storage &amp; Security</a></li>
+        <li><a href="#s7">Data Retention</a></li>
+        <li><a href="#s8">Clinic Partners</a></li>
+        <li><a href="#s9">Your Rights</a></li>
+        <li><a href="#s10">Children's Privacy</a></li>
+        <li><a href="#s11">Changes to This Policy</a></li>
+        <li><a href="#s12">Contact &amp; Grievances</a></li>
+      </ol>
+    </nav>
 
-            <section>
-                <h2>3. How We Use Your Information</h2>
-                <p>The information we collect is used strictly for operational purposes:</p>
-                <ul>
-                    <li>To create, manage, and track your clinic appointments.</li>
-                    <li>To send booking confirmations, status updates, and reminders via WhatsApp.</li>
-                    <li>To help clinic staff efficiently manage their patient queue and availability.</li>
-                </ul>
-                <p><strong>We respect your privacy:</strong> We do not sell your personal data or communications to any third parties.</p>
-            </section>
+    <section class="section" id="s1">
+      <span class="section-number">01</span>
+      <h2>Who We Are</h2>
+      <p>Receptionai (trading as <strong>ReceptionAI</strong>, registered under Udyam, Kerala, India) operates <strong>receptionai.in</strong> — an AI-powered WhatsApp appointment booking and clinic reception platform for private clinics in India.</p>
+      <p>This Privacy Policy explains how ReceptionAI collects, uses, stores, and protects information received through our platform, including through WhatsApp conversations facilitated on behalf of our clinic partners.</p>
+      <p>By interacting with a clinic's WhatsApp number powered by ReceptionAI, you agree to the practices described in this policy.</p>
+    </section>
 
-            <section>
-                <h2>4. WhatsApp Messaging</h2>
-                <p>Our platform relies on WhatsApp to facilitate bookings:</p>
-                <ul>
-                    <li>We use the Meta WhatsApp Business API to securely send and receive messages.</li>
-                    <li>Messages from ReceptionAI are only sent in response to patient-initiated conversations.</li>
-                    <li>Patients can opt out or stop receiving messages at any time simply by not initiating further conversations or by following any provided opt-out instructions.</li>
-                </ul>
-            </section>
+    <section class="section" id="s2">
+      <span class="section-number">02</span>
+      <h2>Information We Collect</h2>
+      <p>We collect information directly from patients via WhatsApp conversations, and indirectly through clinic partners who use our platform.</p>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Data Type</th>
+              <th>Source</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>WhatsApp phone number</td>
+              <td>Meta / WhatsApp</td>
+              <td>Identify and contact you for bookings</td>
+            </tr>
+            <tr>
+              <td>Name</td>
+              <td>Provided by you during conversation</td>
+              <td>Personalise responses and booking records</td>
+            </tr>
+            <tr>
+              <td>Conversation messages</td>
+              <td>WhatsApp chat with the clinic</td>
+              <td>Process AI responses; booking assistance</td>
+            </tr>
+            <tr>
+              <td>Appointment details</td>
+              <td>Booking conversation / clinic</td>
+              <td>Schedule, confirm, and remind appointments</td>
+            </tr>
+            <tr>
+              <td>Visit history</td>
+              <td>Stored after each appointment</td>
+              <td>Follow-ups; service continuity</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>We do <strong>not</strong> collect payment card details, government IDs, precise location, or biometric data.</p>
+    </section>
 
-            <section>
-                <h2>5. Data Storage and Security</h2>
-                <p>We take the security of your data seriously:</p>
-                <ul>
-                    <li>All data is stored securely on servers located within India, in compliance with local regulations.</li>
-                    <li>We retain appointment and booking data for a period of 1 year to assist clinics with patient records and follow-ups.</li>
-                    <li>We implement industry-standard security measures to protect against unauthorized access, alteration, disclosure, or destruction of your personal information.</li>
-                </ul>
-            </section>
+    <section class="section" id="s3">
+      <span class="section-number">03</span>
+      <h2>How We Use Your Information</h2>
+      <p>Information collected is used solely to deliver the appointment booking service on behalf of the clinic you contacted. Specific uses include:</p>
+      <ul class="rights-list">
+        <li><span class="dot"></span><span>Responding to your booking requests and queries through WhatsApp</span></li>
+        <li><span class="dot"></span><span>Creating and managing appointment records for the clinic</span></li>
+        <li><span class="dot"></span><span>Sending appointment confirmation and reminder messages</span></li>
+        <li><span class="dot"></span><span>Enabling the clinic to view and manage their patient appointments</span></li>
+        <li><span class="dot"></span><span>Improving service reliability and identifying technical issues</span></li>
+      </ul>
+      <p style="margin-top:16px;">We do <strong>not</strong> use your data for advertising, sell it to third parties, or share it with any party not listed in Section 5.</p>
+    </section>
 
-            <section>
-                <h2>6. Your Rights</h2>
-                <p>You have control over your personal data:</p>
-                <ul>
-                    <li><strong>Right to Deletion:</strong> You can request the deletion of your data from our systems by contacting us.</li>
-                    <li><strong>Right to Access:</strong> You can ask us what specific data we hold about you at any time.</li>
-                </ul>
-            </section>
+    <section class="section" id="s4">
+      <span class="section-number">04</span>
+      <h2>WhatsApp Messaging</h2>
+      <p>Our platform relies on WhatsApp to facilitate bookings:</p>
+      <ul class="rights-list">
+        <li><span class="dot"></span><span>We use the Meta WhatsApp Business API to securely send and receive messages on behalf of clinics.</span></li>
+        <li><span class="dot"></span><span>Messages from ReceptionAI are only sent in response to patient-initiated conversations or as appointment reminders the patient consented to by booking.</span></li>
+        <li><span class="dot"></span><span>Patients can stop receiving messages at any time by not initiating further conversations or by requesting opt-out through the clinic.</span></li>
+      </ul>
+    </section>
 
-            <section>
-                <h2>7. Contact Us</h2>
-                <p>If you have any questions, concerns, or requests regarding this Privacy Policy or your data, please contact us:</p>
-                <ul>
-                    <li><strong>Email:</strong> <a href="mailto:support.receptionai@gmail.com">support.receptionai@gmail.com</a></li>
-                    <li><strong>Website:</strong> <a href="https://receptionai.in">receptionai.in</a></li>
-                </ul>
-            </section>
+    <section class="section" id="s5">
+      <span class="section-number">05</span>
+      <h2>Third-Party Services</h2>
+      <p>To deliver our service, your data is processed by the following third parties:</p>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Provider</th>
+              <th>What is shared</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>WhatsApp Cloud API</td>
+              <td>Meta Platforms, Inc.</td>
+              <td>Messages, phone number</td>
+              <td>Message delivery infrastructure</td>
+            </tr>
+            <tr>
+              <td>Gemini AI</td>
+              <td>Google LLC</td>
+              <td>Conversation message content</td>
+              <td>AI-generated booking responses</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="highlight-box">
+        <p><strong>Note on AI processing:</strong> Your message content is sent to Google Gemini to generate automated responses. Google processes this data under its own data processing agreements. Message content is not stored by Google for model training when accessed via the API.</p>
+      </div>
+      <p>We do not share your data with any other third party.</p>
+    </section>
 
-            <section>
-                <h2>8. Changes to This Policy</h2>
-                <p>We may update this Privacy Policy from time to time to reflect changes in our practices or legal requirements. We will notify users of any significant changes by updating the "Last updated" date at the top of this page or through appropriate communication channels.</p>
-            </section>
-        </main>
+    <section class="section" id="s6">
+      <span class="section-number">06</span>
+      <h2>Data Storage &amp; Security</h2>
+      <p>All data is stored on servers located in <strong>Mumbai, India</strong> (Google Cloud Platform). We implement the following security measures:</p>
+      <ul class="rights-list">
+        <li><span class="dot"></span><span>HTTPS encryption for all data in transit</span></li>
+        <li><span class="dot"></span><span>Database access restricted to backend services only — no public exposure</span></li>
+        <li><span class="dot"></span><span>Tenant isolation — each clinic's data is logically separated and inaccessible to other clinics</span></li>
+        <li><span class="dot"></span><span>Rate limiting on all API endpoints to prevent abuse</span></li>
+        <li><span class="dot"></span><span>Regular automated backups</span></li>
+      </ul>
+      <p style="margin-top:16px;">In the event of a data breach affecting your information, we will notify the affected clinic partner within 72 hours of becoming aware of the incident.</p>
+    </section>
 
-        <footer>
-            <p>&copy; 2026 ReceptionAI. All rights reserved.</p>
-        </footer>
-    </div>
+    <section class="section" id="s7">
+      <span class="section-number">07</span>
+      <h2>Data Retention</h2>
+      <p>We retain your data for <strong>12 months from your last interaction</strong> with any clinic using the ReceptionAI platform. After this period, your data is permanently deleted from our systems.</p>
+      <p>A clinic may request earlier deletion of their patient records at any time by contacting us at <strong>support@receptionai.in</strong>. Individual patients may also request deletion directly (see Section 9).</p>
+    </section>
+
+    <section class="section" id="s8">
+      <span class="section-number">08</span>
+      <h2>Clinic Partners</h2>
+      <p>ReceptionAI provides its platform to clinics as a data processor. The clinic you interacted with is the <strong>data controller</strong> for your appointment and medical records — they determine the purpose and means of processing your clinical data.</p>
+      <p>Clinics using our platform are responsible for:</p>
+      <ul class="rights-list">
+        <li><span class="dot"></span><span>Obtaining patient consent for data collection as required under applicable law</span></li>
+        <li><span class="dot"></span><span>Maintaining their own patient privacy policies</span></li>
+        <li><span class="dot"></span><span>Complying with applicable health data regulations</span></li>
+      </ul>
+      <p style="margin-top:16px;">ReceptionAI processes data on behalf of clinics solely to provide the agreed booking and communication service.</p>
+    </section>
+
+    <section class="section" id="s9">
+      <span class="section-number">09</span>
+      <h2>Your Rights</h2>
+      <p>Under India's Digital Personal Data Protection Act, 2023 (DPDP Act), you have the following rights regarding your personal data:</p>
+      <ul class="rights-list">
+        <li><span class="dot"></span><span><strong>Right to access</strong> — request a copy of the personal data we hold about you</span></li>
+        <li><span class="dot"></span><span><strong>Right to correction</strong> — request correction of inaccurate or incomplete data</span></li>
+        <li><span class="dot"></span><span><strong>Right to erasure</strong> — request deletion of your personal data</span></li>
+        <li><span class="dot"></span><span><strong>Right to grievance redressal</strong> — raise a complaint with our Grievance Officer (see Section 12)</span></li>
+      </ul>
+      <p style="margin-top:16px;">To exercise any of these rights, email <strong>support@receptionai.in</strong> with your request. We will respond within 30 days.</p>
+    </section>
+
+    <section class="section" id="s10">
+      <span class="section-number">10</span>
+      <h2>Children's Privacy</h2>
+      <p>Our platform is not directed at individuals under the age of 18. We do not knowingly collect personal data from minors. Appointments for minors may be booked by a parent or guardian, in which case the adult's consent covers the booking.</p>
+      <p>If you believe a minor's data has been collected without appropriate consent, please contact us at <strong>support@receptionai.in</strong> and we will promptly delete it.</p>
+    </section>
+
+    <section class="section" id="s11">
+      <span class="section-number">11</span>
+      <h2>Changes to This Policy</h2>
+      <p>We may update this Privacy Policy from time to time. When we do, we will revise the "Last updated" date at the top of this page. Material changes will be communicated to clinic partners via email.</p>
+      <p>Continued use of any clinic's WhatsApp number powered by ReceptionAI after changes are posted constitutes acceptance of the updated policy.</p>
+    </section>
+
+    <section class="section" id="s12">
+      <span class="section-number">12</span>
+      <h2>Contact &amp; Grievances</h2>
+      <p>For any privacy-related queries, data requests, or complaints, contact our Grievance Officer as required under the DPDP Act, 2023:</p>
+      <div class="contact-box">
+        <div class="contact-grid">
+          <div>
+            <div class="label">Grievance Officer</div>
+            <div class="value">Jinu</div>
+            <div class="sub">Founder, ReceptionAI</div>
+          </div>
+          <div>
+            <div class="label">Email</div>
+            <div class="value">support@receptionai.in</div>
+            <div class="sub">Response within 30 days</div>
+          </div>
+          <div>
+            <div class="label">Registered Entity</div>
+            <div class="value">Receptionai</div>
+            <div class="sub">Udyam-registered, Kerala, India</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="doc-footer">
+      <span>&copy; 2026 Receptionai. All rights reserved.</span>
+      <span>receptionai.in/privacy</span>
+    </footer>
+
+  </div>
 </body>
 </html>
