@@ -131,6 +131,7 @@ export default function Conversations() {
 
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
+    if (!token) return;
     const eventSource = new EventSource(`/api/v1/hitl/events?token=${token}`, { withCredentials: true });
 
     eventSource.onmessage = (e) => { };

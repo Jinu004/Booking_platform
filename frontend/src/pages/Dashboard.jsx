@@ -26,8 +26,17 @@ const Dashboard = () => {
   const staffDoctorId = isDoctor ? staff?.doctor_id : null;
   useEffect(() => {
     fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 15000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchDashboardData, 30000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchDashboardData();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   const fetchDashboardData = async () => {
