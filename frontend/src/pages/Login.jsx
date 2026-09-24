@@ -54,11 +54,7 @@ export default function Login() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-4">
-          <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-9 h-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-            </svg>
-          </div>
+          <img src="/icons/icon-192.png" alt="ReceptionAI" className="w-16 h-16 rounded-2xl shadow-lg" />
         </div>
         <h2 className="text-center text-3xl font-extrabold text-gray-900">
           ReceptionAI
