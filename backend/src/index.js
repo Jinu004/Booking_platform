@@ -1,5 +1,22 @@
 const Sentry = require('@sentry/node');
-Sentry.init({ dsn: "https://d5a24190d008af20a29fbf24be492ad0@o4512141900578816.ingest.de.sentry.io/4512141919584336" });
+Sentry.init({
+  dsn: "https://d5a24190d008af20a29fbf24be492ad0@o4512141900578816.ingest.de.sentry.io/4512141919584336",
+  beforeSend(event) {
+    const redact = (str) => {
+      if (typeof str !== 'string') return str;
+      return str
+        .replace(/\b\d{10,15}\b/g, '[redacted-phone]')
+        .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[redacted-email]');
+    };
+    if (event.exception?.values) {
+      event.exception.values.forEach(ex => {
+        if (ex.value) ex.value = redact(ex.value);
+      });
+    }
+    if (event.message) event.message = redact(event.message);
+    return event;
+  }
+});
 
 const express = require('express');
 const helmet = require('helmet');
