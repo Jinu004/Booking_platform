@@ -4,6 +4,7 @@ const pool = require('../../config/database')
 const { successResponse, errorResponse } = require('../../utils/response')
 const { bcrypt } = require('../../config/auth')
 const { sendWelcomeEmail } = require('../../utils/email')
+const { logAction } = require('../../utils/audit')
 
 function generateTempPassword() {
   // crypto.randomBytes is cryptographically secure, unlike Math.random()
@@ -66,6 +67,7 @@ async function inviteStaff(req, res, next) {
     staffData.password_hash = password_hash
     
     const staff = await StaffService.inviteStaff(req.tenantId, staffData)
+    await logAction({ tenantId: req.tenantId, staffId: req.staff?.id, action: 'staff.created', entityType: 'staff', entityId: staff?.id, ipAddress: req.ip });
 
     await sendWelcomeEmail({
       to: staff.email,
@@ -146,6 +148,7 @@ async function deleteStaff(req, res, next) {
     if (!staff) {
       return errorResponse(res, 'Staff member not found', 404)
     }
+    await logAction({ tenantId: req.tenantId, staffId: req.staff?.id, action: 'staff.deleted', entityType: 'staff', entityId: req.params.id, ipAddress: req.ip });
     return successResponse(res, { message: 'Staff deactivated successfully' })
   } catch (error) {
     next(error)

@@ -5,7 +5,8 @@ const pool = require('../../config/database');
 const logger = require('../../utils/logger');
 
 // UUID v4 format validation helper
-const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter')
+const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter');
+const { logAction } = require('../../utils/audit');
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 // Phone: 7–15 digits optionally prefixed with +
 const isPhone = (str) => /^\+?\d{7,15}$/.test(str);
@@ -145,6 +146,7 @@ async function cancelBooking(req, res, next) {
     const { id } = req.params;
     
     const booking = await BookingService.cancelBookingWithRules(tenantId, id, 'staff');
+    await logAction({ tenantId, staffId: req.staff?.id, action: 'booking.cancelled', entityType: 'booking', entityId: id, ipAddress: req.ip });
     return successResponse(res, booking);
   } catch (error) {
     if (error.message.includes('Cannot cancel')) {
