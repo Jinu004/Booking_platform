@@ -1,3 +1,6 @@
+const Sentry = require('@sentry/node');
+Sentry.init({ dsn: "https://d5a24190d008af20a29fbf24be492ad0@o4512141900578816.ingest.de.sentry.io/4512141919584336" });
+
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -138,6 +141,8 @@ app.use('/api/v1/catalogue', catalogueRoutes);
 
 const leadsRoutes = require('./modules/leads/leads.routes');
 app.use('/api/v1/leads', leadsRoutes);
+
+Sentry.setupExpressErrorHandler(app);
 
 // 17. Global Error Handler must be the last middleware
 app.use(errorHandler);
