@@ -35,3 +35,5 @@ backend/cloudflared.deb
 oracle_final_backup.sql
 *.sql
 frontend/.env.production
+
+stress-test/
