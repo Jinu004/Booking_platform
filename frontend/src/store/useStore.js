@@ -1,27 +1,41 @@
 import { create } from 'zustand';
 import { getStoredStaff } from '../services/auth.service';
 
+const getStoredTenant = () => {
+  try {
+    const t = localStorage.getItem('tenant_data');
+    return t ? JSON.parse(t) : null;
+  } catch {
+    return null;
+  }
+};
+
 const useStore = create((set, get) => ({
   // AUTH SLICE
   staff: getStoredStaff() || null,
-  tenant: null,
+  tenant: getStoredTenant() || null,
   isAuthenticated: !!getStoredStaff(),
   isLoading: false,
   permissions: [],
 
   setStaff: (staff) => set({ staff, isAuthenticated: true }),
-  setTenant: (tenant) => set({ tenant }),
+  setTenant: (tenant) => {
+    try { localStorage.setItem('tenant_data', JSON.stringify(tenant)); } catch {}
+    set({ tenant });
+  },
   setPermissions: (permissions) => set({ permissions }),
   setLoading: (isLoading) => set({ isLoading }),
   logout: () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('staff_data');
+    localStorage.removeItem('tenant_data');
     set({ staff: null, tenant: null, permissions: [], isAuthenticated: false });
   },
   clearAuth: () => {
     set({ staff: null, isAuthenticated: false });
     localStorage.removeItem('auth_token');
     localStorage.removeItem('staff_data');
+    localStorage.removeItem('tenant_data');
   },
   hasPermission: (permission) => {
     const { permissions, staff } = get();

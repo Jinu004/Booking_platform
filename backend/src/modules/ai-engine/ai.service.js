@@ -51,11 +51,18 @@ async function processMessage(context) {
     // Inject doctor profiles for Pro plan clinics
     if (tenant.plan === 'pro' && tenant.industry === 'clinic') {
       try {
-        const profilesResult = await pool.query(
-          `SELECT id, name, specialization, profile_description FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true AND profile_description IS NOT NULL AND profile_description != ''`,
-          [tenant.id]
-        )
-        additionalData.doctorProfiles = profilesResult.rows
+        const profilesCacheKey = `doctor_profiles:${tenant.id}`
+        const cachedProfiles = await redisClient.get(profilesCacheKey)
+        if (cachedProfiles) {
+          additionalData.doctorProfiles = JSON.parse(cachedProfiles)
+        } else {
+          const profilesResult = await pool.query(
+            `SELECT id, name, specialization, profile_description FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true AND profile_description IS NOT NULL AND profile_description != ''`,
+            [tenant.id]
+          )
+          additionalData.doctorProfiles = profilesResult.rows
+          await redisClient.set(profilesCacheKey, JSON.stringify(profilesResult.rows), { EX: 60 })
+        }
       } catch (err) {
         logger.warn('Failed to fetch doctor profiles for prompt:', err.message)
       }
@@ -237,7 +244,7 @@ async function processMessage(context) {
         const chat = model.startChat({ history: cleanHistory })
 
         // Send the latest patient message
-        let response = await chat.sendMessage(latestMessage)
+        let response = await chat.sendMessage(latestMessage, { signal: AbortSignal.timeout(25000) })
         let result = response.response
 
         // Function calling loop — Gemini may call multiple functions
@@ -341,7 +348,11 @@ async function processMessage(context) {
           throw new Error('Empty text response from Gemini');
         }
 
-        return text.trim()
+        // Output filter — strip any leaked UUIDs or phone numbers before sending to patient
+        let cleanText = text.trim();
+        cleanText = cleanText.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '[ref]');
+        cleanText = cleanText.replace(/\b(\+91[\s-]?)?[6-9]\d{9}\b/g, '[number]');
+        return cleanText;
 
       } catch (err) {
         lastError = err;

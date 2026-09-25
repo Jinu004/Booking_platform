@@ -5,7 +5,8 @@ const pool = require('../../config/database');
 const logger = require('../../utils/logger');
 
 // UUID v4 format validation helper
-const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter')
+const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter');
+const { logAction } = require('../../utils/audit');
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 // Phone: 7–15 digits optionally prefixed with +
 const isPhone = (str) => /^\+?\d{7,15}$/.test(str);
@@ -145,6 +146,7 @@ async function cancelBooking(req, res, next) {
     const { id } = req.params;
     
     const booking = await BookingService.cancelBookingWithRules(tenantId, id, 'staff');
+    await logAction({ tenantId, staffId: req.staff?.id, action: 'booking.cancelled', entityType: 'booking', entityId: id, ipAddress: req.ip });
     return successResponse(res, booking);
   } catch (error) {
     if (error.message.includes('Cannot cancel')) {
@@ -221,7 +223,14 @@ async function exportBookings(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { startDate, endDate } = req.query;
-    
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (startDate && !dateRegex.test(startDate)) {
+      return res.status(400).json({ error: 'Invalid startDate format. Use YYYY-MM-DD.' });
+    }
+    if (endDate && !dateRegex.test(endDate)) {
+      return res.status(400).json({ error: 'Invalid endDate format. Use YYYY-MM-DD.' });
+    }
+
     let sql = `
       SELECT b.token_number, c.name as patient_name, c.phone, d.name as doctor_name, b.status, b.booking_date
       FROM bookings b

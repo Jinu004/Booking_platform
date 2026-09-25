@@ -4,6 +4,7 @@ const pool = require('../../config/database')
 const { successResponse, errorResponse } = require('../../utils/response')
 const { bcrypt } = require('../../config/auth')
 const { sendWelcomeEmail } = require('../../utils/email')
+const { logAction } = require('../../utils/audit')
 
 function generateTempPassword() {
   // crypto.randomBytes is cryptographically secure, unlike Math.random()
@@ -51,12 +52,22 @@ async function inviteStaff(req, res, next) {
     if (!staffData.name || !staffData.role || !staffData.email) {
       return errorResponse(res, 'Name, role, and email are required', 400)
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffData.email)) {
+      return errorResponse(res, 'Invalid email address', 400)
+    }
+    if (staffData.role === 'admin' && req.staff.role !== 'admin') {
+      return errorResponse(res, 'Only admins can create admin accounts', 403)
+    }
+    if (req.body.password && req.body.password.length < 8) {
+      return errorResponse(res, 'Password must be at least 8 characters', 400)
+    }
 
     const password = req.body.password || generateTempPassword()
     const password_hash = await bcrypt.hash(password, 12)
     staffData.password_hash = password_hash
     
     const staff = await StaffService.inviteStaff(req.tenantId, staffData)
+    await logAction({ tenantId: req.tenantId, staffId: req.staff?.id, action: 'staff.created', entityType: 'staff', entityId: staff?.id, ipAddress: req.ip });
 
     await sendWelcomeEmail({
       to: staff.email,
@@ -80,6 +91,12 @@ async function updateStaff(req, res, next) {
     let staff;
     
     if (updates.role) {
+      if (req.params.id === req.staff.id) {
+        return errorResponse(res, 'You cannot change your own role', 400)
+      }
+      if (updates.role === 'admin' && req.staff.role !== 'admin') {
+        return errorResponse(res, 'Only admins can grant the admin role', 403)
+      }
       if (updates.role !== 'admin') {
         const targetStaff = await StaffModel.getStaffById(pool, req.tenantId, req.params.id)
         if (targetStaff?.role === 'admin') {
@@ -131,6 +148,7 @@ async function deleteStaff(req, res, next) {
     if (!staff) {
       return errorResponse(res, 'Staff member not found', 404)
     }
+    await logAction({ tenantId: req.tenantId, staffId: req.staff?.id, action: 'staff.deleted', entityType: 'staff', entityId: req.params.id, ipAddress: req.ip });
     return successResponse(res, { message: 'Staff deactivated successfully' })
   } catch (error) {
     next(error)
@@ -160,6 +178,7 @@ async function deleteStaffPermanent(req, res, next) {
       return errorResponse(res, 'Cannot delete your own account', 400)
     }
     const target = await StaffModel.getStaffById(pool, req.tenantId, req.params.id)
+    if (!target) return errorResponse(res, 'Staff not found', 404)
     if (target?.role === 'admin') {
       const adminCount = await pool.query(
         'SELECT COUNT(*) FROM staff WHERE tenant_id = $1 AND role = $2 AND is_active = true',

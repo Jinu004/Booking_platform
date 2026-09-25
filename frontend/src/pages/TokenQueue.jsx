@@ -51,7 +51,7 @@ const TokenQueue = () => {
   const doctors = [...new Set(tokenQueue.map(t => t.doctor_name))].filter(Boolean);
 
   const filteredTokens = tokenQueue
-    .filter(t => activeFilter === 'all' || (activeFilter === 'arrived' ? t.status === 'arrived' : activeFilter === 'in_consult' ? t.status === 'in_progress' : t.status === 'done' || t.status === 'completed'))
+    .filter(t => activeFilter === 'all' ? (t.status !== 'done' && t.status !== 'completed' && t.status !== 'cancelled') : (activeFilter === 'arrived' ? t.status === 'arrived' : activeFilter === 'in_consult' ? t.status === 'in_progress' : t.status === 'done' || t.status === 'completed'))
     .filter(t => doctorFilter === 'all' || t.doctor_name === doctorFilter)
     .filter(t => !searchQuery || (t.patient_name || '').toLowerCase().includes(searchQuery.toLowerCase()) || (t.patient_phone || '').includes(searchQuery));
 

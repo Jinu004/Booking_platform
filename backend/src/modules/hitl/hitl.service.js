@@ -180,6 +180,10 @@ function broadcastIncomingPatientMessage(tenantId, conversationId, content, cust
   });
 }
 
+async function acknowledgeConversation(conversationId, tenantId) {
+  return HITLModel.acknowledgeConversation(conversationId, tenantId);
+}
+
 module.exports = {
   addSseClient,
   removeSseClient,
@@ -189,4 +193,5 @@ module.exports = {
   staffReply,
   toggleMode,
   isWithinWorkingHours,
+  acknowledgeConversation,
 };

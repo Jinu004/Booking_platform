@@ -137,7 +137,7 @@ async function createPatient(req, res) {
     } else {
       const newCustomer = await pool.query(
         `INSERT INTO customers (tenant_id, phone, name) VALUES ($1, $2, $3) RETURNING id`,
-        [tenantId, normalizedPhone, name.trim()]
+        [tenantId, normalizedPhone, stripHtml(name.trim())]
       );
       customerId = newCustomer.rows[0].id;
     }
@@ -154,7 +154,7 @@ async function createPatient(req, res) {
     const newPatient = await pool.query(
       `INSERT INTO patients (tenant_id, customer_id, name, phone, age, gender, blood_group)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [tenantId, customerId, name.trim(), normalizedPhone, age || null, gender || null, blood_group || null]
+      [tenantId, customerId, stripHtml(name.trim()), normalizedPhone, age || null, gender || null, blood_group || null]
     );
 
     return res.json({ success: true, data: { patient: newPatient.rows[0] } });
@@ -182,7 +182,7 @@ async function upsertProfile(req, res, next) {
         updated_at = NOW()
       WHERE id = $2 AND tenant_id = $1
       RETURNING *
-    `, [req.tenantId, patientId, age || null, gender || null, blood_group || null, emergency_contact_name || null, emergency_contact_phone || null, emergency_contact_relationship || null]);
+    `, [req.tenantId, patientId, age || null, gender || null, blood_group || null, emergency_contact_name ? stripHtml(emergency_contact_name) : null, emergency_contact_phone || null, emergency_contact_relationship ? stripHtml(emergency_contact_relationship) : null]);
     if (!result.rows.length) return errorResponse(res, 'Patient not found', 404);
     return successResponse(res, result.rows[0]);
   } catch (err) {

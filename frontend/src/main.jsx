@@ -1,8 +1,28 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import * as Sentry from '@sentry/react';
 import './index.css'
 import App from './App.jsx';
 import ErrorBoundary from './components/shared/ErrorBoundary.jsx';
+
+Sentry.init({
+  dsn: "https://4e4fbd4d0bf1025ff3892ff51ed8d870@o4512141900578816.ingest.de.sentry.io/4512142217904208",
+  beforeSend(event) {
+    const redact = (str) => {
+      if (typeof str !== 'string') return str;
+      return str
+        .replace(/\b\d{10,15}\b/g, '[redacted-phone]')
+        .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[redacted-email]');
+    };
+    if (event.exception?.values) {
+      event.exception.values.forEach(ex => {
+        if (ex.value) ex.value = redact(ex.value);
+      });
+    }
+    if (event.message) event.message = redact(event.message);
+    return event;
+  }
+});
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <ErrorBoundary>

@@ -1,3 +1,23 @@
+const Sentry = require('@sentry/node');
+Sentry.init({
+  dsn: "https://d5a24190d008af20a29fbf24be492ad0@o4512141900578816.ingest.de.sentry.io/4512141919584336",
+  beforeSend(event) {
+    const redact = (str) => {
+      if (typeof str !== 'string') return str;
+      return str
+        .replace(/\b\d{10,15}\b/g, '[redacted-phone]')
+        .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[redacted-email]');
+    };
+    if (event.exception?.values) {
+      event.exception.values.forEach(ex => {
+        if (ex.value) ex.value = redact(ex.value);
+      });
+    }
+    if (event.message) event.message = redact(event.message);
+    return event;
+  }
+});
+
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -139,6 +159,8 @@ app.use('/api/v1/catalogue', catalogueRoutes);
 const leadsRoutes = require('./modules/leads/leads.routes');
 app.use('/api/v1/leads', leadsRoutes);
 
+Sentry.setupExpressErrorHandler(app);
+
 // 17. Global Error Handler must be the last middleware
 app.use(errorHandler);
 
@@ -158,6 +180,7 @@ const { startHITLCron } = require('./modules/hitl/hitl.cron');
 const { startRetentionCron } = require('./cron/retention.cron');
 const { startNoShowCron } = require('./cron/noshow.cron');
 const { startRecallCron } = require('./cron/recall.cron');
+const { startRetryCron }  = require('./cron/retry.cron');
 const { broadcastToTenant } = require('./modules/hitl/hitl.service');
 
 setTimeout(() => {
@@ -169,6 +192,7 @@ setTimeout(() => {
   startRetentionCron();
   console.log('Starting Recall cron...');
   startRecallCron();
+  startRetryCron();
 }, 5000);
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);

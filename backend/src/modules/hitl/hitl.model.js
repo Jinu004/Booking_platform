@@ -77,10 +77,18 @@ async function getTenantSettings(tenantId) {
   return rows[0] || null;
 }
 
+async function acknowledgeConversation(conversationId, tenantId) {
+  await pool.query(
+    `UPDATE conversations SET needs_attention = false WHERE id = $1 AND tenant_id = $2`,
+    [conversationId, tenantId]
+  );
+}
+
 module.exports = {
   getConversationWithMode,
   setMode,
   getMessages,
   getConversationList,
   getTenantSettings,
+  acknowledgeConversation,
 };

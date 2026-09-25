@@ -103,11 +103,11 @@ const Layout = () => {
     eventSource.addEventListener('session_refresh', async () => {
       try {
         const res = await api.get('/auth/me');
-        if (res.data?.staff) {
+        if (res.data?.staff && res.data?.tenant) {
           const current = JSON.parse(localStorage.getItem(STORAGE_KEYS.STAFF_DATA) || '{}');
           const updated = { ...current, tenantPlan: res.data.tenant?.plan };
           localStorage.setItem(STORAGE_KEYS.STAFF_DATA, JSON.stringify(updated));
-          window.location.reload();
+          useStore.getState().setTenant(res.data.tenant);
         }
       } catch {}
     });
