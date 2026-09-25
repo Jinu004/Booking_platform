@@ -1,0 +1,25 @@
+config:
+  target: "https://receptionai.in"
+  processor: "./processor.js"
+  phases:
+    - duration: 30
+      arrivalRate: 1
+      name: "Warm up"
+    - duration: 60
+      arrivalRate: 8
+      rampTo: 20
+      name: "Ramp up to 20 concurrent"
+    - duration: 30
+      arrivalRate: 20
+      name: "Sustained peak load"
+
+scenarios:
+  - name: "WhatsApp Hi message"
+    flow:
+      - function: "setWebhookPayload"
+      - post:
+          url: "/webhook/whatsapp"
+          body: "{{ body }}"
+          headers:
+            Content-Type: "application/json"
+            X-Hub-Signature-256: "{{ signature }}"
