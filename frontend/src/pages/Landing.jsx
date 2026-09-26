@@ -521,13 +521,6 @@ function Hero({ onNavigate }) {
                 See how it works
               </button>
             </div>
-            <div className="rai-hero-microtrust">
-              <span className="rai-pulse">Live in 24 hours</span>
-              <span style={{ opacity: 0.4 }}>·</span>
-              <span>WhatsApp setup included</span>
-              <span style={{ opacity: 0.4 }}>·</span>
-              <span>Setup in 20 min</span>
-            </div>
           </div>
           <div className="rai-hero-visual">
             {/* phone-wrap: overflow visible, float cards positioned relative to it */}
