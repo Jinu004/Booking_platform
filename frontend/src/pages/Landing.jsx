@@ -732,7 +732,7 @@ function Features() {
             <span className="rai-eyebrow"><span className="dot" />Features</span>
             <h2 className="rai-h2" style={{ marginTop: 16 }}>Built around how clinics actually work.</h2>
           </div>
-          <p className="rai-lead">Not a generic chatbot bolted onto WhatsApp. Every feature is shaped by reception teams, doctors, and patients in Kerala.</p>
+          <p className="rai-lead">Not a generic chatbot bolted onto WhatsApp. Every feature is shaped by reception teams, doctors, and patients.</p>
         </div>
         <div className="rai-feature-hero">
           <div className="rai-feature-hero-copy">
