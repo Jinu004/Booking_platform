@@ -976,7 +976,7 @@ function Footer() {
           </div>
           <div className="rai-footer-col">
             <h4>Legal</h4>
-            <ul><li><a href="#">Privacy</a></li><li><a href="#">Terms</a></li></ul>
+            <ul><li><a href="/privacy.html">Privacy</a></li><li><a href="/terms.html">Terms</a></li></ul>
           </div>
         </div>
         <div className="rai-footer-bottom">
