@@ -943,7 +943,7 @@ function FinalCTA({ onNavigate }) {
         <span className="rai-eyebrow" style={{ justifyContent: 'center', display: 'inline-flex' }}><span className="dot" />Get started</span>
         <h2 style={{ marginTop: 20 }}>Stop missing patients<br />after 6 PM.</h2>
         <p className="rai-lead" style={{ marginTop: 20, margin: '20px auto 0' }}>
-          Set up takes 20 minutes. Your first overnight booking arrives while you're asleep. That's the pitch.
+          Your first overnight booking arrives while you're asleep. That's the pitch.
         </p>
         <div className="rai-final-ctas">
           <button className="rai-btn rai-btn-accent rai-btn-lg" onClick={() => onNavigate('/onboarding')}>Get Started <span className="arr">→</span></button>
