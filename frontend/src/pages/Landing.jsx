@@ -284,6 +284,7 @@ const SCRIPT = [
   { side: 'in', text: 'Hi', delay: 600 },
   { side: 'typing', delay: 800 },
   { side: 'out', card: 'menu', delay: 400 },
+  { side: 'out', card: 'more', delay: 600 },
   { side: 'in', text: 'Dr. Rajan Kumar · General Medicine', delay: 2200 },
   { side: 'typing', delay: 900 },
   { side: 'out', card: 'doctors', delay: 400 },
@@ -343,20 +344,17 @@ function AnimatedWABody({ bodyRef }) {
         if (m.card === 'menu') return (
           <div className="rai-wa-card" key={m.id}>
             <div style={{ fontSize: 12, color: '#111', lineHeight: 1.45 }}>Hello! Welcome to <strong>Menon Family Clinic</strong> 👋<br />Here are today's available doctors:</div>
-            <div className="rai-wa-doctors" style={{ marginTop: 8 }}>
-              {[{ n: 'Dr. Rajan Kumar', s: 'General Medicine', t: '9:00 AM - 1:00 PM' }, { n: 'Dr. Priya Menon', s: 'Gynaecology', t: '9:00 AM - 12:00 PM' }, { n: 'Dr. Suresh Nair', s: 'Orthopaedics', t: '10:00 AM - 2:00 PM' }].map((d, i) => (
-                <div className="rai-wa-doctor" key={i}>
-                  <div style={{ fontSize: 16 }}>🩺</div>
-                  <div className="rai-wa-doctor-info">
-                    <strong>{d.n}</strong>
-                    <span>{d.s}</span>
-                    <span className="rai-wa-doctor-meta">{d.t}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>☰&nbsp;&nbsp;Book Today</div>
             <div className="rai-wa-meta"><span>10:42 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
+            <div style={{ marginTop: 6, paddingTop: 7, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>☰&nbsp;&nbsp;Book Today</div>
+          </div>
+        );
+        if (m.card === 'more') return (
+          <div className="rai-wa-card" key={m.id}>
+            <div style={{ fontSize: 12, color: '#111', lineHeight: 1.45 }}>Need something else?</div>
+            <div className="rai-wa-meta"><span>10:42 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
+            <div style={{ marginTop: 6, paddingTop: 7, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>↩&nbsp;&nbsp;Book Another Day</div>
+            <div style={{ marginTop: 7, paddingTop: 7, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>↩&nbsp;&nbsp;Talk to Staff</div>
+            <div style={{ marginTop: 7, paddingTop: 7, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>↩&nbsp;&nbsp;Check My Booking</div>
           </div>
         );
         if (m.card === 'doctors') return (
