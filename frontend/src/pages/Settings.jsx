@@ -319,6 +319,27 @@ export default function Settings() {
                     );
                   })}
                 </div>
+                {hitl.working_hours.mon?.enabled && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const { open, close } = hitl.working_hours.mon;
+                      setHITL(prev => ({
+                        ...prev,
+                        working_hours: {
+                          ...prev.working_hours,
+                          tue: { ...prev.working_hours.tue, open, close },
+                          wed: { ...prev.working_hours.wed, open, close },
+                          thu: { ...prev.working_hours.thu, open, close },
+                          fri: { ...prev.working_hours.fri, open, close },
+                        }
+                      }));
+                    }}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 mt-1"
+                  >
+                    Apply Monday's hours to weekdays (Tue–Fri)
+                  </button>
+                )}
                 <div className="flex justify-end pt-4">
                   <button
                     onClick={handleSaveWorkingHours}
@@ -328,6 +349,7 @@ export default function Settings() {
                     {savingHours ? 'Saving...' : 'Save Working Hours'}
                   </button>
                 </div>
+                <p className="text-xs text-gray-400 mt-1">Times are in 24-hour format — e.g. 09:00 for 9 AM, 18:00 for 6 PM</p>
               </div>
             </>
           )}
