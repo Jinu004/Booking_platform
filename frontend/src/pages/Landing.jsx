@@ -774,7 +774,7 @@ function HowtoPreview({ step }) {
     <WAChrome>
       <div style={waBodyStyle}>
         <div className="rai-wa-msg in">
-          Hi, I need to see Dr. Menon this week. Any morning slots?
+          Hi, I'd like to book an appointment
         </div>
         <div style={{ fontSize: 11, color: 'var(--fg-muted)', textAlign: 'right', padding: '0 4px' }}>delivered · 11:42 PM</div>
       </div>
@@ -783,14 +783,20 @@ function HowtoPreview({ step }) {
 
   if (step === 1) return (
     <WAChrome>
-      <div style={{ ...waBodyStyle, background: 'var(--bg-soft)', justifyContent: 'center', gap: 10 }}>
-        <div style={{ fontSize: 10, color: 'var(--fg-faint)', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'monospace', marginBottom: 4 }}>AI Parsing</div>
-        {[{ k: 'Intent', v: 'book_appointment' }, { k: 'Doctor', v: 'Dr. Menon' }, { k: 'Time', v: 'this week, morning' }, { k: 'Patient', v: 'returning · Priya R.' }].map(r => (
-          <div key={r.k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '10px 14px', borderRadius: 8, background: 'var(--bg-elev)', border: '1px solid var(--border)' }}>
-            <span style={{ color: 'var(--fg-muted)' }}>{r.k}</span>
-            <span style={{ fontFamily: 'monospace', color: 'var(--accent)', fontWeight: 500 }}>{r.v}</span>
+      <div style={{ ...waBodyStyle, background: 'var(--bg-soft)', justifyContent: 'flex-end', gap: 0, padding: 0 }}>
+        <div style={{ background: 'var(--bg-elev)', borderTopLeftRadius: 14, borderTopRightRadius: 14, border: '1px solid var(--border)', borderBottom: 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 12px' }}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Book Today</span>
+            <span style={{ fontSize: 15, color: 'var(--fg-muted)', lineHeight: 1 }}>✕</span>
           </div>
-        ))}
+          {[{ n: 'Dr. Rajan Kumar', s: 'General Medicine — 9:00 AM - 1:00 PM' }, { n: 'Dr. Priya Menon', s: 'Gynaecology — 9:00 AM - 12:00 PM' }, { n: 'Dr. Suresh Nair', s: 'Orthopaedics — 10:00 AM - 2:00 PM' }].map(d => (
+            <div key={d.n} style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13.5, fontWeight: 500 }}>{d.n}</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 2 }}>{d.s}</div>
+            </div>
+          ))}
+          <div style={{ fontSize: 11.5, color: 'var(--fg-faint)', textAlign: 'center', padding: '14px 16px 18px', borderTop: '1px solid var(--border)' }}>Tap an item to select it</div>
+        </div>
       </div>
     </WAChrome>
   );
