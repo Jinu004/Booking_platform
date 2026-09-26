@@ -284,13 +284,13 @@ const SCRIPT = [
   { side: 'in', text: 'Hi', delay: 600 },
   { side: 'typing', delay: 800 },
   { side: 'out', card: 'menu', delay: 400 },
-  { side: 'in', text: '1', delay: 1800 },
+  { side: 'in', text: 'Dr. Rajan Kumar · General Medicine', delay: 2200 },
   { side: 'typing', delay: 900 },
   { side: 'out', card: 'doctors', delay: 400 },
-  { side: 'in', text: 'Rajan Kumar', delay: 2400 },
+  { side: 'in', text: '9:00 AM - 1:00 PM', delay: 1800 },
   { side: 'typing', delay: 800 },
   { side: 'out', card: 'askName', delay: 400 },
-  { side: 'in', text: 'Anjali', delay: 1800 },
+  { side: 'in', text: 'Anjali · Existing profile', delay: 1800 },
   { side: 'typing', delay: 1000 },
   { side: 'out', card: 'confirmed', delay: 400 },
 ];
@@ -342,32 +342,27 @@ function AnimatedWABody({ bodyRef }) {
         );
         if (m.card === 'menu') return (
           <div className="rai-wa-card" key={m.id}>
-            <div style={{ fontSize: 12, color: '#111', lineHeight: 1.45 }}>Hello! Welcome to <strong>Menon Family Clinic</strong> 👋</div>
-            <div style={{ marginTop: 8, fontSize: 11.5, color: '#444' }}>Reply with:</div>
-            <div className="rai-wa-menu">
-              <div className="rai-wa-menu-row"><span className="rai-wa-menu-num">1</span> Book appointment</div>
-              <div className="rai-wa-menu-row"><span className="rai-wa-menu-num">2</span> Check my booking</div>
-              <div className="rai-wa-menu-row"><span className="rai-wa-menu-num">3</span> Talk to staff</div>
-            </div>
-            <div className="rai-wa-meta"><span>10:42 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
-          </div>
-        );
-        if (m.card === 'doctors') return (
-          <div className="rai-wa-card" key={m.id}>
-            <div className="rai-wa-card-title">Which doctor would you like to see?</div>
-            <div className="rai-wa-doctors">
-              {[{ n: 'Dr. Rajan Kumar', s: 'General Medicine', t: '9:00 AM', tk: '15 left' }, { n: 'Dr. Priya Menon', s: 'Gynaecology', t: '9:00 AM', tk: '8 left' }, { n: 'Dr. Suresh Nair', s: 'Orthopaedics', t: '10:00 AM', tk: '20 left' }].map((d, i) => (
+            <div style={{ fontSize: 12, color: '#111', lineHeight: 1.45 }}>Hello! Welcome to <strong>Menon Family Clinic</strong> 👋<br />Here are today's available doctors:</div>
+            <div className="rai-wa-doctors" style={{ marginTop: 8 }}>
+              {[{ n: 'Dr. Rajan Kumar', s: 'General Medicine', t: '9:00 AM - 1:00 PM' }, { n: 'Dr. Priya Menon', s: 'Gynaecology', t: '9:00 AM - 12:00 PM' }, { n: 'Dr. Suresh Nair', s: 'Orthopaedics', t: '10:00 AM - 2:00 PM' }].map((d, i) => (
                 <div className="rai-wa-doctor" key={i}>
                   <div style={{ fontSize: 16 }}>🩺</div>
                   <div className="rai-wa-doctor-info">
                     <strong>{d.n}</strong>
                     <span>{d.s}</span>
-                    <span className="rai-wa-doctor-meta">{d.t} · {d.tk}</span>
+                    <span className="rai-wa-doctor-meta">{d.t}</span>
                   </div>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 11, color: '#667781', marginTop: 8 }}>Reply with doctor name</div>
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>☰&nbsp;&nbsp;Book Today</div>
+            <div className="rai-wa-meta"><span>10:42 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
+          </div>
+        );
+        if (m.card === 'doctors') return (
+          <div className="rai-wa-card" key={m.id}>
+            <div style={{ fontSize: 12, color: '#111', lineHeight: 1.45 }}><strong>Dr. Rajan Kumar</strong> has session(s) available today. Select one:</div>
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>↩&nbsp;&nbsp;9:00 AM - 1:00 PM</div>
             <div className="rai-wa-meta"><span>10:42 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
           </div>
         );
@@ -379,7 +374,8 @@ function AnimatedWABody({ bodyRef }) {
               <div><span>Session starts</span><strong>9:00 AM</strong></div>
               <div><span>Tokens remaining</span><strong>15</strong></div>
             </div>
-            <div style={{ fontSize: 11.5, color: '#111', marginTop: 10, lineHeight: 1.4 }}>Reply with your name to confirm booking.</div>
+            <div style={{ fontSize: 11.5, color: '#111', marginTop: 10, lineHeight: 1.4 }}>Who is this booking for?</div>
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>☰&nbsp;&nbsp;Select Patient</div>
             <div className="rai-wa-meta"><span>10:43 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
           </div>
         );
@@ -401,7 +397,7 @@ function AnimatedWABody({ bodyRef }) {
               <div><span>Department</span><strong>General Medicine</strong></div>
               <div><span>Starts</span><strong>🕘 9:00 AM</strong></div>
             </div>
-            <div style={{ fontSize: 11, color: '#667781', marginTop: 8, lineHeight: 1.4 }}>Please arrive before session begins.<br />Reply <strong style={{ color: '#111' }}>CANCEL</strong> to cancel.</div>
+            <div style={{ fontSize: 11, color: '#667781', marginTop: 8, lineHeight: 1.4 }}>📍 Please arrive at the clinic and show your token number to reception.</div>
             <div className="rai-wa-meta"><span>10:43 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
           </div>
         );
