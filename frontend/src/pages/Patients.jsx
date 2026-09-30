@@ -29,11 +29,6 @@ function initials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function calcAge(dob) {
-  if (!dob) return null;
-  return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-}
-
 function relativeDate(dateStr) {
   if (!dateStr) return 'Never';
   const diffDays = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
@@ -251,8 +246,6 @@ export default function Patients() {
               {paginatedPatients.map(p => {
                 const isNew = (parseInt(p.total_visits || 0)) === 0;
                 const bloodGroup = p.blood_group;
-                const age = calcAge(p.profile?.date_of_birth);
-                const gender = p.profile?.gender;
                 return (
                   <tr key={p.id} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4">
@@ -262,9 +255,6 @@ export default function Patients() {
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-gray-900">{p.name || '—'}</p>
-                          <p className="text-xs text-gray-400">
-                            {[age ? `${age}y` : null, gender].filter(Boolean).join(' · ') || 'No info'}
-                          </p>
                         </div>
                       </div>
                     </td>
