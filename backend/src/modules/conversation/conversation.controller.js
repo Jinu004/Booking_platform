@@ -5,6 +5,7 @@ const pool = require('../../config/database');
 const { successResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 const whatsappAdapter = require('../channel/whatsapp/whatsapp.adapter');
+const { runAsTenant } = require('../channel/whatsapp/senderContext');
 const { getOrCreateSession, updateSession } = require('./conversation.session');
 
 /**
@@ -179,7 +180,7 @@ async function sendManualMessage(req, res, next) {
     successResponse(res, savedMsg);
 
     // Send to WhatsApp in background (non-blocking)
-    (async () => {
+    runAsTenant(tenantId, async () => {
       try {
         let phone = '';
         if (conversation.customer_id) {
@@ -199,7 +200,7 @@ async function sendManualMessage(req, res, next) {
       } catch (err) {
         logger.error('Background WhatsApp send failed:', err.message);
       }
-    })();
+    });
   } catch (err) {
     next(err);
   }

@@ -84,6 +84,13 @@ async function verifyRegistration(req, res) {
       );
     }
 
+    if (/^\d+$/.test(String(phone_number_id))) {
+      await pool.query(
+        'UPDATE tenants SET whatsapp_phone_number_id = $1 WHERE id = $2',
+        [String(phone_number_id), tenant_id]
+      );
+    }
+
     logger.info(`WABA registration verified for tenant ${tenant_id}`);
     return successResponse(res, { message: 'WhatsApp number registered successfully' });
   } catch (err) {

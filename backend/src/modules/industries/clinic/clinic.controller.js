@@ -2,6 +2,7 @@ const ClinicModel = require('./clinic.model');
 const pool = require('../../../config/database');
 const { successResponse, errorResponse } = require('../../../utils/response');
 const { sendTemplateMessage, sendMessage } = require('../../channel/whatsapp/whatsapp.adapter');
+const { runAsTenant } = require('../../channel/whatsapp/senderContext');
 
 // Sentinel value used to soft-delete doctors from token queues
 // clinic.model.js getDoctors filters out records where leave_days equals this value
@@ -363,6 +364,7 @@ async function createProcedureBooking(req, res, next) {
 
     // Send WhatsApp notification to patient
     setImmediate(async () => {
+      await runAsTenant(tenantId, async () => {
       try {
         const phoneRes = await pool.query(`SELECT phone FROM customers WHERE id = $1`, [customer_id]);
         const procRes = await pool.query(`SELECT name FROM procedures WHERE id = $1`, [procedure_id]);
@@ -392,6 +394,7 @@ async function createProcedureBooking(req, res, next) {
       } catch (err) {
         console.error('Procedure WhatsApp notification failed:', err.message);
       }
+      });
     });
 
     return successResponse(res, booking, 201);

@@ -1,5 +1,6 @@
 const HITLModel = require('./hitl.model');
 const { sendMessage, sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter');
+const { runAsTenant } = require('../channel/whatsapp/senderContext');
 const ConversationService = require('../conversation/conversation.service');
 const logger = require('../../utils/logger');
 const pool = require('../../config/database');
@@ -111,6 +112,7 @@ async function staffReply(conversationId, tenantId, staffId, content) {
 
   // WhatsApp send and DB update run in background (non-blocking)
   setImmediate(async () => {
+    await runAsTenant(tenantId, async () => {
     try {
       if (phone) await sendMessage(phone, content);
     } catch (err) {
@@ -139,6 +141,7 @@ async function staffReply(conversationId, tenantId, staffId, content) {
     } catch (err) {
       logger.error('Background DB update failed:', err.message);
     }
+    });
   });
 
   return message;

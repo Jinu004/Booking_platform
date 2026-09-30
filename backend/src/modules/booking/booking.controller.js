@@ -486,12 +486,15 @@ async function createManualBooking(req, res, next) {
     // Send WhatsApp confirmation in background only if requested
     if (sendWhatsapp) {
       setImmediate(async () => {
+        const { runAsTenant } = require('../channel/whatsapp/senderContext')
+        await runAsTenant(tenantId, async () => {
         try {
           const { sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter')
           await sendTemplateMessage(normalizedPhone, 'appointment_confirmation', 'en', [])
         } catch (waErr) {
           logger.warn('WhatsApp confirmation failed for manual booking:', waErr.message)
         }
+        })
       })
     }
     return successResponse(res, booking, 201);

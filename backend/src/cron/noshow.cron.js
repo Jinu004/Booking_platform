@@ -2,6 +2,7 @@ const cron = require('node-cron')
 const pool = require('../config/database')
 const logger = require('../utils/logger')
 const { sendTemplateMessage } = require('../modules/channel/whatsapp/whatsapp.adapter')
+const { runAsTenant } = require('../modules/channel/whatsapp/senderContext')
 
 function startNoShowCron() {
   // Runs every day at 11:59 PM IST — marks uncompleted bookings as no-show
@@ -39,7 +40,7 @@ function startNoShowCron() {
 
         for (const row of customerRes.rows) {
           try {
-            await sendTemplateMessage(row.phone, 'noshow_followup', 'en', [])
+            await runAsTenant(row.tenant_id, () => sendTemplateMessage(row.phone, 'noshow_followup', 'en', []))
             await pool.query(`
               INSERT INTO notifications (tenant_id, booking_id, customer_id, type, channel, status, scheduled_at, sent_at)
               VALUES ($1, $2, $3, 'noshow_followup', 'whatsapp', 'sent', NOW(), NOW())

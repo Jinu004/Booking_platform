@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const pool = require('../config/database');
 const whatsapp = require('../modules/channel/whatsapp/whatsapp.adapter');
+const { runAsTenant } = require('../modules/channel/whatsapp/senderContext');
 const logger = require('../utils/logger');
 
 async function processRetryQueue() {
@@ -22,11 +23,13 @@ async function processRetryQueue() {
           [job.id]
         );
         const p = job.payload;
-        if (job.message_type === 'text') {
-          await whatsapp.sendMessage(job.to_number, p.message);
-        } else if (job.message_type === 'template') {
-          await whatsapp.sendTemplateMessage(job.to_number, p.templateName, p.languageCode, p.components);
-        }
+        await runAsTenant(job.tenant_id, async () => {
+          if (job.message_type === 'text') {
+            await whatsapp.sendMessage(job.to_number, p.message);
+          } else if (job.message_type === 'template') {
+            await whatsapp.sendTemplateMessage(job.to_number, p.templateName, p.languageCode, p.components);
+          }
+        });
         await pool.query(
           `UPDATE whatsapp_retry_queue SET status = 'sent' WHERE id = $1`,
           [job.id]

@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const pool = require('../../config/database');
 const { sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter');
+const { runAsTenant } = require('../channel/whatsapp/senderContext');
 const logger = require('../../utils/logger');
 
 /**
@@ -35,7 +36,7 @@ cron.schedule('0 8 * * *', async () => {
           const appointmentTime = booking.slot_time
             ? `${booking.slot_time} session, Token #${booking.token_number}`
             : `Token #${booking.token_number}`
-          await sendTemplateMessage(booking.phone, 'appointment_reminder_v2_', 'en', [
+          await runAsTenant(booking.tenant_id, () => sendTemplateMessage(booking.phone, 'appointment_reminder_v2_', 'en', [
             {
               type: 'body',
               parameters: [
@@ -43,7 +44,7 @@ cron.schedule('0 8 * * *', async () => {
                 { type: 'text', text: appointmentTime }
               ]
             }
-          ])
+          ]))
           await pool.query(
             `INSERT INTO notifications
              (tenant_id, booking_id, customer_id,

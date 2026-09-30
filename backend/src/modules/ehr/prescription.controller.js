@@ -3,6 +3,7 @@ const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 const { sendDocument } = require('../channel/whatsapp/whatsapp.adapter');
+const { runAsTenant } = require('../channel/whatsapp/senderContext');
 
 function isPro(req) {
   return req.tenant?.plan === 'pro';
@@ -330,7 +331,7 @@ async function sendPrescriptionToWhatsApp(req, res, next) {
     const filename = `prescription-${data.patient_name?.replace(/\s+/g, '-')}-${noteId.slice(0, 8)}.pdf`;
     const caption = `Prescription from ${data.clinic_name}\nPatient: ${data.patient_name}\nDate: ${new Date(data.visit_date).toLocaleDateString('en-IN')}`;
 
-    await sendDocument(data.patient_phone, pdfBuffer, filename, caption);
+    await runAsTenant(req.tenantId, () => sendDocument(data.patient_phone, pdfBuffer, filename, caption));
     return successResponse(res, { message: 'Prescription sent to patient WhatsApp' });
   } catch (err) {
     logger.error('Prescription WhatsApp send failed:', err.message);
