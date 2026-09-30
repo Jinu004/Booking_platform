@@ -4,6 +4,13 @@ import * as Sentry from '@sentry/react';
 import './index.css'
 import App from './App.jsx';
 import ErrorBoundary from './components/shared/ErrorBoundary.jsx';
+import { reloadOnceForChunkError } from './utils/chunkReload';
+
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadOnceForChunkError()) {
+    event.preventDefault()
+  }
+})
 
 Sentry.init({
   dsn: "https://4e4fbd4d0bf1025ff3892ff51ed8d870@o4512141900578816.ingest.de.sentry.io/4512142217904208",
