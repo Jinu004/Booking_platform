@@ -53,7 +53,7 @@ export default function SuperAdmin() {
 
   // Edit modal
   const [editTenant, setEditTenant] = useState(null);
-  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', industry: 'clinic', aiModel: '', proactiveTemplates: false, recallEnabled: true, email: '' });
+  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', whatsappPhoneNumberId: '', industry: 'clinic', aiModel: '', proactiveTemplates: false, recallEnabled: true, email: '' });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -119,7 +119,7 @@ export default function SuperAdmin() {
       setCreateForm({ clinicName: '', email: '', password: '', plan: 'starter', industry: 'clinic' });
       fetchData();
     } catch (err) {
-      setCreateError(err?.response?.data?.error || 'Failed to create clinic');
+      setCreateError(err?.error || err?.response?.data?.error || 'Failed to create clinic');
     } finally {
       setCreateLoading(false);
     }
@@ -127,7 +127,7 @@ export default function SuperAdmin() {
 
   const openEdit = (t) => {
     setEditTenant(t);
-    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', industry: t.industry || 'clinic', aiModel: t.ai_model || '', proactiveTemplates: t.proactive_templates_enabled === 'true',
+    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', whatsappPhoneNumberId: t.whatsapp_phone_number_id || '', industry: t.industry || 'clinic', aiModel: t.ai_model || '', proactiveTemplates: t.proactive_templates_enabled === 'true',
     recallEnabled: t.recall_enabled !== 'false', email: t.email || '' });
     setEditError('');
   };
@@ -152,7 +152,7 @@ export default function SuperAdmin() {
       await fetchData();
       closeEditModal();
     } catch (err) {
-      setEditError(err?.response?.data?.error || 'Failed to update clinic');
+      setEditError(err?.error || err?.response?.data?.error || 'Failed to update clinic');
     } finally {
       setEditLoading(false);
     }
@@ -199,6 +199,7 @@ export default function SuperAdmin() {
       setWabaStep('done');
       addToast('WhatsApp number registered successfully', 'success');
       fetchData();
+      setEditForm(f => ({ ...f, whatsappPhoneNumberId: wabaPhoneNumberId }));
     } catch (err) {
       setWabaError(err.error || 'Invalid OTP');
       setWabaStep('otp_sent');
@@ -487,6 +488,17 @@ export default function SuperAdmin() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 placeholder="+919876543210"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number ID</label>
+              <input
+                type="text"
+                value={editForm.whatsappPhoneNumberId}
+                onChange={e => setEditForm(f => ({ ...f, whatsappPhoneNumberId: e.target.value.replace(/\D/g, '') }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                placeholder="Digits only"
+              />
+              <p className="text-xs text-gray-400 mt-1">From WhatsApp Manager (gear icon next to the number). Used to send reminders and staff replies from this clinic's number.</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Admin Email</label>
