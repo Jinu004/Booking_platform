@@ -8,11 +8,18 @@ const PHONE_NUMBER_ID_PATTERN = /^\d{8,20}$/
 function run(phoneNumberId, fn) {
   const value = phoneNumberId == null ? '' : String(phoneNumberId)
   const validated = PHONE_NUMBER_ID_PATTERN.test(value) ? value : null
+  if (value && !validated) {
+    logger.warn(`[senderContext] run() received non-empty but invalid phoneNumberId: ${value}`)
+  }
   return storage.run({ phoneNumberId: validated }, fn)
 }
 
 function getPhoneNumberId() {
   return storage.getStore()?.phoneNumberId || null
+}
+
+function hasContext() {
+  return !!storage.getStore()
 }
 
 async function runAsTenant(tenantId, fn) {
@@ -25,8 +32,10 @@ async function runAsTenant(tenantId, fn) {
       )
       phoneNumberId = result.rows[0]?.whatsapp_phone_number_id || null
     }
-    if (!phoneNumberId) {
-      logger.warn(`Tenant ${tenantId} has no whatsapp_phone_number_id, sending from the default number`)
+    if (phoneNumberId && !PHONE_NUMBER_ID_PATTERN.test(String(phoneNumberId))) {
+      logger.warn(`[senderContext] Tenant ${tenantId} has a stored ID that failed validation: ${phoneNumberId}`)
+    } else if (!phoneNumberId) {
+      logger.warn(`[senderContext] Tenant ${tenantId} has no valid whatsapp_phone_number_id; context will have null ID`)
     }
   } catch (err) {
     logger.error(`Phone number ID lookup failed for tenant ${tenantId}:`, err.message)
@@ -38,5 +47,6 @@ async function runAsTenant(tenantId, fn) {
 module.exports = {
   run,
   getPhoneNumberId,
-  runAsTenant
+  runAsTenant,
+  hasContext
 }

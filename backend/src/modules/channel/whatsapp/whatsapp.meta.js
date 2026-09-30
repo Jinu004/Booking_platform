@@ -7,9 +7,11 @@ const META_PHONE_ID = process.env.META_PHONE_NUMBER_ID || ''
 const META_API_URL = 'https://graph.facebook.com/v18.0'
 
 const getPhoneId = () => {
-  const contextPhoneId = senderContext.getPhoneNumberId()
-  if (contextPhoneId) return contextPhoneId
-  logger.warn('WhatsApp send using the default env phone number ID (no sender context)')
+  if (senderContext.hasContext()) {
+    const id = senderContext.getPhoneNumberId()
+    if (!id) throw new Error('No WhatsApp Phone Number ID set for this clinic - message not sent')
+    return id
+  }
   return META_PHONE_ID
 }
 
