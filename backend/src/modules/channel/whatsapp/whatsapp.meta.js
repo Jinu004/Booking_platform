@@ -1,9 +1,17 @@
 const axios = require('axios')
 const logger = require('../../../utils/logger')
+const senderContext = require('./senderContext')
 
 const META_TOKEN = process.env.META_WHATSAPP_TOKEN || ''
 const META_PHONE_ID = process.env.META_PHONE_NUMBER_ID || ''
 const META_API_URL = 'https://graph.facebook.com/v18.0'
+
+const getPhoneId = () => {
+  const contextPhoneId = senderContext.getPhoneNumberId()
+  if (contextPhoneId) return contextPhoneId
+  logger.warn('WhatsApp send using the default env phone number ID (no sender context)')
+  return META_PHONE_ID
+}
 
 /**
  * Sends a text message via Meta Cloud API
@@ -15,7 +23,7 @@ const META_API_URL = 'https://graph.facebook.com/v18.0'
 async function sendTextMessage(to, message) {
   try {
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      `${META_API_URL}/${getPhoneId()}/messages`,
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
@@ -125,7 +133,7 @@ function verifyWebhook(query) {
 async function sendInteractiveButtons(to, bodyText, buttons) {
   try {
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      `${META_API_URL}/${getPhoneId()}/messages`,
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
@@ -176,7 +184,7 @@ async function sendInteractiveButtons(to, bodyText, buttons) {
 async function sendListMessage(to, bodyText, buttonText, items, sectionTitle = 'Options') {
   try {
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      `${META_API_URL}/${getPhoneId()}/messages`,
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
@@ -210,7 +218,7 @@ async function sendListMessage(to, bodyText, buttonText, items, sectionTitle = '
     logger.info(`Meta list message sent to ${to}`)
     return response.data
   } catch (err) {
-    logger.error('Meta list message failed:', err.message)
+    logger.error('Meta list message failed:', err.response?.data || err.message)
     throw err
   }
 }
@@ -223,7 +231,7 @@ async function uploadMedia(fileBuffer, mimeType, filename) {
     form.append('file', fileBuffer, { filename, contentType: mimeType });
     form.append('messaging_product', 'whatsapp');
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/media`,
+      `${META_API_URL}/${getPhoneId()}/media`,
       form,
       {
         headers: {
@@ -243,7 +251,7 @@ async function uploadMedia(fileBuffer, mimeType, filename) {
 async function sendDocument(to, mediaId, filename, caption) {
   try {
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      `${META_API_URL}/${getPhoneId()}/messages`,
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
@@ -270,13 +278,13 @@ async function sendDocument(to, mediaId, filename, caption) {
   }
 }
 
-async function sendContact(to, clinicName, phoneNumber, wabaId, accessToken) {
+async function sendContact(to, clinicName, phoneNumber) {
   const waId = phoneNumber.replace(/\D/g, '');
-  const url = `https://graph.facebook.com/v18.0/${wabaId}/messages`;
+  const url = `${META_API_URL}/${getPhoneId()}/messages`;
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
-    to: to,
+    to: to.replace('+', ''),
     type: 'contacts',
     contacts: [{
       name: {
@@ -293,7 +301,7 @@ async function sendContact(to, clinicName, phoneNumber, wabaId, accessToken) {
   try {
     await axios.post(url, payload, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${META_TOKEN}`,
         'Content-Type': 'application/json'
       }
     });
@@ -306,7 +314,7 @@ async function sendContact(to, clinicName, phoneNumber, wabaId, accessToken) {
 async function sendTemplateMessage(to, templateName, languageCode = 'en', components = []) {
   try {
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      `${META_API_URL}/${getPhoneId()}/messages`,
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',

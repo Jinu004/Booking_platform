@@ -48,6 +48,11 @@ router.post('/', async (req, res) => {
   res.status(200).json({ success: true, data: { received: true }, error: null })
 
   setImmediate(async () => {
+    const senderContext = require('./senderContext')
+    const incomingPhoneId = req.body?.object === 'whatsapp_business_account'
+      ? req.body?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id
+      : null
+    await senderContext.run(incomingPhoneId, async () => {
     try {
       const body = req.body
       const source = body.object === 'whatsapp_business_account' ? 'meta' : 'waha'
@@ -430,9 +435,7 @@ if (!isEscalated && !isInteractiveSent && aiResponse) {
           const alreadySent = flagResult.rows[0]?.contact_card_sent === true
           if (!alreadySent) {
             const { sendContact } = require('./whatsapp.meta')
-            const META_TOKEN = process.env.META_WHATSAPP_TOKEN || ''
-            const META_PHONE_ID = process.env.META_PHONE_NUMBER_ID || ''
-            await sendContact(message.from, tenant.name, tenant.whatsapp_number, META_PHONE_ID, META_TOKEN)
+            await sendContact(message.from, tenant.name, tenant.whatsapp_number)
             await pool.query(
               'UPDATE conversations SET contact_card_sent = true WHERE id = $1',
               [context.conversation.id]
@@ -455,6 +458,7 @@ if (!isEscalated && !isInteractiveSent && aiResponse) {
         } catch (e) {}
       }
     }
+    })
   })
 })
 
