@@ -4,7 +4,7 @@ const senderContext = require('./senderContext')
 
 const META_TOKEN = process.env.META_WHATSAPP_TOKEN || ''
 const META_PHONE_ID = process.env.META_PHONE_NUMBER_ID || ''
-const META_API_URL = 'https://graph.facebook.com/v18.0'
+const META_API_URL = 'https://graph.facebook.com/v24.0'
 
 const getPhoneId = () => {
   if (senderContext.hasContext()) {

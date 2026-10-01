@@ -5,7 +5,7 @@ const logger = require('../../utils/logger');
 
 const META_TOKEN = process.env.META_WHATSAPP_TOKEN;
 const WABA_ID = process.env.META_WABA_ID;
-const META_API_URL = 'https://graph.facebook.com/v18.0';
+const META_API_URL = 'https://graph.facebook.com/v24.0';
 
 // POST /admin/waba/initiate
 // Initiates phone number registration with Meta, sends OTP to the number
