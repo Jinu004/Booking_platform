@@ -26,7 +26,7 @@ function getProvider() {
  * @returns {Promise<object>} Provider response
  */
 async function sendMessage(to, message) {
-  await randomDelay(3000, 8000)
+  await randomDelay(800, 1500)
 
   const provider = getProvider()
   logger.info(`Sending via ${provider} to ${to.toString().slice(0, 2)}XXXXXX${to.toString().slice(-3)}`)
