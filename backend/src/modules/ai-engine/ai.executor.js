@@ -909,7 +909,9 @@ Please reply with your name to confirm booking.`
         : (() => { const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return now.getHours() * 60 + now.getMinutes(); })();
       const matched = sess.find(s => { const ss = toMins(s.start_time); const se = toMins(s.end_time); return slotMins >= ss && slotMins < se; });
       if (matched) { sessionStart = matched.start_time.toString().slice(0, 5); sessionEnd = matched.end_time.toString().slice(0, 5); }
-    } catch {}
+    } catch (err) {
+      logger.error(`Session scope lookup failed in create_token_booking: ${err.message}`)
+    }
 
     let tokenQuery, tokenParams;
     if (sessionStart && sessionEnd) {
