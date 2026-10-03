@@ -45,4 +45,24 @@ async function submitPosterRequest(req, res) {
   }
 }
 
-module.exports = { submitPosterRequest }
+async function getPosterRequests(req, res) {
+  try {
+    const { id: tenantId } = req.params
+
+    if (req.staff.role !== 'super_admin' && req.staff.tenantId !== tenantId) {
+      return errorResponse(res, 'Forbidden: tenant mismatch', 403)
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM poster_requests WHERE tenant_id = $1 ORDER BY created_at DESC`,
+      [tenantId]
+    )
+
+    return successResponse(res, result.rows)
+  } catch (err) {
+    logger.error('Error fetching poster requests:', err.message)
+    return errorResponse(res, 'Failed to fetch poster requests', 500)
+  }
+}
+
+module.exports = { submitPosterRequest, getPosterRequests }

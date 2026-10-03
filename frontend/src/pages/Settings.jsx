@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getClinicSettings, updateClinicSettings, getHITLSettings, updateHITLSettings, getSettings, updateSettings } from '../services/settings.service';
 import { getDoctors, updateDoctor } from '../services/clinic.service';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import { PLANS } from '../constants';
 import { useIndustry } from '../hooks/useIndustry';
+import api from '../utils/api';
 
 const DAYS = [
   { key: 'mon', label: 'Monday' },
@@ -88,6 +89,10 @@ export default function Settings() {
   const kbUnlocked = plan === 'growth' || plan === 'pro';
   const kbLimit = plan === 'pro' ? 3500 : 1000;
   const kbOverLimit = knowledgeBase.length > kbLimit;
+
+  useEffect(() => {
+    if (activeTab === 'posters') fetchPosterRequests();
+  }, [activeTab]);
 
   useEffect(() => {
     getClinicSettings()
@@ -209,11 +214,55 @@ export default function Settings() {
     }));
   };
 
+  // Poster upload state
+  const [posterFile, setPosterFile] = useState(null);
+  const [posterPreview, setPosterPreview] = useState(null);
+  const [posterCaption, setPosterCaption] = useState('');
+  const [posterUploading, setPosterUploading] = useState(false);
+  const [posterRequests, setPosterRequests] = useState([]);
+  const [posterLoading, setPosterLoading] = useState(false);
+  const posterInputRef = useRef(null);
+
+  const fetchPosterRequests = async () => {
+    try {
+      setPosterLoading(true);
+      const res = await api.get(`/tenants/${staff?.tenantId}/poster-requests`);
+      setPosterRequests(res.data || []);
+    } catch {
+    } finally {
+      setPosterLoading(false);
+    }
+  };
+
+  const handlePosterUpload = async () => {
+    if (!posterFile) return;
+    try {
+      setPosterUploading(true);
+      const formData = new FormData();
+      formData.append('poster', posterFile);
+      if (posterCaption.trim()) formData.append('caption', posterCaption.trim());
+      await api.post(`/tenants/${staff?.tenantId}/poster-request`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      addToast('Poster submitted for review', 'success');
+      setPosterFile(null);
+      setPosterPreview(null);
+      setPosterCaption('');
+      if (posterInputRef.current) posterInputRef.current.value = '';
+      fetchPosterRequests();
+    } catch {
+      addToast('Failed to upload poster', 'error');
+    } finally {
+      setPosterUploading(false);
+    }
+  };
+
   const tabs = [
     { key: 'clinic', label: 'Clinic Profile' },
     { key: 'ai', label: 'AI & HITL' },
     { key: 'whatsapp', label: 'WhatsApp' },
     ...(plan === 'pro' ? [{ key: 'doctors', label: 'Doctor Profiles' }] : []),
+    { key: 'posters', label: 'Posters' },
     { key: 'billing', label: 'Billing' },
   ];
 
@@ -622,6 +671,93 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+      {activeTab === 'posters' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+            <h2 className="text-lg font-semibold text-gray-900">Upload Poster</h2>
+            <p className="text-sm text-gray-500">Upload a poster image for your WhatsApp marketing template. Our team will review and set it up for you.</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Poster Image</label>
+              <input
+                ref={posterInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (file.size > 5 * 1024 * 1024) {
+                      addToast('Image must be under 5MB', 'error');
+                      e.target.value = '';
+                      return;
+                    }
+                    setPosterFile(file);
+                    setPosterPreview(URL.createObjectURL(file));
+                  }
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              />
+              <p className="text-xs text-gray-400 mt-1">JPEG, PNG or WebP. Max 5MB.</p>
+            </div>
+            {posterPreview && (
+              <div className="mt-3">
+                <img src={posterPreview} alt="Preview" className="max-w-xs rounded-lg border border-gray-200 shadow-sm" />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Caption (optional)</label>
+              <input
+                type="text"
+                value={posterCaption}
+                onChange={e => setPosterCaption(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="e.g. Diwali health check-up offer"
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={handlePosterUpload}
+                disabled={!posterFile || posterUploading}
+                className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {posterUploading ? 'Uploading...' : 'Submit for Review'}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Your Poster Requests</h2>
+              <button onClick={fetchPosterRequests} className="text-sm text-indigo-600 hover:text-indigo-800">Refresh</button>
+            </div>
+            {posterLoading ? (
+              <p className="text-sm text-gray-400">Loading...</p>
+            ) : posterRequests.length === 0 ? (
+              <p className="text-sm text-gray-400">No poster requests yet. Upload one above to get started.</p>
+            ) : (
+              <div className="space-y-3">
+                {posterRequests.map(pr => (
+                  <div key={pr.id} className="flex items-start gap-4 p-4 border border-gray-100 rounded-lg">
+                    <img src={pr.image_url} alt="Poster" className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                          pr.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          pr.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>{pr.status}</span>
+                        <span className="text-xs text-gray-400">{new Date(pr.created_at).toLocaleDateString('en-IN')}</span>
+                      </div>
+                      {pr.caption && <p className="text-sm text-gray-700 mt-1 truncate">{pr.caption}</p>}
+                      {pr.notes && <p className="text-xs text-red-500 mt-1">{pr.notes}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {activeTab === 'billing' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">

@@ -44,6 +44,49 @@ export default function SuperAdmin() {
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [industryFilter, setIndustryFilter] = useState('all');
+  const [view, setView] = useState('tenants');
+
+  // Poster requests state
+  const [posterRequests, setPosterRequests] = useState([]);
+  const [posterLoading, setPosterLoading] = useState(false);
+  const [posterStatusFilter, setPosterStatusFilter] = useState('pending');
+  const [rejectingId, setRejectingId] = useState(null);
+  const [rejectNotes, setRejectNotes] = useState('');
+
+  const fetchPosterRequests = async () => {
+    try {
+      setPosterLoading(true);
+      const params = posterStatusFilter !== 'all' ? `?status=${posterStatusFilter}` : '';
+      const res = await api.get(`/superadmin/poster-requests${params}`);
+      setPosterRequests(res.data || []);
+    } catch {
+      addToast('Failed to load poster requests', 'error');
+    } finally {
+      setPosterLoading(false);
+    }
+  };
+
+  const handleApprovePoster = async (id) => {
+    try {
+      await api.patch(`/superadmin/poster-requests/${id}/approve`);
+      addToast('Poster approved', 'success');
+      fetchPosterRequests();
+    } catch {
+      addToast('Failed to approve poster', 'error');
+    }
+  };
+
+  const handleRejectPoster = async (id) => {
+    try {
+      await api.patch(`/superadmin/poster-requests/${id}/reject`, { notes: rejectNotes || null });
+      addToast('Poster rejected', 'success');
+      setRejectingId(null);
+      setRejectNotes('');
+      fetchPosterRequests();
+    } catch {
+      addToast('Failed to reject poster', 'error');
+    }
+  };
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false);
@@ -67,6 +110,7 @@ export default function SuperAdmin() {
   const ownTenantId = staff?.tenantId;
 
   useEffect(() => { fetchData(); }, []);
+  useEffect(() => { if (view === 'posters') fetchPosterRequests(); }, [view, posterStatusFilter]);
 
   const fetchData = async () => {
     try {
@@ -261,14 +305,119 @@ export default function SuperAdmin() {
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Platform Admin</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          + New Tenant
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex bg-gray-100 rounded-lg p-0.5">
+            {[{ key: 'tenants', label: 'Tenants' }, { key: 'posters', label: 'Posters' }].map(v => (
+              <button
+                key={v.key}
+                onClick={() => setView(v.key)}
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  view === v.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+          {view === 'tenants' && (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+            >
+              + New Tenant
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* Posters View */}
+      {view === 'posters' && (
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            {['all', 'pending', 'approved', 'rejected'].map(s => (
+              <button
+                key={s}
+                onClick={() => setPosterStatusFilter(s)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                  posterStatusFilter === s ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+          <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Caption</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {posterLoading ? (
+                    <tr><td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-400">Loading...</td></tr>
+                  ) : posterRequests.length === 0 ? (
+                    <tr><td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">No poster requests</td></tr>
+                  ) : posterRequests.map(pr => (
+                    <tr key={pr.id}>
+                      <td className="px-4 py-3">
+                        <a href={pr.image_url} target="_blank" rel="noopener noreferrer">
+                          <img src={pr.image_url} alt="Poster" className="w-14 h-14 object-cover rounded-lg border border-gray-200 hover:opacity-80 transition" />
+                        </a>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{pr.tenant_name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{pr.caption || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3">{statusBadge(pr.status)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{new Date(pr.created_at).toLocaleDateString('en-IN')}</td>
+                      <td className="px-4 py-3 text-right text-sm font-medium">
+                        {pr.status === 'pending' && (
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => handleApprovePoster(pr.id)} className="text-green-600 hover:text-green-900">Approve</button>
+                            <button onClick={() => { setRejectingId(pr.id); setRejectNotes(''); }} className="text-red-600 hover:text-red-900">Reject</button>
+                          </div>
+                        )}
+                        {pr.status === 'rejected' && pr.notes && (
+                          <span className="text-xs text-red-500">{pr.notes}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {rejectingId && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+                <h2 className="text-lg font-semibold text-gray-900">Reject Poster Request</h2>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+                  <textarea
+                    rows={3}
+                    value={rejectNotes}
+                    onChange={e => setRejectNotes(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    placeholder="e.g. Image quality too low, please re-upload"
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => { setRejectingId(null); setRejectNotes(''); }} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+                  <button onClick={() => handleRejectPoster(rejectingId)} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Reject</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {view === 'tenants' && <>
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
@@ -638,6 +787,7 @@ export default function SuperAdmin() {
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 }
