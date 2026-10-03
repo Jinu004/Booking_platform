@@ -298,6 +298,59 @@ async function clearTenantConversations(req, res) {
   }
 }
 
+async function getPosterRequests(req, res) {
+  try {
+    const { status } = req.query;
+    let sql = `SELECT pr.*, t.name AS tenant_name FROM poster_requests pr JOIN tenants t ON t.id = pr.tenant_id`;
+    const params = [];
+    if (status) {
+      sql += ` WHERE pr.status = $1`;
+      params.push(status);
+    }
+    sql += ` ORDER BY pr.created_at DESC`;
+    const result = await pool.query(sql, params);
+    return successResponse(res, result.rows);
+  } catch (err) {
+    logger.error('Error fetching poster requests:', err.message);
+    return errorResponse(res, 'Failed to fetch poster requests', 500);
+  }
+}
+
+async function approvePosterRequest(req, res) {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `UPDATE poster_requests SET status = 'approved', reviewed_at = NOW() WHERE id = $1 AND status = 'pending' RETURNING *`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return errorResponse(res, 'Poster request not found or already reviewed', 409);
+    }
+    return successResponse(res, result.rows[0]);
+  } catch (err) {
+    logger.error('Error approving poster request:', err.message);
+    return errorResponse(res, 'Failed to approve poster request', 500);
+  }
+}
+
+async function rejectPosterRequest(req, res) {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const result = await pool.query(
+      `UPDATE poster_requests SET status = 'rejected', reviewed_at = NOW(), notes = $2 WHERE id = $1 AND status = 'pending' RETURNING *`,
+      [id, notes || null]
+    );
+    if (result.rows.length === 0) {
+      return errorResponse(res, 'Poster request not found or already reviewed', 409);
+    }
+    return successResponse(res, result.rows[0]);
+  } catch (err) {
+    logger.error('Error rejecting poster request:', err.message);
+    return errorResponse(res, 'Failed to reject poster request', 500);
+  }
+}
+
 module.exports = {
   getAllTenants,
   getTenantDetails,
@@ -306,5 +359,8 @@ module.exports = {
   createTenant,
   getPlatformStats,
   clearTenantConversations,
-  deleteTenant
+  deleteTenant,
+  getPosterRequests,
+  approvePosterRequest,
+  rejectPosterRequest
 };

@@ -10,7 +10,10 @@ const {
   createTenant,
   getPlatformStats,
   clearTenantConversations,
-  deleteTenant
+  deleteTenant,
+  getPosterRequests,
+  approvePosterRequest,
+  rejectPosterRequest
 } = require('./superadmin.controller');
 const { getConfig, updateConfig } = require('./platform-config.controller');
 
@@ -41,5 +44,9 @@ router.delete('/tenants/:id/conversations', clearTenantConversations);
 
 router.get('/platform-config', getConfig);
 router.put('/platform-config', updateConfig);
+
+router.get('/poster-requests', getPosterRequests);
+router.patch('/poster-requests/:id/approve', approvePosterRequest);
+router.patch('/poster-requests/:id/reject', rejectPosterRequest);
 
 module.exports = router;
