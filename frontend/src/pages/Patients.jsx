@@ -136,16 +136,16 @@ export default function Patients() {
   if (!isPro) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-16 h-16 bg-ink/[0.05] rounded-full flex items-center justify-center mb-4">
+          <svg className="w-8 h-8 text-ink/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
               d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">EHR is a Pro Feature</h2>
-        <p className="text-gray-500 text-sm max-w-sm">
+        <h2 className="text-xl font-semibold tracking-[-0.03em] text-ink mb-2">EHR is a Pro Feature</h2>
+        <p className="text-ink/55 text-sm max-w-sm">
           EHR is available on the Pro plan. Contact{' '}
-          <a href="mailto:support@receptionai.in" className="text-indigo-600 hover:underline">
+          <a href="mailto:support@receptionai.in" className="text-ink font-medium underline underline-offset-2 hover:text-ink/70">
             support@receptionai.in
           </a>{' '}
           to upgrade.
@@ -173,19 +173,19 @@ export default function Patients() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Patients</h1>
+          <h1 className="text-2xl md:text-[28px] font-semibold tracking-[-0.035em] text-ink">Patients</h1>
           <div className="flex items-center gap-3 mt-1">
-            <span className="text-sm text-gray-500">{total} total</span>
-            <span className="w-1 h-1 bg-gray-300 rounded-full" />
+            <span className="text-sm text-ink/55">{total} total</span>
+            <span className="w-1 h-1 bg-ink/[0.12] rounded-full" />
             <span className="text-sm text-green-600 font-medium">{newCount} new</span>
-            <span className="w-1 h-1 bg-gray-300 rounded-full" />
+            <span className="w-1 h-1 bg-ink/[0.12] rounded-full" />
             <span className="text-sm text-blue-600 font-medium">{returningCount} returning</span>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <button
             onClick={() => setShowAddPatient(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap"
+            className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-hover transition-colors whitespace-nowrap"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -197,13 +197,13 @@ export default function Patients() {
             placeholder="Search name or phone..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="flex-1 min-w-[140px] sm:flex-none sm:w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="flex-1 min-w-[140px] sm:flex-none sm:w-64 border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15"
           />
         </div>
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-ink/[0.08]">
         {[
           { key: 'all', label: 'All' },
           { key: 'new', label: 'New' },
@@ -214,8 +214,8 @@ export default function Patients() {
             onClick={() => setActiveFilter(tab.key)}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
               activeFilter === tab.key
-                ? 'border-indigo-600 text-indigo-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-ink/55 hover:text-ink/80'
             }`}
           >
             {tab.label}
@@ -224,52 +224,52 @@ export default function Patients() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto hidden md:block">
+      <div className="bg-white rounded-2xl border border-ink/[0.08] shadow-card overflow-x-auto hidden md:block">
         {loading ? (
           <TableRowSkeleton rows={6} />
         ) : filtered.length === 0 ? (
-          <div className="p-16 text-center text-gray-400 text-sm">No patients found</div>
+          <div className="p-16 text-center text-ink/40 text-sm">No patients found</div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-100">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-ink/[0.06]">
+            <thead className="bg-ink/[0.02]">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Patient</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Blood Group</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Visit</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Visits</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left font-mono text-[10px] font-medium text-ink/45 uppercase tracking-[0.08em]">Patient</th>
+                <th className="px-6 py-3 text-left font-mono text-[10px] font-medium text-ink/45 uppercase tracking-[0.08em]">Phone</th>
+                <th className="px-6 py-3 text-left font-mono text-[10px] font-medium text-ink/45 uppercase tracking-[0.08em]">Blood Group</th>
+                <th className="px-6 py-3 text-left font-mono text-[10px] font-medium text-ink/45 uppercase tracking-[0.08em]">Last Visit</th>
+                <th className="px-6 py-3 text-left font-mono text-[10px] font-medium text-ink/45 uppercase tracking-[0.08em]">Visits</th>
+                <th className="px-6 py-3 text-left font-mono text-[10px] font-medium text-ink/45 uppercase tracking-[0.08em]">Status</th>
                 <th className="px-6 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-ink/[0.06]">
               {paginatedPatients.map(p => {
                 const isNew = (parseInt(p.total_visits || 0)) === 0;
                 const bloodGroup = p.blood_group;
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50 transition">
+                  <tr key={p.id} className="hover:bg-ink/[0.02] transition">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarColor(p.name)}`}>
                           {initials(p.name)}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">{p.name || '—'}</p>
+                          <p className="text-sm font-semibold text-ink">{p.name || '—'}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{p.phone || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-ink/65">{p.phone || '—'}</td>
                     <td className="px-6 py-4">
                       {bloodGroup ? (
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${BLOOD_COLORS[bloodGroup] || 'bg-gray-100 text-gray-600'}`}>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${BLOOD_COLORS[bloodGroup] || 'bg-ink/[0.05] text-ink/65'}`}>
                           {bloodGroup}
                         </span>
                       ) : (
                         <span className="text-gray-300 text-sm">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{relativeDate(p.last_visit)}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-700">{parseInt(p.total_visits || 0)}</td>
+                    <td className="px-6 py-4 text-sm text-ink/55">{relativeDate(p.last_visit)}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-ink/80">{parseInt(p.total_visits || 0)}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                         isNew ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
@@ -280,7 +280,7 @@ export default function Patients() {
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => navigate(`/patients/${p.id}`)}
-                        className="text-sm text-indigo-600 font-semibold hover:text-indigo-800"
+                        className="text-sm text-ink font-medium hover:text-ink/70 whitespace-nowrap"
                       >
                         View Profile →
                       </button>
@@ -294,9 +294,9 @@ export default function Patients() {
       </div>
 
       {/* Mobile patient list */}
-      <div className="block md:hidden bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+      <div className="block md:hidden bg-white rounded-2xl border border-ink/[0.08] shadow-card overflow-hidden divide-y divide-ink/[0.06]">
         {!loading && filtered.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-gray-400">No patients found.</div>
+          <div className="px-4 py-8 text-center text-sm text-ink/40">No patients found.</div>
         ) : (
           paginatedPatients.map(p => {
             const isNew = parseInt(p.total_visits || 0) === 0;
@@ -304,7 +304,7 @@ export default function Patients() {
               <div
                 key={p.id}
                 onClick={() => navigate(`/patients/${p.id}`)}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 active:bg-gray-100 cursor-pointer"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-ink/[0.02] active:bg-ink/[0.05] cursor-pointer"
               >
                 <div
                   className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0"
@@ -314,18 +314,18 @@ export default function Patients() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-gray-900 text-sm truncate">{p.name}</span>
+                    <span className="font-semibold text-ink text-sm truncate">{p.name}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${isNew ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                       {isNew ? 'New' : 'Returning'}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">{p.phone}</div>
-                  <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+                  <div className="text-xs text-ink/55 mt-0.5">{p.phone}</div>
+                  <div className="flex items-center gap-3 mt-0.5 text-xs text-ink/40">
                     {p.last_visit && <span>Last: {relativeDate(p.last_visit)}</span>}
                     <span>{parseInt(p.total_visits || 0)} visits</span>
                   </div>
                 </div>
-                <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-ink/40 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
               </div>
@@ -337,30 +337,30 @@ export default function Patients() {
       {/* Pagination */}
       {!loading && filtered.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-ink/55">
             Showing{' '}
-            <span className="font-medium text-gray-700">
+            <span className="font-medium text-ink/80">
               {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)}
             </span>{' '}
             of{' '}
-            <span className="font-medium text-gray-700">{filtered.length}</span>{' '}
+            <span className="font-medium text-ink/80">{filtered.length}</span>{' '}
             patients
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentPage(p => p - 1)}
               disabled={currentPage === 1}
-              className="px-3 py-1.5 text-sm font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="px-3 py-1.5 text-sm font-semibold rounded-lg border border-ink/[0.08] text-ink/65 hover:bg-ink/[0.02] disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               ← Prev
             </button>
-            <span className="text-sm font-medium text-gray-600 px-1">
+            <span className="text-sm font-medium text-ink/65 px-1">
               {currentPage} / {totalPages}
             </span>
             <button
               onClick={() => setCurrentPage(p => p + 1)}
               disabled={currentPage === totalPages}
-              className="px-4 py-2 text-sm font-semibold rounded-lg border border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="px-4 py-2 text-sm font-semibold rounded-lg border border-accent bg-accent text-white hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               Next →
             </button>
@@ -369,11 +369,11 @@ export default function Patients() {
       )}
       {showAddPatient && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Add Patient</h2>
-              <button onClick={handleCloseAddPatient} className="text-gray-400 hover:text-gray-600">
+            <div className="flex items-center justify-between p-6 border-b border-ink/[0.08]">
+              <h2 className="text-lg font-semibold text-ink">Add Patient</h2>
+              <button onClick={handleCloseAddPatient} className="text-ink/40 hover:text-ink/65">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -383,19 +383,19 @@ export default function Patients() {
             <div className="p-6 space-y-4">
               {/* Step 1 — Phone search */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Phone Number</label>
+                <label className="block text-sm font-medium text-ink/80 mb-1">WhatsApp Phone Number</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={addPatientPhone}
                     onChange={e => { setAddPatientPhone(e.target.value); setAddPatientSearch(null); }}
                     placeholder="+919876543210"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="flex-1 px-3 py-2 border border-ink/[0.12] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15"
                   />
                   <button
                     onClick={handleSearchPhone}
                     disabled={addPatientSearching || !addPatientPhone.trim()}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                    className="px-4 py-2 bg-ink/[0.05] text-ink/80 text-sm font-medium rounded-lg hover:bg-ink/[0.08] disabled:opacity-50"
                   >
                     {addPatientSearching ? 'Searching...' : 'Search'}
                   </button>
@@ -413,7 +413,7 @@ export default function Patients() {
                           <span className="text-sm text-amber-900">{p.name}</span>
                           <button
                             onClick={() => navigate(`/patients/${p.id}`)}
-                            className="text-xs text-indigo-600 hover:underline"
+                            className="text-xs text-ink font-medium underline underline-offset-2 hover:text-ink/70"
                           >
                             View Profile
                           </button>
@@ -429,35 +429,35 @@ export default function Patients() {
 
               {/* Step 2 — Patient details (show after search) */}
               {addPatientSearch !== null && (
-                <div className="space-y-3 border-t border-gray-100 pt-4">
-                  <p className="text-sm font-medium text-gray-700">New Patient Details</p>
+                <div className="space-y-3 border-t border-ink/[0.06] pt-4">
+                  <p className="text-sm font-medium text-ink/80">New Patient Details</p>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
+                    <label className="block text-xs font-medium text-ink/65 mb-1">Full Name *</label>
                     <input
                       type="text"
                       value={addPatientForm.name}
                       onChange={e => setAddPatientForm(p => ({ ...p, name: e.target.value }))}
                       placeholder="Patient full name"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-ink/[0.12] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15"
                     />
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Age</label>
+                      <label className="block text-xs font-medium text-ink/65 mb-1">Age</label>
                       <input
                         type="number"
                         value={addPatientForm.age}
                         onChange={e => setAddPatientForm(p => ({ ...p, age: e.target.value }))}
                         placeholder="Age"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 border border-ink/[0.12] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Gender</label>
+                      <label className="block text-xs font-medium text-ink/65 mb-1">Gender</label>
                       <select
                         value={addPatientForm.gender}
                         onChange={e => setAddPatientForm(p => ({ ...p, gender: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 border border-ink/[0.12] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15"
                       >
                         <option value="">-</option>
                         <option value="male">Male</option>
@@ -466,11 +466,11 @@ export default function Patients() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Blood Group</label>
+                      <label className="block text-xs font-medium text-ink/65 mb-1">Blood Group</label>
                       <select
                         value={addPatientForm.blood_group}
                         onChange={e => setAddPatientForm(p => ({ ...p, blood_group: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 border border-ink/[0.12] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15"
                       >
                         <option value="">-</option>
                         <option value="A+">A+</option>
@@ -490,12 +490,12 @@ export default function Patients() {
 
             {/* Footer */}
             {addPatientSearch !== null && (
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
-                <button onClick={handleCloseAddPatient} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-ink/[0.06]">
+                <button onClick={handleCloseAddPatient} className="px-4 py-2 text-sm text-ink/65 hover:text-ink/80">Cancel</button>
                 <button
                   onClick={handleAddPatient}
                   disabled={addPatientSaving || !addPatientForm.name.trim()}
-                  className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-hover disabled:opacity-50"
                 >
                   {addPatientSaving ? 'Saving...' : 'Add Patient'}
                 </button>
