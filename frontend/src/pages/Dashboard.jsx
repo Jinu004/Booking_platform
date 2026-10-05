@@ -145,8 +145,21 @@ const Dashboard = () => {
     );
   }
 
+  const now = new Date();
+  const dateLabel = `${now.toLocaleDateString('en-IN', { weekday: 'short' })} · ${now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`;
+
+  const cardBase = 'bg-white rounded-2xl border border-ink/[0.08] shadow-card';
+  const monoLabel = 'font-mono text-[11px] tracking-[0.08em] uppercase';
+  const filterTabs = [
+    { key: 'all', label: 'All' },
+    { key: 'arrived', label: 'Waiting' },
+    { key: 'in_consult', label: 'In Consult' },
+    { key: 'done', label: 'Done' },
+  ];
+  const queueGrid = 'grid grid-cols-[56px_minmax(0,1fr)_96px_76px] md:grid-cols-[64px_minmax(0,1.3fr)_minmax(0,1fr)_96px_76px] items-center gap-3';
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col gap-0">
+    <div className="min-h-screen bg-bg text-ink flex flex-col gap-0">
 
       {isOffline && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800 flex items-center gap-2">
@@ -187,17 +200,17 @@ const Dashboard = () => {
       )}
 
       {/* Section 1 — Top Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center">
-        <div>
-          <p className="text-xl font-bold text-gray-900">{isDoctor ? 'My Queue' : (tenant?.name || staff?.tenantName || 'Dashboard')}</p>
-          <p className="text-sm text-gray-500">
-            {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
+      <div className="border-b border-ink/[0.08] px-6 py-5 flex justify-between items-end gap-4">
+        <div className="min-w-0">
+          <p className={`${monoLabel} text-ink/50`}>{dateLabel}</p>
+          <h1 className="mt-1.5 text-[28px] md:text-[32px] font-semibold tracking-[-0.035em] leading-tight truncate">
+            {isDoctor ? 'My Queue' : (tenant?.name || staff?.tenantName || 'Dashboard')}
+          </h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-shrink-0">
           <Link
             to="/bookings"
-            className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
+            className="px-4 py-2 text-sm font-medium bg-ink text-bg rounded-lg hover:-translate-y-px hover:shadow-[0_4px_16px_rgba(14,15,12,0.18)] transition"
           >
             + New Token
           </Link>
@@ -205,27 +218,27 @@ const Dashboard = () => {
       </div>
 
       {/* Section 2 — Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 py-4">
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Today's Tokens</p>
-          <p className="mt-2 text-4xl font-black text-indigo-600">{stats.bookingsToday}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 py-5">
+        <div className={`${cardBase} p-5`}>
+          <p className={`${monoLabel} text-ink/50`}>Today's Tokens</p>
+          <p className="mt-3 text-[40px] font-semibold tracking-[-0.04em] leading-none">{stats.bookingsToday}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Waiting Now</p>
-          <p className="mt-2 text-4xl font-black text-amber-500">{stats.pendingTokens}</p>
+        <div className="bg-ink text-bg rounded-2xl border border-ink shadow-card p-5">
+          <p className={`${monoLabel} text-bg/60`}>Waiting Now</p>
+          <p className="mt-3 text-[40px] font-semibold tracking-[-0.04em] leading-none">{stats.pendingTokens}</p>
         </div>
         {!isDoctor && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Doctors on Duty</p>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-4xl font-black text-emerald-600">{doctors.filter(d => d.available_now && !d.leave_days).length}</span>
-              <span className="text-xl text-gray-400 font-bold">/ {doctors.length}</span>
+          <div className={`${cardBase} p-5`}>
+            <p className={`${monoLabel} text-ink/50`}>Doctors on Duty</p>
+            <div className="mt-3 flex items-baseline gap-1.5">
+              <span className="text-[40px] font-semibold tracking-[-0.04em] leading-none">{doctors.filter(d => d.available_now && !d.leave_days).length}</span>
+              <span className="text-xl text-ink/35 font-medium">/ {doctors.length}</span>
             </div>
           </div>
         )}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Chats</p>
-          <p className="mt-2 text-4xl font-black text-blue-600">{stats.activeConversations}</p>
+        <div className={`${cardBase} p-5`}>
+          <p className={`${monoLabel} text-ink/50`}>Active Chats</p>
+          <p className="mt-3 text-[40px] font-semibold tracking-[-0.04em] leading-none">{stats.activeConversations}</p>
         </div>
       </div>
 
@@ -233,32 +246,26 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-6">
 
         {/* Left — Live Token Queue */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          {/* Card header — matches Active Chats pattern */}
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        <div className={`lg:col-span-2 ${cardBase} overflow-hidden`}>
+          <div className="px-6 py-4 border-b border-ink/[0.08] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-semibold text-gray-800">Live Token Queue</span>
+              <span className="font-semibold tracking-tight">Live Token Queue</span>
             </div>
-            <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-full bg-ink/[0.06] text-ink/70">
               {tokenQueue.length}
             </span>
           </div>
-          {/* Filter tabs — full width, evenly spaced */}
-          <div className="px-4 py-2 flex gap-1 border-b border-gray-100">
-            {[
-              { key: 'all', label: 'All' },
-              { key: 'arrived', label: 'Waiting' },
-              { key: 'in_consult', label: 'In Consult' },
-              { key: 'done', label: 'Done' },
-            ].map(tab => (
+
+          <div className="px-4 py-3 flex flex-wrap gap-1.5 border-b border-ink/[0.08]">
+            {filterTabs.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveFilter(tab.key)}
-                className={`flex-1 text-sm transition rounded-md px-3 py-1 ${
+                className={`text-[13px] font-medium transition rounded-full px-3.5 py-1 ${
                   activeFilter === tab.key
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-ink text-bg'
+                    : 'text-ink/55 hover:text-ink hover:bg-ink/[0.05]'
                 }`}
               >
                 {tab.label}
@@ -266,22 +273,31 @@ const Dashboard = () => {
             ))}
           </div>
 
-          <div className="divide-y divide-gray-100 max-h-[480px] overflow-y-auto">
+          {filteredTokens.length > 0 && (
+            <div className={`${queueGrid} px-6 py-2.5 border-b border-ink/[0.08] bg-ink/[0.02] ${monoLabel} text-[10px] text-ink/45`}>
+              <span>Token</span>
+              <span>Patient</span>
+              <span className="hidden md:block">Doctor</span>
+              <span>Status</span>
+              <span className="text-right">Action</span>
+            </div>
+          )}
+
+          <div className="divide-y divide-ink/[0.08] max-h-[480px] overflow-y-auto">
             {filteredTokens.length === 0 ? (
-              <div className="p-12 text-center text-sm text-gray-500">No tokens in queue</div>
+              <div className="p-12 text-center text-sm text-ink/55">No tokens in queue</div>
             ) : filteredTokens.map(t => (
-              <div key={t.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-indigo-50 rounded-lg flex items-center justify-center font-black text-indigo-600 text-sm flex-shrink-0">
-                    {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-900">{t.patient_name || 'Walk-in'}</p>
-                    <p className="text-sm font-semibold text-indigo-600">{t.doctor_name}</p>
-                  </div>
+              <div key={t.id} className={`${queueGrid} px-6 py-3.5 hover:bg-ink/[0.02] transition`}>
+                <span className="inline-flex items-center justify-center h-8 px-2 rounded-md bg-ink/[0.05] font-mono text-[12px] font-semibold">
+                  {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{t.patient_name || 'Walk-in'}</p>
+                  <p className="md:hidden text-xs text-ink/55 truncate">{t.doctor_name}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {getStatusPill(t.status)}
+                <p className="hidden md:block text-sm text-ink/60 truncate">{t.doctor_name}</p>
+                <div>{getStatusPill(t.status)}</div>
+                <div className="flex items-center justify-end gap-2 min-w-[72px]">
                   {t.status === 'waiting' && (
                     <button
                       disabled={loadingToken === t.id}
@@ -337,52 +353,54 @@ const Dashboard = () => {
             ))}
           </div>
 
-          <div className="px-6 py-3 border-t border-gray-100 bg-gray-50">
-            <p className="text-sm text-gray-500">Showing {filteredTokens.length} of {tokenQueue.length} tokens today</p>
+          <div className="px-6 py-3 border-t border-ink/[0.08] bg-ink/[0.02]">
+            <p className="text-sm text-ink/55">Showing {filteredTokens.length} of {tokenQueue.length} tokens today</p>
           </div>
         </div>
 
         {/* Right — Active Chats */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col self-start">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-            <span className="font-bold text-gray-900">Active Chats</span>
-            <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
+        <div className={`${cardBase} overflow-hidden flex flex-col self-start`}>
+          <div className="px-5 py-4 border-b border-ink/[0.08] flex items-center justify-between flex-shrink-0">
+            <span className="font-semibold tracking-tight">Active Chats</span>
+            <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-full bg-ink/[0.06] text-ink/70">
               {stats.activeConversations}
             </span>
           </div>
 
-          <div className="divide-y divide-gray-100 overflow-y-auto flex-1" style={{ maxHeight: '480px' }}>
+          <div className="divide-y divide-ink/[0.08] overflow-y-auto flex-1" style={{ maxHeight: '480px' }}>
             {recentConversations.length === 0 ? (
-              <p className="p-6 text-sm text-gray-500 text-center">No active chats</p>
+              <p className="p-6 text-sm text-ink/55 text-center">No active chats</p>
             ) : recentConversations.map(c => (
               <Link
                 key={c.id}
                 to={`/conversations?id=${c.id}`}
-                className="flex items-start gap-3 p-4 hover:bg-gray-50 transition"
+                className="flex items-start gap-3 p-4 hover:bg-ink/[0.02] transition"
               >
-                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-bold text-indigo-700">
+                <div className="w-8 h-8 rounded-full bg-ink/[0.06] flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-semibold">
                     {(c.customer_name || c.customer_phone || '?')[0].toUpperCase()}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{c.customer_name || c.customer_phone}</p>
-                    <p className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                    <p className="text-sm font-semibold truncate">{c.customer_name || c.customer_phone}</p>
+                    <p className="font-mono text-[11px] text-ink/40 flex-shrink-0 ml-2">
                       {new Date(c.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
-                  <p className="text-xs text-gray-500 truncate mt-0.5">{c.last_message || 'New conversation'}</p>
+                  <p className="text-xs text-ink/55 truncate mt-0.5">{c.last_message || 'New conversation'}</p>
                   {c.mode === 'human' && (
-                    <span className="text-xs text-orange-600 font-medium">● Handoff requested</span>
+                    <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded bg-ink text-bg font-mono text-[10px] font-medium tracking-[0.04em]">
+                      <span className="text-orange-400">●</span> Handoff requested
+                    </span>
                   )}
                 </div>
               </Link>
             ))}
           </div>
 
-          <div className="border-t border-gray-100 px-5 py-3 bg-gray-50 flex-shrink-0">
-            <Link to="/conversations" className="text-sm font-semibold text-indigo-600 hover:text-indigo-800">
+          <div className="border-t border-ink/[0.08] px-5 py-3 bg-ink/[0.02] flex-shrink-0">
+            <Link to="/conversations" className="text-sm font-semibold text-ink hover:text-ink/70">
               View all chats →
             </Link>
           </div>
@@ -391,36 +409,36 @@ const Dashboard = () => {
 
       {/* Section 4 — Doctor Availability Strip */}
       {!isDoctor && (
-        <div className="px-6 pb-6 mt-4">
+        <div className="px-6 pb-6 mt-5">
           <div className="flex justify-between items-center mb-4">
-            <span className="font-bold text-gray-900 text-lg">Doctor Availability</span>
+            <span className="font-semibold tracking-tight text-lg">Doctor Availability</span>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2">
             {doctors.length === 0 ? (
-              <p className="text-sm text-gray-500">No doctors added yet</p>
+              <p className="text-sm text-ink/55">No doctors added yet</p>
             ) : doctors.map(d => (
-              <div key={d.id} className="min-w-[160px] bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex-shrink-0">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-3 ${d.available_now && !d.leave_days ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+              <div key={d.id} className={`min-w-[170px] ${cardBase} p-4 flex-shrink-0`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm mb-3 ${d.available_now && !d.leave_days ? 'bg-emerald-100 text-emerald-700' : 'bg-ink/[0.06] text-ink/50'}`}>
                   {(d.name || '?').split(' ').filter(w => w.toLowerCase() !== 'dr.' && w.toLowerCase() !== 'dr')[0]?.[0]?.toUpperCase() || '?'}
                 </div>
-                <p className="font-semibold text-sm text-gray-900 truncate">{d.name}</p>
-                <p className="text-xs text-gray-500 truncate mb-2">{d.specialization}</p>
+                <p className="font-semibold text-sm truncate">{d.name}</p>
+                <p className="text-xs text-ink/55 truncate mb-2">{d.specialization}</p>
                 {d.available_now && !d.leave_days ? (
-                  <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                  <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
                     Available
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block"></span>
+                  <span className="flex items-center gap-1.5 text-xs text-ink/40 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-ink/30 inline-block"></span>
                     Off Duty
                   </span>
                 )}
-                <div className="flex gap-3 mt-2">
-                  <span className="text-xs text-gray-500">
+                <div className="flex gap-3 mt-2.5 font-mono text-[11px] text-ink/55">
+                  <span>
                     Seen: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'done' || t.status === 'completed')).length}
                   </span>
-                  <span className="text-xs text-gray-500">
+                  <span>
                     Queue: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'waiting' || t.status === 'in_progress')).length}
                   </span>
                 </div>

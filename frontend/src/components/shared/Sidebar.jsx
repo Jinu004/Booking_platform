@@ -78,17 +78,20 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   const can = (...roles) => roles.includes(role) || role === 'super_admin';
   const { industry } = useIndustry();
 
-  const sidebarBg      = industry === 'enquiry' ? 'bg-[#1E2E45] border-[#2A3F5F]'  : 'bg-white border-gray-200';
-  const sidebarDivider = industry === 'enquiry' ? 'border-[#2A3F5F]'               : 'border-gray-200';
-  const activeBg       = industry === 'enquiry' ? 'bg-white/10'                    : 'bg-indigo-50';
-  const activeText     = industry === 'enquiry' ? 'text-white'                     : 'text-indigo-700';
-  const activeIcon     = industry === 'enquiry' ? 'text-white'                     : 'text-indigo-600';
-  const inactiveText   = industry === 'enquiry' ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50';
-  const brandColor     = industry === 'enquiry' ? 'text-white'                     : 'text-indigo-600';
-  const brandHover     = industry === 'enquiry' ? 'hover:text-white/80'            : 'hover:text-indigo-800';
-  const avatarBg       = industry === 'enquiry' ? 'bg-white/20'                   : 'bg-indigo-100';
-  const avatarText     = industry === 'enquiry' ? 'text-white'                     : 'text-indigo-700';
-  const sectionLabel   = industry === 'enquiry' ? 'text-white/40'                  : 'text-gray-400';
+  const sidebarBg      = industry === 'enquiry' ? 'bg-[#1E2E45] border-[#2A3F5F]'  : 'bg-bg border-ink/[0.08]';
+  const sidebarDivider = industry === 'enquiry' ? 'border-[#2A3F5F]'               : 'border-ink/[0.08]';
+  const activeBg       = industry === 'enquiry' ? 'bg-white/10'                    : 'bg-ink/[0.06]';
+  const activeText     = industry === 'enquiry' ? 'text-white'                     : 'text-ink';
+  const activeIcon     = industry === 'enquiry' ? 'text-white'                     : 'text-ink';
+  const inactiveText   = industry === 'enquiry' ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-ink/60 hover:text-ink hover:bg-ink/[0.04]';
+  const inactiveIcon   = industry === 'enquiry' ? 'text-white/50'                  : 'text-ink/40';
+  const brandColor     = industry === 'enquiry' ? 'text-white'                     : 'text-ink';
+  const brandHover     = industry === 'enquiry' ? 'hover:text-white/80'            : 'hover:text-ink/70';
+  const avatarBg       = industry === 'enquiry' ? 'bg-white/20'                   : 'bg-ink';
+  const avatarText     = industry === 'enquiry' ? 'text-white'                     : 'text-bg';
+  const sectionLabel   = industry === 'enquiry' ? 'text-white/40'                  : 'text-ink/40';
+  const markBg         = industry === 'enquiry' ? 'bg-white/15'                    : 'bg-ink';
+  const markRing       = industry === 'enquiry' ? 'border-white'                   : 'border-bg';
 
   // ── Enquiry-industry nav (additive — does not touch clinic link definitions) ──
   const enquiryMainLinks = [
@@ -153,18 +156,18 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           if (setIsOpen) setIsOpen(false);
 
         }}
-        className={`flex items-center px-3 py-2 text-sm font-medium w-full transition-colors rounded-lg gap-3
+        className={`flex items-center px-3 py-2 text-[13.5px] font-medium w-full transition-colors rounded-lg gap-3
           ${isActive
             ? `${activeBg} ${activeText}`
             : inactiveText
           }`}
       >
-        <span className={isActive ? activeIcon : (industry === 'enquiry' ? 'text-white/50' : 'text-gray-400')}>
+        <span className={`flex-shrink-0 [&>svg]:w-4 [&>svg]:h-4 ${isActive ? activeIcon : inactiveIcon}`}>
           {icons[iconKey] || icons.Dashboard}
         </span>
         {link.name}
         {link.name === 'Conversations' && pendingHandoffs > 0 && (
-          <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="ml-auto bg-red-500 text-white font-mono text-[10px] font-semibold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center">
             {pendingHandoffs > 9 ? '9+' : pendingHandoffs}
           </span>
         )}
@@ -183,14 +186,19 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
         {/* Header */}
         <div className={`p-5 border-b ${sidebarDivider} flex justify-between items-center`}>
-          <div className="flex-1 min-w-0">
-            <Link to="/dashboard" className={`text-base font-bold ${brandColor} truncate ${brandHover} transition`}>
-              ReceptionAI
-            </Link>
-            <p className={`text-xs mt-0.5 capitalize ${sectionLabel}`}>{staff?.tenantPlan || 'Starter'} plan</p>
+          <div className="flex-1 min-w-0 flex items-center gap-2.5">
+            <span className={`w-6 h-6 rounded-[7px] grid place-items-center flex-shrink-0 ${markBg}`}>
+              <span className={`w-[10px] h-[10px] rounded-full border-2 border-r-transparent -rotate-45 ${markRing}`} />
+            </span>
+            <div className="min-w-0">
+              <Link to="/dashboard" className={`block text-[15px] font-semibold tracking-tight leading-tight ${brandColor} truncate ${brandHover} transition`}>
+                ReceptionAI
+              </Link>
+              <p className={`font-mono text-[10px] tracking-[0.08em] uppercase mt-0.5 ${sectionLabel}`}>{staff?.tenantPlan || 'Starter'} plan</p>
+            </div>
           </div>
           <button
-            className={`md:hidden p-1 rounded-full transition-colors ${industry === 'enquiry' ? 'text-white/50 hover:text-white hover:bg-white/10' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-100'}`}
+            className={`md:hidden p-1 rounded-full transition-colors ${industry === 'enquiry' ? 'text-white/50 hover:text-white hover:bg-white/10' : 'text-ink/40 hover:text-ink hover:bg-ink/[0.06]'}`}
             onClick={() => setIsOpen(false)}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -205,7 +213,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             <>
               {enquiryMainLinks.map(renderLink)}
               <div className="pt-4 pb-1">
-                <p className={`px-3 text-[10px] font-bold uppercase tracking-widest ${sectionLabel}`}>Business</p>
+                <p className={`px-3 font-mono text-[11px] tracking-[0.08em] ${sectionLabel}`}>Business</p>
               </div>
               {allEnquirySecondaryLinks.map(renderLink)}
             </>
@@ -213,7 +221,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             <>
               {mainLinks.map(renderLink)}
               <div className="pt-4 pb-1">
-                <p className={`px-3 text-[10px] font-bold uppercase tracking-widest ${sectionLabel}`}>Clinic</p>
+                <p className={`px-3 font-mono text-[11px] tracking-[0.08em] ${sectionLabel}`}>Clinic</p>
               </div>
               {allClinicLinks.map(renderLink)}
             </>
@@ -222,20 +230,20 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
         {/* Bottom */}
         <div className={`p-4 border-t ${sidebarDivider}`}>
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <div className={`w-7 h-7 rounded-full ${avatarBg} flex items-center justify-center flex-shrink-0`}>
-              <span className={`text-xs font-bold ${avatarText}`}>
+          <div className="flex items-center gap-2.5 mb-3 px-1">
+            <div className={`w-8 h-8 rounded-lg ${avatarBg} flex items-center justify-center flex-shrink-0`}>
+              <span className={`text-xs font-semibold ${avatarText}`}>
                 {(staff?.tenantName || tenant?.name || 'R')[0].toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-semibold truncate ${industry === 'enquiry' ? 'text-white' : 'text-gray-900'}`}>{staff?.tenantName || tenant?.name || 'Clinic'}</p>
-              <p className={`text-xs capitalize ${sectionLabel}`}>{staff?.role || 'admin'}</p>
+              <p className={`text-[13px] font-semibold truncate ${industry === 'enquiry' ? 'text-white' : 'text-ink'}`}>{staff?.tenantName || tenant?.name || 'Clinic'}</p>
+              <p className={`font-mono text-[10px] tracking-[0.08em] uppercase ${sectionLabel}`}>{staff?.role || 'admin'}</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center justify-center px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${industry === 'enquiry' ? 'text-red-300 bg-white/10 border border-white/20 hover:bg-white/20' : 'text-red-600 bg-white border border-red-200 hover:bg-red-50'}`}
+            className={`w-full flex items-center justify-center px-4 py-2 text-[13px] font-medium rounded-lg transition-colors ${industry === 'enquiry' ? 'text-red-300 bg-white/10 border border-white/20 hover:bg-white/20' : 'text-red-600 bg-transparent border border-ink/[0.12] hover:bg-red-50'}`}
           >
             Log out
           </button>
