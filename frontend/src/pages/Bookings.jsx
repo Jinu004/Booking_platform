@@ -305,19 +305,19 @@ const Bookings = () => {
           <div className="flex rounded-lg border border-ink/[0.12] overflow-hidden">
             <button
               onClick={() => { setViewMode('today'); const _ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); setDate(`${_ist.getFullYear()}-${String(_ist.getMonth()+1).padStart(2,'0')}-${String(_ist.getDate()).padStart(2,'0')}`); }}
-              className={`px-3 py-2 text-sm font-medium transition ${viewMode === 'today' ? 'bg-ink text-bg' : 'bg-white text-ink/65 hover:bg-ink/[0.03]'}`}
+              className={`px-3 py-2 text-sm font-medium transition ${viewMode === 'today' ? 'bg-accent text-white' : 'bg-white text-ink/65 hover:bg-ink/[0.03]'}`}
             >
               Today
             </button>
             <button
               onClick={() => { setViewMode('tomorrow'); const _ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); _ist.setDate(_ist.getDate() + 1); setDate(`${_ist.getFullYear()}-${String(_ist.getMonth()+1).padStart(2,'0')}-${String(_ist.getDate()).padStart(2,'0')}`); }}
-              className={`px-3 py-2 text-sm font-medium border-l border-ink/[0.12] transition ${viewMode === 'tomorrow' ? 'bg-ink text-bg' : 'bg-white text-ink/65 hover:bg-ink/[0.03]'}`}
+              className={`px-3 py-2 text-sm font-medium border-l border-ink/[0.12] transition ${viewMode === 'tomorrow' ? 'bg-accent text-white' : 'bg-white text-ink/65 hover:bg-ink/[0.03]'}`}
             >
               Tomorrow
             </button>
             <button
               onClick={() => setViewMode('upcoming')}
-              className={`px-3 py-2 text-sm font-medium border-l border-ink/[0.12] transition ${viewMode === 'upcoming' ? 'bg-ink text-bg' : 'bg-white text-ink/65 hover:bg-ink/[0.03]'}`}
+              className={`px-3 py-2 text-sm font-medium border-l border-ink/[0.12] transition ${viewMode === 'upcoming' ? 'bg-accent text-white' : 'bg-white text-ink/65 hover:bg-ink/[0.03]'}`}
             >
               Upcoming
             </button>
@@ -349,7 +349,7 @@ const Bookings = () => {
             try { const res = await getDoctors(); if (res?.data) setDoctors(res.data); } catch {}
             setIsScheduleModalOpen(true);
           }}
-          className="bg-ink text-bg px-5 py-2.5 rounded-lg font-medium hover:-translate-y-px hover:shadow-[0_4px_16px_rgba(14,15,12,0.18)] transition flex-1 md:flex-none"
+          className="bg-white text-brand border border-brand px-5 py-2.5 rounded-lg font-medium hover:bg-brand-soft transition flex-1 md:flex-none"
         >
           + Schedule Booking
         </button>
@@ -371,7 +371,7 @@ const Bookings = () => {
             loadFormDependencies();
             setIsModalOpen(true);
           }}
-          className="bg-ink text-bg px-5 py-2.5 rounded-lg font-medium hover:-translate-y-px hover:shadow-[0_4px_16px_rgba(14,15,12,0.18)] transition flex-1 md:flex-none"
+          className="bg-brand text-white px-5 py-2.5 rounded-lg font-medium hover:bg-brand-hover transition flex-1 md:flex-none"
         >
           + New Booking
         </button>
@@ -396,7 +396,7 @@ const Bookings = () => {
           <button
             onClick={() => setSelectedDoctor(null)}
             className={selectedDoctor === null
-              ? 'bg-ink text-bg px-3 md:px-4 py-1.5 rounded-full text-xs md:text-[13px] font-medium whitespace-nowrap border border-ink'
+              ? 'bg-accent text-white px-3 md:px-4 py-1.5 rounded-full text-xs md:text-[13px] font-medium whitespace-nowrap border border-accent'
               : 'bg-white text-ink/65 px-3 md:px-4 py-1.5 rounded-full text-xs md:text-[13px] font-medium border border-ink/[0.1] whitespace-nowrap hover:text-ink hover:bg-ink/[0.03]'
             }
           >
@@ -413,7 +413,7 @@ const Bookings = () => {
                 key={doctor.id}
                 onClick={() => setSelectedDoctor(doctor)}
                 className={selectedDoctor?.id === doctor.id
-                  ? 'bg-ink text-bg px-3 md:px-4 py-1.5 rounded-full text-xs md:text-[13px] font-medium whitespace-nowrap border border-ink'
+                  ? 'bg-accent text-white px-3 md:px-4 py-1.5 rounded-full text-xs md:text-[13px] font-medium whitespace-nowrap border border-accent'
                   : 'bg-white text-ink/65 px-3 md:px-4 py-1.5 rounded-full text-xs md:text-[13px] font-medium border border-ink/[0.1] whitespace-nowrap hover:text-ink hover:bg-ink/[0.03]'
                 }
               >
@@ -890,7 +890,7 @@ const Bookings = () => {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={scheduleBooking.sendWhatsapp}
                   onChange={e => setScheduleBooking({...scheduleBooking, sendWhatsapp: e.target.checked})}
-                  className="w-4 h-4 rounded accent-ink" />
+                  className="w-4 h-4 rounded accent-accent" />
                 <span className="text-sm font-medium text-ink/80">Send WhatsApp confirmation</span>
               </label>
             </div>
@@ -923,7 +923,7 @@ const Bookings = () => {
                     setIsScheduleSubmitting(false);
                   }
                 }}
-                className="px-6 py-2.5 bg-ink font-medium text-bg rounded-lg hover:bg-ink/85 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2.5 bg-brand font-medium text-white rounded-lg hover:bg-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed"
               >{isScheduleSubmitting ? 'Scheduling...' : 'Schedule Booking'}</button>
             </div>
           </div>
@@ -1010,17 +1010,17 @@ const Bookings = () => {
 
               <div className="flex flex-col gap-2 mb-4">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={newBooking.isPresent} onChange={e => setNewBooking({...newBooking, isPresent: e.target.checked})} className="w-4 h-4 rounded accent-ink" />
+                  <input type="checkbox" checked={newBooking.isPresent} onChange={e => setNewBooking({...newBooking, isPresent: e.target.checked})} className="w-4 h-4 rounded accent-accent" />
                   <span className="text-sm font-medium text-ink/80">Patient is here now</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={newBooking.sendWhatsapp} onChange={e => setNewBooking({...newBooking, sendWhatsapp: e.target.checked})} className="w-4 h-4 rounded accent-ink" />
+                  <input type="checkbox" checked={newBooking.sendWhatsapp} onChange={e => setNewBooking({...newBooking, sendWhatsapp: e.target.checked})} className="w-4 h-4 rounded accent-accent" />
                   <span className="text-sm font-medium text-ink/80">Send WhatsApp confirmation</span>
                 </label>
               </div>
               <div className="flex justify-end space-x-3 pt-4 border-t border-ink/[0.06]">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 rounded-lg text-ink/80 font-bold hover:bg-ink/[0.05] transition">Cancel</button>
-                <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-ink font-medium text-bg rounded-lg hover:bg-ink/85 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
+                <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-brand font-medium text-white rounded-lg hover:bg-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
                   {isSubmitting ? 'Issuing...' : 'Issue Token'}
                 </button>
               </div>

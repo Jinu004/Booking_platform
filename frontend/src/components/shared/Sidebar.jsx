@@ -87,10 +87,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   const inactiveIcon   = industry === 'enquiry' ? 'text-white/50'                  : 'text-ink/40';
   const brandColor     = industry === 'enquiry' ? 'text-white'                     : 'text-ink';
   const brandHover     = industry === 'enquiry' ? 'hover:text-white/80'            : 'hover:text-ink/70';
-  const avatarBg       = industry === 'enquiry' ? 'bg-white/20'                   : 'bg-ink';
-  const avatarText     = industry === 'enquiry' ? 'text-white'                     : 'text-bg';
+  const avatarBg       = industry === 'enquiry' ? 'bg-white/20'                   : 'bg-accent';
+  const avatarText     = industry === 'enquiry' ? 'text-white'                     : 'text-white';
   const sectionLabel   = industry === 'enquiry' ? 'text-white/40'                  : 'text-ink/40';
-  const markBg         = industry === 'enquiry' ? 'bg-white/15'                    : 'bg-ink';
+  const markBg         = industry === 'enquiry' ? 'bg-white/15'                    : 'bg-accent';
   const markRing       = industry === 'enquiry' ? 'border-white'                   : 'border-bg';
 
   // ── Enquiry-industry nav (additive — does not touch clinic link definitions) ──

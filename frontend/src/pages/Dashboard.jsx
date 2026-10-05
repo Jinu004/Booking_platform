@@ -210,7 +210,7 @@ const Dashboard = () => {
         <div className="flex items-center gap-3 flex-shrink-0">
           <Link
             to="/bookings"
-            className="px-4 py-2 text-sm font-medium bg-ink text-bg rounded-lg hover:-translate-y-px hover:shadow-[0_4px_16px_rgba(14,15,12,0.18)] transition"
+            className="px-4 py-2 text-sm font-medium bg-brand text-white rounded-lg hover:bg-brand-hover transition"
           >
             + New Token
           </Link>
@@ -223,8 +223,8 @@ const Dashboard = () => {
           <p className={`${monoLabel} text-ink/50`}>Today's Tokens</p>
           <p className="mt-3 text-[40px] font-semibold tracking-[-0.04em] leading-none">{stats.bookingsToday}</p>
         </div>
-        <div className="bg-ink text-bg rounded-2xl border border-ink shadow-card p-5">
-          <p className={`${monoLabel} text-bg/60`}>Waiting Now</p>
+        <div className="bg-accent-soft text-accent rounded-2xl border border-accent/15 shadow-card p-5">
+          <p className={`${monoLabel} text-accent/70`}>Waiting Now</p>
           <p className="mt-3 text-[40px] font-semibold tracking-[-0.04em] leading-none">{stats.pendingTokens}</p>
         </div>
         {!isDoctor && (
@@ -264,7 +264,7 @@ const Dashboard = () => {
                 onClick={() => setActiveFilter(tab.key)}
                 className={`text-[13px] font-medium transition rounded-full px-3.5 py-1.5 ${
                   activeFilter === tab.key
-                    ? 'bg-ink text-bg'
+                    ? 'bg-accent text-white'
                     : 'text-ink/55 hover:text-ink hover:bg-ink/[0.05]'
                 }`}
               >
@@ -391,7 +391,7 @@ const Dashboard = () => {
                   </div>
                   <p className="text-xs text-ink/55 truncate mt-0.5">{c.last_message || 'New conversation'}</p>
                   {c.mode === 'human' && (
-                    <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded bg-ink text-bg font-mono text-[11px] font-medium tracking-[0.04em]">
+                    <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded bg-accent-soft text-accent font-mono text-[11px] font-medium tracking-[0.04em]">
                       <span className="text-orange-400">●</span> Handoff requested
                     </span>
                   )}
