@@ -308,26 +308,26 @@ export default function Conversations() {
 
   return (
     <>
-    <div className="flex flex-col h-[calc(100vh-130px)] bg-gray-50 overflow-hidden rounded-xl border border-gray-200">
+    <div className="flex flex-col h-[calc(100vh-130px)] bg-white overflow-hidden rounded-2xl border border-ink/[0.08] shadow-card">
 
       <div className="flex flex-1 overflow-hidden h-full">
 
         {/* Left Panel */}
-        <div className={`${showChat && selectedConversation ? 'hidden lg:flex' : 'flex'} flex-col w-full md:w-80 border-r border-gray-200 bg-white h-full md:flex-shrink-0`}>
+        <div className={`${showChat && selectedConversation ? 'hidden lg:flex' : 'flex'} flex-col w-full md:w-80 border-r border-ink/[0.08] bg-white h-full md:flex-shrink-0`}>
           {/* Header */}
-          <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-            <h3 className="font-bold text-gray-900">Conversations</h3>
-            <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
+          <div className="px-5 py-4 border-b border-ink/[0.06] flex justify-between items-center">
+            <h3 className="font-semibold tracking-tight text-ink">Conversations</h3>
+            <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-full bg-ink/[0.06] text-ink/70">
               {conversations.length}
             </span>
           </div>
-          <div className="px-4 py-2 border-b border-gray-100">
+          <div className="px-4 py-2 border-b border-ink/[0.06]">
             <input
               type="text"
               placeholder="Search by name or phone..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400"
+              className="w-full px-3 py-1.5 text-sm border border-ink/[0.12] bg-white rounded-lg focus:outline-none focus:border-ink/30"
             />
           </div>
 
@@ -338,12 +338,12 @@ export default function Conversations() {
                 {[1, 2, 3].map(i => <CardSkeleton key={i} />)}
               </div>
             ) : conversations.length === 0 ? (
-              <div className="p-8 text-center text-gray-500 text-sm">No active conversations</div>
+              <div className="p-8 text-center text-ink/55 text-sm">No active conversations</div>
             ) : (
               dateOrder.map(dateLabel => (
                 <div key={dateLabel}>
-                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                    <p className="text-[10px] font-bold text-gray-400 tracking-widest">{dateLabel}</p>
+                  <div className="px-4 py-2 bg-ink/[0.02] border-b border-ink/[0.06]">
+                    <p className="font-mono text-[10px] font-medium text-ink/40 uppercase tracking-[0.08em]">{dateLabel}</p>
                   </div>
                   {groupedConversations[dateLabel].map(conv => {
                     const name = conv.customer_name || conv.customer_phone || 'Unknown';
@@ -355,8 +355,8 @@ export default function Conversations() {
                       <div
                         key={conv.id}
                         onClick={() => { setSelectedConversationId(conv.id); setShowChat(true); }}
-                        className={`px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors flex items-start gap-3
-                          ${isSelected ? 'bg-indigo-50 border-l-2 border-l-indigo-500' : 'border-l-2 border-l-transparent'}
+                        className={`px-4 py-3 border-b border-ink/[0.06] cursor-pointer hover:bg-ink/[0.02] transition-colors flex items-start gap-3
+                          ${isSelected ? 'bg-accent-soft border-l-2 border-l-accent' : 'border-l-2 border-l-transparent'}
                           ${conv.mode === 'human' && !isSelected ? 'border-l-2 border-l-orange-400' : ''}`}
                       >
                         {/* Avatar */}
@@ -366,11 +366,11 @@ export default function Conversations() {
 
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between items-center mb-0.5">
-                            <p className="font-semibold text-sm text-gray-900 truncate">{name}</p>
-                            <p className="text-xs text-gray-400 flex-shrink-0 ml-1">{formatTime(conv.last_message_at)}</p>
+                            <p className="font-semibold text-sm text-ink truncate">{name}</p>
+                            <p className="text-xs text-ink/40 flex-shrink-0 ml-1">{formatTime(conv.last_message_at)}</p>
                           </div>
 
-                          <p className="text-xs text-gray-500 truncate mb-1.5">
+                          <p className="text-xs text-ink/55 truncate mb-1.5">
                             {conv.last_message_role === 'staff' ? 'You: ' :
                               conv.last_message_role === 'assistant' ? 'AI: ' : ''}
                             {conv.last_message || 'No messages'}
@@ -401,16 +401,16 @@ export default function Conversations() {
         </div>
 
         {/* Right Panel */}
-        <div className={`${showChat && selectedConversation ? 'flex' : 'hidden lg:flex'} flex-1 flex-col bg-gray-200 h-full overflow-hidden`}>
+        <div className={`${showChat && selectedConversation ? 'flex' : 'hidden lg:flex'} flex-1 flex-col bg-bg h-full overflow-hidden`}>
           {selectedConversation ? (
             <>
               {/* ── Header ── */}
-              <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between flex-shrink-0">
+              <div className="px-6 py-4 border-b border-ink/[0.08] bg-white flex items-center justify-between flex-shrink-0">
                 {/* Left: back button (mobile) + avatar + name + phone */}
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setShowChat(false)}
-                    className="md:hidden p-1.5 -ml-1 rounded-full hover:bg-gray-100 text-gray-500 transition flex-shrink-0"
+                    className="md:hidden p-1.5 -ml-1 rounded-full hover:bg-ink/[0.05] text-ink/55 transition flex-shrink-0"
                     aria-label="Back to conversations"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -421,10 +421,10 @@ export default function Conversations() {
                     {getInitials(selectedConversation.customer_name, selectedConversation.customer_phone)}
                   </div>
                   <div>
-                    <p className="font-bold text-gray-900 text-base leading-tight">
+                    <p className="font-semibold tracking-tight text-ink text-base leading-tight">
                       {selectedConversation.customer_name || 'Unknown Patient'}
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5">{selectedConversation.customer_phone}</p>
+                    <p className="text-xs text-ink/40 mt-0.5">{selectedConversation.customer_phone}</p>
                     <p className="text-xs mt-0.5 md:hidden">
                       {selectedConversation.mode === 'human'
                         ? <span className="text-orange-500 font-semibold">● Human Mode</span>
@@ -451,8 +451,8 @@ export default function Conversations() {
                     onClick={handleToggleMode}
                     className={`hidden md:block px-4 py-1.5 rounded-lg text-sm font-semibold border transition ${
                       selectedConversation.mode === 'human'
-                        ? 'text-gray-600 border-gray-300 hover:bg-gray-50'
-                        : 'text-indigo-700 border-indigo-300 hover:bg-indigo-50'
+                        ? 'text-ink/65 border-ink/[0.12] hover:bg-ink/[0.02]'
+                        : 'text-brand border-brand hover:bg-brand-soft'
                     }`}
                   >
                     {selectedConversation.mode === 'human' ? 'Hand back to AI' : 'Take Over'}
@@ -514,11 +514,11 @@ export default function Conversations() {
                       <React.Fragment key={msg.id || idx}>
                         {showDateSeparator && (
                           <div className="flex items-center gap-3 my-3">
-                            <div className="flex-1 h-px bg-gray-200" />
-                            <span className="text-[11px] text-gray-400 font-medium px-2 whitespace-nowrap">
+                            <div className="flex-1 h-px bg-ink/[0.08]" />
+                            <span className="text-[11px] text-ink/40 font-medium px-2 whitespace-nowrap">
                               {getMessageDateLabel(msg.created_at)}
                             </span>
-                            <div className="flex-1 h-px bg-gray-200" />
+                            <div className="flex-1 h-px bg-ink/[0.08]" />
                           </div>
                         )}
                         <div
@@ -526,7 +526,7 @@ export default function Conversations() {
                         >
                         {/* Sender label */}
                         <p className={`text-[11px] font-semibold mb-1 px-1 ${
-                          isPatient ? 'text-gray-400' : 'text-indigo-600'
+                          isPatient ? 'text-ink/40' : 'text-brand'
                         }`}>
                           {isPatient
                             ? (selectedConversation.customer_name || selectedConversation.customer_phone || 'Patient')
@@ -535,13 +535,13 @@ export default function Conversations() {
                         {/* Bubble */}
                         <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                           isPatient
-                            ? 'bg-white text-gray-800 rounded-tl-sm shadow-sm border border-gray-100'
-                            : 'bg-indigo-600 text-white rounded-tr-sm'
+                            ? 'bg-white text-ink/80 rounded-tl-sm border border-ink/[0.08]'
+                            : 'bg-brand-soft text-ink border border-brand/20 rounded-tr-sm'
                         }`}>
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                         </div>
                         {/* Timestamp */}
-                        <p className="text-[10px] text-gray-400 mt-1 px-1">
+                        <p className="text-[10px] text-ink/40 mt-1 px-1">
                           {formatTime(msg.created_at)}
                         </p>
                         </div>
@@ -578,7 +578,7 @@ export default function Conversations() {
                     </div>
                   ) : null;
                 })()}
-                <div className="px-4 py-3 bg-white border-t border-gray-200 flex-shrink-0">
+                <div className="px-4 py-3 bg-white border-t border-ink/[0.08] flex-shrink-0">
                   <div className="flex items-end gap-3">
                     <textarea
                       value={replyText}
@@ -588,14 +588,14 @@ export default function Conversations() {
                         (new Date() - new Date(messages.filter(m => m.role === 'user').slice(-1)[0].created_at)) > 24 * 60 * 60 * 1000
                           ? 'Type your message — a re-engagement template will be sent first...'
                           : 'Type a reply...'}
-                      className="flex-1 resize-none rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none min-h-[48px] max-h-32 px-4 py-3 text-sm"
+                      className="flex-1 resize-none rounded-xl border border-ink/[0.12] focus:border-ink/30 focus:ring-2 focus:ring-ink/[0.06] outline-none min-h-[48px] max-h-32 px-4 py-3 text-sm"
                       rows={1}
                       disabled={sending}
                     />
                     <button
                       onClick={handleReply}
                       disabled={!replyText.trim() || sending}
-                      className="mb-0.5 px-5 py-3 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      className="mb-0.5 px-5 py-3 bg-brand text-white rounded-xl font-medium text-sm hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition"
                     >
                       {sending ? <Spinner size="sm" /> : 'Send'}
                     </button>
@@ -603,11 +603,11 @@ export default function Conversations() {
                 </div>
                 </>
               ) : (
-                <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-center justify-between flex-shrink-0">
-                  <p className="text-sm text-gray-400">Switch to Human mode to reply</p>
+                <div className="px-4 py-3 bg-white border-t border-ink/[0.08] flex items-center justify-between flex-shrink-0">
+                  <p className="text-sm text-ink/40">Switch to Human mode to reply</p>
                   <button
                     onClick={handleToggleMode}
-                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition"
+                    className="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-hover transition"
                   >
                     Take Over
                   </button>
@@ -615,36 +615,36 @@ export default function Conversations() {
               )}
             </>
           ) : (
-            <div className="hidden lg:flex flex-1 flex-col bg-gray-50 p-8 overflow-y-auto">
+            <div className="hidden lg:flex flex-1 flex-col bg-bg p-8 overflow-y-auto">
 
               {/* Header */}
               <div className="mb-6">
-                <h2 className="text-2xl font-black text-gray-900">Your inbox, on autopilot.</h2>
-                <p className="text-sm text-gray-500 mt-1">AI is handling new bookings and patient questions in real time. Pick a conversation to review or take over.</p>
+                <h2 className="text-2xl font-semibold tracking-[-0.03em] text-ink">Your inbox, on autopilot.</h2>
+                <p className="text-sm text-ink/55 mt-1">AI is handling new bookings and patient questions in real time. Pick a conversation to review or take over.</p>
               </div>
 
               {/* Stats row */}
               <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 md:p-5">
-                  <p className="text-[10px] md:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Today's Chats</p>
-                  <p className="text-3xl font-black text-indigo-600 mt-2">{conversations.filter(c => c.last_message_at && new Date(c.last_message_at).toDateString() === new Date().toDateString()).length}</p>
+                <div className="bg-white rounded-2xl border border-ink/[0.08] shadow-card p-3 md:p-5">
+                  <p className="font-mono text-[10px] md:text-[11px] font-medium text-ink/50 uppercase tracking-[0.08em] truncate">Today's Chats</p>
+                  <p className="text-[32px] font-semibold tracking-[-0.04em] text-ink mt-2">{conversations.filter(c => c.last_message_at && new Date(c.last_message_at).toDateString() === new Date().toDateString()).length}</p>
                 </div>
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 md:p-5">
-                  <p className="text-[10px] md:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">AI Handled</p>
-                  <p className="text-3xl font-black text-green-600 mt-2">{conversations.filter(c => c.mode === 'ai' && c.last_message_at && new Date(c.last_message_at).toDateString() === new Date().toDateString()).length}</p>
+                <div className="bg-white rounded-2xl border border-ink/[0.08] shadow-card p-3 md:p-5">
+                  <p className="font-mono text-[10px] md:text-[11px] font-medium text-ink/50 uppercase tracking-[0.08em] truncate">AI Handled</p>
+                  <p className="text-[32px] font-semibold tracking-[-0.04em] text-green-600 mt-2">{conversations.filter(c => c.mode === 'ai' && c.last_message_at && new Date(c.last_message_at).toDateString() === new Date().toDateString()).length}</p>
                 </div>
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 md:p-5">
-                  <p className="text-[10px] md:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Needs Reply</p>
-                  <p className="text-3xl font-black text-amber-500 mt-2">{conversations.filter(c => c.mode === 'human').length}</p>
+                <div className="bg-white rounded-2xl border border-ink/[0.08] shadow-card p-3 md:p-5">
+                  <p className="font-mono text-[10px] md:text-[11px] font-medium text-ink/50 uppercase tracking-[0.08em] truncate">Needs Reply</p>
+                  <p className="text-[32px] font-semibold tracking-[-0.04em] text-amber-500 mt-2">{conversations.filter(c => c.mode === 'human').length}</p>
                 </div>
               </div>
 
               {/* Recent Activity */}
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100">
-                  <h3 className="font-bold text-gray-900">Recent Conversations</h3>
+              <div className="bg-white rounded-2xl border border-ink/[0.08] shadow-card overflow-hidden">
+                <div className="px-6 py-4 border-b border-ink/[0.06]">
+                  <h3 className="font-semibold tracking-tight text-ink">Recent Conversations</h3>
                 </div>
-                <div className="divide-y divide-gray-50">
+                <div className="divide-y divide-ink/[0.06]">
                   {conversations.filter(c => {
                     const d = c.last_message_at;
                     return d && new Date(d).toDateString() === new Date().toDateString();
@@ -652,17 +652,17 @@ export default function Conversations() {
                     <div
                       key={c.id}
                       onClick={() => { setSelectedConversationId(c.id); setShowChat(true); }}
-                      className="px-6 py-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between transition"
+                      className="px-6 py-4 hover:bg-ink/[0.02] cursor-pointer flex items-center justify-between transition"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs font-bold text-indigo-700">
+                        <div className="w-9 h-9 rounded-full bg-ink/[0.06] flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-semibold text-ink">
                             {(c.customer_name || c.customer_phone || '?')[0].toUpperCase()}
                           </span>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">{c.customer_name || c.customer_phone || 'Unknown'}</p>
-                          <p className="text-xs text-gray-500 truncate max-w-xs">{c.last_message || 'New conversation'}</p>
+                          <p className="text-sm font-semibold text-ink">{c.customer_name || c.customer_phone || 'Unknown'}</p>
+                          <p className="text-xs text-ink/55 truncate max-w-xs">{c.last_message || 'New conversation'}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0">
@@ -673,7 +673,7 @@ export default function Conversations() {
                         }`}>
                           {c.mode === 'human' ? 'Needs Reply' : c.status === 'resolved' ? 'Resolved' : 'AI'}
                         </span>
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-ink/40">
                           {c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}
                         </span>
                       </div>
@@ -683,7 +683,7 @@ export default function Conversations() {
                     const d = c.last_message_at;
                     return d && new Date(d).toDateString() === new Date().toDateString();
                   }).length === 0 && (
-                    <div className="px-6 py-12 text-center text-gray-400 text-sm">
+                    <div className="px-6 py-12 text-center text-ink/40 text-sm">
                       No conversations today.
                     </div>
                   )}
@@ -691,7 +691,7 @@ export default function Conversations() {
               </div>
 
               {/* Tip */}
-              <p className="text-xs text-gray-400 mt-4 text-center">
+              <p className="text-xs text-ink/40 mt-4 text-center">
                 💡 You'll be notified when a patient needs your help. Look for the <span className="font-semibold text-amber-600">Needs Reply</span> tag.
               </p>
 
@@ -703,10 +703,10 @@ export default function Conversations() {
 
     {/* Template Message Modal */}
     {showTemplateModal && (
-      <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
-          <h3 className="text-base font-semibold text-gray-900 mb-1">Send Template Message</h3>
-          <p className="text-xs text-gray-500 mb-4">Select a template to send to {selectedConversation?.customer_name || selectedConversation?.customer_phone}</p>
+      <div className="fixed inset-0 bg-ink/[0.02]0 bg-opacity-75 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+          <h3 className="text-base font-semibold text-ink mb-1">Send Template Message</h3>
+          <p className="text-xs text-ink/55 mb-4">Select a template to send to {selectedConversation?.customer_name || selectedConversation?.customer_phone}</p>
           {templateError && (
             <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-xs text-red-700">{templateError}</p>
@@ -733,10 +733,10 @@ export default function Conversations() {
                     setTemplateSending(false);
                   }
                 }}
-                className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left px-4 py-3 border border-ink/[0.08] rounded-lg hover:border-ink/30 hover:bg-ink/[0.03] transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <p className="text-sm font-medium text-gray-800">{template.label}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{template.description}</p>
+                <p className="text-sm font-medium text-ink/80">{template.label}</p>
+                <p className="text-xs text-ink/55 mt-0.5">{template.description}</p>
               </button>
             ))}
           </div>
@@ -744,7 +744,7 @@ export default function Conversations() {
             <button
               onClick={() => setShowTemplateModal(false)}
               disabled={templateSending}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition"
+              className="px-4 py-2 text-sm text-ink/65 hover:text-ink/80 transition"
             >
               Cancel
             </button>
