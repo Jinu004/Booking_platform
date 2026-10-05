@@ -156,7 +156,7 @@ const Dashboard = () => {
     { key: 'in_consult', label: 'In Consult' },
     { key: 'done', label: 'Done' },
   ];
-  const queueGrid = 'grid grid-cols-[56px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1.3fr)_minmax(0,1fr)_96px_76px] items-center gap-3';
+  const queueGrid = 'grid grid-cols-[56px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1.3fr)_minmax(0,1fr)_96px_110px] items-center gap-3';
 
   return (
     <div className="min-h-screen bg-bg text-ink flex flex-col gap-0">
@@ -298,7 +298,7 @@ const Dashboard = () => {
                 </div>
                 <p className="hidden md:block text-sm text-ink/60 truncate">{t.doctor_name}</p>
                 <div className="hidden md:block">{getStatusPill(t.status)}</div>
-                <div className="flex items-center justify-end gap-2 md:min-w-[72px]">
+                <div className="flex items-center justify-end gap-2 md:min-w-[100px]">
                   {t.status === 'waiting' && (
                     <button
                       disabled={loadingToken === t.id}
@@ -314,7 +314,7 @@ const Dashboard = () => {
                         } finally { setLoadingToken(null); }
                       }}
                       className="px-3 py-1 text-xs font-semibold text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition"
-                    >{loadingToken === t.id ? '...' : 'Arrived'}</button>
+                    >{loadingToken === t.id ? '...' : 'Mark arrived'}</button>
                   )}
                   {t.status === 'arrived' && (
                     <button
@@ -331,7 +331,7 @@ const Dashboard = () => {
                         } finally { setLoadingToken(null); }
                       }}
                       className="px-3 py-1 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition"
-                    >{loadingToken === t.id ? '...' : 'Call'}</button>
+                    >{loadingToken === t.id ? '...' : 'Call in'}</button>
                   )}
                   {t.status === 'in_progress' && (
                     <button
@@ -347,7 +347,7 @@ const Dashboard = () => {
                         finally { setLoadingToken(null); }
                       }}
                       className="px-3 py-1 text-xs font-semibold text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
-                    >{loadingToken === t.id ? '...' : 'Done'}</button>
+                    >{loadingToken === t.id ? '...' : 'Finish'}</button>
                   )}
                 </div>
               </div>

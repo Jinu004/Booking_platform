@@ -6,7 +6,7 @@ import { getStoredStaff } from '../services/auth.service';
 const getStatusPill = (status) => {
   switch (status) {
     case 'waiting': case 'pending':
-      return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Booked</span>;
+      return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-ink/[0.05] text-ink/65">Booked</span>;
     case 'arrived':
       return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Waiting</span>;
     case 'in_progress':
@@ -16,7 +16,7 @@ const getStatusPill = (status) => {
     case 'cancelled':
       return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">Cancelled</span>;
     default:
-      return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">{status}</span>;
+      return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-ink/[0.05] text-ink/65">{status}</span>;
   }
 };
 
@@ -67,8 +67,8 @@ const TokenQueue = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
           <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse inline-block flex-shrink-0"></span>
-          <h1 className="text-lg md:text-2xl font-bold text-gray-900 whitespace-nowrap">Live Token Queue</h1>
-          <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">{tokenQueue.length}</span>
+          <h1 className="text-xl md:text-[28px] font-semibold tracking-[-0.035em] text-ink whitespace-nowrap">Live Token Queue</h1>
+          <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-full bg-ink/[0.06] text-ink/70">{tokenQueue.length}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -76,13 +76,13 @@ const TokenQueue = () => {
             placeholder="Search patient..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 w-36 md:w-48"
+            className="px-3 py-2 text-sm border border-ink/[0.12] bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-ink/15 w-36 md:w-48"
           />
           {!isDoctor && doctors.length > 1 && (
             <select
               value={doctorFilter}
               onChange={e => setDoctorFilter(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="px-3 py-2 text-sm border border-ink/[0.12] bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-ink/15"
             >
               <option value="all">All Doctors</option>
               {doctors.map(d => <option key={d} value={d}>{d}</option>)}
@@ -91,47 +91,47 @@ const TokenQueue = () => {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 mb-3 px-1">
-        <span>Today: <strong className="text-gray-900">{tokenQueue.length}</strong></span>
+      <div className="flex flex-wrap items-center gap-3 text-sm text-ink/55 mb-3 px-1">
+        <span>Today: <strong className="text-ink">{tokenQueue.length}</strong></span>
         <span>· Waiting: <strong className="text-amber-600">{tokenQueue.filter(t => t.status === 'arrived').length}</strong></span>
         <span>· In Consult: <strong className="text-blue-600">{tokenQueue.filter(t => t.status === 'in_progress').length}</strong></span>
         <span>· Done: <strong className="text-green-600">{tokenQueue.filter(t => t.status === 'done' || t.status === 'completed').length}</strong></span>
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="flex gap-1 p-3 border-b border-gray-100">
+      <div className="bg-white rounded-2xl border border-ink/[0.08] shadow-card overflow-hidden">
+        <div className="flex gap-1.5 px-3 md:px-4 py-3 border-b border-ink/[0.06]">
           {tabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveFilter(tab.key)}
-              className={`flex-1 text-xs md:text-sm transition rounded-lg px-2 md:px-3 py-2 font-medium ${
-                activeFilter === tab.key ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:text-gray-700'
+              className={`flex-1 md:flex-none text-xs md:text-[13px] transition rounded-full px-2 md:px-3.5 py-1.5 font-medium whitespace-nowrap ${
+                activeFilter === tab.key ? 'bg-accent text-white' : 'text-ink/55 hover:text-ink hover:bg-ink/[0.04]'
               }`}
             >
-              {tab.label} <span className="ml-1 text-xs opacity-70">({tab.count})</span>
+              {tab.label} <span className="ml-1 font-mono text-[11px] opacity-70">{tab.count}</span>
             </button>
           ))}
         </div>
 
         {loading ? (
-          <div className="p-12 text-center text-sm text-gray-400">Loading queue...</div>
+          <div className="p-12 text-center text-sm text-ink/40">Loading queue...</div>
         ) : filteredTokens.length === 0 ? (
-          <div className="p-12 text-center text-sm text-gray-400">No tokens in this queue</div>
+          <div className="p-12 text-center text-sm text-ink/40">No tokens in this queue</div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-ink/[0.08]">
             {(() => {
               const fmtSlot = t => { if (!t) return null; const [h,m] = t.split(':').map(Number); return `${h>12?h-12:h||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`; };
               const renderToken = (t) => (
-                <div key={t.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-3 md:px-6 py-4 md:py-5 hover:bg-gray-50 transition">
+                <div key={t.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-3 md:px-6 py-4 md:py-5 hover:bg-ink/[0.02] transition">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="w-10 h-10 md:w-14 md:h-14 bg-indigo-50 rounded-xl flex items-center justify-center font-black text-indigo-600 text-base flex-shrink-0">
+                    <div className="w-10 h-10 md:w-14 md:h-14 bg-ink/[0.05] rounded-xl flex items-center justify-center font-mono font-semibold text-ink text-sm md:text-base flex-shrink-0">
                       {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 text-base truncate">{t.patient_name || 'Walk-in'}</p>
-                      <p className="text-sm text-indigo-600 font-medium">{t.doctor_name}</p>
-                      {t.patient_phone && <p className="text-xs text-gray-400">{t.patient_phone}</p>}
+                      <p className="font-semibold text-ink text-base truncate">{t.patient_name || 'Walk-in'}</p>
+                      <p className="text-sm text-ink/60 font-medium">{t.doctor_name}</p>
+                      {t.patient_phone && <p className="text-xs text-ink/40">{t.patient_phone}</p>}
                       <div className="flex items-center gap-2 mt-1">
-                        {t.slot_time && <span className="text-xs text-gray-400">🕘 {fmtSlot(t.slot_time)}</span>}
+                        {t.slot_time && <span className="text-xs text-ink/40">🕘 {fmtSlot(t.slot_time)}</span>}
                         {t.source === 'walkin' ? (
                           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">Walk-in</span>
                         ) : t.source === 'whatsapp' ? (
@@ -152,7 +152,7 @@ const TokenQueue = () => {
                           finally { setLoadingToken(null); }
                         }}
                         className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition"
-                      >{loadingToken === t.id ? '...' : 'Arrived'}</button>
+                      >{loadingToken === t.id ? '...' : 'Mark arrived'}</button>
                     )}
                     {t.status === 'arrived' && (
                       <button
@@ -164,7 +164,7 @@ const TokenQueue = () => {
                           finally { setLoadingToken(null); }
                         }}
                         className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition"
-                      >{loadingToken === t.id ? '...' : 'Call'}</button>
+                      >{loadingToken === t.id ? '...' : 'Call in'}</button>
                     )}
                     {t.status === 'in_progress' && (
                       <button
@@ -175,12 +175,12 @@ const TokenQueue = () => {
                           catch {} finally { setLoadingToken(null); }
                         }}
                         className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
-                      >{loadingToken === t.id ? '...' : 'Done'}</button>
+                      >{loadingToken === t.id ? '...' : 'Finish'}</button>
                     )}
                     {(t.patient_id || t.customer_id) && (
                       <Link
                         to={`/patients/${t.patient_id || t.customer_id}`}
-                        className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition"
+                        className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-ink/80 border border-ink/[0.12] rounded-lg hover:bg-ink/[0.04] transition"
                       >Profile</Link>
                     )}
                   </div>
@@ -197,10 +197,10 @@ const TokenQueue = () => {
                   return (
                     <React.Fragment key={key}>
                       <div
-                        className="px-4 py-2 bg-indigo-50 text-xs font-semibold text-indigo-600 uppercase tracking-wider border-b border-indigo-100 flex items-center justify-between cursor-pointer select-none"
+                        className="px-4 py-2 bg-ink/[0.03] font-mono text-[11px] font-medium text-ink/55 uppercase tracking-[0.08em] border-b border-ink/[0.06] flex items-center justify-between cursor-pointer select-none"
                         onClick={() => setCollapsedSessions(prev => ({ ...prev, [key]: !isCollapsed }))}
                       >
-                        <span>{label} <span className="ml-2 font-normal text-indigo-400">({group.length} tokens)</span></span>
+                        <span>{label} <span className="ml-2 font-normal text-ink/40">({group.length} tokens)</span></span>
                         <span>{isCollapsed ? '▸' : '▾'}</span>
                       </div>
                       {!isCollapsed && group.map(t => renderToken(t))}
@@ -213,7 +213,7 @@ const TokenQueue = () => {
           </div>
         )}
 
-        <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 text-sm text-gray-500">
+        <div className="px-6 py-3 border-t border-ink/[0.06] bg-ink/[0.02] text-sm text-ink/55">
           Showing {filteredTokens.length} of {tokenQueue.length} tokens today
         </div>
       </div>

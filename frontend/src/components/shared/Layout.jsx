@@ -45,6 +45,7 @@ const Layout = () => {
     const path = location.pathname;
     if (path === '/dashboard') return tenant?.name || staff?.tenantName || 'Dashboard';
     if (path.startsWith('/bookings')) return 'Bookings';
+    if (path.startsWith('/queue')) return 'Token Queue';
     if (path.startsWith('/patients')) return 'Patients';
     if (path.startsWith('/doctors')) return 'Doctors';
     if (path.startsWith('/staff')) return 'Staff';

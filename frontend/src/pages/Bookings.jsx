@@ -227,7 +227,7 @@ const Bookings = () => {
               <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
             )}
             {b.token_id && b.token_status === 'waiting' && (
-              <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-ink/70 hover:text-ink transition">Arrived</button>
+              <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-ink/70 hover:text-ink transition">Mark arrived</button>
             )}
             <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
           </>
@@ -518,7 +518,7 @@ const Bookings = () => {
                                   <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
                                 )}
                                 {b.token_id && b.token_status === 'waiting' && (
-                                  <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-ink/70 hover:text-ink transition">Arrived</button>
+                                  <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-ink/70 hover:text-ink transition">Mark arrived</button>
                                 )}
                                 <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
                               </>
@@ -613,7 +613,7 @@ const Bookings = () => {
                     <button onClick={() => handleAction(b.id, completeBooking)} className="flex-1 py-2 text-xs font-bold text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition">Complete</button>
                   )}
                   {b.token_id && b.token_status === 'waiting' && (
-                    <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed'); } }} className="flex-1 py-2 text-xs font-bold text-ink/80 border border-ink/[0.12] rounded-lg hover:bg-ink/[0.04] transition">Arrived</button>
+                    <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed'); } }} className="flex-1 py-2 text-xs font-bold text-ink/80 border border-ink/[0.12] rounded-lg hover:bg-ink/[0.04] transition">Mark arrived</button>
                   )}
                   <button onClick={() => handleAction(b.id, cancelBooking)} className="flex-1 py-2 text-xs font-bold text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition">Cancel</button>
                   {(b.patient_id || b.customer_id) && (
