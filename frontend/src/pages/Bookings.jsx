@@ -192,8 +192,8 @@ const Bookings = () => {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-0.5">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700">Token</span>
-            <span className="text-sm font-black text-teal-700">{b.token_number || '-'}</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">Token</span>
+            <span className="text-sm font-black text-indigo-700">{b.token_number || '-'}</span>
           </div>
         )}
       </td>
@@ -227,13 +227,13 @@ const Bookings = () => {
               <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
             )}
             {b.token_id && b.token_status === 'waiting' && (
-              <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-blue-500 hover:text-blue-700 transition">Arrived</button>
+              <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-indigo-500 hover:text-indigo-700 transition">Arrived</button>
             )}
             <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
           </>
         )}
         {(b.patient_id || b.customer_id) && (
-          <Link to={`/patients/${b.patient_id || b.customer_id}`} className="text-blue-600 hover:text-blue-900 text-sm font-medium">
+          <Link to={`/patients/${b.patient_id || b.customer_id}`} className="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
             View Profile
           </Link>
         )}
@@ -305,19 +305,19 @@ const Bookings = () => {
           <div className="flex rounded-lg border border-gray-300 overflow-hidden">
             <button
               onClick={() => { setViewMode('today'); const _ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); setDate(`${_ist.getFullYear()}-${String(_ist.getMonth()+1).padStart(2,'0')}-${String(_ist.getDate()).padStart(2,'0')}`); }}
-              className={`px-3 py-2 text-sm font-medium transition ${viewMode === 'today' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`px-3 py-2 text-sm font-medium transition ${viewMode === 'today' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               Today
             </button>
             <button
               onClick={() => { setViewMode('tomorrow'); const _ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); _ist.setDate(_ist.getDate() + 1); setDate(`${_ist.getFullYear()}-${String(_ist.getMonth()+1).padStart(2,'0')}-${String(_ist.getDate()).padStart(2,'0')}`); }}
-              className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${viewMode === 'tomorrow' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${viewMode === 'tomorrow' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               Tomorrow
             </button>
             <button
               onClick={() => setViewMode('upcoming')}
-              className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${viewMode === 'upcoming' ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${viewMode === 'upcoming' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               Upcoming
             </button>
@@ -327,7 +327,7 @@ const Bookings = () => {
             placeholder="Search patient..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="border border-gray-300 rounded-md shadow-sm p-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="border border-gray-300 rounded-md shadow-sm p-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           <select
             value={statusFilter}
@@ -349,7 +349,7 @@ const Bookings = () => {
             try { const res = await getDoctors(); if (res?.data) setDoctors(res.data); } catch {}
             setIsScheduleModalOpen(true);
           }}
-          className="bg-teal-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-teal-700 transition flex-1 md:flex-none"
+          className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-indigo-700 transition flex-1 md:flex-none"
         >
           + Schedule Booking
         </button>
@@ -396,7 +396,7 @@ const Bookings = () => {
           <button
             onClick={() => setSelectedDoctor(null)}
             className={selectedDoctor === null
-              ? 'bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
+              ? 'bg-indigo-600 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap shadow-sm shadow-indigo-200'
               : 'bg-white text-gray-600 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
             }
           >
@@ -413,7 +413,7 @@ const Bookings = () => {
                 key={doctor.id}
                 onClick={() => setSelectedDoctor(doctor)}
                 className={selectedDoctor?.id === doctor.id
-                  ? 'bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap shadow-sm shadow-blue-200'
+                  ? 'bg-indigo-600 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap shadow-sm shadow-indigo-200'
                   : 'bg-white text-gray-600 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border whitespace-nowrap hover:bg-gray-50'
                 }
               >
@@ -483,8 +483,8 @@ const Bookings = () => {
                               </div>
                             ) : (
                               <div className="flex flex-col items-center gap-0.5">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700">Token</span>
-                                <span className="text-sm font-black text-teal-700">{b.token_number || '-'}</span>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">Token</span>
+                                <span className="text-sm font-black text-indigo-700">{b.token_number || '-'}</span>
                               </div>
                             )}
                           </td>
@@ -518,13 +518,13 @@ const Bookings = () => {
                                   <button onClick={() => handleAction(b.id, completeBooking)} className="text-emerald-600 hover:text-emerald-800 transition">Complete</button>
                                 )}
                                 {b.token_id && b.token_status === 'waiting' && (
-                                  <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-blue-500 hover:text-blue-700 transition">Arrived</button>
+                                  <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed to mark arrived'); } }} className="text-indigo-500 hover:text-indigo-700 transition">Arrived</button>
                                 )}
                                 <button onClick={() => handleAction(b.id, cancelBooking)} className="text-red-500 hover:text-red-700 transition">Cancel</button>
                               </>
                             )}
                             {(b.patient_id || b.customer_id) && (
-                              <Link to={`/patients/${b.patient_id || b.customer_id}`} className="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                              <Link to={`/patients/${b.patient_id || b.customer_id}`} className="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
                                 View Profile
                               </Link>
                             )}
@@ -580,8 +580,8 @@ const Bookings = () => {
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Proc</span>
                   ) : (
                     <div className="flex flex-col items-center">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700">Token</span>
-                      <span className="text-sm font-black text-teal-700">{b.token_number || '-'}</span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">Token</span>
+                      <span className="text-sm font-black text-indigo-700">{b.token_number || '-'}</span>
                     </div>
                   )}
                 </div>
@@ -614,17 +614,17 @@ const Bookings = () => {
                     <button onClick={() => handleAction(b.id, completeBooking)} className="flex-1 py-1.5 text-xs font-bold text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition">Complete</button>
                   )}
                   {b.token_id && b.token_status === 'waiting' && (
-                    <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed'); } }} className="flex-1 py-1.5 text-xs font-bold text-blue-500 border border-blue-200 rounded-lg hover:bg-blue-50 transition">Arrived</button>
+                    <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed'); } }} className="flex-1 py-1.5 text-xs font-bold text-indigo-500 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition">Arrived</button>
                   )}
                   <button onClick={() => handleAction(b.id, cancelBooking)} className="flex-1 py-1.5 text-xs font-bold text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition">Cancel</button>
                   {(b.patient_id || b.customer_id) && (
-                    <Link to={`/patients/${b.patient_id || b.customer_id}`} className="flex-1 py-1.5 text-xs font-bold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition text-center">Profile</Link>
+                    <Link to={`/patients/${b.patient_id || b.customer_id}`} className="flex-1 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition text-center">Profile</Link>
                   )}
                 </div>
               )}
               {b.status !== 'confirmed' && b.status !== 'pending' && (b.patient_id || b.customer_id) && (
                 <div className="mt-2 pt-2 border-t border-gray-100">
-                  <Link to={`/patients/${b.patient_id || b.customer_id}`} className="text-xs font-bold text-blue-600 hover:text-blue-900">View Profile →</Link>
+                  <Link to={`/patients/${b.patient_id || b.customer_id}`} className="text-xs font-bold text-indigo-600 hover:text-indigo-900">View Profile →</Link>
                 </div>
               )}
             </div>
@@ -797,7 +797,7 @@ const Bookings = () => {
                         } catch { setShowSuggestions(false); }
                       } else { setShowSuggestions(false); }
                     }}
-                    className="flex-1 rounded-none rounded-r-md border border-gray-300 p-2 font-bold focus:ring-teal-500 focus:border-teal-500"
+                    className="flex-1 rounded-none rounded-r-md border border-gray-300 p-2 font-bold focus:ring-indigo-500 focus:border-indigo-500"
                     placeholder="9876543210" />
                 </div>
                 {showSuggestions && activeSuggestionModal === 'schedule' && (
@@ -891,7 +891,7 @@ const Bookings = () => {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={scheduleBooking.sendWhatsapp}
                   onChange={e => setScheduleBooking({...scheduleBooking, sendWhatsapp: e.target.checked})}
-                  className="w-4 h-4 rounded accent-teal-600" />
+                  className="w-4 h-4 rounded accent-indigo-600" />
                 <span className="text-sm font-medium text-gray-700">Send WhatsApp confirmation</span>
               </label>
             </div>
@@ -924,7 +924,7 @@ const Bookings = () => {
                     setIsScheduleSubmitting(false);
                   }
                 }}
-                className="px-6 py-2.5 bg-teal-600 font-bold text-white rounded-lg hover:bg-teal-700 shadow-lg shadow-teal-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2.5 bg-indigo-600 font-bold text-white rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >{isScheduleSubmitting ? 'Scheduling...' : 'Schedule Booking'}</button>
             </div>
           </div>
@@ -1011,11 +1011,11 @@ const Bookings = () => {
 
               <div className="flex flex-col gap-2 mb-4">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={newBooking.isPresent} onChange={e => setNewBooking({...newBooking, isPresent: e.target.checked})} className="w-4 h-4 rounded accent-teal-600" />
+                  <input type="checkbox" checked={newBooking.isPresent} onChange={e => setNewBooking({...newBooking, isPresent: e.target.checked})} className="w-4 h-4 rounded accent-indigo-600" />
                   <span className="text-sm font-medium text-gray-700">Patient is here now</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={newBooking.sendWhatsapp} onChange={e => setNewBooking({...newBooking, sendWhatsapp: e.target.checked})} className="w-4 h-4 rounded accent-teal-600" />
+                  <input type="checkbox" checked={newBooking.sendWhatsapp} onChange={e => setNewBooking({...newBooking, sendWhatsapp: e.target.checked})} className="w-4 h-4 rounded accent-indigo-600" />
                   <span className="text-sm font-medium text-gray-700">Send WhatsApp confirmation</span>
                 </label>
               </div>

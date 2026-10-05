@@ -117,7 +117,7 @@ const Layout = () => {
   return (
     <div className={`flex h-screen w-full overflow-hidden relative ${updateAvailable ? 'pt-9' : ''} ${isEnquiry ? 'bg-[#F0F4F8] text-[#1E2E45]' : 'bg-gray-50 text-gray-900'}`}>
       {updateAvailable && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-teal-600 text-white px-4 py-2 flex items-center justify-between text-sm shadow-md">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-indigo-600 text-white px-4 py-2 flex items-center justify-between text-sm shadow-md">
           <span className="truncate">🆕 A new version of ReceptionAI is available — please update to get the latest features.</span>
           <button
             onClick={async () => {
@@ -131,7 +131,7 @@ const Layout = () => {
                   window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now()
                 }
               }}
-            className="ml-4 flex-shrink-0 px-3 py-1 bg-white text-teal-600 rounded font-semibold hover:bg-teal-50 transition"
+            className="ml-4 flex-shrink-0 px-3 py-1 bg-white text-indigo-600 rounded font-semibold hover:bg-indigo-50 transition"
           >
             Update Now
           </button>

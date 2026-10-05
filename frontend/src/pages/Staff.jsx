@@ -116,7 +116,7 @@ const Staff = () => {
 
   // ── Role style maps ──────────────────────────────────────────────────────────
   const ROLE_AVATAR_BG = {
-    doctor: 'bg-teal-500',
+    doctor: 'bg-indigo-500',
     admin: 'bg-indigo-500',
     manager: 'bg-purple-600',
     receptionist: 'bg-orange-500',
@@ -124,7 +124,7 @@ const Staff = () => {
   };
 
   const ROLE_BADGE = {
-    doctor: 'bg-teal-100 text-teal-700',
+    doctor: 'bg-indigo-100 text-indigo-700',
     admin: 'bg-indigo-100 text-indigo-700',
     manager: 'bg-purple-100 text-purple-700',
     receptionist: 'bg-orange-100 text-orange-700',
@@ -176,7 +176,7 @@ const Staff = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Total Staff', value: staffList.length, color: 'text-gray-900' },
-          { label: 'Doctors', value: staffList.filter(s => s.role === 'doctor').length, color: 'text-teal-600' },
+          { label: 'Doctors', value: staffList.filter(s => s.role === 'doctor').length, color: 'text-indigo-600' },
           { label: 'Active ', value: staffList.filter(s => s.is_active).length, color: 'text-green-600' },
           { label: 'Inactive', value: staffList.filter(s => !s.is_active).length, color: 'text-red-500' },
         ].map(card => (

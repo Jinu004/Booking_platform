@@ -41,7 +41,7 @@ const Table = ({ columns, data, loading = false, emptyMessage = 'No data found',
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               className={`
                 ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-                ${onRowClick ? 'hover:bg-blue-50 cursor-pointer transition-colors' : ''}
+                ${onRowClick ? 'hover:bg-indigo-50 cursor-pointer transition-colors' : ''}
               `}
             >
               {columns.map((col, colIndex) => (

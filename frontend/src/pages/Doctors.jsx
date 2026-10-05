@@ -5,7 +5,7 @@ import { getStoredStaff } from '../services/auth.service';
 import { CardSkeleton } from '../components/shared/Skeleton';
 
 const AVATAR_COLORS = [
-  'bg-teal-100 text-teal-700',
+  'bg-indigo-100 text-indigo-700',
   'bg-indigo-100 text-indigo-700',
   'bg-amber-100 text-amber-700',
   'bg-rose-100 text-rose-700',
@@ -87,7 +87,7 @@ function SearchableSelect({
         onFocus={() => {
           if (search.length > 0) setOpen(true);
         }}
-        className="block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border text-sm"
+        className="block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500 border text-sm"
       />
       {open && search.length > 0 && filtered.length > 0 && (
         <ul className="absolute z-50 w-full bg-white border rounded-lg shadow-lg mt-1 max-h-44 overflow-y-auto">
@@ -100,7 +100,7 @@ function SearchableSelect({
                 setSearch(opt);
                 setOpen(false);
               }}
-              className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm border-b last:border-0"
+              className="px-3 py-2 cursor-pointer hover:bg-indigo-50 text-sm border-b last:border-0"
             >
               {opt}
             </li>
@@ -458,7 +458,7 @@ const Doctors = () => {
           </div>
           {!isReadOnly && !isDoctor && <button
             onClick={openAddDoctor}
-            className="bg-teal-600 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-teal-700 transition text-sm"
+            className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-indigo-700 transition text-sm"
           >
             + Add Doctor
           </button>}
@@ -471,7 +471,7 @@ const Doctors = () => {
         ) : doctors.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
             <p className="text-gray-400 text-sm">No doctors added yet.</p>
-            <button onClick={openAddDoctor} className="mt-3 text-teal-600 font-semibold text-sm hover:text-teal-800">+ Add your first doctor</button>
+            <button onClick={openAddDoctor} className="mt-3 text-indigo-600 font-semibold text-sm hover:text-indigo-800">+ Add your first doctor</button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -485,7 +485,7 @@ const Doctors = () => {
                   </div>
                   <div className="min-w-0">
                     <p className="text-lg font-bold text-gray-900 truncate">{doc.name}</p>
-                    <p className="text-sm text-teal-600 font-medium truncate">{doc.specialization || 'General'}</p>
+                    <p className="text-sm text-indigo-600 font-medium truncate">{doc.specialization || 'General'}</p>
                   </div>
                 </div>
 
@@ -509,7 +509,7 @@ const Doctors = () => {
                   <button
                     onClick={() => openScheduleModal(doc)}
                     title="Set Schedule"
-                    className="p-2 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition"
+                    className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -579,12 +579,12 @@ const Doctors = () => {
               key={tab.key}
               onClick={() => setAvailFilter(tab.key)}
               className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${availFilter === tab.key
-                ? 'border-teal-600 text-teal-700'
+                ? 'border-indigo-600 text-indigo-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
             >
               {tab.label}
-              <span className={`ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${availFilter === tab.key ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'
+              <span className={`ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${availFilter === tab.key ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'
                 }`}>
                 {tab.count}
               </span>
@@ -649,7 +649,7 @@ const Doctors = () => {
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <div
-                        className="h-1.5 rounded-full bg-teal-500 transition-all"
+                        className="h-1.5 rounded-full bg-indigo-500 transition-all"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
@@ -747,7 +747,7 @@ const Doctors = () => {
             <form onSubmit={handleManageSubmit} className="space-y-4" noValidate>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Full Name *</label>
-                <input type="text" value={manageDoctorForm.name || ''} onChange={e => setManageDoctorForm({ ...manageDoctorForm, name: formatDoctorName(e.target.value) })} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.name ? 'border-red-500' : ''}`} />
+                <input type="text" value={manageDoctorForm.name || ''} onChange={e => setManageDoctorForm({ ...manageDoctorForm, name: formatDoctorName(e.target.value) })} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500 border ${formErrors.name ? 'border-red-500' : ''}`} />
                 {formErrors.name && <p className="mt-1 text-xs text-red-600">{formErrors.name}</p>}
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -767,7 +767,7 @@ const Doctors = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Phone *</label>
-                  <input type="text" value={manageDoctorForm.phone} onChange={e => { const numericOnly = e.target.value.replace(/\D/g, '').slice(0, 10); setManageDoctorForm({ ...manageDoctorForm, phone: numericOnly }); }} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.phone ? 'border-red-500' : ''}`} />
+                  <input type="text" value={manageDoctorForm.phone} onChange={e => { const numericOnly = e.target.value.replace(/\D/g, '').slice(0, 10); setManageDoctorForm({ ...manageDoctorForm, phone: numericOnly }); }} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500 border ${formErrors.phone ? 'border-red-500' : ''}`} />
                   {formErrors.phone && <p className="mt-1 text-xs text-red-600">{formErrors.phone}</p>}
                 </div>
               </div>
@@ -788,13 +788,13 @@ const Doctors = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Daily Token Limit *</label>
-                  <input type="number" min="1" max="100" value={manageDoctorForm.maxTokensDaily} onChange={e => setManageDoctorForm({ ...manageDoctorForm, maxTokensDaily: e.target.value })} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.maxTokensDaily ? 'border-red-500' : ''}`} />
+                  <input type="number" min="1" max="100" value={manageDoctorForm.maxTokensDaily} onChange={e => setManageDoctorForm({ ...manageDoctorForm, maxTokensDaily: e.target.value })} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500 border ${formErrors.maxTokensDaily ? 'border-red-500' : ''}`} />
                   {formErrors.maxTokensDaily && <p className="mt-1 text-xs text-red-600">{formErrors.maxTokensDaily}</p>}
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Consultation Fee *</label>
-                <input type="text" placeholder="e.g. 300" value={manageDoctorForm.consultationFee} onChange={e => { const numericOnly = e.target.value.replace(/\D/g, ''); setManageDoctorForm({ ...manageDoctorForm, consultationFee: numericOnly }); }} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border ${formErrors.consultationFee ? 'border-red-500' : ''}`} />
+                <input type="text" placeholder="e.g. 300" value={manageDoctorForm.consultationFee} onChange={e => { const numericOnly = e.target.value.replace(/\D/g, ''); setManageDoctorForm({ ...manageDoctorForm, consultationFee: numericOnly }); }} className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500 border ${formErrors.consultationFee ? 'border-red-500' : ''}`} />
                 {formErrors.consultationFee && <p className="mt-1 text-xs text-red-600">{formErrors.consultationFee}</p>}
               </div>
 
@@ -803,7 +803,7 @@ const Doctors = () => {
                 <select
                   value={manageDoctorForm.avgConsultationMinutes}
                   onChange={e => setManageDoctorForm({ ...manageDoctorForm, avgConsultationMinutes: parseInt(e.target.value) })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 border"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500 border"
                 >
                   <option value={5}>5 minutes</option>
                   <option value={10}>10 minutes</option>
@@ -818,7 +818,7 @@ const Doctors = () => {
 
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
                 <button type="button" onClick={() => setIsManageModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium">Save Details</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium">Save Details</button>
               </div>
             </form>
           </div>
@@ -892,7 +892,7 @@ const Doctors = () => {
                               updated[idx] = { ...updated[idx], sessions: [...sessions, { start_time: '17:00', end_time: '21:00' }] };
                               setDoctorSchedule(updated);
                             }}
-                            className="text-xs text-teal-600 hover:text-teal-800 font-medium ml-1"
+                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-1"
                           >
                             + Add Session
                           </button>
@@ -953,7 +953,7 @@ const Doctors = () => {
                               updated[idx] = { ...updated[idx], sessions: [...sessions, { start_time: '17:00', end_time: '21:00' }] };
                               setDoctorSchedule(updated);
                             }}
-                            className="text-xs text-teal-600 hover:text-teal-800 font-medium self-start"
+                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium self-start"
                           >
                             + Add Session
                           </button>

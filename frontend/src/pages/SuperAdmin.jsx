@@ -322,7 +322,7 @@ export default function SuperAdmin() {
           {view === 'tenants' && (
             <button
               onClick={() => setShowCreate(true)}
-              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
             >
               + New Tenant
             </button>
@@ -339,7 +339,7 @@ export default function SuperAdmin() {
                 key={s}
                 onClick={() => setPosterStatusFilter(s)}
                 className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                  posterStatusFilter === s ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  posterStatusFilter === s ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -445,7 +445,7 @@ export default function SuperAdmin() {
               onClick={() => setIndustryFilter(tab.key)}
               className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                 industryFilter === tab.key
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-indigo-600 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -480,7 +480,7 @@ export default function SuperAdmin() {
                   <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{t.name}</td>
                   <td className="px-3 py-3 whitespace-nowrap">{industryBadge(t.industry)}</td>
                   <td className="px-3 py-3 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 capitalize">{t.plan}</span>
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800 capitalize">{t.plan}</span>
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap">{statusBadge(t.status)}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.whatsapp_number || <span className="text-gray-300">—</span>}</td>
@@ -488,7 +488,7 @@ export default function SuperAdmin() {
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.conversation_count}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                    <button onClick={() => openEdit(t)} className="text-blue-600 hover:text-blue-900">Edit</button>
+                    <button onClick={() => openEdit(t)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
                     {t.id === ownTenantId && (
                       <span className="inline-flex text-xs leading-5 font-semibold text-gray-400">(You)</span>
                     )}
@@ -527,7 +527,7 @@ export default function SuperAdmin() {
                 type="text"
                 value={createForm.clinicName}
                 onChange={e => setCreateForm(f => ({ ...f, clinicName: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Apollo Medical Centre"
               />
             </div>
@@ -537,7 +537,7 @@ export default function SuperAdmin() {
                 type="email"
                 value={createForm.email}
                 onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="doctor@clinic.com"
               />
             </div>
@@ -547,7 +547,7 @@ export default function SuperAdmin() {
                 type="password"
                 value={createForm.password}
                 onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Min 8 characters"
               />
             </div>
@@ -556,7 +556,7 @@ export default function SuperAdmin() {
               <select
                 value={createForm.plan}
                 onChange={e => setCreateForm(f => ({ ...f, plan: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 {PLANS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
               </select>
@@ -566,7 +566,7 @@ export default function SuperAdmin() {
               <select
                 value={createForm.industry}
                 onChange={e => setCreateForm(f => ({ ...f, industry: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="clinic">Clinic</option>
                 <option value="enquiry">Enquiry</option>
@@ -582,7 +582,7 @@ export default function SuperAdmin() {
               <button
                 onClick={handleCreate}
                 disabled={createLoading}
-                className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
               >
                 {createLoading ? 'Creating...' : 'Create Clinic'}
               </button>
@@ -604,7 +604,7 @@ export default function SuperAdmin() {
                 type="text"
                 value={editForm.clinicName}
                 onChange={e => setEditForm(f => ({ ...f, clinicName: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
@@ -612,7 +612,7 @@ export default function SuperAdmin() {
               <select
                 value={editForm.plan}
                 onChange={e => setEditForm(f => ({ ...f, plan: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 {PLANS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
               </select>
@@ -622,7 +622,7 @@ export default function SuperAdmin() {
               <select
                 value={editForm.industry}
                 onChange={e => setEditForm(f => ({ ...f, industry: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="clinic">Clinic</option>
                 <option value="enquiry">Enquiry</option>
@@ -634,7 +634,7 @@ export default function SuperAdmin() {
                 type="text"
                 value={editForm.whatsappNumber}
                 onChange={e => setEditForm(f => ({ ...f, whatsappNumber: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="+919876543210"
               />
             </div>
@@ -644,7 +644,7 @@ export default function SuperAdmin() {
                 type="text"
                 value={editForm.whatsappPhoneNumberId}
                 onChange={e => setEditForm(f => ({ ...f, whatsappPhoneNumberId: e.target.value.replace(/\D/g, '') }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Digits only"
               />
               <p className="text-xs text-gray-400 mt-1">From WhatsApp Manager (gear icon next to the number). Used to send reminders and staff replies from this clinic's number.</p>
@@ -655,7 +655,7 @@ export default function SuperAdmin() {
                 type="email"
                 value={editForm.email}
                 onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="clinic@example.com"
               />
             </div>
@@ -664,7 +664,7 @@ export default function SuperAdmin() {
               <select
                 value={editForm.aiModel}
                 onChange={e => setEditForm(f => ({ ...f, aiModel: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">Use plan default</option>
                 <option value="gemini-2.5-pro">gemini-2.5-pro (Pro quality)</option>
@@ -680,7 +680,7 @@ export default function SuperAdmin() {
                   id="proactiveTemplates"
                   checked={editForm.proactiveTemplates}
                   onChange={e => setEditForm(f => ({ ...f, proactiveTemplates: e.target.checked }))}
-                  className="w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
+                  className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
                 />
                 <label htmlFor="proactiveTemplates" className="text-sm text-gray-600">
                   Allow staff to send template messages when 24-hour window is closed
@@ -695,7 +695,7 @@ export default function SuperAdmin() {
                   id="recallEnabled"
                   checked={editForm.recallEnabled}
                   onChange={e => setEditForm(f => ({ ...f, recallEnabled: e.target.checked }))}
-                  className="w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
+                  className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
                 />
                 <label htmlFor="recallEnabled" className="text-sm text-gray-600">
                   Send recall checkup WhatsApp reminders to patients not seen in 90 days (every Monday)
@@ -725,7 +725,7 @@ export default function SuperAdmin() {
                     <button
                       onClick={handleSendOTP}
                       disabled={wabaStep === 'sending' || wabaStep === 'otp_sent' || !wabaPhone}
-                      className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
                     >
                       {wabaStep === 'sending' ? 'Sending...' : 'Send OTP'}
                     </button>
@@ -778,7 +778,7 @@ export default function SuperAdmin() {
                 <button
                   onClick={handleEdit}
                   disabled={editLoading}
-                  className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {editLoading ? 'Saving...' : 'Save Changes'}
                 </button>

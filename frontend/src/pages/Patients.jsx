@@ -8,7 +8,7 @@ import api from '../utils/api';
 
 const AVATAR_COLORS = [
   'bg-indigo-100 text-indigo-700',
-  'bg-teal-100 text-teal-700',
+  'bg-indigo-100 text-indigo-700',
   'bg-amber-100 text-amber-700',
   'bg-rose-100 text-rose-700',
   'bg-violet-100 text-violet-700',
@@ -145,7 +145,7 @@ export default function Patients() {
         <h2 className="text-xl font-bold text-gray-900 mb-2">EHR is a Pro Feature</h2>
         <p className="text-gray-500 text-sm max-w-sm">
           EHR is available on the Pro plan. Contact{' '}
-          <a href="mailto:support@receptionai.in" className="text-teal-600 hover:underline">
+          <a href="mailto:support@receptionai.in" className="text-indigo-600 hover:underline">
             support@receptionai.in
           </a>{' '}
           to upgrade.
@@ -197,7 +197,7 @@ export default function Patients() {
             placeholder="Search name or phone..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
       </div>
@@ -214,7 +214,7 @@ export default function Patients() {
             onClick={() => setActiveFilter(tab.key)}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
               activeFilter === tab.key
-                ? 'border-teal-600 text-teal-700'
+                ? 'border-indigo-600 text-indigo-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -280,7 +280,7 @@ export default function Patients() {
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => navigate(`/patients/${p.id}`)}
-                        className="text-sm text-teal-600 font-semibold hover:text-teal-800"
+                        className="text-sm text-indigo-600 font-semibold hover:text-indigo-800"
                       >
                         View Profile →
                       </button>
@@ -360,7 +360,7 @@ export default function Patients() {
             <button
               onClick={() => setCurrentPage(p => p + 1)}
               disabled={currentPage === totalPages}
-              className="px-4 py-2 text-sm font-semibold rounded-lg border border-teal-600 bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="px-4 py-2 text-sm font-semibold rounded-lg border border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               Next →
             </button>

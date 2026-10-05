@@ -17,7 +17,7 @@ import { CardSkeleton } from '../components/shared/Skeleton';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = [
-  'bg-teal-100 text-teal-700',
+  'bg-indigo-100 text-indigo-700',
   'bg-indigo-100 text-indigo-700',
   'bg-amber-100 text-amber-700',
   'bg-rose-100 text-rose-700',
@@ -95,7 +95,7 @@ function LockScreen() {
       <h2 className="text-xl font-bold text-gray-900 mb-2">EHR is a Pro Feature</h2>
       <p className="text-gray-500 text-sm max-w-sm">
         EHR is available on the Pro plan. Contact{' '}
-        <a href="mailto:support@receptionai.in" className="text-teal-600 hover:underline">
+        <a href="mailto:support@receptionai.in" className="text-indigo-600 hover:underline">
           support@receptionai.in
         </a>{' '}
         to upgrade.
@@ -126,7 +126,7 @@ function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, savi
         </h3>
         {!isReadOnly && <button
           onClick={() => { setAdding(true); setName(''); }}
-          className="text-xs text-teal-600 font-semibold hover:text-teal-800"
+          className="text-xs text-indigo-600 font-semibold hover:text-indigo-800"
         >
           + Add
         </button>}
@@ -161,12 +161,12 @@ function ConditionSection({ title, type, items, chipClass, onAdd, onDelete, savi
             onChange={e => setName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
             placeholder={`Enter ${title.toLowerCase()}...`}
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           <button
             onClick={handleAdd}
             disabled={saving || !name.trim()}
-            className="px-3 py-1.5 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50"
+            className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50"
           >
             Add
           </button>
@@ -201,14 +201,14 @@ function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend, canEdit = t
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {isLatest && (
-            <span className="px-2 py-0.5 bg-teal-50 text-teal-700 text-xs font-bold rounded-full border border-teal-100">
+            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-100">
               Latest
             </span>
           )}
           <p className="text-xs text-gray-400">{fmtDate(note.visit_date)} · {relativeDate(note.visit_date)}</p>
           {canEdit && <button
             onClick={() => onEdit(note)}
-            className="text-gray-300 hover:text-teal-600 transition"
+            className="text-gray-300 hover:text-indigo-600 transition"
             title="Edit note"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,7 +238,7 @@ function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend, canEdit = t
         </div>
       )}
       {note.follow_up_date && (
-        <div className="mt-3 flex items-center gap-2 text-xs text-teal-700 bg-teal-50 rounded-lg px-3 py-2">
+        <div className="mt-3 flex items-center gap-2 text-xs text-indigo-700 bg-indigo-50 rounded-lg px-3 py-2">
           <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
               d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -250,7 +250,7 @@ function VisitNoteCard({ note, isLatest, onEdit, onDownload, onSend, canEdit = t
       <div className="flex gap-2 mt-3">
         <button
           onClick={() => onDownload(note.id)}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-teal-700 border border-teal-300 rounded-lg hover:bg-teal-50 transition"
+          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-indigo-700 border border-indigo-300 rounded-lg hover:bg-indigo-50 transition"
         >
           ↓ Download PDF
         </button>
@@ -710,7 +710,7 @@ export default function PatientProfile() {
               <>
               <button
                 onClick={() => handleBookingAction(activeBooking.id, completeBooking, 'complete')}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition"
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition"
               >
                 Complete
               </button>
@@ -761,7 +761,7 @@ export default function PatientProfile() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider mb-2">Total Visits</p>
-          <p className="text-3xl font-black text-teal-600">{totalVisits}</p>
+          <p className="text-3xl font-black text-indigo-600">{totalVisits}</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider mb-2">Last Visit</p>
@@ -773,7 +773,7 @@ export default function PatientProfile() {
             <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider">Next Appointment</p>
             <button
               onClick={openScheduleModal}
-              className="text-xs text-teal-600 font-semibold hover:text-teal-700 transition"
+              className="text-xs text-indigo-600 font-semibold hover:text-indigo-700 transition"
             >
               + Schedule
             </button>
@@ -798,7 +798,7 @@ export default function PatientProfile() {
               onClick={() => { setActiveTab(t.key); if (t.key === 'notes') loadDoctors(); }}
               className={`pb-3 px-1 border-b-2 text-sm font-semibold whitespace-nowrap transition-colors ${
                 activeTab === t.key
-                  ? 'border-teal-600 text-teal-700'
+                  ? 'border-indigo-600 text-indigo-700'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -817,7 +817,7 @@ export default function PatientProfile() {
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-semibold text-gray-900">Basic Information</h2>
               {!editingBasic && staff?.role !== 'receptionist' && (
-                <button onClick={startEditBasic} className="text-xs text-teal-600 font-semibold hover:text-teal-800">
+                <button onClick={startEditBasic} className="text-xs text-indigo-600 font-semibold hover:text-indigo-800">
                   Edit
                 </button>
               )}
@@ -831,7 +831,7 @@ export default function PatientProfile() {
                     type="date"
                     value={basicForm.date_of_birth || ''}
                     onChange={e => setBasicForm(p => ({ ...p, date_of_birth: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
@@ -842,7 +842,7 @@ export default function PatientProfile() {
                     max="120"
                     value={basicForm.age || ''}
                     onChange={e => setBasicForm(p => ({ ...p, age: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="Age"
                   />
                 </div>
@@ -851,7 +851,7 @@ export default function PatientProfile() {
                   <select
                     value={basicForm.gender || ''}
                     onChange={e => setBasicForm(p => ({ ...p, gender: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="">Select gender</option>
                     <option>Male</option>
@@ -864,7 +864,7 @@ export default function PatientProfile() {
                   <select
                     value={basicForm.blood_group || ''}
                     onChange={e => setBasicForm(p => ({ ...p, blood_group: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="">Select blood group</option>
                     {BLOOD_GROUPS.map(g => <option key={g}>{g}</option>)}
@@ -874,7 +874,7 @@ export default function PatientProfile() {
                   <button
                     onClick={saveBasic}
                     disabled={savingProfile}
-                    className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                   >
                     {savingProfile ? 'Saving…' : 'Save'}
                   </button>
@@ -903,7 +903,7 @@ export default function PatientProfile() {
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-semibold text-gray-900">Emergency Contact</h2>
               {!editingEmergency && staff?.role !== 'receptionist' && (
-                <button onClick={startEditEmergency} className="text-xs text-teal-600 font-semibold hover:text-teal-800">
+                <button onClick={startEditEmergency} className="text-xs text-indigo-600 font-semibold hover:text-indigo-800">
                   Edit
                 </button>
               )}
@@ -917,7 +917,7 @@ export default function PatientProfile() {
                     type="text"
                     value={emergencyForm.emergency_contact_name || ''}
                     onChange={e => setEmergencyForm(p => ({ ...p, emergency_contact_name: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
@@ -926,7 +926,7 @@ export default function PatientProfile() {
                     type="text"
                     value={emergencyForm.emergency_contact_phone || ''}
                     onChange={e => setEmergencyForm(p => ({ ...p, emergency_contact_phone: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
@@ -936,14 +936,14 @@ export default function PatientProfile() {
                     value={emergencyForm.emergency_contact_relationship || ''}
                     onChange={e => setEmergencyForm(p => ({ ...p, emergency_contact_relationship: e.target.value }))}
                     placeholder="e.g. Spouse, Parent, Sibling…"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button
                     onClick={saveEmergency}
                     disabled={savingProfile}
-                    className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                   >
                     {savingProfile ? 'Saving…' : 'Save'}
                   </button>
@@ -996,7 +996,7 @@ export default function PatientProfile() {
               title="Current Medications"
               type="medication"
               items={conditions.filter(c => c.type === 'medication')}
-              chipClass="bg-teal-100 text-teal-700"
+              chipClass="bg-indigo-100 text-indigo-700"
               onAdd={handleAddCondition}
               onDelete={handleDeleteCondition}
               saving={savingCondition}
@@ -1017,7 +1017,7 @@ export default function PatientProfile() {
             {staff?.role !== 'receptionist' && (
             <button
               onClick={openAddNote}
-              className="px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition"
+              className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition"
             >
               + Add Visit Note
             </button>
@@ -1034,7 +1034,7 @@ export default function PatientProfile() {
               {sortedNotes.map((note, idx) => (
                 <div key={note.id} className="flex gap-4 pb-5">
                   <div className="flex flex-col items-center pt-2 flex-shrink-0">
-                    <div className="w-3 h-3 rounded-full bg-teal-500 ring-2 ring-white ring-offset-1 flex-shrink-0" />
+                    <div className="w-3 h-3 rounded-full bg-indigo-500 ring-2 ring-white ring-offset-1 flex-shrink-0" />
                     {idx < sortedNotes.length - 1 && (
                       <div className="flex-1 w-0.5 bg-gray-200 mt-1" />
                     )}
@@ -1137,7 +1137,7 @@ export default function PatientProfile() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Doctor</label>
                 <select
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   value={scheduleForm.doctorId}
                   onChange={e => setScheduleForm(f => ({ ...f, doctorId: e.target.value }))}
                   disabled={staff?.role === 'doctor'}
@@ -1152,7 +1152,7 @@ export default function PatientProfile() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Date</label>
                 <input
                   type="date"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   value={scheduleForm.bookingDate}
                   min={(() => { const _d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`; })()}
                   onChange={e => setScheduleForm(f => ({ ...f, bookingDate: e.target.value }))}
@@ -1162,7 +1162,7 @@ export default function PatientProfile() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
                 <textarea
                   rows={2}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                   placeholder="Follow-up instructions or reason for visit"
                   value={scheduleForm.notes}
                   onChange={e => setScheduleForm(f => ({ ...f, notes: e.target.value }))}
@@ -1179,7 +1179,7 @@ export default function PatientProfile() {
               <button
                 onClick={handleScheduleNext}
                 disabled={scheduleSaving}
-                className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 transition"
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition"
               >
                 {scheduleSaving ? 'Scheduling...' : 'Schedule & Notify'}
               </button>
@@ -1217,7 +1217,7 @@ export default function PatientProfile() {
                     type="date"
                     value={noteForm.visit_date}
                     onChange={e => setNoteForm(p => ({ ...p, visit_date: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
@@ -1226,7 +1226,7 @@ export default function PatientProfile() {
                     value={noteForm.doctor_id}
                     onChange={e => setNoteForm(p => ({ ...p, doctor_id: e.target.value }))}
                     disabled={staff?.role === 'doctor'}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {editingNote && noteForm._doctor_name ? noteForm._doctor_name : 'Select doctor'}
@@ -1246,7 +1246,7 @@ export default function PatientProfile() {
                   value={noteForm.diagnosis}
                   onChange={e => setNoteForm(p => ({ ...p, diagnosis: e.target.value }))}
                   placeholder="Enter diagnosis…"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
@@ -1256,7 +1256,7 @@ export default function PatientProfile() {
                   value={noteForm.prescription}
                   onChange={e => setNoteForm(p => ({ ...p, prescription: e.target.value }))}
                   placeholder="Enter prescription…"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
@@ -1266,7 +1266,7 @@ export default function PatientProfile() {
                   value={noteForm.notes}
                   onChange={e => setNoteForm(p => ({ ...p, notes: e.target.value }))}
                   placeholder="Additional notes…"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div className="w-1/2">
@@ -1275,7 +1275,7 @@ export default function PatientProfile() {
                   type="date"
                   value={noteForm.follow_up_date}
                   onChange={e => setNoteForm(p => ({ ...p, follow_up_date: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
             </div>
@@ -1292,7 +1292,7 @@ export default function PatientProfile() {
               <button
                 onClick={handleSaveNote}
                 disabled={savingNote || !noteForm.visit_date}
-                className="px-5 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition"
+                className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
               >
                 {savingNote ? 'Saving…' : 'Save Note'}
               </button>

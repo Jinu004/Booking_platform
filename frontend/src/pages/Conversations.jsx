@@ -56,7 +56,7 @@ function getAvatarColor(str) {
     'bg-rose-100 text-rose-700',
     'bg-purple-100 text-purple-700',
     'bg-blue-100 text-blue-700',
-    'bg-teal-100 text-teal-700',
+    'bg-indigo-100 text-indigo-700',
   ];
   let hash = 0;
   for (let i = 0; i < (str || '').length; i++) hash += str.charCodeAt(i);
@@ -428,7 +428,7 @@ export default function Conversations() {
                     <p className="text-xs mt-0.5 md:hidden">
                       {selectedConversation.mode === 'human'
                         ? <span className="text-orange-500 font-semibold">● Human Mode</span>
-                        : <span className="text-teal-600 font-semibold">● AI Mode</span>
+                        : <span className="text-indigo-600 font-semibold">● AI Mode</span>
                       }
                     </p>
                   </div>
@@ -442,7 +442,7 @@ export default function Conversations() {
                       Human Mode
                     </span>
                   ) : (
-                    <span className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-teal-50 text-teal-700 rounded-full text-xs font-semibold">
+                    <span className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
                       AI Mode
                     </span>
@@ -452,7 +452,7 @@ export default function Conversations() {
                     className={`hidden md:block px-4 py-1.5 rounded-lg text-sm font-semibold border transition ${
                       selectedConversation.mode === 'human'
                         ? 'text-gray-600 border-gray-300 hover:bg-gray-50'
-                        : 'text-teal-700 border-teal-300 hover:bg-teal-50'
+                        : 'text-indigo-700 border-indigo-300 hover:bg-indigo-50'
                     }`}
                   >
                     {selectedConversation.mode === 'human' ? 'Hand back to AI' : 'Take Over'}
@@ -479,13 +479,13 @@ export default function Conversations() {
 
               {/* ── AI Status Bar ── */}
               {selectedConversation.mode === 'ai' && (
-                <div className="bg-teal-50 border-b border-teal-100 px-6 py-2 flex items-center justify-between flex-shrink-0">
-                  <p className="text-sm text-teal-700 font-medium">
+                <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-2 flex items-center justify-between flex-shrink-0">
+                  <p className="text-sm text-indigo-700 font-medium">
                     🤖 AI is handling this conversation. Replies sent automatically.
                   </p>
                   <button
                     onClick={handleToggleMode}
-                    className="text-xs font-semibold text-teal-700 hover:text-teal-900 underline underline-offset-2 transition"
+                    className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline underline-offset-2 transition"
                   >
                     Take Over
                   </button>
@@ -526,7 +526,7 @@ export default function Conversations() {
                         >
                         {/* Sender label */}
                         <p className={`text-[11px] font-semibold mb-1 px-1 ${
-                          isPatient ? 'text-gray-400' : 'text-teal-600'
+                          isPatient ? 'text-gray-400' : 'text-indigo-600'
                         }`}>
                           {isPatient
                             ? (selectedConversation.customer_name || selectedConversation.customer_phone || 'Patient')
@@ -536,7 +536,7 @@ export default function Conversations() {
                         <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                           isPatient
                             ? 'bg-white text-gray-800 rounded-tl-sm shadow-sm border border-gray-100'
-                            : 'bg-teal-600 text-white rounded-tr-sm'
+                            : 'bg-indigo-600 text-white rounded-tr-sm'
                         }`}>
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                         </div>
@@ -588,14 +588,14 @@ export default function Conversations() {
                         (new Date() - new Date(messages.filter(m => m.role === 'user').slice(-1)[0].created_at)) > 24 * 60 * 60 * 1000
                           ? 'Type your message — a re-engagement template will be sent first...'
                           : 'Type a reply...'}
-                      className="flex-1 resize-none rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 outline-none min-h-[48px] max-h-32 px-4 py-3 text-sm"
+                      className="flex-1 resize-none rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none min-h-[48px] max-h-32 px-4 py-3 text-sm"
                       rows={1}
                       disabled={sending}
                     />
                     <button
                       onClick={handleReply}
                       disabled={!replyText.trim() || sending}
-                      className="mb-0.5 px-5 py-3 bg-teal-600 text-white rounded-xl font-semibold text-sm hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      className="mb-0.5 px-5 py-3 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                     >
                       {sending ? <Spinner size="sm" /> : 'Send'}
                     </button>
@@ -607,7 +607,7 @@ export default function Conversations() {
                   <p className="text-sm text-gray-400">Switch to Human mode to reply</p>
                   <button
                     onClick={handleToggleMode}
-                    className="px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition"
+                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition"
                   >
                     Take Over
                   </button>
@@ -733,7 +733,7 @@ export default function Conversations() {
                     setTemplateSending(false);
                   }
                 }}
-                className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:border-teal-400 hover:bg-teal-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <p className="text-sm font-medium text-gray-800">{template.label}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{template.description}</p>

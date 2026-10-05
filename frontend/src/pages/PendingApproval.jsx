@@ -63,7 +63,7 @@ export default function PendingApproval() {
 
         <p className="text-xs text-gray-400 mb-6">
           Need help? Contact us at{' '}
-          <a href="mailto:support@receptionai.in" className="text-teal-600 hover:underline">
+          <a href="mailto:support@receptionai.in" className="text-indigo-600 hover:underline">
             support@receptionai.in
           </a>
         </p>

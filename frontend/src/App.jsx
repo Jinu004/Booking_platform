@@ -31,7 +31,7 @@ const PatientProfile = React.lazy(() => import('./pages/PatientProfile'));
 
 const PageLoader = (
   <div className="flex items-center justify-center h-screen">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
   </div>
 );
 
