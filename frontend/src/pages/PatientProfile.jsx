@@ -669,14 +669,14 @@ export default function PatientProfile() {
       </button>
 
       {/* Header card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center gap-5">
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center text-2xl font-black flex-shrink-0 ${avatarColor(customer.name)}`}>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 max-md:p-4">
+        <div className="flex items-center gap-5 max-md:gap-3">
+          <div className={`w-20 h-20 max-md:w-14 max-md:h-14 rounded-full flex items-center justify-center text-2xl max-md:text-lg font-black flex-shrink-0 ${avatarColor(customer.name)}`}>
             {initials(customer.name)}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-1.5">
-              <h1 className="text-2xl font-bold text-gray-900">{customer.name || 'Unknown Patient'}</h1>
+            <div className="flex items-center gap-3 mb-1.5 max-md:flex-wrap max-md:gap-x-2 max-md:gap-y-1">
+              <h1 className="text-2xl max-md:text-xl font-bold text-gray-900 break-words min-w-0">{customer.name || 'Unknown Patient'}</h1>
               <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
                 isNew ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
               }`}>
@@ -699,8 +699,8 @@ export default function PatientProfile() {
           </div>
         </div>
         {activeBooking && (
-          <div className="flex flex-col items-end justify-center gap-2 ml-4 pl-4 border-l border-gray-100">
-            <div className="text-right">
+          <div className="flex flex-col items-end justify-center gap-2 ml-4 pl-4 border-l border-gray-100 max-md:ml-0 max-md:pl-0 max-md:border-l-0 max-md:border-t max-md:mt-4 max-md:pt-4 max-md:items-start">
+            <div className="text-right max-md:text-left">
               <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Today's Appointment</p>
               <p className="text-sm font-semibold text-gray-800 mt-0.5">{activeBooking.doctor_name}</p>
               <p className="text-xs text-gray-500">{fmtSessionTime(activeBooking.session_start_time)} · {activeBooking.status}</p>

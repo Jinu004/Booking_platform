@@ -278,7 +278,7 @@ export default function SuperAdmin() {
   }
   if (loading) {
     return (
-      <div className="p-8 space-y-8">
+      <div className="p-0 md:p-8 space-y-8">
         <h1 className="text-2xl font-bold text-gray-900">Platform Admin</h1>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
@@ -302,10 +302,10 @@ export default function SuperAdmin() {
     : tenants.filter(t => t.industry === industryFilter);
 
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="p-0 md:p-8 space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Platform Admin</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex bg-gray-100 rounded-lg p-0.5">
             {[{ key: 'tenants', label: 'Tenants' }, { key: 'posters', label: 'Posters' }].map(v => (
               <button
@@ -322,7 +322,7 @@ export default function SuperAdmin() {
           {view === 'tenants' && (
             <button
               onClick={() => setShowCreate(true)}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap"
             >
               + New Tenant
             </button>

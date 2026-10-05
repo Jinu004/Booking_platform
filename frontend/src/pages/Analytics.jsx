@@ -129,21 +129,21 @@ const Analytics = () => {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-0 md:p-8 space-y-8">
 
       {/* ══════════════════════════════════════════════════════════════════════
           CLINIC ANALYTICS
       ══════════════════════════════════════════════════════════════════════ */}
       {industry !== 'enquiry' && (
         <>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
-            <div className="space-x-2 bg-gray-100 p-1 rounded-lg border border-gray-200">
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-lg border border-gray-200 w-full sm:w-auto">
               {['today', 'week', 'month'].map(p => (
                 <button
                   key={p}
                   onClick={() => setPeriod(p)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${period === p
+                  className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-md text-sm font-medium capitalize whitespace-nowrap ${period === p
                     ? 'bg-white shadow text-indigo-600'
                     : 'text-gray-500 hover:text-gray-700'
                     }`}

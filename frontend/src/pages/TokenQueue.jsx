@@ -64,10 +64,10 @@ const TokenQueue = () => {
 
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
-          <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse inline-block"></span>
-          <h1 className="text-lg md:text-2xl font-bold text-gray-900">Live Token Queue</h1>
+          <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse inline-block flex-shrink-0"></span>
+          <h1 className="text-lg md:text-2xl font-bold text-gray-900 whitespace-nowrap">Live Token Queue</h1>
           <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">{tokenQueue.length}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -121,7 +121,7 @@ const TokenQueue = () => {
             {(() => {
               const fmtSlot = t => { if (!t) return null; const [h,m] = t.split(':').map(Number); return `${h>12?h-12:h||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`; };
               const renderToken = (t) => (
-                <div key={t.id} className="flex items-center justify-between px-3 md:px-6 py-4 md:py-5 hover:bg-gray-50 transition">
+                <div key={t.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-3 md:px-6 py-4 md:py-5 hover:bg-gray-50 transition">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="w-10 h-10 md:w-14 md:h-14 bg-indigo-50 rounded-xl flex items-center justify-center font-black text-indigo-600 text-base flex-shrink-0">
                       {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
@@ -140,7 +140,7 @@ const TokenQueue = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 md:gap-3 pl-14 md:pl-0 md:flex-shrink-0">
                     {getStatusPill(t.status)}
                     {t.status === 'waiting' && (
                       <button

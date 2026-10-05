@@ -154,10 +154,10 @@ const Staff = () => {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-0 md:p-8 space-y-6">
 
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-wrap justify-between items-start gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Staff Management</h1>
           <p className="text-sm text-indigo-600 mt-0.5">
@@ -166,7 +166,7 @@ const Staff = () => {
         </div>
         <button
           onClick={() => setInviteModalOpen(true)}
-          className="bg-indigo-600 text-white px-4 py-2.5 rounded-lg shadow-sm hover:bg-indigo-700 font-semibold text-sm"
+          className="bg-indigo-600 text-white px-4 py-2.5 rounded-lg shadow-sm hover:bg-indigo-700 font-semibold text-sm whitespace-nowrap"
         >
           + Invite Staff
         </button>
@@ -250,7 +250,7 @@ const Staff = () => {
                   {['Name', 'Email', 'Role', 'Status', 'Actions'].map((col, i) => (
                     <th
                       key={col}
-                      className={`px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider ${i === 4 ? 'text-right' : 'text-left'}`}
+                      className={`px-3 md:px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider ${i >= 1 && i <= 3 ? 'hidden md:table-cell' : ''} ${i === 4 ? 'text-right' : 'text-left'}`}
                     >
                       {col}
                     </th>
@@ -262,30 +262,37 @@ const Staff = () => {
                   <tr key={s.id} className="hover:bg-gray-50 transition-colors">
 
                     {/* Name + Avatar */}
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 md:px-6 py-4 whitespace-nowrap max-md:whitespace-normal">
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${ROLE_AVATAR_BG[s.role] || 'bg-gray-400'}`}>
                           {staffInitials(s.name)}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-sm font-semibold text-gray-900">{s.name}</p>
                           {s.phone && <p className="text-xs text-gray-400">{s.phone}</p>}
+                          <div className="md:hidden flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${ROLE_BADGE[s.role] || 'bg-gray-100 text-gray-700'}`}>{s.role}</span>
+                            <span className="flex items-center gap-1">
+                              <span className={`w-1.5 h-1.5 rounded-full ${s.is_active ? 'bg-green-500' : 'bg-red-400'}`} />
+                              <span className={`text-xs font-medium ${s.is_active ? 'text-green-700' : 'text-red-500'}`}>{s.is_active ? 'Active' : 'Inactive'}</span>
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </td>
 
                     {/* Email */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{s.email || '—'}</td>
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500">{s.email || '—'}</td>
 
                     {/* Role Badge */}
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${ROLE_BADGE[s.role] || 'bg-gray-100 text-gray-700'}`}>
                         {s.role}
                       </span>
                     </td>
 
                     {/* Status */}
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
                       <span className="flex items-center gap-1.5">
                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.is_active ? 'bg-green-500' : 'bg-red-400'}`} />
                         <span className={`text-sm font-medium ${s.is_active ? 'text-green-700' : 'text-red-500'}`}>
@@ -295,7 +302,7 @@ const Staff = () => {
                     </td>
 
                     {/* Actions */}
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <td className="px-3 md:px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => setEditRoleModal({ id: s.id, role: s.role })}

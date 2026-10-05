@@ -267,7 +267,7 @@ export default function Settings() {
   ];
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-0 md:p-8 max-w-4xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
 
       <div className="border-b border-gray-200">
@@ -331,7 +331,7 @@ export default function Settings() {
                   {DAYS.map(({ key, label }) => {
                     const day = hitl.working_hours[key] || { enabled: false, open: '09:00', close: '18:00' };
                     return (
-                      <div key={key} className="flex items-center gap-4">
+                      <div key={key} className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
                         <div className="w-28">
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input

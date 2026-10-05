@@ -593,10 +593,9 @@ const Bookings = () => {
                     </span>
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">{b.patient_phone}</div>
+                  <div className="mt-0.5 text-xs text-gray-400 truncate">{b.doctor_name}</div>
                   <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
-                    <span>{b.doctor_name}</span>
-                    <span>·</span>
-                    <span>
+                    <span className="whitespace-nowrap">
                       {b.slot_time ? (() => {
                         const [h, m] = b.slot_time.split(':');
                         const hr = parseInt(h);
@@ -611,14 +610,14 @@ const Bookings = () => {
               {(b.status === 'confirmed' || b.status === 'pending') && (
                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
                   {(!b.token_id || b.token_status === 'arrived') && (
-                    <button onClick={() => handleAction(b.id, completeBooking)} className="flex-1 py-1.5 text-xs font-bold text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition">Complete</button>
+                    <button onClick={() => handleAction(b.id, completeBooking)} className="flex-1 py-2 text-xs font-bold text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition">Complete</button>
                   )}
                   {b.token_id && b.token_status === 'waiting' && (
-                    <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed'); } }} className="flex-1 py-1.5 text-xs font-bold text-indigo-500 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition">Arrived</button>
+                    <button onClick={async () => { try { await updateTokenStatus(b.token_id, 'arrived'); fetchData(); } catch { alert('Failed'); } }} className="flex-1 py-2 text-xs font-bold text-indigo-500 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition">Arrived</button>
                   )}
-                  <button onClick={() => handleAction(b.id, cancelBooking)} className="flex-1 py-1.5 text-xs font-bold text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition">Cancel</button>
+                  <button onClick={() => handleAction(b.id, cancelBooking)} className="flex-1 py-2 text-xs font-bold text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition">Cancel</button>
                   {(b.patient_id || b.customer_id) && (
-                    <Link to={`/patients/${b.patient_id || b.customer_id}`} className="flex-1 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition text-center">Profile</Link>
+                    <Link to={`/patients/${b.patient_id || b.customer_id}`} className="flex-1 py-2 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition text-center">Profile</Link>
                   )}
                 </div>
               )}

@@ -447,7 +447,7 @@ const Doctors = () => {
   });
 
   return (
-    <div className="p-8 space-y-10">
+    <div className="p-0 md:p-8 space-y-10">
 
       {/* ── SECTION 1: Doctor Cards ── */}
       <div>
@@ -549,17 +549,17 @@ const Doctors = () => {
             <h2 className="text-xl font-bold text-gray-900">Today's Availability</h2>
             <p className="text-sm text-gray-400 mt-0.5">{todayLabel}</p>
           </div>
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm whitespace-nowrap">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
               <span className="text-gray-600">{availableCount} available</span>
             </span>
-            <span className="text-gray-300">·</span>
+            <span className="text-gray-300 hidden sm:inline">·</span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
               <span className="text-gray-600">{offDutyCount} off duty</span>
             </span>
-            <span className="text-gray-300">·</span>
+            <span className="text-gray-300 hidden sm:inline">·</span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-red-400 inline-block"></span>
               <span className="text-gray-600">{onLeaveCount} on leave</span>
@@ -568,7 +568,7 @@ const Doctors = () => {
         </div>
 
         {/* Filter tabs */}
-        <div className="flex gap-1 border-b border-gray-200 mb-5">
+        <div className="flex gap-1 border-b border-gray-200 mb-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {[
             { key: 'all', label: 'All', count: doctors.length },
             { key: 'available', label: 'Available', count: availableCount },

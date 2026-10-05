@@ -137,7 +137,7 @@ export default function Onboarding() {
         .plan-card:hover { border-color: var(--border-strong) !important; }
       `}</style>
 
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', fontFamily: 'var(--sans)' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '72px 20px 40px', fontFamily: 'var(--sans)' }}>
 
         {/* Progress bar — top edge */}
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 3, background: '#e2e8f0', zIndex: 100 }}>
@@ -213,7 +213,7 @@ export default function Onboarding() {
             {step === 1 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
                 <Input label="Clinic Name" name="clinicName" value={formData.clinicName} onChange={handleChange} error={errors.clinicName} required />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 20 }}>
                   <Input label="Owner Name" name="ownerName" value={formData.ownerName} onChange={handleChange} error={errors.ownerName} required />
                   <Input label="Email" name="email" type="email" value={formData.email} onChange={handleChange} error={errors.email} required />
                 </div>

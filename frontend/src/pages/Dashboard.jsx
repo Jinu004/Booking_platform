@@ -156,7 +156,7 @@ const Dashboard = () => {
     { key: 'in_consult', label: 'In Consult' },
     { key: 'done', label: 'Done' },
   ];
-  const queueGrid = 'grid grid-cols-[56px_minmax(0,1fr)_96px_76px] md:grid-cols-[64px_minmax(0,1.3fr)_minmax(0,1fr)_96px_76px] items-center gap-3';
+  const queueGrid = 'grid grid-cols-[56px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1.3fr)_minmax(0,1fr)_96px_76px] items-center gap-3';
 
   return (
     <div className="min-h-screen bg-bg text-ink flex flex-col gap-0">
@@ -203,7 +203,7 @@ const Dashboard = () => {
       <div className="border-b border-ink/[0.08] px-6 py-5 flex justify-between items-end gap-4">
         <div className="min-w-0">
           <p className={`${monoLabel} text-ink/50`}>{dateLabel}</p>
-          <h1 className="mt-1.5 text-[28px] md:text-[32px] font-semibold tracking-[-0.035em] leading-tight truncate">
+          <h1 className="mt-1.5 text-[26px] md:text-[32px] font-semibold tracking-[-0.035em] leading-tight md:truncate">
             {isDoctor ? 'My Queue' : (tenant?.name || staff?.tenantName || 'Dashboard')}
           </h1>
         </div>
@@ -262,7 +262,7 @@ const Dashboard = () => {
               <button
                 key={tab.key}
                 onClick={() => setActiveFilter(tab.key)}
-                className={`text-[13px] font-medium transition rounded-full px-3.5 py-1 ${
+                className={`text-[13px] font-medium transition rounded-full px-3.5 py-1.5 ${
                   activeFilter === tab.key
                     ? 'bg-ink text-bg'
                     : 'text-ink/55 hover:text-ink hover:bg-ink/[0.05]'
@@ -274,11 +274,11 @@ const Dashboard = () => {
           </div>
 
           {filteredTokens.length > 0 && (
-            <div className={`${queueGrid} px-6 py-2.5 border-b border-ink/[0.08] bg-ink/[0.02] ${monoLabel} text-[10px] text-ink/45`}>
+            <div className={`${queueGrid} px-4 md:px-6 py-2.5 border-b border-ink/[0.08] bg-ink/[0.02] ${monoLabel} text-[10px] text-ink/45`}>
               <span>Token</span>
               <span>Patient</span>
               <span className="hidden md:block">Doctor</span>
-              <span>Status</span>
+              <span className="hidden md:block">Status</span>
               <span className="text-right">Action</span>
             </div>
           )}
@@ -287,17 +287,18 @@ const Dashboard = () => {
             {filteredTokens.length === 0 ? (
               <div className="p-12 text-center text-sm text-ink/55">No tokens in queue</div>
             ) : filteredTokens.map(t => (
-              <div key={t.id} className={`${queueGrid} px-6 py-3.5 hover:bg-ink/[0.02] transition`}>
+              <div key={t.id} className={`${queueGrid} px-4 md:px-6 py-3.5 hover:bg-ink/[0.02] transition`}>
                 <span className="inline-flex items-center justify-center h-8 px-2 rounded-md bg-ink/[0.05] font-mono text-[12px] font-semibold">
                   {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{t.patient_name || 'Walk-in'}</p>
                   <p className="md:hidden text-xs text-ink/55 truncate">{t.doctor_name}</p>
+                  <div className="md:hidden mt-1.5">{getStatusPill(t.status)}</div>
                 </div>
                 <p className="hidden md:block text-sm text-ink/60 truncate">{t.doctor_name}</p>
-                <div>{getStatusPill(t.status)}</div>
-                <div className="flex items-center justify-end gap-2 min-w-[72px]">
+                <div className="hidden md:block">{getStatusPill(t.status)}</div>
+                <div className="flex items-center justify-end gap-2 md:min-w-[72px]">
                   {t.status === 'waiting' && (
                     <button
                       disabled={loadingToken === t.id}
@@ -390,7 +391,7 @@ const Dashboard = () => {
                   </div>
                   <p className="text-xs text-ink/55 truncate mt-0.5">{c.last_message || 'New conversation'}</p>
                   {c.mode === 'human' && (
-                    <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded bg-ink text-bg font-mono text-[10px] font-medium tracking-[0.04em]">
+                    <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded bg-ink text-bg font-mono text-[11px] font-medium tracking-[0.04em]">
                       <span className="text-orange-400">●</span> Handoff requested
                     </span>
                   )}
