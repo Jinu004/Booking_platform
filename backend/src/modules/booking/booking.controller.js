@@ -446,7 +446,7 @@ async function createManualBooking(req, res, next) {
          AND (
            (slot_time IS NOT NULL AND slot_time >= $4 AND slot_time < $5)
            OR
-           (slot_time IS NULL AND (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $4::time AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $5::time)
+           (slot_time IS NULL AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time >= $4::time AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time < $5::time)
          )`,
         [tenantId, doctorId, targetDate, sessionStart, sessionEnd]
       );

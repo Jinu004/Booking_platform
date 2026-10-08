@@ -634,8 +634,8 @@ async function executeFunction(name, args, ctx) {
              AND (
                (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
                OR (slot_time IS NULL AND
-                   (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $3::time
-                   AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
+                   ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time >= $3::time
+                   AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
              )`,
             [tenant.id, doctor.id, sessStart, sessEnd]
           );
@@ -811,7 +811,7 @@ Please reply with your name to confirm booking.`
     countSqlCTB += ` AND (
       (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
       OR
-      (slot_time IS NULL AND (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
+      (slot_time IS NULL AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
     )`;
     countParamsCTB.push(sessionStartCTB, sessionEndCTB);
   }
@@ -922,7 +922,7 @@ Please reply with your name to confirm booking.`
          AND (
            (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
            OR
-           (slot_time IS NULL AND (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
+           (slot_time IS NULL AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
          )
        ) WHERE id = $5 RETURNING token_number`;
       tokenParams = [tenant.id, doctor.id, sessionStart, sessionEnd, booking.id];
