@@ -253,6 +253,34 @@ router.post('/', async (req, res) => {
         }
         if (codeFlowOn) {
           const { getFlow, clearFlow } = require('../../conversation/conversation.flow')
+          const patientTapId = patientTapMatch[1]
+
+          // Re-tap right after a successful code booking for this patient: fixed reply, no Gemini.
+          // Checked before the flow, because the flow now stays alive after a success.
+          let alreadyBooked = false
+          try {
+            const markerRedis = require('../../../config/redis')
+            alreadyBooked = !!(await markerRedis.get(`codebooking:done:${tenant.id}:${patientTapId}`))
+          } catch (markerErr) {
+            logger.warn('code_booking_flow done-marker read failed, continuing:', markerErr.message)
+          }
+          if (alreadyBooked) {
+            const alreadyText = 'This booking is already confirmed. Tap Check My Booking, or say Hi for the menu.'
+            await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+            HITLService.broadcastToTenant(tenant.id, 'new_message', {
+              conversationId: context.conversation.id,
+              message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
+            })
+            await sendMessage(message.from, alreadyText)
+            await ConversationService.saveOutboundMessage(context.conversation.id, alreadyText, 'assistant')
+            HITLService.broadcastToTenant(tenant.id, 'new_message', {
+              conversationId: context.conversation.id,
+              message: { role: 'assistant', content: alreadyText, created_at: new Date().toISOString() }
+            })
+            logger.info(`CODE_BOOKING_FLOW step=book_today result=already_booked tenant=${tenant.id} conversation=${context.conversation.id}`)
+            return
+          }
+
           const flow = await getFlow(tenant.id, message.from)
           let fallbackReason = null
           if (!flow || flow.state !== 'choose_patient') fallbackReason = 'no_state'
@@ -261,38 +289,9 @@ router.post('/', async (req, res) => {
           else if (!flow.data?.doctorId || !flow.data?.sessionStart) fallbackReason = 'missing_values'
 
           // Double-tap lock: one booking attempt per patient at a time
-          const patientTapId = patientTapMatch[1]
           const lockKey = `codebooking:lock:${tenant.id}:${patientTapId}`
           let lockHeld = false
           let lockRedis = null
-
-          // Late re-tap right after a successful code booking: answer with a fixed reply, no Gemini
-          if (fallbackReason === 'no_state' || fallbackReason === 'expired') {
-            let alreadyBooked = false
-            try {
-              const markerRedis = require('../../../config/redis')
-              alreadyBooked = !!(await markerRedis.get(`codebooking:done:${tenant.id}:${patientTapId}`))
-            } catch (markerErr) {
-              logger.warn('code_booking_flow done-marker read failed, using AI path:', markerErr.message)
-            }
-            if (alreadyBooked) {
-              const alreadyText = 'This booking is already confirmed. Tap Check My Booking, or say Hi for the menu.'
-              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
-              HITLService.broadcastToTenant(tenant.id, 'new_message', {
-                conversationId: context.conversation.id,
-                message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
-              })
-              await sendMessage(message.from, alreadyText)
-              await ConversationService.saveOutboundMessage(context.conversation.id, alreadyText, 'assistant')
-              HITLService.broadcastToTenant(tenant.id, 'new_message', {
-                conversationId: context.conversation.id,
-                message: { role: 'assistant', content: alreadyText, created_at: new Date().toISOString() }
-              })
-              logger.info(`CODE_BOOKING_FLOW step=book_today result=already_booked tenant=${tenant.id} conversation=${context.conversation.id}`)
-              return
-            }
-          }
-
           if (!fallbackReason) {
             try {
               lockRedis = require('../../../config/redis')
@@ -389,7 +388,9 @@ router.post('/', async (req, res) => {
                   logger.warn('code_booking_flow done-marker write failed (non-fatal):', markerErr.message)
                 }
               }
-              await clearFlow(tenant.id, message.from)
+              // After a success keep the flow so another patient from the same list books in code
+              // (its own 30 minute expiresAt still applies); other outcomes clear it
+              if (outcome !== 'success') await clearFlow(tenant.id, message.from)
               logger.info(`CODE_BOOKING_FLOW step=book_today result=${outcome} tenant=${tenant.id} conversation=${context.conversation.id}`)
               return
             } finally {
