@@ -252,6 +252,7 @@ async function processMessage(context) {
         let iteration = 0
         let escalated = false;
         const escalationMessage = 'I am connecting you with a staff member who can better assist you. Please wait a moment.';
+        let patientBookingsCalled = false;
 
         while (iteration < maxIterations) {
           iteration++
@@ -285,6 +286,8 @@ async function processMessage(context) {
               args,
               { tenant, customer, conversation, latestMessage, interactiveId, doctorProfiles: additionalData.doctorProfiles || [] }
             )
+
+            if (name === 'get_patient_bookings') patientBookingsCalled = true
 
             // Handle direct-return signal — bypass Gemini rewrite
             if (typeof functionResult === 'string' && functionResult.startsWith('DIRECT:')) {
@@ -346,6 +349,13 @@ async function processMessage(context) {
         }
         if (!text || !text.trim()) {
           throw new Error('Empty text response from Gemini');
+        }
+
+        // Guard: a real booking confirmation is always returned as a DIRECT: result above (it exits the loop),
+        // so a confirmation-looking reply written by Gemini here was never backed by a booking.
+        if (/booking confirmed/i.test(text) && /token number/i.test(text) && !patientBookingsCalled) {
+          logger.warn(`AI_FAKE_CONFIRMATION_BLOCKED tenant=${tenant.id} conversation=${conversation?.id} phone_last4=${String(customer?.phone || '').slice(-4)}`)
+          return { blockedConfirmation: true, text: 'Sorry, I could not complete your booking. Please tap Book Appointment to try again, or tap Talk to Staff.' }
         }
 
         // Output filter — strip any leaked UUIDs or phone numbers before sending to patient

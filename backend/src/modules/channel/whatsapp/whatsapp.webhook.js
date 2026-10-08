@@ -362,6 +362,7 @@ router.post('/', async (req, res) => {
       let isAIError = false
       let isEscalated = false
       let isInteractiveSent = false
+      let isBlockedConfirmation = false
       try {
         aiResponse = await AIService.processMessage({
           tenant,
@@ -380,6 +381,9 @@ router.post('/', async (req, res) => {
         if (isInteractiveSent) {
           aiResponse = aiResponse.text  // use text for DB/Gemini context
         } else if (isAIError) {
+          aiResponse = aiResponse.text
+        } else if (aiResponse?.blockedConfirmation) {
+          isBlockedConfirmation = true
           aiResponse = aiResponse.text
         } else if (aiResponse?.escalated) {
           isEscalated = true
@@ -421,6 +425,22 @@ if (!isAIError && !isEscalated) {
 
 if (!isEscalated && !isInteractiveSent && aiResponse) {
   await sendMessage(message.from, aiResponse)
+}
+
+// After a blocked fake confirmation, resend the welcome menu so the patient can start over
+if (isBlockedConfirmation) {
+  try {
+    const welcome = await executeFunction('show_welcome', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] })
+    const welcomeContent = typeof welcome === 'string' && welcome.startsWith('DIRECT:') ? welcome.slice(7).trim() : ''
+    if (welcomeContent.startsWith('__INTERACTIVE_SENT__::')) {
+      await ConversationService.saveOutboundMessage(context.conversation.id, welcomeContent.slice('__INTERACTIVE_SENT__::'.length), 'assistant')
+    } else if (welcomeContent) {
+      await sendMessage(message.from, welcomeContent)
+      await ConversationService.saveOutboundMessage(context.conversation.id, welcomeContent, 'assistant')
+    }
+  } catch (welcomeErr) {
+    logger.warn('Resending welcome after blocked confirmation failed (non-fatal):', welcomeErr.message)
+  }
 }
 
       // Send clinic contact card after booking confirmation (Meta only)
