@@ -265,6 +265,34 @@ router.post('/', async (req, res) => {
           const lockKey = `codebooking:lock:${tenant.id}:${patientTapId}`
           let lockHeld = false
           let lockRedis = null
+
+          // Late re-tap right after a successful code booking: answer with a fixed reply, no Gemini
+          if (fallbackReason === 'no_state' || fallbackReason === 'expired') {
+            let alreadyBooked = false
+            try {
+              const markerRedis = require('../../../config/redis')
+              alreadyBooked = !!(await markerRedis.get(`codebooking:done:${tenant.id}:${patientTapId}`))
+            } catch (markerErr) {
+              logger.warn('code_booking_flow done-marker read failed, using AI path:', markerErr.message)
+            }
+            if (alreadyBooked) {
+              const alreadyText = 'This booking is already confirmed. Tap Check My Booking, or say Hi for the menu.'
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              HITLService.broadcastToTenant(tenant.id, 'new_message', {
+                conversationId: context.conversation.id,
+                message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
+              })
+              await sendMessage(message.from, alreadyText)
+              await ConversationService.saveOutboundMessage(context.conversation.id, alreadyText, 'assistant')
+              HITLService.broadcastToTenant(tenant.id, 'new_message', {
+                conversationId: context.conversation.id,
+                message: { role: 'assistant', content: alreadyText, created_at: new Date().toISOString() }
+              })
+              logger.info(`CODE_BOOKING_FLOW step=book_today result=already_booked tenant=${tenant.id} conversation=${context.conversation.id}`)
+              return
+            }
+          }
+
           if (!fallbackReason) {
             try {
               lockRedis = require('../../../config/redis')
@@ -354,6 +382,13 @@ router.post('/', async (req, res) => {
                 }
               }
 
+              if (outcome === 'success') {
+                try {
+                  await lockRedis.set(`codebooking:done:${tenant.id}:${patientTapId}`, '1', { EX: 120 })
+                } catch (markerErr) {
+                  logger.warn('code_booking_flow done-marker write failed (non-fatal):', markerErr.message)
+                }
+              }
               await clearFlow(tenant.id, message.from)
               logger.info(`CODE_BOOKING_FLOW step=book_today result=${outcome} tenant=${tenant.id} conversation=${context.conversation.id}`)
               return

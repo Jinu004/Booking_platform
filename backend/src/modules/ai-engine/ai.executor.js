@@ -1045,22 +1045,6 @@ Please reply with your name to confirm booking.`
     }
   }
 
-  // If outside working hours, store tomorrow option — non-critical, isolated from booking success
-  if (!withinHours) {
-    try {
-      const redisClient = require('../../config/redis')
-      if (redisClient && conversation?.id) {
-        await redisClient.set(
-          `tomorrow_booking:${conversation.id}`,
-          JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization, patient_name: formattedName }),
-          { EX: 3600 }
-        )
-      }
-    } catch (redisErr) {
-      logger.warn('Redis write failed for outside-hours tomorrow offer:', redisErr.message)
-    }
-  }
-
   const avgMinsCTB2 = doctor.avg_consultation_minutes || 20
   let ctbEstTime
   try {
