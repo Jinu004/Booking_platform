@@ -273,7 +273,12 @@ async function processMessage(context) {
 
           for (const part of functionCallParts) {
             const { name, args } = part.functionCall
-            
+            // patient_id / doctor_id are internal-only; never accept them from Gemini
+            if (args) {
+              delete args.patient_id
+              delete args.doctor_id
+            }
+
             if (executedFunctions.has(name)) {
               continue;
             }

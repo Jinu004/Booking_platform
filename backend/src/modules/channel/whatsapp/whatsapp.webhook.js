@@ -240,6 +240,132 @@ router.post('/', async (req, res) => {
         return
       }
 
+      // Code-only "today" booking when the patient taps their name (per-clinic flag code_booking_flow, default off).
+      // Falls through to the AI path unless the flag is on and a live choose_patient/today flow exists.
+      const patientTapMatch = (message.interactiveId || '').match(/^patient_([0-9a-fA-F-]{36})$/)
+      if (patientTapMatch) {
+        let codeFlowOn = false
+        try {
+          const codeFlowConfigs = await TenantService.getAllConfigs(tenant.id)
+          codeFlowOn = codeFlowConfigs?.code_booking_flow === 'true'
+        } catch (cfgErr) {
+          logger.warn('code_booking_flow config read failed, using AI path:', cfgErr.message)
+        }
+        if (codeFlowOn) {
+          const { getFlow, clearFlow } = require('../../conversation/conversation.flow')
+          const flow = await getFlow(tenant.id, message.from)
+          let fallbackReason = null
+          if (!flow || flow.state !== 'choose_patient') fallbackReason = 'no_state'
+          else if (flow.expired) fallbackReason = 'expired'
+          else if (flow.data?.kind !== 'today') fallbackReason = 'wrong_kind'
+          else if (!flow.data?.doctorId || !flow.data?.sessionStart) fallbackReason = 'missing_values'
+
+          // Double-tap lock: one booking attempt per patient at a time
+          const patientTapId = patientTapMatch[1]
+          const lockKey = `codebooking:lock:${tenant.id}:${patientTapId}`
+          let lockHeld = false
+          let lockRedis = null
+          if (!fallbackReason) {
+            try {
+              lockRedis = require('../../../config/redis')
+              lockHeld = (await lockRedis.set(lockKey, '1', { NX: true, EX: 30 })) === 'OK'
+              if (!lockHeld) {
+                logger.info(`CODE_BOOKING_FLOW step=book_today result=duplicate_tap tenant=${tenant.id} conversation=${context.conversation.id}`)
+                return
+              }
+            } catch (lockErr) {
+              logger.warn('code_booking_flow lock failed, using AI path:', lockErr.message)
+              fallbackReason = 'lock_error'
+            }
+          }
+
+          if (fallbackReason) {
+            logger.info(`CODE_BOOKING_FLOW step=book_today result=fallback reason=${fallbackReason} tenant=${tenant.id} conversation=${context.conversation.id}`)
+          } else {
+            try {
+              const bookingCtx = { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: message.interactiveId, doctorProfiles: [] }
+              let outText = ''
+              let outcome = 'business_reply'
+              try {
+                const bookingResult = await executeFunction(
+                  'create_token_booking',
+                  { doctor_id: flow.data.doctorId, patient_id: patientTapId, session_start_time: flow.data.sessionStart },
+                  bookingCtx
+                )
+                if (typeof bookingResult === 'string' && bookingResult.startsWith('DIRECT:')) {
+                  outText = bookingResult.slice(7).trim()
+                  outcome = outText.includes('Booking confirmed') ? 'success' : 'business_reply'
+                } else if (typeof bookingResult === 'string' && bookingResult.trim()) {
+                  outText = bookingResult.trim()
+                } else if (bookingResult && bookingResult.success === false && bookingResult.message) {
+                  outText = String(bookingResult.message)
+                } else {
+                  outcome = 'error'
+                }
+              } catch (bookErr) {
+                logger.error('Code-only booking failed: ' + bookErr?.message)
+                outcome = 'error'
+              }
+
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              HITLService.broadcastToTenant(tenant.id, 'new_message', {
+                conversationId: context.conversation.id,
+                message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
+              })
+
+              if (outcome === 'error') {
+                // Never fall back to Gemini after the booking function ran: it could double-book
+                outText = 'Sorry, I could not complete your booking. Please tap Book Appointment to try again, or tap Talk to Staff.'
+              }
+              await sendMessage(message.from, outText)
+              await ConversationService.saveOutboundMessage(context.conversation.id, outText, 'assistant')
+              HITLService.broadcastToTenant(tenant.id, 'new_message', {
+                conversationId: context.conversation.id,
+                message: { role: 'assistant', content: outText, created_at: new Date().toISOString() }
+              })
+
+              if (outcome === 'error') {
+                try {
+                  const welcome = await executeFunction('show_welcome', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] })
+                  const welcomeContent = typeof welcome === 'string' && welcome.startsWith('DIRECT:') ? welcome.slice(7).trim() : ''
+                  if (welcomeContent.startsWith('__INTERACTIVE_SENT__::')) {
+                    await ConversationService.saveOutboundMessage(context.conversation.id, welcomeContent.slice('__INTERACTIVE_SENT__::'.length), 'assistant')
+                  } else if (welcomeContent) {
+                    await sendMessage(message.from, welcomeContent)
+                    await ConversationService.saveOutboundMessage(context.conversation.id, welcomeContent, 'assistant')
+                  }
+                } catch (welcomeErr) {
+                  logger.warn('Resending welcome after code booking error failed (non-fatal):', welcomeErr.message)
+                }
+              }
+
+              // Same contact card as the AI path, once per conversation
+              if (source === 'meta' && tenant.whatsapp_number && outText.includes('Booking confirmed')) {
+                try {
+                  const pool = require('../../../config/database')
+                  const flagResult = await pool.query('SELECT contact_card_sent FROM conversations WHERE id = $1', [context.conversation.id])
+                  if (flagResult.rows[0]?.contact_card_sent !== true) {
+                    const { sendContact } = require('./whatsapp.meta')
+                    await sendContact(message.from, tenant.name, tenant.whatsapp_number)
+                    await pool.query('UPDATE conversations SET contact_card_sent = true WHERE id = $1', [context.conversation.id])
+                  }
+                } catch (cardErr) {
+                  logger.error('Contact card send failed (non-fatal):', JSON.stringify(cardErr.response?.data || cardErr.message))
+                }
+              }
+
+              await clearFlow(tenant.id, message.from)
+              logger.info(`CODE_BOOKING_FLOW step=book_today result=${outcome} tenant=${tenant.id} conversation=${context.conversation.id}`)
+              return
+            } finally {
+              if (lockHeld) {
+                try { await lockRedis.del(lockKey) } catch (unlockErr) { logger.warn('code_booking_flow lock release failed:', unlockErr.message) }
+              }
+            }
+          }
+        }
+      }
+
       // Intercept "Book for someone else" tap — ask for name
       if (message.interactiveId === 'patient_new') {
         const newPatientMsg = 'Please reply with the patient\'s name to confirm booking.'

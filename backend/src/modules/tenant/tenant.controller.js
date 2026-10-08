@@ -86,6 +86,7 @@ const updateTenant = async (req, res) => {
  */
 const RESERVED_CONFIG_KEYS = new Set([
   'proactive_templates_enabled',
+  'code_booking_flow',
   'plan_override',
   'quota_override'
 ]);

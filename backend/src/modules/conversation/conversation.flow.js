@@ -11,7 +11,8 @@ function getSessionKey(tenantId, phoneNumber) {
 
 /**
  * Reads the pending booking flow stored in the session.
- * Returns { state, step, data } or null when there is no live flow.
+ * Returns { state, step, data, expired } or null when no flow is stored (idle).
+ * `expired` is true once data.expiresAt has passed; callers must ignore expired flows.
  * Never throws.
  */
 async function getFlow(tenantId, phoneNumber) {
@@ -21,8 +22,8 @@ async function getFlow(tenantId, phoneNumber) {
     const session = JSON.parse(raw)
     if (!session.state || session.state === 'idle') return null
     const expiresAt = session.data && session.data.expiresAt
-    if (!expiresAt || new Date(expiresAt).getTime() < Date.now()) return null
-    return { state: session.state, step: session.step || null, data: session.data }
+    const expired = !expiresAt || new Date(expiresAt).getTime() < Date.now()
+    return { state: session.state, step: session.step || null, data: session.data || {}, expired }
   } catch (err) {
     logger.warn('Booking flow get failed:', err.message)
     return null
