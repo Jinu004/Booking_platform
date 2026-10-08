@@ -6,6 +6,36 @@ function escapeLike(str) {
   return str.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
+// Records the pending "Who is this booking for?" step. Never throws.
+async function recordPatientChoiceFlow(ctx, { kind, doctorId, doctorName, date, sessionStart }) {
+  try {
+    const { setFlow } = require('../conversation/conversation.flow')
+    const phone = ctx.customer?.phone
+    if (!phone) return
+    await setFlow(ctx.tenant.id, phone, {
+      state: 'choose_patient',
+      kind: kind || null,
+      doctorId: doctorId || null,
+      doctorName: doctorName || null,
+      date: date || null,
+      sessionStart: sessionStart || null
+    })
+    logger.info(`CODE_BOOKING_FLOW step=choose_patient tenant=${ctx.tenant.id} conversation=${ctx.conversation?.id || null} doctor=${doctorId || null} date=${date || null} session=${sessionStart || null}`)
+  } catch (err) {
+    logger.warn('recordPatientChoiceFlow failed:', err.message)
+  }
+}
+
+// Internal-only: returns the patient row if it belongs to this customer and tenant, else null.
+async function findOwnedPatient(tenantId, customerId, patientId) {
+  if (!customerId) return null
+  const res = await pool.query(
+    `SELECT id, name FROM patients WHERE id = $1 AND tenant_id = $2 AND customer_id = $3 LIMIT 1`,
+    [patientId, tenantId, customerId]
+  )
+  return res.rows[0] || null
+}
+
 /**
  * Executes a named AI function with given arguments.
  * All functions query PostgreSQL and return plain text results
@@ -424,6 +454,7 @@ async function executeFunction(name, args, ctx) {
                 const nameListGDS = patResGDS.rows.map(p => `• ${p.name}`).join('\n')
                 const ctxGDS = `${doctorGDS.name} (${doctorGDS.specialization}) available on ${day.dayLabel}.\nSession: ${fmtGDS(s.start)} - ${fmtGDS(s.end)}\n\nWho is this booking for?\n${nameListGDS}\n• Book for someone else [date:${bookingDate}]`
                 const bodyTextGDS = `${doctorGDS.name} available on ${day.dayLabel}.\nWho is this booking for?`
+                await recordPatientChoiceFlow(ctx, { kind: 'future', doctorId: doctorIdGDS, doctorName: doctorGDS.name, date: bookingDate, sessionStart: s.start })
                 let sentGDS = false
                 try {
                   await sendDLGDS(custPhoneGDS, bodyTextGDS, listItemsGDS, 'Select Patient')
@@ -687,6 +718,7 @@ async function executeFunction(name, args, ctx) {
             const nameListCDA = patResCDA.rows.map(p => `• ${p.name}`).join('\n')
             const ctxCDA = `${doctor.name} (${doctor.specialization})\nSession: ${sessionTime} [session_start:${selectedSessionStart}]\n\nWho is this booking for?\n${nameListCDA}\n• Book for someone else`
             const bodyTextCDA = `${doctor.name} is available.\nWho is this booking for?`
+            await recordPatientChoiceFlow(ctx, { kind: 'today', doctorId: doctor.id, doctorName: doctor.name, date: null, sessionStart: selectedSessionStart })
             let sentCDA = false
             try {
               await sendDLCDA(custPhoneCDA, bodyTextCDA, listItemsCDA, 'Select Patient')
@@ -717,7 +749,14 @@ Please reply with your name to confirm booking.`
       }
 
       case 'create_token_booking': {
-  const { doctor_name, patient_name, session_start_time } = args
+  const { doctor_name, patient_name: patientNameArgCTB, session_start_time, patient_id: patientIdArgCTB, doctor_id: doctorIdArgCTB } = args
+  // Internal-only patient_id: use the stored name of a patient owned by this customer
+  let patient_name = patientNameArgCTB
+  if (patientIdArgCTB) {
+    const ownedPatientCTB = await findOwnedPatient(tenant.id, customer?.id, patientIdArgCTB)
+    if (!ownedPatientCTB) return { success: false, message: 'Patient not found' }
+    patient_name = ownedPatientCTB.name
+  }
   const formattedName = (patient_name || '')
     .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')  // allow Latin, Malayalam, spaces, hyphens
     .trim()
@@ -736,14 +775,21 @@ Please reply with your name to confirm booking.`
   } catch {}
 
   // Find doctor
-  const doctorRes = await pool.query(
-    `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
-     WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND available_today = true AND is_active = true
-     LIMIT 1`,
-    [tenant.id, `%${escapeLike(doctor_name)}%`]
-  )
+  const doctorRes = doctorIdArgCTB
+    ? await pool.query(
+        `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
+         WHERE tenant_id = $1 AND id = $2 AND available_today = true AND is_active = true
+         LIMIT 1`,
+        [tenant.id, doctorIdArgCTB]
+      )
+    : await pool.query(
+        `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
+         WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND available_today = true AND is_active = true
+         LIMIT 1`,
+        [tenant.id, `%${escapeLike(doctor_name)}%`]
+      )
   if (!doctorRes.rows.length) {
-    return { success: false, message: `Dr. ${doctor_name} is not available today.` }
+    return { success: false, message: `Dr. ${doctor_name || 'that doctor'} is not available today.` }
   }
   const doctor = doctorRes.rows[0]
 
@@ -1066,7 +1112,14 @@ For queries, contact us: ${contactPhone}`
 }
 
       case 'create_tomorrow_booking': {
-        const { doctor_name, patient_name } = args
+        const { doctor_name, patient_name: patientNameArgTMR, patient_id: patientIdArgTMR, doctor_id: doctorIdArgTMR } = args
+        // Internal-only patient_id: use the stored name of a patient owned by this customer
+        let patient_name = patientNameArgTMR
+        if (patientIdArgTMR) {
+          const ownedPatientTMR = await findOwnedPatient(tenant.id, customer?.id, patientIdArgTMR)
+          if (!ownedPatientTMR) return { success: false, message: 'Patient not found' }
+          patient_name = ownedPatientTMR.name
+        }
         const formattedName = (patient_name || '')
           .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')  // allow Latin, Malayalam, spaces, hyphens
           .trim()
@@ -1084,14 +1137,21 @@ For queries, contact us: ${contactPhone}`
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
         // Find doctor
-        const doctorRes = await pool.query(
-          `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
-           WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND is_active = true
-           LIMIT 1`,
-          [tenant.id, `%${escapeLike(doctor_name)}%`]
-        )
+        const doctorRes = doctorIdArgTMR
+          ? await pool.query(
+              `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
+               WHERE tenant_id = $1 AND id = $2 AND is_active = true
+               LIMIT 1`,
+              [tenant.id, doctorIdArgTMR]
+            )
+          : await pool.query(
+              `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
+               WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND is_active = true
+               LIMIT 1`,
+              [tenant.id, `%${escapeLike(doctor_name)}%`]
+            )
         if (!doctorRes.rows.length) {
-          return { success: false, message: `No doctor found matching "${doctor_name}"` }
+          return { success: false, message: `No doctor found matching "${doctor_name || 'that doctor'}"` }
         }
         const doctor = doctorRes.rows[0]
 
@@ -1276,6 +1336,14 @@ For queries, contact us: ${contactPhoneTmr}`
       const sessionLabel = sessionMatch ? `\nSelected session: ${sessionMatch[2]}:${sessionMatch[3]}` : ''
       const contextText = `Who is this booking for?${sessionLabel}\n${nameList}\n• Book for someone else${sessionSuffix}`
       const patientVisibleText = `Who is this booking for?${sessionLabel}\n${nameList}\n• Book for someone else`
+      const dayMatchGPP = (ctx.interactiveId || '').match(/^\d::(\d{4}-\d{2}-\d{2})$/)
+      await recordPatientChoiceFlow(ctx, {
+        kind: dayMatchGPP ? 'future' : (sessionMatch ? 'today' : null),
+        doctorId: sessionMatch ? sessionMatch[1] : null,
+        doctorName: null,
+        date: dayMatchGPP ? dayMatchGPP[1] : null,
+        sessionStart: sessionMatch ? `${sessionMatch[2]}:${sessionMatch[3]}:${sessionMatch[4]}` : null
+      })
       if (customerPhone) {
         let sentGPP = false
         try {
@@ -1299,8 +1367,15 @@ For queries, contact us: ${contactPhoneTmr}`
     }
 
     case 'create_future_booking': {
-      const { doctor_name: doctorNameFB, patient_name: patientNameFB, booking_date: bookingDateFB, session_start_time: sessionStartFB } = args
-      if (!doctorNameFB || !patientNameFB || !bookingDateFB) {
+      const { doctor_name: doctorNameFB, patient_name: patientNameArgFB, booking_date: bookingDateFB, session_start_time: sessionStartFB, patient_id: patientIdArgFB, doctor_id: doctorIdArgFB } = args
+      // Internal-only patient_id: use the stored name of a patient owned by this customer
+      let patientNameFB = patientNameArgFB
+      if (patientIdArgFB) {
+        const ownedPatientFB = await findOwnedPatient(tenant.id, customer?.id, patientIdArgFB)
+        if (!ownedPatientFB) return { success: false, message: 'Patient not found' }
+        patientNameFB = ownedPatientFB.name
+      }
+      if ((!doctorNameFB && !doctorIdArgFB) || !patientNameFB || !bookingDateFB) {
         return `DIRECT:Sorry, I need the doctor name, your name, and booking date to complete this booking.`
       }
       const targetDate = new Date(bookingDateFB)
@@ -1315,29 +1390,32 @@ For queries, contact us: ${contactPhoneTmr}`
 
       // Find doctor (outside transaction — read-only)
       const sessionFilterFB = sessionStartFB && /^\d{2}:\d{2}(:\d{2})?$/.test(sessionStartFB)
+      // Internal-only doctor_id replaces the name LIKE match; $3 is the id or the name pattern
+      const doctorCondFB = doctorIdArgFB ? `cd.id = $3` : `LOWER(cd.name) LIKE LOWER($3)`
+      const doctorParamFB = doctorIdArgFB || `%${doctorNameFB}%`
       const docResFB = sessionFilterFB
         ? await pool.query(
             `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily, cd.avg_consultation_minutes,
                     ds.start_time, ds.end_time
              FROM clinic_doctors cd
              JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
-             WHERE cd.tenant_id = $1 AND cd.is_active = true AND LOWER(cd.name) LIKE LOWER($3)
+             WHERE cd.tenant_id = $1 AND cd.is_active = true AND ${doctorCondFB}
                AND ds.start_time::text LIKE $4 || '%'
              LIMIT 1`,
-            [tenant.id, targetDow, `%${doctorNameFB}%`, sessionStartFB]
+            [tenant.id, targetDow, doctorParamFB, sessionStartFB]
           )
         : await pool.query(
             `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily, cd.avg_consultation_minutes,
                     ds.start_time, ds.end_time
              FROM clinic_doctors cd
              JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
-             WHERE cd.tenant_id = $1 AND cd.is_active = true AND LOWER(cd.name) LIKE LOWER($3)
+             WHERE cd.tenant_id = $1 AND cd.is_active = true AND ${doctorCondFB}
              ORDER BY ds.start_time ASC
              LIMIT 1`,
-            [tenant.id, targetDow, `%${doctorNameFB}%`]
+            [tenant.id, targetDow, doctorParamFB]
           )
       if (!docResFB.rows.length) {
-        return `DIRECT:Sorry, ${doctorNameFB} is not available on that day. Please choose another day.`
+        return `DIRECT:Sorry, ${doctorNameFB || 'that doctor'} is not available on that day. Please choose another day.`
       }
       const doctorFB = docResFB.rows[0]
 
