@@ -873,6 +873,24 @@ Please reply with your name to confirm booking.`
       'SELECT id FROM clinic_doctors WHERE id = $1 FOR UPDATE',
       [doctor.id]
     )
+    // Authoritative capacity re-check under the doctor-row lock (the count above runs before the lock)
+    const lockedCountRes = await bookingClient.query(countSqlCTB, countParamsCTB)
+    if (parseInt(lockedCountRes.rows[0].count || 0) >= maxTokensCTB) {
+      await bookingClient.query('ROLLBACK')
+      try {
+        const redisClient = require('../../../config/redis')
+        if (redisClient && conversation?.id) {
+          await redisClient.set(
+            `tomorrow_booking:${conversation.id}`,
+            JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization, patient_name: formattedName }),
+            { EX: 3600 }
+          )
+        }
+      } catch (redisErr) {
+        logger.warn('Redis write failed for tomorrow booking intent:', redisErr.message)
+      }
+      return `${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply *TOMORROW* to confirm tomorrow's booking or ignore to cancel.`
+    }
     const bookingRes = await bookingClient.query(
       `INSERT INTO bookings
          (tenant_id, customer_id, conversation_id, doctor_id,
@@ -916,7 +934,7 @@ Please reply with your name to confirm booking.`
     let tokenQuery, tokenParams;
     if (sessionStart && sessionEnd) {
       tokenQuery = `UPDATE bookings SET token_number = (
-         SELECT COUNT(*) FROM bookings
+         SELECT COALESCE(MAX(token_number), 0) + 1 FROM bookings
          WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
          AND status != 'cancelled'
          AND (
@@ -928,7 +946,7 @@ Please reply with your name to confirm booking.`
       tokenParams = [tenant.id, doctor.id, sessionStart, sessionEnd, booking.id];
     } else {
       tokenQuery = `UPDATE bookings SET token_number = (
-         SELECT COUNT(*) FROM bookings
+         SELECT COALESCE(MAX(token_number), 0) + 1 FROM bookings
          WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
          AND status != 'cancelled'
        ) WHERE id = $3 RETURNING token_number`;
@@ -1169,7 +1187,7 @@ For queries, contact us: ${contactPhone}`
                (tenant_id, customer_id, conversation_id, doctor_id,
                 source, status, booking_date, token_number, notes, patient_name, patient_id)
              VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', $5,
-               (SELECT COUNT(*) + 1 FROM bookings WHERE tenant_id = $1 AND doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
+               (SELECT COALESCE(MAX(token_number), 0) + 1 FROM bookings WHERE tenant_id = $1 AND doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
                $6, $7, $8)
              RETURNING id, token_number`,
             [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
