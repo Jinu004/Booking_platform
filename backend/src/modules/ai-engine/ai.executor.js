@@ -866,7 +866,7 @@ Please reply with your name to confirm booking.`
   if (currentCount >= maxTokensCTB) {
     // Today fully booked — store pending intent and offer tomorrow
     try {
-      const redisClient = require('../../../config/redis')
+      const redisClient = require('../../config/redis')
       if (redisClient && conversation?.id) {
         await redisClient.set(
           `tomorrow_booking:${conversation.id}`,
@@ -924,7 +924,7 @@ Please reply with your name to confirm booking.`
     if (parseInt(lockedCountRes.rows[0].count || 0) >= maxTokensCTB) {
       await bookingClient.query('ROLLBACK')
       try {
-        const redisClient = require('../../../config/redis')
+        const redisClient = require('../../config/redis')
         if (redisClient && conversation?.id) {
           await redisClient.set(
             `tomorrow_booking:${conversation.id}`,
@@ -1048,7 +1048,7 @@ Please reply with your name to confirm booking.`
   // If outside working hours, store tomorrow option — non-critical, isolated from booking success
   if (!withinHours) {
     try {
-      const redisClient = require('../../../config/redis')
+      const redisClient = require('../../config/redis')
       if (redisClient && conversation?.id) {
         await redisClient.set(
           `tomorrow_booking:${conversation.id}`,
