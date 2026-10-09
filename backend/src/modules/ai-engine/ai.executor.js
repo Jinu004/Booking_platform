@@ -762,7 +762,11 @@ Please reply with your name to confirm booking.`
     .trim()
     .slice(0, 100)
     .replace(/\b\w/g, c => c.toUpperCase())
-  
+  // Refuse before any lookup, capacity check or booking insert when there is no usable patient name
+  if (!formattedName) {
+    return { success: false, message: 'Please provide a valid patient name.' }
+  }
+
   // Check working hours
   const HITLService = require('../hitl/hitl.service')
   const HITLModel = require('../hitl/hitl.model')
