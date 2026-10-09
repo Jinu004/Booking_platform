@@ -1113,6 +1113,10 @@ For queries, contact us: ${contactPhone}`
           .trim()
           .slice(0, 100)
           .replace(/\b\w/g, c => c.toUpperCase())
+        // Refuse before any lookup or insert when there is no usable patient name
+        if (!formattedName) {
+          return { success: false, message: 'Please provide a valid patient name.' }
+        }
 
         // Compute tomorrow in IST to avoid UTC/IST date boundary errors
         // (server runs UTC; between 12 AM–5:30 AM IST, UTC is still on the previous date)
@@ -1152,18 +1156,31 @@ For queries, contact us: ${contactPhone}`
           return { success: false, message: `${doctor.name} is on leave tomorrow (${dayNames[tomorrowDow]}). Please choose another doctor.` }
         }
 
-        // Check doctor schedule for tomorrow
-        const scheduleRes = await pool.query(
-          `SELECT start_time, end_time FROM doctor_schedules
-           WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
-           LIMIT 1`,
-          [tenant.id, doctor.id, tomorrowDow]
+        // Tomorrow's sessions: schedule_overrides first (procedure carve-outs), then doctor_schedules; earliest session wins
+        let tomorrowSessions = []
+        const overrideResTmr = await pool.query(
+          `SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`,
+          [tenant.id, doctor.id, tomorrowDate]
         )
-        if (!scheduleRes.rows.length) {
+        if (overrideResTmr.rows.length > 0) {
+          tomorrowSessions = (overrideResTmr.rows[0].sessions || []).map(s => ({ start_time: s.start_time, end_time: s.end_time }))
+        } else {
+          const scheduleRes = await pool.query(
+            `SELECT start_time, end_time FROM doctor_schedules
+             WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
+             ORDER BY start_time ASC`,
+            [tenant.id, doctor.id, tomorrowDow]
+          )
+          tomorrowSessions = scheduleRes.rows
+        }
+        tomorrowSessions.sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)))
+        if (!tomorrowSessions.length) {
           return { success: false, message: `${doctor.name} is not available tomorrow (${dayNames[tomorrowDow]}). Please choose another doctor or a different day.` }
         }
 
-        const { start_time, end_time } = scheduleRes.rows[0]
+        const { start_time, end_time } = tomorrowSessions[0]
+        // slot_time is stored as HH:MM:SS text, like the other booking flows
+        const slotTimeTomorrow = start_time.toString().length === 5 ? `${start_time}:00` : start_time.toString()
         const fmt = (t) => {
           const [h, m] = t.split(':')
           const hour = parseInt(h)
@@ -1173,15 +1190,17 @@ For queries, contact us: ${contactPhone}`
         }
         const sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
 
-        // Check tomorrow token count
-        const tokenRes = await pool.query(
-          `SELECT COUNT(*) AS count FROM bookings
-           WHERE doctor_id = $1 AND booking_date = $2 AND status != 'cancelled'`,
-          [doctor.id, tomorrowDate]
-        )
-        const currentCount = parseInt(tokenRes.rows[0].count || 0)
-        if (currentCount >= doctor.max_tokens_daily) {
-          return { success: false, message: `${doctor.name} is fully booked for tomorrow. Please choose another doctor.` }
+        // Tomorrow token count: same bookings create_token_booking counts (tenant, not cancelled, no procedures).
+        // A null max_tokens_daily means no limit; 0 means no bookings.
+        const tomorrowCountSql = `SELECT COUNT(*) AS count FROM bookings
+           WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
+           AND status != 'cancelled' AND (booking_type IS NULL OR booking_type != 'procedure')`
+        const tomorrowIsFull = (count) => doctor.max_tokens_daily !== null && doctor.max_tokens_daily !== undefined && count >= doctor.max_tokens_daily
+        const fullTomorrowMessage = { success: false, message: `${doctor.name} is fully booked for tomorrow. Please choose another doctor.` }
+        // Quick check before creating anything; the authoritative check runs again under the doctor-row lock below
+        const tokenRes = await pool.query(tomorrowCountSql, [tenant.id, doctor.id, tomorrowDate])
+        if (tomorrowIsFull(parseInt(tokenRes.rows[0].count || 0))) {
+          return fullTomorrowMessage
         }
 
         // Check duplicate booking for tomorrow — scoped to patient name so family members sharing a number can each book
@@ -1230,16 +1249,22 @@ For queries, contact us: ${contactPhone}`
             'SELECT id FROM clinic_doctors WHERE id = $1 FOR UPDATE',
             [doctor.id]
           )
+          // Authoritative capacity check under the doctor-row lock
+          const lockedTomorrowRes = await tomorrowClient.query(tomorrowCountSql, [tenant.id, doctor.id, tomorrowDate])
+          if (tomorrowIsFull(parseInt(lockedTomorrowRes.rows[0].count || 0))) {
+            await tomorrowClient.query('ROLLBACK')
+            return fullTomorrowMessage
+          }
           const bookingRes = await tomorrowClient.query(
             `INSERT INTO bookings
                (tenant_id, customer_id, conversation_id, doctor_id,
-                source, status, booking_date, token_number, notes, patient_name, patient_id)
+                source, status, booking_date, token_number, notes, patient_name, patient_id, slot_time)
              VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', $5,
                (SELECT COALESCE(MAX(token_number), 0) + 1 FROM bookings WHERE tenant_id = $1 AND doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
-               $6, $7, $8)
+               $6, $7, $8, $9)
              RETURNING id, token_number`,
             [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
-             tomorrowDate, `Booked via WhatsApp for ${formattedName}`, formattedName, patientId]
+             tomorrowDate, `Booked via WhatsApp for ${formattedName}`, formattedName, patientId, slotTimeTomorrow]
           )
           tokenNumber = bookingRes.rows[0].token_number
           booking = bookingRes.rows[0]
