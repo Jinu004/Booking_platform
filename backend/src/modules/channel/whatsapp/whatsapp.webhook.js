@@ -207,17 +207,21 @@ router.post('/', async (req, res) => {
         }
       }
       // Stores the name step in the flow, keeping doctor, session, date and the normal 30 minute expiry
-      const storeNameStep = (step, flowData, attempts, pendingName) => CodeFlow.setFlow(tenant.id, message.from, {
-        state: 'choose_patient',
-        step,
-        kind: 'today',
-        doctorId: flowData.doctorId,
-        doctorName: flowData.doctorName,
-        date: flowData.date,
-        sessionStart: flowData.sessionStart,
-        attempts,
-        pendingName: pendingName || null
-      })
+      // Keeps the flow's own kind: 'today' (default) keeps its session, 'tomorrow' has a date and no session
+      const storeNameStep = (step, flowData, attempts, pendingName) => {
+        const nameFlowKind = flowData.kind === 'tomorrow' ? 'tomorrow' : 'today'
+        return CodeFlow.setFlow(tenant.id, message.from, {
+          state: 'choose_patient',
+          step,
+          kind: nameFlowKind,
+          doctorId: flowData.doctorId,
+          doctorName: flowData.doctorName,
+          date: flowData.date,
+          sessionStart: nameFlowKind === 'today' ? flowData.sessionStart : null,
+          attempts,
+          pendingName: pendingName || null
+        })
+      }
       // Asks the patient to confirm the typed name before anything is booked
       const sendNameConfirm = async (flowData, validated, attempts) => {
         await storeNameStep('confirm_new_name', flowData, attempts, validated.typed)
@@ -242,6 +246,20 @@ router.post('/', async (req, res) => {
       }
       // Books the confirmed name: lock, create_token_booking, send and save, contact card, clearFlow. Never calls Gemini.
       const runNameBooking = async (flowData, patientName, confidence = null) => {
+        const isTomorrowName = flowData.kind === 'tomorrow'
+        if (isTomorrowName) {
+          // Tomorrow list used after the date moved on (for example after midnight IST): do not book
+          const istNowName = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+          istNowName.setDate(istNowName.getDate() + 1)
+          const istTomorrowName = `${istNowName.getFullYear()}-${String(istNowName.getMonth() + 1).padStart(2, '0')}-${String(istNowName.getDate()).padStart(2, '0')}`
+          if (flowData.date !== istTomorrowName) {
+            await saveNameInbound()
+            await CodeFlow.clearFlow(tenant.id, message.from)
+            await sendNameReply('This list has expired. Say Hi to start again.')
+            logName('fallback', ' reason=date_changed', confidence)
+            return
+          }
+        }
         const nameCtx = { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] }
         const nameLockKey = `codebooking:lock:${tenant.id}:${message.from}`
         let nameLockRedis = null
@@ -260,11 +278,17 @@ router.post('/', async (req, res) => {
           let outText = ''
           let outcome = 'business_reply'
           try {
-            const nameResult = await executeFunction(
-              'create_token_booking',
-              { doctor_id: flowData.doctorId, session_start_time: flowData.sessionStart, patient_name: patientName },
-              nameCtx
-            )
+            const nameResult = isTomorrowName
+              ? await executeFunction(
+                  'create_tomorrow_booking',
+                  { doctor_id: flowData.doctorId, patient_name: patientName },
+                  nameCtx
+                )
+              : await executeFunction(
+                  'create_token_booking',
+                  { doctor_id: flowData.doctorId, session_start_time: flowData.sessionStart, patient_name: patientName },
+                  nameCtx
+                )
             if (typeof nameResult === 'string' && nameResult.startsWith('DIRECT:')) {
               outText = nameResult.slice(7).trim()
               outcome = outText.includes('Booking confirmed') ? 'success' : 'business_reply'
@@ -638,7 +662,8 @@ router.post('/', async (req, res) => {
       if ((message.interactiveId === 'newname_yes' || message.interactiveId === 'newname_change') && await isCodeFlowOn()) {
         const tapFlow = await CodeFlow.getFlow(tenant.id, message.from)
         const tapLive = !!tapFlow && !tapFlow.expired && tapFlow.state === 'choose_patient' && tapFlow.step === 'confirm_new_name' &&
-          tapFlow.data?.kind === 'today' && !!tapFlow.data.doctorId && !!tapFlow.data.sessionStart
+          ((tapFlow.data?.kind === 'today' && !!tapFlow.data.doctorId && !!tapFlow.data.sessionStart) ||
+           (tapFlow.data?.kind === 'tomorrow' && !!tapFlow.data.doctorId && !!tapFlow.data.date))
         if (!tapLive || (message.interactiveId === 'newname_yes' && !tapFlow.data.pendingName)) {
           await saveNameInbound()
           await sendNameReply('This request has expired. Say Hi to start again.')
@@ -673,6 +698,10 @@ router.post('/', async (req, res) => {
               attempts: 0
             })
             logger.info(`CODE_BOOKING_FLOW step=await_new_name tenant=${tenant.id} conversation=${context.conversation.id} doctor=${listFlow.data.doctorId} date=${listFlow.data.date || null} session=${listFlow.data.sessionStart}`)
+          } else if (listFlow && !listFlow.expired && listFlow.state === 'choose_patient' && listFlow.data?.kind === 'tomorrow' && listFlow.data.doctorId && listFlow.data.date) {
+            // Tomorrow list: arm the name step with the flow's own kind and date
+            await storeNameStep('await_new_name', listFlow.data, 0, null)
+            logger.info(`CODE_BOOKING_FLOW step=await_new_name tenant=${tenant.id} conversation=${context.conversation.id} doctor=${listFlow.data.doctorId} date=${listFlow.data.date} session=null`)
           } else if (!listFlow || listFlow.expired) {
             // Dead list: do not ask for a name, because the typed answer would go to Gemini
             await saveNameInbound()
@@ -810,8 +839,19 @@ router.post('/', async (req, res) => {
                     await ConversationService.saveOutboundMessage(context.conversation.id, listContent.slice('__INTERACTIVE_SENT__::'.length), 'assistant')
                     listOutcome = 'list_sent'
                   } else if (listContent.startsWith('NEW_PATIENT::')) {
-                    await sendNameReply("Sorry, I can't book tomorrow from here for a new patient yet. Say Hi and use Book Another Day.")
-                    listOutcome = 'no_patients'
+                    // No saved patients: ask for the name and book tomorrow in code
+                    await CodeFlow.setFlow(tenant.id, message.from, {
+                      state: 'choose_patient',
+                      step: 'await_new_name',
+                      kind: 'tomorrow',
+                      doctorId: tomorrowKeyData.doctor_id,
+                      doctorName: null,
+                      date: tomorrowListDate,
+                      sessionStart: null,
+                      attempts: 0
+                    })
+                    await sendNameReply("Please reply with the patient's full name.")
+                    listOutcome = 'name_prompt'
                   }
                 } catch (listErr) {
                   logger.error('Tomorrow patient list failed: ' + listErr?.message)
@@ -846,7 +886,7 @@ router.post('/', async (req, res) => {
         }
       }
 
-      // Code-only typed new-patient name for the book-today flow (flag on, flow step await_new_name).
+      // Code-only typed new-patient name for the book-today and book-tomorrow flows (flag on, flow step await_new_name / confirm_new_name).
       // Anything that does not match falls through to the AI path unchanged.
       if (message.type === 'text' && !message.interactiveId && await isCodeFlowOn()) {
         const nameCheck = validatePatientName(message.message)
@@ -854,10 +894,10 @@ router.post('/', async (req, res) => {
 
         if (!nameFlow) {
           if (nameCheck) logName('fallback', ' reason=no_state')
-        } else if (nameFlow.state === 'choose_patient' && (nameFlow.step === 'await_new_name' || nameFlow.step === 'confirm_new_name') && nameFlow.data?.kind === 'today') {
+        } else if (nameFlow.state === 'choose_patient' && (nameFlow.step === 'await_new_name' || nameFlow.step === 'confirm_new_name') && (nameFlow.data?.kind === 'today' || nameFlow.data?.kind === 'tomorrow')) {
           if (nameFlow.expired) {
             logName('fallback', ' reason=expired')
-          } else if (nameFlow.data.doctorId && nameFlow.data.sessionStart) {
+          } else if (nameFlow.data.doctorId && (nameFlow.data.kind === 'tomorrow' ? nameFlow.data.date : nameFlow.data.sessionStart)) {
             const nameAttempts = nameFlow.data.attempts || 0
 
             if (!nameCheck) {
