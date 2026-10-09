@@ -449,13 +449,18 @@ router.post('/', async (req, res) => {
         if (codeFlowOn) {
           const { getFlow, clearFlow } = require('../../conversation/conversation.flow')
           const patientTapId = patientTapMatch[1]
+          const flow = await getFlow(tenant.id, message.from)
+          // Tomorrow flows use their own log step and done-marker key, so a today booking never blocks them
+          const isTomorrowFlow = !!flow && flow.state === 'choose_patient' && flow.data?.kind === 'tomorrow'
+          const bookStep = isTomorrowFlow ? 'book_tomorrow' : 'book_today'
+          const doneKey = isTomorrowFlow ? `codebooking:done:tomorrow:${tenant.id}:${patientTapId}` : `codebooking:done:${tenant.id}:${patientTapId}`
 
           // Re-tap right after a successful code booking for this patient: fixed reply, no Gemini.
           // Checked before the flow, because the flow now stays alive after a success.
           let alreadyBooked = false
           try {
             const markerRedis = require('../../../config/redis')
-            alreadyBooked = !!(await markerRedis.get(`codebooking:done:${tenant.id}:${patientTapId}`))
+            alreadyBooked = !!(await markerRedis.get(doneKey))
           } catch (markerErr) {
             logger.warn('code_booking_flow done-marker read failed, continuing:', markerErr.message)
           }
@@ -472,16 +477,42 @@ router.post('/', async (req, res) => {
               conversationId: context.conversation.id,
               message: { role: 'assistant', content: alreadyText, created_at: new Date().toISOString() }
             })
-            logger.info(`CODE_BOOKING_FLOW step=book_today result=already_booked tenant=${tenant.id} conversation=${context.conversation.id}`)
+            logger.info(`CODE_BOOKING_FLOW step=${bookStep} result=already_booked tenant=${tenant.id} conversation=${context.conversation.id}`)
             return
           }
 
-          const flow = await getFlow(tenant.id, message.from)
           let fallbackReason = null
           if (!flow || flow.state !== 'choose_patient') fallbackReason = 'no_state'
           else if (flow.expired) fallbackReason = 'expired'
+          else if (flow.data?.kind === 'tomorrow') {
+            if (!flow.data?.doctorId) fallbackReason = 'missing_values'
+          }
           else if (flow.data?.kind !== 'today') fallbackReason = 'wrong_kind'
           else if (!flow.data?.doctorId || !flow.data?.sessionStart) fallbackReason = 'missing_values'
+
+          // Tomorrow list tapped after the date moved on (for example after midnight IST): do not book
+          if (!fallbackReason && isTomorrowFlow && flow.data.date) {
+            const istNowTmr = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+            istNowTmr.setDate(istNowTmr.getDate() + 1)
+            const istTomorrow = `${istNowTmr.getFullYear()}-${String(istNowTmr.getMonth() + 1).padStart(2, '0')}-${String(istNowTmr.getDate()).padStart(2, '0')}`
+            if (flow.data.date !== istTomorrow) {
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              HITLService.broadcastToTenant(tenant.id, 'new_message', {
+                conversationId: context.conversation.id,
+                message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
+              })
+              const expiredText = 'This list has expired. Say Hi to start again.'
+              await sendMessage(message.from, expiredText)
+              await ConversationService.saveOutboundMessage(context.conversation.id, expiredText, 'assistant')
+              HITLService.broadcastToTenant(tenant.id, 'new_message', {
+                conversationId: context.conversation.id,
+                message: { role: 'assistant', content: expiredText, created_at: new Date().toISOString() }
+              })
+              await clearFlow(tenant.id, message.from)
+              logger.info(`CODE_BOOKING_FLOW step=book_tomorrow result=fallback reason=date_changed tenant=${tenant.id} conversation=${context.conversation.id}`)
+              return
+            }
+          }
 
           // Double-tap lock: one booking attempt per patient at a time
           const lockKey = `codebooking:lock:${tenant.id}:${patientTapId}`
@@ -492,7 +523,7 @@ router.post('/', async (req, res) => {
               lockRedis = require('../../../config/redis')
               lockHeld = (await lockRedis.set(lockKey, '1', { NX: true, EX: 30 })) === 'OK'
               if (!lockHeld) {
-                logger.info(`CODE_BOOKING_FLOW step=book_today result=duplicate_tap tenant=${tenant.id} conversation=${context.conversation.id}`)
+                logger.info(`CODE_BOOKING_FLOW step=${bookStep} result=duplicate_tap tenant=${tenant.id} conversation=${context.conversation.id}`)
                 return
               }
             } catch (lockErr) {
@@ -502,18 +533,24 @@ router.post('/', async (req, res) => {
           }
 
           if (fallbackReason) {
-            logger.info(`CODE_BOOKING_FLOW step=book_today result=fallback reason=${fallbackReason} tenant=${tenant.id} conversation=${context.conversation.id}`)
+            logger.info(`CODE_BOOKING_FLOW step=${bookStep} result=fallback reason=${fallbackReason} tenant=${tenant.id} conversation=${context.conversation.id}`)
           } else {
             try {
               const bookingCtx = { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: message.interactiveId, doctorProfiles: [] }
               let outText = ''
               let outcome = 'business_reply'
               try {
-                const bookingResult = await executeFunction(
-                  'create_token_booking',
-                  { doctor_id: flow.data.doctorId, patient_id: patientTapId, session_start_time: flow.data.sessionStart },
-                  bookingCtx
-                )
+                const bookingResult = isTomorrowFlow
+                  ? await executeFunction(
+                      'create_tomorrow_booking',
+                      { doctor_id: flow.data.doctorId, patient_id: patientTapId },
+                      bookingCtx
+                    )
+                  : await executeFunction(
+                      'create_token_booking',
+                      { doctor_id: flow.data.doctorId, patient_id: patientTapId, session_start_time: flow.data.sessionStart },
+                      bookingCtx
+                    )
                 if (typeof bookingResult === 'string' && bookingResult.startsWith('DIRECT:')) {
                   outText = bookingResult.slice(7).trim()
                   outcome = outText.includes('Booking confirmed') ? 'success' : 'business_reply'
@@ -578,7 +615,7 @@ router.post('/', async (req, res) => {
 
               if (outcome === 'success') {
                 try {
-                  await lockRedis.set(`codebooking:done:${tenant.id}:${patientTapId}`, '1', { EX: 120 })
+                  await lockRedis.set(doneKey, '1', { EX: 120 })
                 } catch (markerErr) {
                   logger.warn('code_booking_flow done-marker write failed (non-fatal):', markerErr.message)
                 }
@@ -586,7 +623,7 @@ router.post('/', async (req, res) => {
               // After a success keep the flow so another patient from the same list books in code
               // (its own 30 minute expiresAt still applies); other outcomes clear it
               if (outcome !== 'success') await clearFlow(tenant.id, message.from)
-              logger.info(`CODE_BOOKING_FLOW step=book_today result=${outcome} tenant=${tenant.id} conversation=${context.conversation.id}`)
+              logger.info(`CODE_BOOKING_FLOW step=${bookStep} result=${outcome} tenant=${tenant.id} conversation=${context.conversation.id}`)
               return
             } finally {
               if (lockHeld) {
