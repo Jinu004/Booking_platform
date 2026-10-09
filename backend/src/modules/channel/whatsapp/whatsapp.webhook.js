@@ -6,6 +6,25 @@ const { successResponse } = require('../../../utils/response')
 const logger = require('../../../utils/logger')
 const crypto = require('crypto');
 
+// Typed-name validation for the code booking flow. The cleaning below is the same rule
+// create_token_booking applies to patient_name, so the validated name is what gets stored.
+const NAME_STOP_WORDS = new Set(['hi', 'hello', 'hey', 'menu', 'book', 'cancel', 'yes', 'no', 'ok', 'okay', 'thanks', 'thank you', 'tomorrow', 'today'])
+function validatePatientName(text) {
+  const typed = (text || '').trim()
+  if (!typed || typed.includes('?')) return null
+  // Letters (Latin, Malayalam U+0D00-U+0D7F), spaces, hyphens, dots, apostrophes only; digits are rejected
+  if (!/^[a-zA-Z\sഀ-ൿ.'’-]+$/.test(typed)) return null
+  if (NAME_STOP_WORDS.has(typed.toLowerCase().replace(/\s+/g, ' '))) return null
+  const cleaned = typed
+    .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')
+    .trim()
+    .slice(0, 100)
+    .replace(/\b\w/g, c => c.toUpperCase())
+  const letterCount = (cleaned.match(/[a-zA-Zഀ-ൿ]/g) || []).length
+  if (letterCount < 2 || cleaned.length < 2 || cleaned.length > 60) return null
+  return { typed, cleaned }
+}
+
 router.get('/', (req, res) => {
   const meta = require('./whatsapp.meta')
   const challenge = meta.verifyWebhook(req.query)
@@ -125,6 +144,22 @@ router.post('/', async (req, res) => {
         return
       }
 
+      // code_booking_flow flag (cached 60s via getAllConfigs); read lazily, once per message
+      const CodeFlow = require('../../conversation/conversation.flow')
+      let codeFlowOnCache = null
+      const isCodeFlowOn = async () => {
+        if (codeFlowOnCache === null) {
+          try {
+            const flagConfigs = await TenantService.getAllConfigs(tenant.id)
+            codeFlowOnCache = flagConfigs?.code_booking_flow === 'true'
+          } catch (flagErr) {
+            logger.warn('code_booking_flow config read failed, treating as off:', flagErr.message)
+            codeFlowOnCache = false
+          }
+        }
+        return codeFlowOnCache
+      }
+
       // Intercept button replies before Gemini — direct function calls (skip Please wait for these)
       const isButtonReply = ['Book Another Day', 'Talk to Staff', 'Check My Booking', 'Reschedule'].includes(message.message)
       const greetings = ['hi', 'hello', 'hey', 'hii', 'helo', 'hai', 'hiya', 'start', 'menu']
@@ -133,6 +168,7 @@ router.post('/', async (req, res) => {
       const isGreeting = greetings.includes(message.message?.toLowerCase().trim()) || isBookAppointment
 
       if (isGreeting) {
+        if (await isCodeFlowOn()) await CodeFlow.clearFlow(tenant.id, message.from)
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
           const result = await executeFunction('show_welcome', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] })
@@ -156,6 +192,7 @@ router.post('/', async (req, res) => {
       }
 
       if (message.message === 'Book Another Day') {
+        if (await isCodeFlowOn()) await CodeFlow.clearFlow(tenant.id, message.from)
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
           const result = await executeFunction('show_all_doctors', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] })
@@ -179,6 +216,7 @@ router.post('/', async (req, res) => {
       }
 
       if (message.message === 'Reschedule') {
+        if (await isCodeFlowOn()) await CodeFlow.clearFlow(tenant.id, message.from)
         try {
           const result = await executeFunction('show_welcome', {}, {
             tenant,
@@ -208,6 +246,7 @@ router.post('/', async (req, res) => {
       }
 
       if (message.message === 'Talk to Staff') {
+        if (await isCodeFlowOn()) await CodeFlow.clearFlow(tenant.id, message.from)
         try {
           await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
           await HITLService.handleAIHandoffRequest(tenant, { ...context.conversation, customer_phone: context.customer?.phone }, null)
@@ -219,6 +258,7 @@ router.post('/', async (req, res) => {
       }
 
       if (message.message === 'Check My Booking') {
+        if (await isCodeFlowOn()) await CodeFlow.clearFlow(tenant.id, message.from)
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
           const result = await executeFunction('get_patient_bookings', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] })
@@ -404,6 +444,23 @@ router.post('/', async (req, res) => {
 
       // Intercept "Book for someone else" tap — ask for name
       if (message.interactiveId === 'patient_new') {
+        // Code flow: remember that the next typed text is a name (today flow with known doctor and session only)
+        if (await isCodeFlowOn()) {
+          const listFlow = await CodeFlow.getFlow(tenant.id, message.from)
+          if (listFlow && !listFlow.expired && listFlow.state === 'choose_patient' && listFlow.data?.kind === 'today' && listFlow.data.doctorId && listFlow.data.sessionStart) {
+            await CodeFlow.setFlow(tenant.id, message.from, {
+              state: 'choose_patient',
+              step: 'await_new_name',
+              kind: 'today',
+              doctorId: listFlow.data.doctorId,
+              doctorName: listFlow.data.doctorName,
+              date: listFlow.data.date,
+              sessionStart: listFlow.data.sessionStart,
+              attempts: 0
+            })
+            logger.info(`CODE_BOOKING_FLOW step=await_new_name tenant=${tenant.id} conversation=${context.conversation.id} doctor=${listFlow.data.doctorId} date=${listFlow.data.date || null} session=${listFlow.data.sessionStart}`)
+          }
+        }
         const newPatientMsg = 'Please reply with the patient\'s name to confirm booking.'
         await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
         await sendMessage(message.from, newPatientMsg)
@@ -452,6 +509,22 @@ router.post('/', async (req, res) => {
               await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
               await ConversationService.saveOutboundMessage(context.conversation.id, textContent, 'assistant')
             } else if (directContent.startsWith('NEW_PATIENT::')) {
+              // Code flow: no saved patients, so no list was sent; record the name step from the session button id
+              const newPatientSession = message.interactiveId.match(/^session_([0-9a-f-]{36})_(\d{2})-(\d{2})-(\d{2})$/)
+              if (newPatientSession && await isCodeFlowOn()) {
+                const npSessionStart = `${newPatientSession[2]}:${newPatientSession[3]}:${newPatientSession[4]}`
+                await CodeFlow.setFlow(tenant.id, message.from, {
+                  state: 'choose_patient',
+                  step: 'await_new_name',
+                  kind: 'today',
+                  doctorId: newPatientSession[1],
+                  doctorName: null,
+                  date: null,
+                  sessionStart: npSessionStart,
+                  attempts: 0
+                })
+                logger.info(`CODE_BOOKING_FLOW step=await_new_name tenant=${tenant.id} conversation=${context.conversation.id} doctor=${newPatientSession[1]} date=null session=${npSessionStart}`)
+              }
               const askName = 'Please reply with your name to confirm booking.'
               await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
               await sendMessage(message.from, askName)
@@ -511,6 +584,151 @@ router.post('/', async (req, res) => {
           }
         } catch (tomorrowErr) {
           logger.warn('TOMORROW intent lookup failed, falling through to AI:', tomorrowErr.message)
+        }
+      }
+
+      // Code-only typed new-patient name for the book-today flow (flag on, flow step await_new_name).
+      // Anything that does not match falls through to the AI path unchanged.
+      if (message.type === 'text' && !message.interactiveId && await isCodeFlowOn()) {
+        const nameCheck = validatePatientName(message.message)
+        const nameFlow = await CodeFlow.getFlow(tenant.id, message.from)
+        const logName = (result, extra = '') => logger.info(`CODE_BOOKING_FLOW step=new_name result=${result}${extra} tenant=${tenant.id} conversation=${context.conversation.id}`)
+
+        if (!nameFlow) {
+          if (nameCheck) logName('fallback', ' reason=no_state')
+        } else if (nameFlow.state === 'choose_patient' && nameFlow.step === 'await_new_name' && nameFlow.data?.kind === 'today') {
+          if (nameFlow.expired) {
+            logName('fallback', ' reason=expired')
+          } else if (nameFlow.data.doctorId && nameFlow.data.sessionStart) {
+            const nameAttempts = nameFlow.data.attempts || 0
+            const nameCtx = { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] }
+            const saveNameInbound = async () => {
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              HITLService.broadcastToTenant(tenant.id, 'new_message', {
+                conversationId: context.conversation.id,
+                message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
+              })
+            }
+            const sendNameReply = async (text) => {
+              await sendMessage(message.from, text)
+              await ConversationService.saveOutboundMessage(context.conversation.id, text, 'assistant')
+              HITLService.broadcastToTenant(tenant.id, 'new_message', {
+                conversationId: context.conversation.id,
+                message: { role: 'assistant', content: text, created_at: new Date().toISOString() }
+              })
+            }
+            const sendNameWelcome = async () => {
+              try {
+                const welcome = await executeFunction('show_welcome', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] })
+                const welcomeContent = typeof welcome === 'string' && welcome.startsWith('DIRECT:') ? welcome.slice(7).trim() : ''
+                if (welcomeContent.startsWith('__INTERACTIVE_SENT__::')) {
+                  await ConversationService.saveOutboundMessage(context.conversation.id, welcomeContent.slice('__INTERACTIVE_SENT__::'.length), 'assistant')
+                } else if (welcomeContent) {
+                  await sendMessage(message.from, welcomeContent)
+                  await ConversationService.saveOutboundMessage(context.conversation.id, welcomeContent, 'assistant')
+                }
+              } catch (welcomeErr) {
+                logger.warn('Sending welcome from code name flow failed (non-fatal):', welcomeErr.message)
+              }
+            }
+
+            if (!nameCheck) {
+              // Not a usable name: one retry, then back to the menu
+              const attemptsNow = nameAttempts + 1
+              await saveNameInbound()
+              if (attemptsNow < 2) {
+                await CodeFlow.setFlow(tenant.id, message.from, {
+                  state: 'choose_patient',
+                  step: 'await_new_name',
+                  kind: 'today',
+                  doctorId: nameFlow.data.doctorId,
+                  doctorName: nameFlow.data.doctorName,
+                  date: nameFlow.data.date,
+                  sessionStart: nameFlow.data.sessionStart,
+                  attempts: attemptsNow
+                })
+                await sendNameReply("Sorry, I didn't catch a name. Please reply with the patient's full name.")
+              } else {
+                await CodeFlow.clearFlow(tenant.id, message.from)
+                await sendNameWelcome()
+              }
+              logName('invalid_name', ` attempts=${attemptsNow}`)
+              return
+            }
+
+            // Valid name: one booking attempt per phone at a time
+            const nameLockKey = `codebooking:lock:${tenant.id}:${message.from}`
+            let nameLockRedis = null
+            let nameLockHeld = false
+            let nameLockFailed = false
+            try {
+              nameLockRedis = require('../../../config/redis')
+              nameLockHeld = (await nameLockRedis.set(nameLockKey, '1', { NX: true, EX: 30 })) === 'OK'
+            } catch (lockErr) {
+              nameLockFailed = true
+              logger.warn('code_booking_flow name lock failed, using AI path:', lockErr.message)
+            }
+            if (nameLockFailed) {
+              logName('fallback', ' reason=lock_error')
+            } else if (!nameLockHeld) {
+              logName('duplicate_tap')
+              return
+            } else {
+              try {
+                let outText = ''
+                let outcome = 'business_reply'
+                try {
+                  const nameResult = await executeFunction(
+                    'create_token_booking',
+                    { doctor_id: nameFlow.data.doctorId, session_start_time: nameFlow.data.sessionStart, patient_name: nameCheck.typed },
+                    nameCtx
+                  )
+                  if (typeof nameResult === 'string' && nameResult.startsWith('DIRECT:')) {
+                    outText = nameResult.slice(7).trim()
+                    outcome = outText.includes('Booking confirmed') ? 'success' : 'business_reply'
+                  } else if (typeof nameResult === 'string' && nameResult.trim()) {
+                    outText = nameResult.trim()
+                  } else if (nameResult && nameResult.success === false && nameResult.message) {
+                    outText = String(nameResult.message)
+                  } else {
+                    outcome = 'error'
+                  }
+                } catch (nameBookErr) {
+                  logger.error('Code-only new-patient booking failed: ' + nameBookErr?.message)
+                  outcome = 'error'
+                }
+
+                await saveNameInbound()
+                if (outcome === 'error') {
+                  // Never fall back to Gemini after the booking function ran: it could double-book
+                  outText = 'Sorry, I could not complete your booking. Please tap Book Appointment to try again, or tap Talk to Staff.'
+                }
+                await sendNameReply(outText)
+                if (outcome === 'error') await sendNameWelcome()
+
+                // Same contact card as the AI path, once per conversation
+                if (source === 'meta' && tenant.whatsapp_number && outText.includes('Booking confirmed')) {
+                  try {
+                    const pool = require('../../../config/database')
+                    const flagResult = await pool.query('SELECT contact_card_sent FROM conversations WHERE id = $1', [context.conversation.id])
+                    if (flagResult.rows[0]?.contact_card_sent !== true) {
+                      const { sendContact } = require('./whatsapp.meta')
+                      await sendContact(message.from, tenant.name, tenant.whatsapp_number)
+                      await pool.query('UPDATE conversations SET contact_card_sent = true WHERE id = $1', [context.conversation.id])
+                    }
+                  } catch (cardErr) {
+                    logger.error('Contact card send failed (non-fatal):', JSON.stringify(cardErr.response?.data || cardErr.message))
+                  }
+                }
+
+                await CodeFlow.clearFlow(tenant.id, message.from)
+                logName(outcome)
+                return
+              } finally {
+                try { await nameLockRedis.del(nameLockKey) } catch (unlockErr) { logger.warn('code_booking_flow name lock release failed:', unlockErr.message) }
+              }
+            }
+          }
         }
       }
 

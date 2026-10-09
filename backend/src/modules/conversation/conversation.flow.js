@@ -53,6 +53,7 @@ async function setFlow(tenantId, phoneNumber, flow) {
       doctorName: flow.doctorName || null,
       date: flow.date || null,
       sessionStart: flow.sessionStart || null,
+      attempts: flow.attempts || 0,
       expiresAt: new Date(Date.now() + FLOW_TTL_MS).toISOString()
     }
     const updated = {
