@@ -30,6 +30,16 @@ function validatePatientName(text) {
   return { typed, cleaned }
 }
 
+// Used only after validatePatientName accepted the text: true when the text is very likely a real name,
+// so it can be booked without asking for confirmation. Latin letters only, 2 or 3 words, one word of 3+ letters.
+function isConfidentName(typed) {
+  const t = (typed || '').trim()
+  if (!/^[a-zA-Z\s.'’-]+$/.test(t)) return false
+  const words = t.split(/\s+/)
+  if (words.length < 2 || words.length > 3) return false
+  return words.some(w => (w.match(/[a-zA-Z]/g) || []).length >= 3)
+}
+
 router.get('/', (req, res) => {
   const meta = require('./whatsapp.meta')
   const challenge = meta.verifyWebhook(req.query)
@@ -166,7 +176,7 @@ router.post('/', async (req, res) => {
       }
 
       // ---- Code flow: typed new-patient name helpers (used by the text branch and the two button handlers) ----
-      const logName = (result, extra = '') => logger.info(`CODE_BOOKING_FLOW step=new_name result=${result}${extra} tenant=${tenant.id} conversation=${context.conversation.id}`)
+      const logName = (result, extra = '', confidence = null) => logger.info(`CODE_BOOKING_FLOW step=new_name${confidence ? ` confidence=${confidence}` : ''} result=${result}${extra} tenant=${tenant.id} conversation=${context.conversation.id}`)
       const saveNameInbound = async () => {
         await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
         HITLService.broadcastToTenant(tenant.id, 'new_message', {
@@ -222,7 +232,7 @@ router.post('/', async (req, res) => {
             conversationId: context.conversation.id,
             message: { role: 'assistant', content: confirmBody, created_at: new Date().toISOString() }
           })
-          logName('confirm_sent')
+          logName('confirm_sent', '', 'low')
         } catch (btnErr) {
           logger.warn('Confirm buttons failed, asking for the name again:', btnErr.message)
           await storeNameStep('await_new_name', flowData, attempts, null)
@@ -231,7 +241,7 @@ router.post('/', async (req, res) => {
         }
       }
       // Books the confirmed name: lock, create_token_booking, send and save, contact card, clearFlow. Never calls Gemini.
-      const runNameBooking = async (flowData, patientName) => {
+      const runNameBooking = async (flowData, patientName, confidence = null) => {
         const nameCtx = { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] }
         const nameLockKey = `codebooking:lock:${tenant.id}:${message.from}`
         let nameLockRedis = null
@@ -243,7 +253,7 @@ router.post('/', async (req, res) => {
           logger.warn('code_booking_flow name lock failed:', lockErr.message)
         }
         if (!nameLockHeld) {
-          logName('duplicate_tap')
+          logName('duplicate_tap', '', confidence)
           return
         }
         try {
@@ -294,7 +304,7 @@ router.post('/', async (req, res) => {
           }
 
           await CodeFlow.clearFlow(tenant.id, message.from)
-          logName(outcome)
+          logName(outcome, '', confidence)
         } finally {
           try { await nameLockRedis.del(nameLockKey) } catch (unlockErr) { logger.warn('code_booking_flow name lock release failed:', unlockErr.message) }
         }
@@ -594,7 +604,7 @@ router.post('/', async (req, res) => {
           return
         }
         if (message.interactiveId === 'newname_yes') {
-          await runNameBooking(tapFlow.data, tapFlow.data.pendingName)
+          await runNameBooking(tapFlow.data, tapFlow.data.pendingName, 'low')
           return
         }
         await storeNameStep('await_new_name', tapFlow.data, 0, null)
@@ -778,7 +788,12 @@ router.post('/', async (req, res) => {
               return
             }
 
-            // Valid name: ask the patient to confirm it before anything is booked
+            // Valid and confident name: book straight away (same helper as the Yes button)
+            if (isConfidentName(nameCheck.typed)) {
+              await runNameBooking(nameFlow.data, nameCheck.typed, 'high')
+              return
+            }
+            // Valid but unsure name: ask the patient to confirm it before anything is booked
             await saveNameInbound()
             await sendNameConfirm(nameFlow.data, nameCheck, nameAttempts)
             return
