@@ -789,6 +789,45 @@ router.post('/', async (req, res) => {
           const tomorrowKey = `tomorrow_booking:${context.conversation.id}`
           const stored = await redisClient.get(tomorrowKey)
           if (stored) {
+            // Code flow: a stored doctor leads to the tomorrow patient list instead of booking by names
+            if (await isCodeFlowOn()) {
+              let tomorrowKeyData = null
+              try { tomorrowKeyData = JSON.parse(stored) } catch (parseErr) { tomorrowKeyData = null }
+              if (tomorrowKeyData?.doctor_id) {
+                const istNowList = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+                istNowList.setDate(istNowList.getDate() + 1)
+                const tomorrowListDate = `${istNowList.getFullYear()}-${String(istNowList.getMonth() + 1).padStart(2, '0')}-${String(istNowList.getDate()).padStart(2, '0')}`
+                await saveNameInbound()
+                let listOutcome = 'error'
+                try {
+                  const listResult = await executeFunction(
+                    'get_patient_profiles',
+                    { doctor_id: tomorrowKeyData.doctor_id, internal_kind: 'tomorrow', internal_date: tomorrowListDate },
+                    { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] }
+                  )
+                  const listContent = typeof listResult === 'string' && listResult.startsWith('DIRECT:') ? listResult.slice(7).trim() : ''
+                  if (listContent.startsWith('__INTERACTIVE_SENT__::')) {
+                    await ConversationService.saveOutboundMessage(context.conversation.id, listContent.slice('__INTERACTIVE_SENT__::'.length), 'assistant')
+                    listOutcome = 'list_sent'
+                  } else if (listContent.startsWith('NEW_PATIENT::')) {
+                    await sendNameReply("Sorry, I can't book tomorrow from here for a new patient yet. Say Hi and use Book Another Day.")
+                    listOutcome = 'no_patients'
+                  }
+                } catch (listErr) {
+                  logger.error('Tomorrow patient list failed: ' + listErr?.message)
+                }
+                if (listOutcome === 'error') {
+                  // Never fall back to Gemini here; a failed list send is treated as an error too
+                  await CodeFlow.clearFlow(tenant.id, message.from)
+                  await sendNameReply('Sorry, I could not complete your booking. Please tap Book Appointment to try again, or tap Talk to Staff.')
+                  await sendNameWelcome()
+                } else {
+                  await redisClient.del(tomorrowKey)
+                }
+                logger.info(`CODE_BOOKING_FLOW step=tomorrow_list result=${listOutcome} tenant=${tenant.id} conversation=${context.conversation.id}`)
+                return
+              }
+            }
             const { doctor_name, patient_name } = JSON.parse(stored)
             await sendMessage(message.from, '⏳ Please wait a moment...')
             const result = await executeFunction(

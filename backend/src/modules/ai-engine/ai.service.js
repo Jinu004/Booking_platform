@@ -277,6 +277,8 @@ async function processMessage(context) {
             if (args) {
               delete args.patient_id
               delete args.doctor_id
+              delete args.internal_kind
+              delete args.internal_date
             }
 
             if (executedFunctions.has(name)) {

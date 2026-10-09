@@ -674,6 +674,19 @@ async function executeFunction(name, args, ctx) {
           if (sessCount < maxCap) availableSessions.push(sess);
         }
         if (availableSessions.length === 0) {
+          // Code flow only: remember the doctor so a TOMORROW reply can show the tomorrow patient list
+          try {
+            const codeFlowConfigsCDA = await require('../tenant/tenant.service').getAllConfigs(tenant.id)
+            if (codeFlowConfigsCDA?.code_booking_flow === 'true' && conversation?.id) {
+              await require('../../config/redis').set(
+                `tomorrow_booking:${conversation.id}`,
+                JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization }),
+                { EX: 3600 }
+              )
+            }
+          } catch (tomorrowKeyErr) {
+            logger.warn('Redis write failed for tomorrow offer (all sessions full):', tomorrowKeyErr.message)
+          }
           return { available: false, message: `${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply TOMORROW to confirm tomorrow's booking or ignore to cancel.` }
         }
 
@@ -1350,13 +1363,17 @@ For queries, contact us: ${contactPhoneTmr}`
       const contextText = `Who is this booking for?${sessionLabel}\n${nameList}\n• Book for someone else${sessionSuffix}`
       const patientVisibleText = `Who is this booking for?${sessionLabel}\n${nameList}\n• Book for someone else`
       const dayMatchGPP = (ctx.interactiveId || '').match(/^\d::(\d{4}-\d{2}-\d{2})$/)
-      await recordPatientChoiceFlow(ctx, {
-        kind: dayMatchGPP ? 'future' : (sessionMatch ? 'today' : null),
-        doctorId: sessionMatch ? sessionMatch[1] : null,
-        doctorName: null,
-        date: dayMatchGPP ? dayMatchGPP[1] : null,
-        sessionStart: sessionMatch ? `${sessionMatch[2]}:${sessionMatch[3]}:${sessionMatch[4]}` : null
-      })
+      // Internal-only (never from Gemini): tomorrow list for a known doctor
+      const isInternalTomorrowGPP = args?.internal_kind === 'tomorrow' && !!args.doctor_id && /^\d{4}-\d{2}-\d{2}$/.test(args.internal_date || '')
+      await recordPatientChoiceFlow(ctx, isInternalTomorrowGPP
+        ? { kind: 'tomorrow', doctorId: args.doctor_id, doctorName: null, date: args.internal_date, sessionStart: null }
+        : {
+            kind: dayMatchGPP ? 'future' : (sessionMatch ? 'today' : null),
+            doctorId: sessionMatch ? sessionMatch[1] : null,
+            doctorName: null,
+            date: dayMatchGPP ? dayMatchGPP[1] : null,
+            sessionStart: sessionMatch ? `${sessionMatch[2]}:${sessionMatch[3]}:${sessionMatch[4]}` : null
+          })
       if (customerPhone) {
         let sentGPP = false
         try {
