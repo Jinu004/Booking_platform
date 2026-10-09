@@ -303,7 +303,12 @@ router.post('/', async (req, res) => {
             }
           }
 
-          await CodeFlow.clearFlow(tenant.id, message.from)
+          if (outcome === 'success') {
+            // Keep the list usable: back to the base state of the same list (no step, attempts 0, no pending name)
+            await storeNameStep(null, flowData, 0, null)
+          } else {
+            await CodeFlow.clearFlow(tenant.id, message.from)
+          }
           logName(outcome, '', confidence)
         } finally {
           try { await nameLockRedis.del(nameLockKey) } catch (unlockErr) { logger.warn('code_booking_flow name lock release failed:', unlockErr.message) }
@@ -631,6 +636,12 @@ router.post('/', async (req, res) => {
               attempts: 0
             })
             logger.info(`CODE_BOOKING_FLOW step=await_new_name tenant=${tenant.id} conversation=${context.conversation.id} doctor=${listFlow.data.doctorId} date=${listFlow.data.date || null} session=${listFlow.data.sessionStart}`)
+          } else if (!listFlow || listFlow.expired) {
+            // Dead list: do not ask for a name, because the typed answer would go to Gemini
+            await saveNameInbound()
+            await sendNameReply('This list has expired. Say Hi to start again.')
+            logger.info(`CODE_BOOKING_FLOW step=await_new_name result=fallback reason=${listFlow ? 'expired' : 'no_state'} tenant=${tenant.id} conversation=${context.conversation.id}`)
+            return
           }
         }
         const newPatientMsg = 'Please reply with the patient\'s name to confirm booking.'
