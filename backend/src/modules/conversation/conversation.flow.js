@@ -54,6 +54,7 @@ async function setFlow(tenantId, phoneNumber, flow) {
       date: flow.date || null,
       sessionStart: flow.sessionStart || null,
       attempts: flow.attempts || 0,
+      pendingName: flow.pendingName || null,
       expiresAt: new Date(Date.now() + FLOW_TTL_MS).toISOString()
     }
     const updated = {
