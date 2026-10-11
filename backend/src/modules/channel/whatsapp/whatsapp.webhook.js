@@ -476,8 +476,15 @@ router.post('/', async (req, res) => {
           const flow = await getFlow(tenant.id, message.from)
           // Tomorrow flows use their own log step and done-marker key, so a today booking never blocks them
           const isTomorrowFlow = !!flow && flow.state === 'choose_patient' && flow.data?.kind === 'tomorrow'
-          const bookStep = isTomorrowFlow ? 'book_tomorrow' : 'book_today'
-          const doneKey = isTomorrowFlow ? `codebooking:done:tomorrow:${tenant.id}:${patientTapId}` : `codebooking:done:${tenant.id}:${patientTapId}`
+          // Future-date flows (Book Another Day, single-session day) are bookable only with doctor, date and session known
+          const isFutureFlow = !!flow && flow.state === 'choose_patient' && flow.data?.kind === 'future' &&
+            !!flow.data.doctorId && !!flow.data.date && !!flow.data.sessionStart
+          const bookStep = isTomorrowFlow ? 'book_tomorrow' : (isFutureFlow ? 'book_future' : 'book_today')
+          const doneKey = isTomorrowFlow
+            ? `codebooking:done:tomorrow:${tenant.id}:${patientTapId}`
+            : (isFutureFlow
+              ? `codebooking:done:future:${tenant.id}:${patientTapId}:${flow.data.doctorId}:${flow.data.date}`
+              : `codebooking:done:${tenant.id}:${patientTapId}`)
 
           // Re-tap right after a successful code booking for this patient: fixed reply, no Gemini.
           // Checked before the flow, because the flow now stays alive after a success.
@@ -511,6 +518,7 @@ router.post('/', async (req, res) => {
           else if (flow.data?.kind === 'tomorrow') {
             if (!flow.data?.doctorId) fallbackReason = 'missing_values'
           }
+          else if (isFutureFlow) { /* kind 'future' with doctor, date and session: bookable */ }
           else if (flow.data?.kind !== 'today') fallbackReason = 'wrong_kind'
           else if (!flow.data?.doctorId || !flow.data?.sessionStart) fallbackReason = 'missing_values'
 
@@ -534,6 +542,33 @@ router.post('/', async (req, res) => {
               })
               await clearFlow(tenant.id, message.from)
               logger.info(`CODE_BOOKING_FLOW step=book_tomorrow result=fallback reason=date_changed tenant=${tenant.id} conversation=${context.conversation.id}`)
+              return
+            }
+          }
+
+          // Future list tapped when its date is no longer within +1 to +6 days IST (same window create_future_booking uses): do not book
+          if (!fallbackReason && isFutureFlow) {
+            const istNowFut = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+            const istDateStrFut = (daysAhead) => {
+              const d = new Date(istNowFut)
+              d.setDate(d.getDate() + daysAhead)
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+            }
+            if (flow.data.date < istDateStrFut(1) || flow.data.date > istDateStrFut(6)) {
+              await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+              HITLService.broadcastToTenant(tenant.id, 'new_message', {
+                conversationId: context.conversation.id,
+                message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
+              })
+              const expiredFutText = 'This list has expired. Say Hi to start again.'
+              await sendMessage(message.from, expiredFutText)
+              await ConversationService.saveOutboundMessage(context.conversation.id, expiredFutText, 'assistant')
+              HITLService.broadcastToTenant(tenant.id, 'new_message', {
+                conversationId: context.conversation.id,
+                message: { role: 'assistant', content: expiredFutText, created_at: new Date().toISOString() }
+              })
+              await clearFlow(tenant.id, message.from)
+              logger.info(`CODE_BOOKING_FLOW step=book_future result=fallback reason=date_changed tenant=${tenant.id} conversation=${context.conversation.id}`)
               return
             }
           }
@@ -568,6 +603,12 @@ router.post('/', async (req, res) => {
                   ? await executeFunction(
                       'create_tomorrow_booking',
                       { doctor_id: flow.data.doctorId, patient_id: patientTapId },
+                      bookingCtx
+                    )
+                  : isFutureFlow
+                  ? await executeFunction(
+                      'create_future_booking',
+                      { doctor_id: flow.data.doctorId, patient_id: patientTapId, booking_date: flow.data.date, session_start_time: flow.data.sessionStart },
                       bookingCtx
                     )
                   : await executeFunction(
@@ -790,7 +831,25 @@ router.post('/', async (req, res) => {
       if (message.interactiveId && /^\d+::\d{4}-\d{2}-\d{2}$/.test(message.interactiveId)) {
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
-          const result = await executeFunction('get_patient_profiles', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: message.interactiveId, doctorProfiles: [] })
+          // Code flow: when the offered day has exactly one session for the stored doctor, pass them on so the flow knows the doctor and session
+          let dayTapArgs = {}
+          if (await isCodeFlowOn()) {
+            try {
+              const dayKeyRaw = await require('../../../config/redis').get(`anotherday_days:${context.conversation.id}`)
+              const dayTapDate = message.interactiveId.split('::')[1]
+              if (dayKeyRaw) {
+                const dayKeyData = JSON.parse(dayKeyRaw)
+                const daySessions = dayKeyData?.days?.[dayTapDate]
+                if (dayKeyData?.doctor_id && Array.isArray(daySessions) && daySessions.length === 1) {
+                  dayTapArgs = { doctor_id: dayKeyData.doctor_id, internal_kind: 'future', internal_date: dayTapDate, internal_session: daySessions[0] }
+                }
+              }
+            } catch (dayKeyErr) {
+              logger.warn('another-day day key read failed, using the normal day tap:', dayKeyErr.message)
+              dayTapArgs = {}
+            }
+          }
+          const result = await executeFunction('get_patient_profiles', dayTapArgs, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: message.interactiveId, doctorProfiles: [] })
           if (typeof result === 'string' && result.startsWith('DIRECT:')) {
             const directContent = result.slice(7).trim()
             if (directContent.startsWith('__INTERACTIVE_SENT__::')) {

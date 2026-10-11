@@ -279,6 +279,7 @@ async function processMessage(context) {
               delete args.doctor_id
               delete args.internal_kind
               delete args.internal_date
+              delete args.internal_session
             }
 
             if (executedFunctions.has(name)) {

@@ -519,6 +519,26 @@ async function executeFunction(name, args, ctx) {
               description: sessionInfo.slice(0, 72)
             }
           })
+          // Code flow only: remember the doctor and each offered date's session starts so a day tap can resolve a single session
+          try {
+            const codeFlowConfigsGDS = await require('../tenant/tenant.service').getAllConfigs(tenant.id)
+            if (codeFlowConfigsGDS?.code_booking_flow === 'true' && conversation?.id) {
+              const daysByDateGDS = {}
+              for (const d of days) {
+                daysByDateGDS[getBookingDate(d.dayOfWeek)] = d.sessions.map(s => {
+                  const startStr = String(s.start)
+                  return startStr.length === 5 ? `${startStr}:00` : startStr
+                })
+              }
+              await require('../../config/redis').set(
+                `anotherday_days:${conversation.id}`,
+                JSON.stringify({ doctor_id: doctorIdGDS, doctor_name: doctorGDS.name, days: daysByDateGDS }),
+                { EX: 1800 }
+              )
+            }
+          } catch (anotherDayKeyErr) {
+            logger.warn('Redis write failed for another-day day list:', anotherDayKeyErr.message)
+          }
           await sendDoctorList(customerPhone, `When would you like to see ${doctorGDS.name}?`, dayListItems, 'Select Day')
           const contextText = days.map(d => {
             const bookingDate = getBookingDate(d.dayOfWeek)
@@ -1365,8 +1385,12 @@ For queries, contact us: ${contactPhoneTmr}`
       const dayMatchGPP = (ctx.interactiveId || '').match(/^\d::(\d{4}-\d{2}-\d{2})$/)
       // Internal-only (never from Gemini): tomorrow list for a known doctor
       const isInternalTomorrowGPP = args?.internal_kind === 'tomorrow' && !!args.doctor_id && /^\d{4}-\d{2}-\d{2}$/.test(args.internal_date || '')
+      // Internal-only (never from Gemini): future date with a single known session for a known doctor
+      const isInternalFutureGPP = args?.internal_kind === 'future' && !!args.doctor_id && /^\d{4}-\d{2}-\d{2}$/.test(args.internal_date || '') && /^\d{2}:\d{2}:\d{2}$/.test(args.internal_session || '')
       await recordPatientChoiceFlow(ctx, isInternalTomorrowGPP
         ? { kind: 'tomorrow', doctorId: args.doctor_id, doctorName: null, date: args.internal_date, sessionStart: null }
+        : isInternalFutureGPP
+        ? { kind: 'future', doctorId: args.doctor_id, doctorName: null, date: args.internal_date, sessionStart: args.internal_session }
         : {
             kind: dayMatchGPP ? 'future' : (sessionMatch ? 'today' : null),
             doctorId: sessionMatch ? sessionMatch[1] : null,
