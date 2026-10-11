@@ -69,6 +69,7 @@ function parseIncomingMessage(payload) {
 
     let messageText = ''
     let interactiveId = null
+    let interactiveDescription = null
     if (message.type === 'text') {
       messageText = message.text?.body || ''
     } else if (message.type === 'interactive') {
@@ -76,6 +77,7 @@ function parseIncomingMessage(payload) {
         || message.interactive?.list_reply?.title
         || ''
       interactiveId = message.interactive?.list_reply?.id || message.interactive?.button_reply?.id || null
+      interactiveDescription = message.interactive?.list_reply?.description || null
     } else if (message.type === 'button') {
       messageText = message.button?.text || ''
     }
@@ -92,7 +94,8 @@ function parseIncomingMessage(payload) {
       type: message.type,
       customerName: contact?.profile?.name || '',
       provider: 'meta',
-      interactiveId: interactiveId || null
+      interactiveId: interactiveId || null,
+      interactiveDescription
     }
   } catch (err) {
     logger.error('Meta parse failed:', err.message)

@@ -810,6 +810,40 @@ router.post('/', async (req, res) => {
         return
       }
 
+      // Code flow: Book Another Day doctor tap (a bare doctor uuid whose list row description says "this week").
+      // Placed after the other interactive shortcuts; anything that does not match falls through to the AI path unchanged.
+      if (message.interactiveId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.interactiveId) &&
+          /this week/i.test(message.interactiveDescription || '') && await isCodeFlowOn()) {
+        const logAnotherDay = (result) => logger.info(`CODE_BOOKING_FLOW step=another_day_doctor result=${result} tenant=${tenant.id} conversation=${context.conversation.id}`)
+        await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+        let anotherDayResult = null
+        let anotherDayFailed = false
+        try {
+          const { executeFunction } = require('../../ai-engine/ai.executor')
+          anotherDayResult = await executeFunction('get_doctor_schedule', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: message.interactiveId, doctorProfiles: [] })
+        } catch (anotherDayErr) {
+          logger.error('Another Day doctor schedule failed: ' + anotherDayErr?.message)
+          anotherDayFailed = true
+        }
+        if (!anotherDayFailed && typeof anotherDayResult === 'string' && anotherDayResult.startsWith('DIRECT:')) {
+          const anotherDayContent = anotherDayResult.slice(7).trim()
+          if (anotherDayContent.startsWith('__INTERACTIVE_SENT__::')) {
+            await ConversationService.saveOutboundMessage(context.conversation.id, anotherDayContent.slice('__INTERACTIVE_SENT__::'.length), 'assistant')
+            logAnotherDay('list_sent')
+          } else {
+            await sendMessage(message.from, anotherDayContent)
+            await ConversationService.saveOutboundMessage(context.conversation.id, anotherDayContent, 'assistant')
+            logAnotherDay('text_sent')
+          }
+          return
+        }
+        // The function ran but failed or returned something unexpected: never fall back to Gemini
+        await sendNameReply('Sorry, something went wrong. Please try again.')
+        await sendNameWelcome()
+        logAnotherDay('error')
+        return
+      }
+
       // TOMORROW intent interception — read Redis key set when today was fully booked
       // or booking was outside hours. Bypass Gemini entirely for this case.
       if (message.message?.trim().toUpperCase() === 'TOMORROW' && tenant.industry === 'clinic') {
