@@ -17,6 +17,16 @@ const MODELS = {
 }
 const MODEL = 'gemini-2.5-flash' // default fallback
 
+// One log line per Gemini response with its token usage. Never throws, so it cannot affect a reply.
+function logGeminiUsage(tenant, conversation, modelName, geminiResult) {
+  try {
+    const usage = geminiResult?.usageMetadata
+    logger.info(`GEMINI_USAGE tenant=${tenant?.id || 'unknown'} conv=${conversation?.id || 'none'} model=${modelName || 'unknown'} prompt=${usage?.promptTokenCount ?? 0} cached=${usage?.cachedContentTokenCount ?? 0} output=${usage?.candidatesTokenCount ?? 0} total=${usage?.totalTokenCount ?? 0}`)
+  } catch (usageLogErr) {
+    // ignore: usage logging is best effort
+  }
+}
+
 /**
  * Processes an incoming message through Gemini
  * Handles multi-turn function calling loop
@@ -246,6 +256,7 @@ async function processMessage(context) {
         // Send the latest patient message
         let response = await chat.sendMessage(latestMessage, { signal: AbortSignal.timeout(25000) })
         let result = response.response
+        logGeminiUsage(tenant, conversation, currentModel, result)
 
         // Function calling loop — Gemini may call multiple functions
         const maxIterations = 5
@@ -342,6 +353,7 @@ async function processMessage(context) {
           // Feed function results back to Gemini
           response = await chat.sendMessage(functionResponses)
           result = response.response
+          logGeminiUsage(tenant, conversation, currentModel, result)
         }
 
         if (escalated) {
