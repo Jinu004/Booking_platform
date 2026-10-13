@@ -50,6 +50,34 @@ async function sendTextMessage(to, message) {
 }
 
 /**
+ * Parses a smb_message_echoes webhook value (messages the clinic sent from the WhatsApp Business app).
+ * "to" is the patient, "from" is the clinic, the reverse of a normal inbound message.
+ *
+ * @param {object} value - changes[].value of the smb_message_echoes field
+ * @returns {object|null} { type: 'echo', provider, phoneNumberId, echoes: [...] } or null
+ */
+function parseEchoEvent(value) {
+  const items = Array.isArray(value?.message_echoes) ? value.message_echoes : []
+  const echoes = items
+    .filter(item => item && item.to && item.id)
+    .map(item => ({
+      customerPhone: `+${String(item.to).replace(/\D/g, '')}`,
+      wamid: item.id,
+      timestamp: item.timestamp,
+      echoType: item.type || 'unknown',
+      text: item.type === 'text' ? (item.text?.body || '') : '',
+      originalId: item.revoke?.original_message_id || item.edit?.original_message_id || null
+    }))
+  if (!echoes.length) return null
+  return {
+    type: 'echo',
+    provider: 'meta',
+    phoneNumberId: value?.metadata?.phone_number_id || null,
+    echoes
+  }
+}
+
+/**
  * Parses incoming Meta webhook payload
  * Extracts standardized message object
  *
@@ -60,6 +88,7 @@ function parseIncomingMessage(payload) {
   try {
     const entry = payload.entry?.[0]
     const changes = entry?.changes?.[0]
+    if (changes?.field === 'smb_message_echoes') return parseEchoEvent(changes.value)
     if (changes?.field && changes.field !== 'messages') return null
     const value = changes?.value
     const message = value?.messages?.[0]

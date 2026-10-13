@@ -40,6 +40,96 @@ function isConfidentName(typed) {
   return words.some(w => (w.match(/[a-zA-Z]/g) || []).length >= 3)
 }
 
+// Coexistence: how long a conversation stays in human mode after the clinic replies from the WhatsApp Business app.
+// hitl.cron.js resets a human conversation one minute after mode_changed_at, so an echo stores mode_changed_at in the
+// future (now + this many hours - 1 minute); the cron then leaves it alone until this long after the last echo.
+const ECHO_HUMAN_MODE_HOURS = 4
+
+// A staff reply sent from the WhatsApp Business app (smb_message_echoes): store it as a staff message and keep the AI paused.
+// Never runs the AI, never writes the Redis session, and never creates a message from the patient.
+async function handleStaffEcho(event) {
+  const pool = require('../../../config/database')
+  const redisClient = require('../../../config/redis')
+  const ConversationService = require('../../conversation/conversation.service')
+  const ConversationModel = require('../../conversation/conversation.model')
+  const CRMModel = require('../../crm/crm.model')
+  const CRMService = require('../../crm/crm.service')
+  const HITLService = require('../../hitl/hitl.service')
+  const { broadcastToTenant: broadcastSse } = require('../../hitl/sse')
+
+  const tenantRes = await pool.query('SELECT * FROM tenants WHERE whatsapp_phone_number_id = $1 LIMIT 1', [event.phoneNumberId])
+  const tenant = tenantRes.rows[0]
+  if (!tenant) {
+    logger.warn('COEXISTENCE_ECHO result=no_tenant (unknown phone number id)')
+    return
+  }
+
+  for (const echo of event.echoes) {
+    let conversationIdForLog = 'none'
+    const logEcho = (result) => logger.info(`COEXISTENCE_ECHO tenant=${tenant.id} conv=${conversationIdForLog} type=${echo.echoType} result=${result}`)
+    try {
+      // Same dedupe approach as inbound messages, keyed by the echo's wamid
+      if (redisClient) {
+        const seen = await redisClient.get(`msg_dedup:${echo.wamid}`)
+        if (seen) { logEcho('duplicate'); continue }
+        await redisClient.set(`msg_dedup:${echo.wamid}`, '1', { EX: 300 })
+      }
+
+      // Deleted or edited messages: only logged for now
+      if (echo.echoType === 'revoke' || echo.echoType === 'edit') { logEcho('ignored'); continue }
+
+      const content = echo.echoType === 'text'
+        ? echo.text
+        : `[${String(echo.echoType).replace(/[^a-z_]/gi, '') || 'message'}]`
+      if (!content) { logEcho('ignored'); continue }
+
+      // Find the patient and the open conversation; create them if the clinic messaged first (no AI, no Redis session)
+      let customer = await CRMModel.getCustomerByPhone(pool, tenant.id, echo.customerPhone)
+      if (!customer) customer = await CRMService.findOrCreateCustomer(tenant.id, echo.customerPhone, '')
+      let conversation = await ConversationModel.getActiveConversation(pool, tenant.id, customer.id)
+      if (!conversation) {
+        conversation = await ConversationModel.createConversation(pool, tenant.id, customer.id, 'whatsapp')
+        broadcastSse(tenant.id, 'new_conversation', { conversationId: conversation.id, timestamp: new Date().toISOString() })
+      }
+      conversationIdForLog = conversation.id
+
+      // The messages table has no wamid column, so a reply our own system sent a moment ago is recognised by its text
+      if (echo.echoType === 'text') {
+        const own = await pool.query(
+          `SELECT 1 FROM messages WHERE conversation_id = $1 AND role IN ('assistant', 'staff') AND content = $2
+           AND created_at > NOW() - INTERVAL '2 minutes' LIMIT 1`,
+          [conversation.id, content]
+        )
+        if (own.rows.length) { logEcho('own_send'); continue }
+      }
+
+      const saved = await ConversationService.saveOutboundMessage(conversation.id, content, 'staff')
+      await ConversationModel.touchConversation(pool, tenant.id, conversation.id)
+
+      // Human mode with a long expiry: reuse mode_changed_at, which the hitl cron compares to NOW() - 1 minute
+      await pool.query(
+        `UPDATE conversations
+         SET mode = 'human', mode_changed_at = NOW() + ($3::int * INTERVAL '1 minute')
+         WHERE id = $1 AND tenant_id = $2`,
+        [conversation.id, tenant.id, ECHO_HUMAN_MODE_HOURS * 60 - 1]
+      )
+
+      HITLService.broadcastToTenant(tenant.id, 'new_message', {
+        conversationId: conversation.id,
+        message: { id: saved?.id, role: 'staff', content, created_at: new Date().toISOString() }
+      })
+      HITLService.broadcastToTenant(tenant.id, 'mode_changed', {
+        conversationId: conversation.id,
+        mode: 'human',
+        timestamp: new Date().toISOString()
+      })
+      logEcho('stored')
+    } catch (echoErr) {
+      logger.error(`COEXISTENCE_ECHO tenant=${tenant.id} conv=${conversationIdForLog} type=${echo.echoType} result=error ${echoErr?.message}`)
+    }
+  }
+}
+
 router.get('/', (req, res) => {
   const meta = require('./whatsapp.meta')
   const challenge = meta.verifyWebhook(req.query)
@@ -92,6 +182,12 @@ router.post('/', async (req, res) => {
       const source = body.object === 'whatsapp_business_account' ? 'meta' : 'waha'
       const message = parseIncoming(body, source)
       if (!message) return
+
+      // Coexistence: replies the clinic sent from the WhatsApp Business app never go through the AI path below
+      if (message.type === 'echo') {
+        await handleStaffEcho(message)
+        return
+      }
 
       const redisClient = require('../../../config/redis')
       if (message.messageId && redisClient) {
