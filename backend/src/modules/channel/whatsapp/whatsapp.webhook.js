@@ -57,7 +57,10 @@ async function handleStaffEcho(event) {
   const HITLService = require('../../hitl/hitl.service')
   const { broadcastToTenant: broadcastSse } = require('../../hitl/sse')
 
-  const tenantRes = await pool.query('SELECT * FROM tenants WHERE whatsapp_phone_number_id = $1 LIMIT 1', [event.phoneNumberId])
+  const tenantRes = await pool.query(
+    'SELECT id, name, slug, industry, plan, status, whatsapp_number, whatsapp_phone_number_id FROM tenants WHERE whatsapp_phone_number_id = $1 LIMIT 1',
+    [event.phoneNumberId]
+  )
   const tenant = tenantRes.rows[0]
   if (!tenant) {
     logger.warn('COEXISTENCE_ECHO result=no_tenant (unknown phone number id)')
@@ -227,6 +230,9 @@ router.post('/', async (req, res) => {
           return
         }
       }
+
+      // Replies to this message use the clinic's own Meta token when it has one (the shared token otherwise)
+      if (source === 'meta') await senderContext.setTenantAccessToken(tenant.id)
 
       const ConversationService = require('../../conversation/conversation.service')
       const context = await ConversationService.handleIncomingMessage(tenant, message)

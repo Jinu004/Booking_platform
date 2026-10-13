@@ -2,6 +2,7 @@
  * Tenant Data Model
  * Uses plain pg module methods
  */
+const { omitTenantSecrets } = require('../../utils/secretBox');
 
 /**
  * Creates a new tenant record in the database
@@ -17,7 +18,7 @@ const createTenant = async (pool, tenantData) => {
     RETURNING *
   `;
   const result = await pool.query(sql, [name, slug, industry, plan, whatsapp_number]);
-  return result.rows[0];
+  return omitTenantSecrets(result.rows[0]);
 };
 
 /**
@@ -29,7 +30,7 @@ const createTenant = async (pool, tenantData) => {
 const getTenantById = async (pool, id) => {
   const sql = `SELECT * FROM tenants WHERE id = $1`;
   const result = await pool.query(sql, [id]);
-  return result.rows[0] || null;
+  return omitTenantSecrets(result.rows[0]) || null;
 };
 
 /**
@@ -41,7 +42,7 @@ const getTenantById = async (pool, id) => {
 const getTenantBySlug = async (pool, slug) => {
   const sql = `SELECT * FROM tenants WHERE slug = $1`;
   const result = await pool.query(sql, [slug]);
-  return result.rows[0] || null;
+  return omitTenantSecrets(result.rows[0]) || null;
 };
 
 /**
@@ -53,7 +54,7 @@ const getTenantBySlug = async (pool, slug) => {
 const getTenantByWhatsapp = async (pool, whatsappNumber) => {
   const sql = `SELECT * FROM tenants WHERE whatsapp_number = $1`;
   const result = await pool.query(sql, [whatsappNumber]);
-  return result.rows[0] || null;
+  return omitTenantSecrets(result.rows[0]) || null;
 };
 
 /**
@@ -92,7 +93,7 @@ const updateTenant = async (pool, id, updateData) => {
     RETURNING *
   `;
   const result = await pool.query(sql, [id, ...values]);
-  return result.rows[0];
+  return omitTenantSecrets(result.rows[0]);
 };
 
 /**

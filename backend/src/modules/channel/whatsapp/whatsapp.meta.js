@@ -15,6 +15,15 @@ const getPhoneId = () => {
   return META_PHONE_ID
 }
 
+// The clinic's own Meta token when the sender context has one, otherwise the shared env token
+const getToken = () => {
+  if (senderContext.hasContext()) {
+    const tenantToken = senderContext.getAccessToken()
+    if (tenantToken) return tenantToken
+  }
+  return META_TOKEN
+}
+
 /**
  * Sends a text message via Meta Cloud API
  *
@@ -35,7 +44,7 @@ async function sendTextMessage(to, message) {
       },
       {
         headers: {
-          'Authorization': `Bearer ${META_TOKEN}`,
+          'Authorization': `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
         }
       }
@@ -189,7 +198,7 @@ async function sendInteractiveButtons(to, bodyText, buttons) {
       },
       {
         headers: {
-          Authorization: `Bearer ${META_TOKEN}`,
+          Authorization: `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
         }
       }
@@ -244,7 +253,7 @@ async function sendListMessage(to, bodyText, buttonText, items, sectionTitle = '
       },
       {
         headers: {
-          Authorization: `Bearer ${META_TOKEN}`,
+          Authorization: `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
         }
       }
@@ -269,7 +278,7 @@ async function uploadMedia(fileBuffer, mimeType, filename) {
       form,
       {
         headers: {
-          Authorization: `Bearer ${META_TOKEN}`,
+          Authorization: `Bearer ${getToken()}`,
           ...form.getHeaders()
         }
       }
@@ -299,7 +308,7 @@ async function sendDocument(to, mediaId, filename, caption) {
       },
       {
         headers: {
-          Authorization: `Bearer ${META_TOKEN}`,
+          Authorization: `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
         }
       }
@@ -335,7 +344,7 @@ async function sendContact(to, clinicName, phoneNumber) {
   try {
     await axios.post(url, payload, {
       headers: {
-        Authorization: `Bearer ${META_TOKEN}`,
+        Authorization: `Bearer ${getToken()}`,
         'Content-Type': 'application/json'
       }
     });
@@ -362,7 +371,7 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en', compon
       },
       {
         headers: {
-          'Authorization': `Bearer ${META_TOKEN}`,
+          'Authorization': `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
         }
       }

@@ -3,6 +3,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 const { bcrypt } = require('../../config/auth');
 const { normalizeNumber } = require('../tenant/tenant.service');
+const { omitTenantSecrets } = require('../../utils/secretBox');
 
 /**
  * GET /superadmin/tenants
@@ -42,7 +43,7 @@ async function getTenantDetails(req, res) {
       return errorResponse(res, 'Tenant not found', 404);
     }
 
-    return successResponse(res, result.rows[0]);
+    return successResponse(res, omitTenantSecrets(result.rows[0]));
   } catch (err) {
     logger.error('Error fetching tenant details:', err.message);
     return errorResponse(res, 'Failed to fetch tenant', 500);
@@ -70,7 +71,7 @@ async function updateTenantStatus(req, res) {
       return errorResponse(res, 'Tenant not found', 404);
     }
 
-    return successResponse(res, result.rows[0]);
+    return successResponse(res, omitTenantSecrets(result.rows[0]));
   } catch (err) {
     logger.error('Error updating tenant status:', err.message);
     return errorResponse(res, 'Failed to update tenant status', 500);
@@ -175,7 +176,7 @@ async function createTenant(req, res) {
     );
 
     await client.query('COMMIT');
-    return successResponse(res, tenant, 201);
+    return successResponse(res, omitTenantSecrets(tenant), 201);
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === '23505') {
@@ -253,7 +254,7 @@ async function updateTenant(req, res) {
       await redisClient.del(`tenant_configs:${id}`);
     } catch (_) {}
 
-    return successResponse(res, result.rows[0]);
+    return successResponse(res, omitTenantSecrets(result.rows[0]));
   } catch (err) {
     if (err.code === '23505' && err.constraint === 'idx_tenants_whatsapp_phone_number_id') {
       return errorResponse(res, 'This Phone Number ID is already assigned to another clinic', 409);
