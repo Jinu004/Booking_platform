@@ -182,6 +182,28 @@ router.post('/', async (req, res) => {
     await senderContext.run(incomingPhoneId, async () => {
     try {
       const body = req.body
+
+      // Coexistence: log-only capture of the payload shape of history, smb_app_state_sync and account_update (all entries and changes)
+      try {
+        const { captureCoexistenceEvent } = require('./whatsapp.coexistence.capture')
+        if (body?.object === 'whatsapp_business_account' && Array.isArray(body.entry)) {
+          for (const captureEntry of body.entry) {
+            for (const captureChange of (Array.isArray(captureEntry?.changes) ? captureEntry.changes : [])) {
+              if (['history', 'smb_app_state_sync', 'account_update'].includes(captureChange?.field)) {
+                try {
+                  await captureCoexistenceEvent(captureEntry, captureChange)
+                } catch {}
+              }
+            }
+          }
+        } else if (body && typeof body === 'object' && !Array.isArray(body.entry)
+          && (Array.isArray(body.errors) || (Array.isArray(body.history) && body.history.some(h => h && h.errors)))) {
+          // The documented history decline has no entry wrapper
+          const topKeys = Object.keys(body).slice(0, 20).map(k => String(k).replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)).join(',')
+          logger.info(`COEXISTENCE_CAPTURE field=history result=no_entry_wrapper keys=${topKeys}`)
+        }
+      } catch {}
+
       const source = body.object === 'whatsapp_business_account' ? 'meta' : 'waha'
       const message = parseIncoming(body, source)
       if (!message) return
