@@ -3,6 +3,7 @@ import { getAllTenants, getPlatformStats, updateTenantStatus, updateTenant, crea
 import useStore from '../store/useStore';
 import api from '../utils/api';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/shared/Skeleton';
+import CoexistenceConnect from '../components/shared/CoexistenceConnect';
 
 const PLANS = ['starter', 'growth', 'pro'];
 
@@ -754,6 +755,14 @@ export default function SuperAdmin() {
                 </div>
               )}
             </div>
+
+            {/* WhatsApp Coexistence (clinic's own WhatsApp Business app number) */}
+            <CoexistenceConnect
+              key={editTenant.id}
+              tenant={editTenant}
+              addToast={addToast}
+              onConnected={(connected) => setEditForm(f => ({ ...f, whatsappPhoneNumberId: connected.phoneNumberId || f.whatsappPhoneNumberId }))}
+            />
 
             </div>{/* end scrollable body */}
             <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
