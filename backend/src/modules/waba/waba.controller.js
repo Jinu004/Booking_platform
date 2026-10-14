@@ -157,7 +157,9 @@ async function connectClinicNumber(req, res) {
     if (!META_ID_PATTERN.test(String(wabaId || ''))) {
       return errorResponse(res, 'wabaId must be 8-20 digits', 400);
     }
-    if (!META_ID_PATTERN.test(String(phoneNumberId || ''))) {
+    // phoneNumberId is optional: when it is missing it is looked up from the WABA after the token is known
+    const hasPhoneNumberId = phoneNumberId !== undefined && phoneNumberId !== null && phoneNumberId !== '';
+    if (hasPhoneNumberId && !META_ID_PATTERN.test(String(phoneNumberId))) {
       return errorResponse(res, 'phoneNumberId must be 8-20 digits', 400);
     }
     if (code !== undefined && code !== null && typeof code !== 'string') {
@@ -174,17 +176,23 @@ async function connectClinicNumber(req, res) {
     }
     const tenantRow = tenantRes.rows[0];
 
-    // Without a code this is a retry (for example after a failed subscribe): it needs a token already stored for the same ids
+    // Without a code this is a retry (for example after a failed subscribe or lookup): it needs a token already stored for the same WABA,
+    // and a phone number id (when given) that does not contradict the one already stored
     const hasCode = typeof code === 'string' && code.trim() !== '';
     const isRetry = !hasCode;
     if (isRetry) {
       const sameConnection = !!tenantRow.whatsapp_access_token_enc &&
         tenantRow.whatsapp_waba_id === String(wabaId) &&
-        tenantRow.whatsapp_phone_number_id === String(phoneNumberId);
+        !(hasPhoneNumberId && tenantRow.whatsapp_phone_number_id && tenantRow.whatsapp_phone_number_id !== String(phoneNumberId));
       if (!sameConnection) {
         return errorResponse(res, 'code is required', 400);
       }
     }
+
+    // The phone number id to use: the request's, else (on a retry) the stored one, else it is looked up from the WABA below
+    let phoneId = hasPhoneNumberId
+      ? String(phoneNumberId)
+      : (isRetry && tenantRow.whatsapp_phone_number_id ? tenantRow.whatsapp_phone_number_id : null);
 
     // 2. Fail before calling Meta when the server is not configured
     try {
@@ -199,12 +207,15 @@ async function connectClinicNumber(req, res) {
       return errorResponse(res, 'META_APP_SECRET is not configured on the server', 500);
     }
 
-    // 3. The phone number id must not belong to another clinic
-    const inUse = await pool.query(
-      'SELECT id FROM tenants WHERE whatsapp_phone_number_id = $1 AND id <> $2',
-      [String(phoneNumberId), tenantId]
-    );
-    if (inUse.rows.length) {
+    // 3. The phone number id must not belong to another clinic (checked again later if the id is only found after the exchange)
+    const isUsedByAnotherTenant = async (id) => {
+      const inUse = await pool.query(
+        'SELECT id FROM tenants WHERE whatsapp_phone_number_id = $1 AND id <> $2',
+        [String(id), tenantId]
+      );
+      return inUse.rows.length > 0;
+    };
+    if (phoneId && await isUsedByAnotherTenant(phoneId)) {
       return errorResponse(res, 'This Phone Number ID is already assigned to another clinic', 409);
     }
 
@@ -248,17 +259,18 @@ async function connectClinicNumber(req, res) {
         return errorResponse(res, 'Meta code exchange returned no access token', 502);
       }
 
-      // Save the token right away: the code cannot be used again, so a failed subscribe must not lose it
+      // Save the token right away: the code cannot be used again, so a failed lookup or subscribe must not lose it.
+      // When the phone number id is not known yet, the stored one is left unchanged.
       try {
         await pool.query(
           `UPDATE tenants
-           SET whatsapp_phone_number_id = $1,
+           SET whatsapp_phone_number_id = COALESCE($1, whatsapp_phone_number_id),
                whatsapp_waba_id = $2,
                whatsapp_access_token_enc = $3,
                whatsapp_connected_at = NOW(),
                updated_at = NOW()
            WHERE id = $4`,
-          [String(phoneNumberId), String(wabaId), encrypt(businessToken), tenantId]
+          [phoneId, String(wabaId), encrypt(businessToken), tenantId]
         );
       } catch (storeErr) {
         if (storeErr.code === '23505') {
@@ -271,6 +283,60 @@ async function connectClinicNumber(req, res) {
       await clearTenantCache([tenantRow.whatsapp_number]);
     }
     const authHeaders = { Authorization: `Bearer ${businessToken}` };
+
+    // 4b. Phone number id still unknown: look it up from the WABA with the business token.
+    // The token is already saved at this point, so every failure below can be repeated by calling /connect again without the code.
+    let phoneIdFromLookup = false;
+    if (!phoneId) {
+      let numbers;
+      try {
+        const listRes = await axios.get(`${META_API_URL}/${wabaId}/phone_numbers`, {
+          params: { fields: 'id,display_phone_number' },
+          headers: authHeaders
+        });
+        numbers = Array.isArray(listRes.data?.data) ? listRes.data.data : [];
+      } catch (listErr) {
+        logger.warn(`WABA connect: phone number lookup failed for tenant ${tenantId}: ${metaFailure(listErr)}`);
+        return errorResponse(
+          res,
+          `The token was saved, but the numbers of this WABA could not be listed (${metaFailure(listErr)}). Call /connect again without the code and with phoneNumberId.`,
+          409
+        );
+      }
+      if (numbers.length !== 1) {
+        const described = numbers.map(n => `${String(n.id)} (${n.display_phone_number || 'unknown number'})`).join(', ');
+        return errorResponse(
+          res,
+          `The token was saved, but this WABA has ${numbers.length} phone number(s)${numbers.length ? `: ${described}` : ''}. Call /connect again without the code and with phoneNumberId.`,
+          409
+        );
+      }
+      const foundId = String(numbers[0].id || '');
+      if (!META_ID_PATTERN.test(foundId)) {
+        return errorResponse(res, 'The token was saved, but Meta returned an unexpected phone number id. Call /connect again without the code and with phoneNumberId.', 409);
+      }
+      phoneId = foundId;
+      phoneIdFromLookup = true;
+      if (await isUsedByAnotherTenant(phoneId)) {
+        return errorResponse(res, 'This Phone Number ID is already assigned to another clinic (the token was saved)', 409);
+      }
+    }
+
+    // Store the phone number id when it was not stored together with the exchange (found by lookup, or given on a retry)
+    if (phoneIdFromLookup || (isRetry && tenantRow.whatsapp_phone_number_id !== phoneId)) {
+      try {
+        await pool.query(
+          'UPDATE tenants SET whatsapp_phone_number_id = $1, updated_at = NOW() WHERE id = $2',
+          [phoneId, tenantId]
+        );
+      } catch (phoneStoreErr) {
+        if (phoneStoreErr.code === '23505') {
+          return errorResponse(res, 'This Phone Number ID is already assigned to another clinic (the token was saved)', 409);
+        }
+        logger.error(`WABA connect: storing the phone number id failed for tenant ${tenantId}: ${phoneStoreErr.message}`);
+        return errorResponse(res, 'Failed to store the phone number id', 500);
+      }
+    }
 
     // 5. Subscribe the app to the clinic's WABA (the token is already saved, so this can be repeated without the code)
     try {
@@ -292,7 +358,7 @@ async function connectClinicNumber(req, res) {
     let displayNumber = null;
     let detailsWarning = null;
     try {
-      const phoneRes = await axios.get(`${META_API_URL}/${phoneNumberId}`, {
+      const phoneRes = await axios.get(`${META_API_URL}/${phoneId}`, {
         params: { fields: 'display_phone_number,is_on_biz_app,platform_type' },
         headers: authHeaders
       });
@@ -326,13 +392,13 @@ async function connectClinicNumber(req, res) {
     // 9. Drop cached copies of this tenant (lookup by incoming number)
     await clearTenantCache([tenantRow.whatsapp_number, normalizedDisplay]);
 
-    logger.info(`WABA connect: tenant ${tenantId} connected (phone number id ${phoneNumberId}${isRetry ? ', retry without code' : ''})`);
+    logger.info(`WABA connect: tenant ${tenantId} connected (phone number id ${phoneId}${isRetry ? ', retry without code' : ''})`);
 
     // 10. The token is never part of the response; the sync deadline follows the first connect
     return successResponse(res, {
       connected: true,
       wabaId: String(wabaId),
-      phoneNumberId: String(phoneNumberId),
+      phoneNumberId: phoneId,
       isOnBizApp,
       platformType,
       syncDeadline: new Date(connectedAtMs + SYNC_WINDOW_MS).toISOString(),
