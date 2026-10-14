@@ -6,6 +6,10 @@ const APP_ID = import.meta.env.VITE_META_APP_ID;
 const CONFIG_ID = import.meta.env.VITE_META_CONFIG_ID;
 const SDK_ID = 'facebook-jssdk';
 const WABA_WAIT_MS = 15000; // the code is only valid for 30 seconds, so do not wait long for the WABA id
+const FLOW_TIMEOUT_MS = 3 * 60 * 1000; // the Meta window must be finished within 3 minutes
+const DIGITS_ONLY = /^\d+$/;
+const IDS_SET = !!APP_ID && !!CONFIG_ID;
+const IDS_INVALID = (!!APP_ID && !DIGITS_ONLY.test(String(APP_ID))) || (!!CONFIG_ID && !DIGITS_ONLY.test(String(CONFIG_ID)));
 
 let sdkInitialised = false;
 
@@ -30,9 +34,10 @@ const SYNC_BUTTONS = [
  * Props: tenant { id, name }, onConnected(), addToast(message, type)
  */
 export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
-  const configured = !!APP_ID && !!CONFIG_ID;
+  const configured = IDS_SET && !IDS_INVALID;
   const [sdkReady, setSdkReady] = useState(false);
   const [sdkFailed, setSdkFailed] = useState(false);
+  const [sdkError, setSdkError] = useState('');
   const [step, setStep] = useState('idle'); // idle | waiting | connecting | connected | error
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
@@ -51,6 +56,8 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
   const wabaRef = useRef(null);
   const phoneRef = useRef(null);
   const waitTimerRef = useRef(null);
+  const flowTimerRef = useRef(null);
+  const flowIdRef = useRef(0);
   const listenerRef = useRef(null);
   const connectingRef = useRef(false);
 
@@ -58,11 +65,25 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
   useEffect(() => {
     if (!configured) return undefined;
     const init = () => {
-      if (!sdkInitialised) {
-        window.FB.init({ appId: APP_ID, autoLogAppEvents: true, xfbml: true, version: 'v25.0' });
-        sdkInitialised = true;
+      try {
+        if (!sdkInitialised) {
+          window.FB.init({ appId: APP_ID, autoLogAppEvents: true, xfbml: true, version: 'v25.0' });
+          sdkInitialised = true;
+        }
+        if (typeof window.FB.getAppId === 'function') {
+          const initialisedId = window.FB.getAppId();
+          if (initialisedId !== undefined && initialisedId !== null && String(initialisedId) !== String(APP_ID)) {
+            setSdkReady(false);
+            setSdkError('Meta SDK could not start with this app id');
+            return;
+          }
+        }
+        setSdkError('');
+        setSdkReady(true);
+      } catch {
+        setSdkReady(false);
+        setSdkError('Meta SDK could not start');
       }
-      setSdkReady(true);
     };
     if (window.FB) {
       init();
@@ -91,6 +112,22 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
       clearTimeout(waitTimerRef.current);
       waitTimerRef.current = null;
     }
+    if (flowTimerRef.current) {
+      clearTimeout(flowTimerRef.current);
+      flowTimerRef.current = null;
+    }
+  };
+
+  // Stops the running flow without an error and returns the section to idle
+  const cancelFlow = (message = '') => {
+    flowIdRef.current += 1; // a late answer from the Meta window is ignored
+    stopListening();
+    codeRef.current = null;
+    wabaRef.current = null;
+    phoneRef.current = null;
+    connectingRef.current = false;
+    setError(message);
+    setStep('idle');
   };
 
   // Clean up when the form closes
@@ -218,9 +255,17 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
     listenerRef.current = onMessage;
     window.addEventListener('message', onMessage);
     setStep('waiting');
+    flowIdRef.current += 1;
+    const flowId = flowIdRef.current;
+    flowTimerRef.current = setTimeout(() => {
+      flowTimerRef.current = null;
+      if (flowIdRef.current === flowId) cancelFlow('The Meta window timed out. Please start again.');
+    }, FLOW_TIMEOUT_MS);
 
+    try {
     window.FB.login(
       (response) => {
+        if (flowIdRef.current !== flowId) return;
         const code = response?.authResponse?.code;
         if (!code) {
           failFlow('The Meta window was closed before finishing.');
@@ -242,6 +287,9 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
         extras: { setup: {}, featureType: 'whatsapp_business_app_onboarding' }
       }
     );
+    } catch {
+      failFlow('The Meta window could not be opened.');
+    }
   };
 
   const requestSync = async (syncType) => {
@@ -279,8 +327,14 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
           <p>The whole flow must be finished while you are on the call.</p>
         </div>
 
-        {!configured && (
+        {!configured && !IDS_INVALID && (
           <p className="text-red-600 text-xs">Meta app id / config id is not configured</p>
+        )}
+        {IDS_INVALID && (
+          <p className="text-red-600 text-xs">Meta app id / config id looks invalid (it must be numbers only). Rebuild the dashboard with the correct values.</p>
+        )}
+        {configured && sdkError && (
+          <p className="text-red-600 text-xs">{sdkError}</p>
         )}
         {configured && sdkFailed && (
           <p className="text-red-600 text-xs">The Meta script could not be loaded. It may be blocked by the site's security policy or the network.</p>
@@ -293,6 +347,15 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
           >
             {step === 'waiting' ? 'Waiting for the clinic in the Meta window...' : step === 'connecting' ? 'Connecting...' : 'Connect WhatsApp number'}
+          </button>
+        )}
+
+        {step === 'waiting' && (
+          <button
+            onClick={() => cancelFlow()}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+          >
+            Cancel
           </button>
         )}
 
