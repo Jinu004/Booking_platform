@@ -6,7 +6,7 @@ const APP_ID = import.meta.env.VITE_META_APP_ID;
 const CONFIG_ID = import.meta.env.VITE_META_CONFIG_ID;
 const SDK_ID = 'facebook-jssdk';
 const WABA_WAIT_MS = 15000; // the code is only valid for 30 seconds, so do not wait long for the WABA id
-const FLOW_TIMEOUT_MS = 3 * 60 * 1000; // the Meta window must be finished within 3 minutes
+const FLOW_TIMEOUT_MS = 15 * 60 * 1000; // the Meta window must be finished within 15 minutes
 const DIGITS_ONLY = /^\d+$/;
 const IDS_SET = !!APP_ID && !!CONFIG_ID;
 const IDS_INVALID = (!!APP_ID && !DIGITS_ONLY.test(String(APP_ID))) || (!!CONFIG_ID && !DIGITS_ONLY.test(String(CONFIG_ID)));
@@ -238,6 +238,7 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
       }
       if (!data || data.type !== 'WA_EMBEDDED_SIGNUP') return;
       const payload = data.data || {};
+      if (data.event === 'ERROR' || data.event === 'CANCEL') console.warn('Meta embedded signup event', { event: data.event, current_step: payload.current_step, error_code: payload.error_code, error_message: payload.error_message, session_id: payload.session_id, business_id: payload.business_id });
       if (data.event === 'FINISH' || data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') {
         wabaRef.current = payload.waba_id || null;
         if (payload.phone_number_id) phoneRef.current = payload.phone_number_id; // may be missing for coexistence
