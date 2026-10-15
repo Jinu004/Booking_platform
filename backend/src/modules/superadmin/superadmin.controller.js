@@ -13,6 +13,7 @@ async function getAllTenants(req, res) {
   try {
     const sql = `
       SELECT t.id, t.name, t.plan, t.status, t.industry, t.whatsapp_number, t.whatsapp_phone_number_id, t.created_at, t.ai_model,
+             t.whatsapp_waba_id, t.whatsapp_connected_at, (t.whatsapp_access_token_enc IS NOT NULL) AS whatsapp_token_set,
              (SELECT COUNT(*) FROM bookings b WHERE b.tenant_id = t.id AND b.created_at >= DATE_TRUNC('month', NOW())) AS booking_count,
              (SELECT COUNT(*) FROM conversations c WHERE c.tenant_id = t.id AND c.started_at >= DATE_TRUNC('month', NOW())) AS conversation_count,
              (SELECT COUNT(*) FROM customers cu WHERE cu.tenant_id = t.id) AS customer_count,
