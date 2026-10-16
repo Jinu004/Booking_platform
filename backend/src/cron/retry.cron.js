@@ -7,11 +7,13 @@ const logger = require('../utils/logger');
 async function processRetryQueue() {
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM whatsapp_retry_queue
-       WHERE status = 'pending'
-         AND next_retry_at <= NOW()
-         AND attempts < max_attempts
-       ORDER BY next_retry_at ASC
+      `SELECT q.* FROM whatsapp_retry_queue q
+       LEFT JOIN tenants t ON t.id = q.tenant_id
+       WHERE q.status = 'pending'
+         AND q.next_retry_at <= NOW()
+         AND q.attempts < q.max_attempts
+         AND (q.tenant_id IS NULL OR t.status = 'active')
+       ORDER BY q.next_retry_at ASC
        LIMIT 20`
     );
     for (const job of rows) {

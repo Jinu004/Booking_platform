@@ -66,6 +66,11 @@ async function handleStaffEcho(event) {
     logger.warn('COEXISTENCE_ECHO result=no_tenant (unknown phone number id)')
     return
   }
+  // Tenant kill switch: nothing is stored and human mode is not changed for a tenant that is not active
+  if (tenant.status !== 'active') {
+    logger.info(`TENANT_OFF tenant=${tenant.id} status=${tenant.status} result=ignored`)
+    return
+  }
 
   for (const echo of event.echoes) {
     let conversationIdForLog = 'none'
@@ -251,6 +256,12 @@ router.post('/', async (req, res) => {
           logger.warn(`No tenant found for number: ${message.from}`)
           return
         }
+      }
+
+      // Tenant kill switch: only an active tenant gets replies (the webhook still answers 200 to Meta)
+      if (tenant.status !== 'active') {
+        logger.info(`TENANT_OFF tenant=${tenant.id} status=${tenant.status} result=ignored`)
+        return
       }
 
       // Replies to this message use the clinic's own Meta token when it has one (the shared token otherwise)

@@ -73,6 +73,13 @@ async function updateTenantStatus(req, res) {
       return errorResponse(res, 'Tenant not found', 404);
     }
 
+    // The webhook caches the tenant by number for 5 minutes: drop it so the new status takes effect at once
+    try {
+      const redisClient = require('../../config/redis');
+      const statusWhatsapp = result.rows[0].whatsapp_number;
+      if (statusWhatsapp) await redisClient.del(`tenant_wa:${normalizeNumber(statusWhatsapp)}`);
+    } catch (_) {}
+
     return successResponse(res, omitTenantSecrets(result.rows[0]));
   } catch (err) {
     logger.error('Error updating tenant status:', err.message);

@@ -23,6 +23,7 @@ cron.schedule('0 8 * * *', async () => {
          JOIN tenants t ON t.id = b.tenant_id
          WHERE b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
          AND b.status IN ('pending', 'confirmed')
+         AND t.status = 'active'
          AND NOT EXISTS (
            SELECT 1 FROM notifications n
            WHERE n.booking_id = b.id

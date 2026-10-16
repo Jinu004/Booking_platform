@@ -34,7 +34,9 @@ function startNoShowCron() {
           SELECT b.id AS booking_id, b.tenant_id, c.phone, c.id AS customer_id
           FROM bookings b
           JOIN customers c ON c.id = b.customer_id
+          JOIN tenants t ON t.id = b.tenant_id
           WHERE b.id = ANY($1)
+          AND t.status = 'active'
           AND c.phone IS NOT NULL
         `, [bookingIds])
 
