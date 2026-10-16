@@ -55,6 +55,13 @@ const corsOptions = {
   credentials: true
 };
 app.use(cors(corsOptions));
+// WhatsApp webhook only: larger JSON bodies (history sync chunks). Registered before the global parser, which then skips the already parsed body.
+app.use('/webhook', express.json({
+  limit: '5mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.json({
   verify: (req, res, buf) => {
     req.rawBody = buf;
