@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getAllTenants, getPlatformStats, updateTenantStatus, updateTenant, createTenant, clearTenantConversations } from '../services/superadmin.service';
+import { useNavigate } from 'react-router-dom';
+import { getAllTenants, getPlatformStats, updateTenantStatus, createTenant, clearTenantConversations } from '../services/superadmin.service';
 import useStore from '../store/useStore';
 import api from '../utils/api';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/shared/Skeleton';
-import CoexistenceConnect from '../components/shared/CoexistenceConnect';
 
 const PLANS = ['starter', 'growth', 'pro'];
 
@@ -38,7 +38,7 @@ const industryBadge = (industry) => {
 
 export default function SuperAdmin() {
   const { staff, addToast } = useStore();
-
+  const navigate = useNavigate();
 
 
   const [stats, setStats] = useState(null);
@@ -94,19 +94,6 @@ export default function SuperAdmin() {
   const [createForm, setCreateForm] = useState({ clinicName: '', email: '', password: '', plan: 'starter', industry: 'clinic' });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
-
-  // Edit modal
-  const [editTenant, setEditTenant] = useState(null);
-  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', whatsappPhoneNumberId: '', industry: 'clinic', aiModel: '', proactiveTemplates: false, recallEnabled: true, email: '' });
-  const [editLoading, setEditLoading] = useState(false);
-  const [editError, setEditError] = useState('');
-
-  // WhatsApp WABA registration
-  const [wabaPhone, setWabaPhone] = useState('');
-  const [wabaPhoneNumberId, setWabaPhoneNumberId] = useState('');
-  const [wabaOtp, setWabaOtp] = useState('');
-  const [wabaStep, setWabaStep] = useState('idle'); // idle | sending | otp_sent | verifying | done
-  const [wabaError, setWabaError] = useState('');
 
   const ownTenantId = staff?.tenantId;
 
@@ -167,103 +154,6 @@ export default function SuperAdmin() {
       setCreateError(err?.error || err?.response?.data?.error || 'Failed to create clinic');
     } finally {
       setCreateLoading(false);
-    }
-  };
-
-  const openEdit = (t) => {
-    setEditTenant(t);
-    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', whatsappPhoneNumberId: t.whatsapp_phone_number_id || '', industry: t.industry || 'clinic', aiModel: t.ai_model || '', proactiveTemplates: t.proactive_templates_enabled === 'true',
-    recallEnabled: t.recall_enabled !== 'false', email: t.email || '' });
-    setEditError('');
-  };
-
-  const handleEdit = async () => {
-    setEditError('');
-    if (editForm.industry !== editTenant.industry) {
-      const confirmed = window.confirm(
-        `Changing industry from "${editTenant.industry}" to "${editForm.industry}" will change the AI behaviour, pages, and theme for this tenant immediately. Are you sure?`
-      );
-      if (!confirmed) return;
-    }
-    try {
-      setEditLoading(true);
-      const { proactiveTemplates, ...tenantForm } = editForm;
-      await updateTenant(editTenant.id, tenantForm);
-      await api.patch(`/superadmin/tenants/${editTenant.id}/config`, {
-        key: 'proactive_templates_enabled',
-        value: String(proactiveTemplates)
-      });
-      await api.patch(`/superadmin/tenants/${editTenant.id}/config`, { key: 'recall_enabled', value: String(editForm.recallEnabled) });
-      await fetchData();
-      closeEditModal();
-    } catch (err) {
-      setEditError(err?.error || err?.response?.data?.error || 'Failed to update clinic');
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-
-  const closeEditModal = () => {
-    setEditTenant(null);
-    setWabaStep('idle');
-    setWabaPhone('');
-    setWabaOtp('');
-    setWabaPhoneNumberId('');
-    setWabaError('');
-  };
-
-  const handleSendOTP = async () => {
-    if (!wabaPhone || !editTenant?.id) return;
-    setWabaStep('sending');
-    setWabaError('');
-    try {
-      const res = await api.post('/admin/waba/initiate', {
-        phone_number: wabaPhone,
-        tenant_id: editTenant.id
-      });
-      setWabaPhoneNumberId(res.data?.phone_number_id || res.phone_number_id);
-      setWabaStep('otp_sent');
-    } catch (err) {
-      setWabaError(err.error || 'Failed to send OTP');
-      setWabaStep('idle');
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    if (!wabaOtp || !wabaPhoneNumberId) return;
-    setWabaStep('verifying');
-    setWabaError('');
-    try {
-      await api.post('/admin/waba/verify', {
-        phone_number_id: wabaPhoneNumberId,
-        code: wabaOtp,
-        tenant_id: editTenant.id,
-        phone_number: wabaPhone
-      });
-      setWabaStep('done');
-      addToast('WhatsApp number registered successfully', 'success');
-      fetchData();
-      setEditForm(f => ({ ...f, whatsappPhoneNumberId: wabaPhoneNumberId }));
-    } catch (err) {
-      setWabaError(err.error || 'Invalid OTP');
-      setWabaStep('otp_sent');
-    }
-  };
-
-  const handleDeleteClinic = async (tenantId, clinicName) => {
-    const confirmed = window.prompt(`Type "${clinicName}" to confirm permanent deletion:`);
-    if (confirmed !== clinicName) {
-      if (confirmed !== null) addToast('Clinic name did not match', 'error');
-      return;
-    }
-    try {
-      await api.delete(`/superadmin/tenants/${tenantId}`);
-      addToast('Clinic deleted permanently', 'success');
-      closeEditModal();
-      fetchData();
-    } catch {
-      addToast('Failed to delete clinic', 'error');
     }
   };
 
@@ -489,7 +379,7 @@ export default function SuperAdmin() {
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.conversation_count}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                    <button onClick={() => openEdit(t)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
+                    <button onClick={() => navigate(`/superadmin/tenants/${t.id}`)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
                     {t.id === ownTenantId && (
                       <span className="inline-flex text-xs leading-5 font-semibold text-gray-400">(You)</span>
                     )}
@@ -592,210 +482,6 @@ export default function SuperAdmin() {
         </div>
       )}
 
-      {/* Edit Clinic Modal */}
-      {editTenant && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
-          <div className="p-6 space-y-4 overflow-y-auto flex-1">
-            <h2 className="text-lg font-semibold text-gray-900">Edit Clinic</h2>
-            {editError && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{editError}</p>}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Name</label>
-              <input
-                type="text"
-                value={editForm.clinicName}
-                onChange={e => setEditForm(f => ({ ...f, clinicName: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
-              <select
-                value={editForm.plan}
-                onChange={e => setEditForm(f => ({ ...f, plan: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                {PLANS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
-              <select
-                value={editForm.industry}
-                onChange={e => setEditForm(f => ({ ...f, industry: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="clinic">Clinic</option>
-                <option value="enquiry">Enquiry</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
-              <input
-                type="text"
-                value={editForm.whatsappNumber}
-                onChange={e => setEditForm(f => ({ ...f, whatsappNumber: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="+919876543210"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number ID</label>
-              <input
-                type="text"
-                value={editForm.whatsappPhoneNumberId}
-                onChange={e => setEditForm(f => ({ ...f, whatsappPhoneNumberId: e.target.value.replace(/\D/g, '') }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Digits only"
-              />
-              <p className="text-xs text-gray-400 mt-1">From WhatsApp Manager (gear icon next to the number). Used to send reminders and staff replies from this clinic's number.</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Email</label>
-              <input
-                type="email"
-                value={editForm.email}
-                onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="clinic@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">AI Model Override <span className="text-gray-400 font-normal">(optional — overrides plan default)</span></label>
-              <select
-                value={editForm.aiModel}
-                onChange={e => setEditForm(f => ({ ...f, aiModel: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">Use plan default</option>
-                <option value="gemini-2.5-pro">gemini-2.5-pro (Pro quality)</option>
-                <option value="gemini-2.5-flash">gemini-2.5-flash (Balanced)</option>
-                <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Fast)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Proactive Template Messaging</label>
-              <div className="flex items-center gap-3 mt-1">
-                <input
-                  type="checkbox"
-                  id="proactiveTemplates"
-                  checked={editForm.proactiveTemplates}
-                  onChange={e => setEditForm(f => ({ ...f, proactiveTemplates: e.target.checked }))}
-                  className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-                />
-                <label htmlFor="proactiveTemplates" className="text-sm text-gray-600">
-                  Allow staff to send template messages when 24-hour window is closed
-                </label>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Recall Checkup Messages</label>
-              <div className="flex items-center gap-3 mt-1">
-                <input
-                  type="checkbox"
-                  id="recallEnabled"
-                  checked={editForm.recallEnabled}
-                  onChange={e => setEditForm(f => ({ ...f, recallEnabled: e.target.checked }))}
-                  className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-                />
-                <label htmlFor="recallEnabled" className="text-sm text-gray-600">
-                  Send recall checkup WhatsApp reminders to patients not seen in 90 days (every Monday)
-                </label>
-              </div>
-            </div>
-
-            {/* WhatsApp WABA Registration */}
-            <div className="border-t pt-4 mt-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">📱 Register WhatsApp Number</h4>
-              {wabaStep === 'done' ? (
-                <div className="text-sm text-green-600 font-medium">✅ WhatsApp number registered successfully</div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
-                    ⚠️ After registration, WhatsApp app will stop working on this number. All messages will be handled by ReceptionAI.
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="91XXXXXXXXXX"
-                      value={wabaPhone}
-                      onChange={e => setWabaPhone(e.target.value)}
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      disabled={wabaStep === 'otp_sent' || wabaStep === 'sending'}
-                    />
-                    <button
-                      onClick={handleSendOTP}
-                      disabled={wabaStep === 'sending' || wabaStep === 'otp_sent' || !wabaPhone}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-                    >
-                      {wabaStep === 'sending' ? 'Sending...' : 'Send OTP'}
-                    </button>
-                  </div>
-                  {wabaStep === 'otp_sent' && (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Enter 6-digit OTP"
-                        value={wabaOtp}
-                        onChange={e => setWabaOtp(e.target.value)}
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      />
-                      <button
-                        onClick={handleVerifyOTP}
-                        disabled={wabaStep === 'verifying' || !wabaOtp}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-                      >
-                        {wabaStep === 'verifying' ? 'Verifying...' : 'Verify OTP'}
-                      </button>
-                    </div>
-                  )}
-                  {wabaError && (
-                    <p className="text-red-600 text-xs">{wabaError}</p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* WhatsApp Coexistence (clinic's own WhatsApp Business app number) */}
-            <CoexistenceConnect
-              key={editTenant.id}
-              tenant={editTenant}
-              addToast={addToast}
-              onConnected={(connected) => setEditForm(f => ({ ...f, whatsappPhoneNumberId: connected.phoneNumberId || f.whatsappPhoneNumberId }))}
-            />
-
-            </div>{/* end scrollable body */}
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
-              <div>
-                {editTenant?.status === 'suspended' && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteClinic(editTenant.id, editTenant.name)}
-                    className="px-4 py-2 text-red-600 border border-red-200 rounded-md hover:bg-red-50 text-sm font-medium"
-                  >
-                    Delete Permanently
-                  </button>
-                )}
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => closeEditModal()}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleEdit}
-                  disabled={editLoading}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {editLoading ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       </>}
     </div>
   );

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../utils/api';
-import WhatsappTemplatesPanel from './WhatsappTemplatesPanel';
 
 // The Meta app id and config id come only from the Vite environment; nothing secret is kept in the code.
 const APP_ID = import.meta.env.VITE_META_APP_ID;
@@ -467,8 +466,6 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
                 </div>
               ))}
             </div>
-
-            {(result.saved || result.connected === true) && <WhatsappTemplatesPanel tenantId={tenant.id} />}
           </div>
         )}
       </div>
