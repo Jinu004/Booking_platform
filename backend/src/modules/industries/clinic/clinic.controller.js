@@ -378,7 +378,7 @@ async function createProcedureBooking(req, res, next) {
             await sendMessage(phone, confirmationMsg);
           } catch (msgErr) {
             const metaCode = msgErr.response?.data?.error?.code;
-            if (metaCode === 131026) {
+            if (metaCode === 131047) {
               await sendTemplateMessage(phone, 'procedure_scheduled', 'en', [
                 { type: 'body', parameters: [
                   { type: 'text', text: procedureName },

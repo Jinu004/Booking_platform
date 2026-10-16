@@ -1,5 +1,6 @@
 const axios = require('axios')
 const logger = require('../../../utils/logger')
+const pool = require('../../../config/database')
 const senderContext = require('./senderContext')
 
 const META_TOKEN = process.env.META_WHATSAPP_TOKEN || ''
@@ -27,6 +28,45 @@ const getToken = () => {
     if (tenantToken) return tenantToken
   }
   return META_TOKEN
+}
+
+// Safe summary of a failed send: HTTP status, Meta error code/subcode, a trimmed message and the fbtrace id.
+// Never the Authorization header, request body, phone numbers, tokens or message text.
+function summariseSendError(err) {
+  const metaError = err?.response?.data?.error
+  const message = String(metaError?.message || err?.message || 'unknown error')
+    .replace(/\s+/g, ' ')
+    .replace(/EA[A-Za-z0-9]{20,}/g, '[token]')
+    .replace(/\+?\d{7,}/g, '[number]')
+    .slice(0, 200)
+  const asInt = (value) => (Number.isInteger(Number(value)) && value !== null && value !== undefined && value !== '' ? Number(value) : null)
+  return {
+    http: asInt(err?.response?.status),
+    code: asInt(metaError?.code),
+    subcode: asInt(metaError?.error_subcode),
+    message,
+    trace: metaError?.fbtrace_id ? String(metaError.fbtrace_id).slice(0, 40) : null
+  }
+}
+
+// Logs one line for a failed send (part of the message text, so it is always printed) and records a send_failures row.
+// Never throws and never waits for the database, so it cannot break or delay a send.
+function recordSendFailure(ctx, templateName, err) {
+  try {
+    const s = summariseSendError(err)
+    const tenantId = senderContext.hasContext() ? senderContext.getTenantId() : null
+    logger.error(`META_SEND_FAILED tenant=${tenantId || 'unknown'} ctx=${ctx} template=${templateName || 'none'} code=${s.code ?? 'none'} subcode=${s.subcode ?? 'none'} http=${s.http ?? 'none'} msg=${s.message}${s.trace ? ` trace=${s.trace}` : ''}`)
+    const phoneNumberId = senderContext.hasContext() ? senderContext.getPhoneNumberId() : null
+    pool.query(
+      `INSERT INTO send_failures (tenant_id, ctx, template_name, meta_code, meta_subcode, http_status, error_message)
+       VALUES (COALESCE($1::uuid, (SELECT id FROM tenants WHERE whatsapp_phone_number_id = $2 LIMIT 1)), $3, $4, $5, $6, $7, $8)`,
+      [tenantId, phoneNumberId, ctx, templateName || null, s.code, s.subcode, s.http, s.message]
+    ).catch(dbErr => {
+      logger.warn(`SEND_FAILURE_RECORD_FAILED ctx=${ctx} ${String(dbErr?.message || 'error').slice(0, 120)}`)
+    })
+  } catch (recordErr) {
+    try { logger.warn(`SEND_FAILURE_RECORD_FAILED ctx=${ctx}`) } catch {}
+  }
 }
 
 /**
@@ -58,7 +98,7 @@ async function sendTextMessage(to, message) {
     logger.info(`Meta message sent to ${to.toString().slice(0, 2)}XXXXXX${to.toString().slice(-3)}`)
     return response.data
   } catch (err) {
-    logger.error('Meta send failed:', err.response?.data || err.message)
+    recordSendFailure('text', null, err)
     throw err
   }
 }
@@ -211,8 +251,7 @@ async function sendInteractiveButtons(to, bodyText, buttons) {
     logger.info(`Meta interactive buttons sent to ${to}`)
     return response.data
   } catch (err) {
-    const metaError = err.response?.data?.error;
-    logger.error(`Meta interactive buttons failed — code: ${metaError?.code || 'unknown'}, message: ${metaError?.message || err.message}`)
+    recordSendFailure('buttons', null, err)
     throw err
   }
 }
@@ -266,7 +305,7 @@ async function sendListMessage(to, bodyText, buttonText, items, sectionTitle = '
     logger.info(`Meta list message sent to ${to}`)
     return response.data
   } catch (err) {
-    logger.error('Meta list message failed:', err.response?.data || err.message)
+    recordSendFailure('list', null, err)
     throw err
   }
 }
@@ -291,7 +330,7 @@ async function uploadMedia(fileBuffer, mimeType, filename) {
     logger.info('Media uploaded to Meta:', response.data.id);
     return response.data.id;
   } catch (err) {
-    logger.error('Meta media upload failed:', err.message);
+    recordSendFailure('media_upload', null, err);
     throw err;
   }
 }
@@ -321,7 +360,7 @@ async function sendDocument(to, mediaId, filename, caption) {
     logger.info(`Meta document sent to ${to}`);
     return response.data;
   } catch (err) {
-    logger.error('Meta document send failed:', err.message);
+    recordSendFailure('document', null, err);
     throw err;
   }
 }
@@ -355,7 +394,7 @@ async function sendContact(to, clinicName, phoneNumber) {
     });
     logger.info(`Contact card sent to ${to}`);
   } catch (err) {
-    logger.error('sendContact failed:', JSON.stringify(err.response?.data || err.message));
+    recordSendFailure('contact', null, err);
   }
 }
 
@@ -384,7 +423,7 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en', compon
     logger.info(`Meta template message sent to ${to} using template: ${templateName}`)
     return response.data
   } catch (err) {
-    logger.error('Meta template send failed:', err.response?.data || err.message)
+    recordSendFailure('template', templateName, err)
     throw err
   }
 }

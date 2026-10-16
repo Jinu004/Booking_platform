@@ -12,13 +12,18 @@ const tokenCache = new Map()
 let tokenLookupWarned = false
 
 // Optional accessToken: a tenant's own Meta token; null means the shared env token is used
-function run(phoneNumberId, fn, accessToken = null) {
+// Optional tenantId: only used to label failed sends in logs and in the send_failures table
+function run(phoneNumberId, fn, accessToken = null, tenantId = null) {
   const value = phoneNumberId == null ? '' : String(phoneNumberId)
   const validated = PHONE_NUMBER_ID_PATTERN.test(value) ? value : null
   if (value && !validated) {
     logger.warn(`[senderContext] run() received non-empty but invalid phoneNumberId: ${value}`)
   }
-  return storage.run({ phoneNumberId: validated, accessToken: accessToken || null }, fn)
+  return storage.run({ phoneNumberId: validated, accessToken: accessToken || null, tenantId: tenantId || null }, fn)
+}
+
+function getTenantId() {
+  return storage.getStore()?.tenantId || null
 }
 
 function getPhoneNumberId() {
@@ -63,6 +68,7 @@ async function resolveTenantToken(tenantId) {
 async function setTenantAccessToken(tenantId) {
   const store = storage.getStore()
   if (!store) return
+  store.tenantId = tenantId || null
   store.accessToken = await resolveTenantToken(tenantId)
 }
 
@@ -90,12 +96,13 @@ async function runAsTenant(tenantId, fn) {
     phoneNumberId = null
   }
   const tenantToken = await resolveTenantToken(tenantId)
-  return run(phoneNumberId, fn, tenantToken)
+  return run(phoneNumberId, fn, tenantToken, tenantId)
 }
 
 module.exports = {
   run,
   getPhoneNumberId,
+  getTenantId,
   getAccessToken,
   setTenantAccessToken,
   runAsTenant,

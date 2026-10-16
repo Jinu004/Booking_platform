@@ -117,7 +117,7 @@ async function staffReply(conversationId, tenantId, staffId, content) {
       if (phone) await sendMessage(phone, content);
     } catch (err) {
       const metaCode = err.response?.data?.error?.code;
-      if (metaCode === 131026) {
+      if (metaCode === 131047) {
         logger.warn('24-hour window expired for staffReply — sending follow_up template instead');
         try {
           await sendTemplateMessage(phone, 'follow_up', 'en');
