@@ -16,6 +16,8 @@ const {
   rejectPosterRequest
 } = require('./superadmin.controller');
 const { getConfig, updateConfig } = require('./platform-config.controller');
+const { successResponse, errorResponse } = require('../../utils/response');
+const { createTemplatesForTenant, refreshTemplateStatuses, getTenantTemplates, TemplateError } = require('../waba/waba.templates.service');
 
 const router = express.Router();
 
@@ -37,6 +39,21 @@ router.patch('/tenants/:id/config', async (req, res) => {
     return res.status(500).json({ error: 'Failed to update config' })
   }
 })
+// WhatsApp templates on the clinic's own WhatsApp Business account
+const templateRoute = (action) => async (req, res) => {
+  try {
+    const data = await action(req.params.id);
+    return successResponse(res, data);
+  } catch (err) {
+    if (err instanceof TemplateError) return errorResponse(res, err.message, err.status);
+    logger.error(`SuperAdmin templates failed: ${err.message}`);
+    return errorResponse(res, 'Template request failed', 500);
+  }
+};
+router.post('/tenants/:id/templates/create', templateRoute(createTemplatesForTenant));
+router.post('/tenants/:id/templates/refresh', templateRoute(refreshTemplateStatuses));
+router.get('/tenants/:id/templates', templateRoute(getTenantTemplates));
+
 router.patch('/tenants/:id', updateTenant);
 router.delete('/tenants/:id', deleteTenant);
 router.get('/stats', getPlatformStats);
