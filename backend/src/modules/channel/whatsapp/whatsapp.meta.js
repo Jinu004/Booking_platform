@@ -3,16 +3,21 @@ const logger = require('../../../utils/logger')
 const senderContext = require('./senderContext')
 
 const META_TOKEN = process.env.META_WHATSAPP_TOKEN || ''
-const META_PHONE_ID = process.env.META_PHONE_NUMBER_ID || ''
 const META_API_URL = 'https://graph.facebook.com/v24.0'
 
+// Every send needs a tenant sender context with that clinic's own phone number id; there is no platform-wide fallback number.
+// The context only holds the phone number id and token, so the tenant id is not available here.
 const getPhoneId = () => {
-  if (senderContext.hasContext()) {
-    const id = senderContext.getPhoneNumberId()
-    if (!id) throw new Error('No WhatsApp Phone Number ID set for this clinic - message not sent')
-    return id
+  if (!senderContext.hasContext()) {
+    logger.warn('TENANT_NO_NUMBER tenant=unknown result=blocked (no sender context)')
+    throw new Error('No WhatsApp sender context - message not sent')
   }
-  return META_PHONE_ID
+  const id = senderContext.getPhoneNumberId()
+  if (!id) {
+    logger.warn('TENANT_NO_NUMBER tenant=unknown result=blocked')
+    throw new Error('No WhatsApp Phone Number ID set for this clinic - message not sent')
+  }
+  return id
 }
 
 // The clinic's own Meta token when the sender context has one, otherwise the shared env token
