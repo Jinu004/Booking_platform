@@ -42,8 +42,8 @@ function isConfidentName(typed) {
 
 // Coexistence: how long a conversation stays in human mode after the clinic replies from the WhatsApp Business app.
 // hitl.cron.js resets a human conversation one minute after mode_changed_at, so an echo stores mode_changed_at in the
-// future (now + this many hours - 1 minute); the cron then leaves it alone until this long after the last echo.
-const ECHO_HUMAN_MODE_HOURS = 4
+// future (now + this many minutes - 1 minute); the cron then leaves it alone until this long after the last echo.
+const ECHO_HUMAN_MODE_MINUTES = 10
 
 // A staff reply sent from the WhatsApp Business app (smb_message_echoes): store it as a staff message and keep the AI paused.
 // Never runs the AI, never writes the Redis session, and never creates a message from the patient.
@@ -114,7 +114,7 @@ async function handleStaffEcho(event) {
         `UPDATE conversations
          SET mode = 'human', mode_changed_at = NOW() + ($3::int * INTERVAL '1 minute')
          WHERE id = $1 AND tenant_id = $2`,
-        [conversation.id, tenant.id, ECHO_HUMAN_MODE_HOURS * 60 - 1]
+        [conversation.id, tenant.id, ECHO_HUMAN_MODE_MINUTES - 1]
       )
 
       HITLService.broadcastToTenant(tenant.id, 'new_message', {
