@@ -23,6 +23,21 @@ function isFacebookOrigin(origin) {
   }
 }
 
+const SYNC_WINDOW_MS = 24 * 60 * 60 * 1000; // Meta allows the one-time sync requests within 24 hours of connecting
+
+// The connection already saved on the tenant (from the tenant list), shaped like a connect result; null when not connected
+function savedConnection(tenant) {
+  if (!tenant?.whatsapp_connected_at || tenant.whatsapp_token_set !== true) return null;
+  const connectedMs = Date.parse(tenant.whatsapp_connected_at);
+  if (Number.isNaN(connectedMs)) return null;
+  return {
+    saved: true,
+    phoneNumberId: tenant.whatsapp_phone_number_id || '',
+    connectedAt: new Date(connectedMs).toISOString(),
+    syncDeadline: new Date(connectedMs + SYNC_WINDOW_MS).toISOString()
+  };
+}
+
 const SYNC_BUTTONS = [
   { type: 'history', label: 'Request chat history sync' },
   { type: 'smb_app_state_sync', label: 'Request contacts sync' }
@@ -38,9 +53,9 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
   const [sdkReady, setSdkReady] = useState(false);
   const [sdkFailed, setSdkFailed] = useState(false);
   const [sdkError, setSdkError] = useState('');
-  const [step, setStep] = useState('idle'); // idle | waiting | connecting | connected | error
+  const [step, setStep] = useState(() => (savedConnection(tenant) ? 'connected' : 'idle')); // idle | waiting | connecting | connected | error
   const [error, setError] = useState('');
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState(() => savedConnection(tenant));
   const [savedWabaId, setSavedWabaId] = useState('');
   const [needsPhoneId, setNeedsPhoneId] = useState(false);
   const [canRetrySubscription, setCanRetrySubscription] = useState(false);
@@ -314,6 +329,14 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
     }
   };
 
+  // Leaves the connected view so the Meta signup can be started again for this clinic
+  const reconnect = () => {
+    if (!window.confirm('Connect this clinic number again? This starts the Meta signup again.')) return;
+    setResult(null);
+    setError('');
+    setStep('idle');
+  };
+
   const syncExpired = !!deadlineMs && now > deadlineMs;
   const busy = step === 'waiting' || step === 'connecting';
   const startDisabled = !configured || !sdkReady || busy;
@@ -395,11 +418,18 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
           <div className="space-y-3">
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 space-y-1">
               <div className="font-medium">✅ Connected</div>
-              <div className="text-xs">Phone number id: {result.phoneNumberId}</div>
-              <div className="text-xs">
-                On the WhatsApp Business app: {result.isOnBizApp === true ? 'Yes' : result.isOnBizApp === false ? 'No' : 'Unknown'}
-              </div>
-              <div className="text-xs">Platform type: {result.platformType || 'Unknown'}</div>
+              <div className="text-xs">Phone number id: {result.phoneNumberId || 'Unknown'}</div>
+              {result.connectedAt && (
+                <div className="text-xs">Connected at: {new Date(result.connectedAt).toLocaleString()}</div>
+              )}
+              {!result.saved && (
+                <>
+                  <div className="text-xs">
+                    On the WhatsApp Business app: {result.isOnBizApp === true ? 'Yes' : result.isOnBizApp === false ? 'No' : 'Unknown'}
+                  </div>
+                  <div className="text-xs">Platform type: {result.platformType || 'Unknown'}</div>
+                </>
+              )}
               <div className="text-xs">
                 Sync deadline: {result.syncDeadline ? new Date(result.syncDeadline).toLocaleString() : 'Unknown'}
               </div>
@@ -420,8 +450,15 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
                 ))}
               </div>
               {syncExpired && (
-                <p className="text-xs text-gray-500">The 24-hour sync window has passed. The clinic must disconnect and onboard again to sync.</p>
+                <p className="text-xs text-gray-500">Sync window closed. The clinic must disconnect and onboard again to sync.</p>
               )}
+              <button
+                type="button"
+                onClick={reconnect}
+                className="text-xs text-indigo-600 underline hover:text-indigo-800"
+              >
+                Connect again
+              </button>
               {SYNC_BUTTONS.map(({ type, label }) => (
                 <div key={type}>
                   {sync[type].message && <p className="text-green-600 text-xs">{label}: {sync[type].message}</p>}
