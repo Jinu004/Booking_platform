@@ -69,6 +69,36 @@ function recordSendFailure(ctx, templateName, err) {
   }
 }
 
+// Meta message id of an accepted send. The send functions return Meta's response body, so the id is at messages[0].id.
+function extractWamid(result) {
+  return result?.messages?.[0]?.id ?? result?.data?.messages?.[0]?.id ?? null
+}
+
+// Records the outcome of one send on the stored message row: sent (with the Meta message id) or failed (with the Meta error code).
+// A row already marked failed by a status update stays failed. Callers do not await it; it never throws, and the id is never logged.
+function recordDelivery(messageId, result, err) {
+  try {
+    if (!messageId) return
+    const update = err
+      ? pool.query(
+          `UPDATE messages SET delivery_status = 'failed', delivery_error = $2 WHERE id = $1`,
+          [messageId, summariseSendError(err).code !== null ? String(summariseSendError(err).code) : 'none']
+        )
+      : pool.query(
+          `UPDATE messages
+           SET wa_message_id = COALESCE($2::text, wa_message_id),
+               delivery_status = CASE WHEN delivery_status = 'failed' THEN delivery_status ELSE 'sent' END
+           WHERE id = $1`,
+          [messageId, extractWamid(result)]
+        )
+    update.catch(dbErr => {
+      logger.warn(`MESSAGE_DELIVERY_UPDATE_FAILED ${String(dbErr?.message || 'error').slice(0, 120)}`)
+    })
+  } catch (recordErr) {
+    try { logger.warn('MESSAGE_DELIVERY_UPDATE_FAILED') } catch {}
+  }
+}
+
 /**
  * Sends a text message via Meta Cloud API
  *
@@ -429,6 +459,8 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en', compon
 }
 
 module.exports = {
+  extractWamid,
+  recordDelivery,
   sendTextMessage,
   sendInteractiveButtons,
   sendListMessage,

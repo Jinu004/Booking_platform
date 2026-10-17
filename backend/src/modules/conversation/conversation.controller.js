@@ -8,6 +8,7 @@ const whatsappAdapter = require('../channel/whatsapp/whatsapp.adapter');
 const { runAsTenant } = require('../channel/whatsapp/senderContext');
 const { getOrCreateSession, updateSession } = require('./conversation.session');
 const { isWindowOpen, WINDOW_CLOSED_MESSAGE } = require('./conversation.window');
+const { recordDelivery } = require('../channel/whatsapp/whatsapp.meta');
 
 /**
  * GET /conversations
@@ -194,7 +195,14 @@ async function sendManualMessage(req, res, next) {
           if (c.rows.length > 0) phone = c.rows[0].phone;
         }
         if (phone) {
-          await whatsappAdapter.sendMessage(phone, message);
+          try {
+            const sendResult = await whatsappAdapter.sendMessage(phone, message);
+            recordDelivery(savedMsg.id, sendResult, null);
+          } catch (sendErr) {
+            // Only the Meta send marks the message failed (not the session update that follows)
+            recordDelivery(savedMsg.id, null, sendErr);
+            throw sendErr;
+          }
           const session = await getOrCreateSession(tenantId, phone);
           await updateSession(tenantId, phone, {
             messageCount: (session.messageCount || 0) + 1,

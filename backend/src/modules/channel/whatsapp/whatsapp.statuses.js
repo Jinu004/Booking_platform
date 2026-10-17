@@ -40,25 +40,34 @@ async function recordFailedStatus(value, status) {
   if (status.id && !(await isFirstDelivery(status.id))) return
 
   const phoneNumberId = value?.metadata?.phone_number_id ? String(value.metadata.phone_number_id) : null
-  if (!phoneNumberId) {
+  let tenantId = null
+  if (phoneNumberId) {
+    // Same tenant match as recordSendFailure: by the phone number id (unique on tenants); no row is written when no tenant matches
+    const result = await pool.query(
+      `INSERT INTO send_failures (tenant_id, ctx, template_name, meta_code, meta_subcode, http_status, error_message)
+       SELECT id, 'async_status', NULL, $2::int, NULL, NULL, $3
+       FROM tenants WHERE whatsapp_phone_number_id = $1
+       LIMIT 1
+       RETURNING tenant_id`,
+      [phoneNumberId, code, message]
+    )
+    tenantId = result.rows[0]?.tenant_id || null
+  }
+  if (tenantId) {
+    logger.info(`META_STATUS_FAILED tenant=${tenantId} code=${code ?? 'none'} msg=${message}`)
+  } else {
     logger.info(`META_STATUS_FAILED tenant=unknown code=${code ?? 'none'}`)
-    return
   }
 
-  // Same tenant match as recordSendFailure: by the phone number id (unique on tenants); no row is written when no tenant matches
-  const result = await pool.query(
-    `INSERT INTO send_failures (tenant_id, ctx, template_name, meta_code, meta_subcode, http_status, error_message)
-     SELECT id, 'async_status', NULL, $2::int, NULL, NULL, $3
-     FROM tenants WHERE whatsapp_phone_number_id = $1
-     LIMIT 1
-     RETURNING tenant_id`,
-    [phoneNumberId, code, message]
-  )
-  if (!result.rows.length) {
-    logger.info(`META_STATUS_FAILED tenant=unknown code=${code ?? 'none'}`)
-    return
+  // Mark the stored message of this send as failed, if we tracked it. The Meta message id is only a query parameter (never logged).
+  // No match (status arrived before the send was recorded, or an untracked send): nothing more to do.
+  if (status.id) {
+    await pool.query(
+      `UPDATE messages SET delivery_status = 'failed', delivery_error = $2
+       WHERE wa_message_id = $1 AND delivery_status IS DISTINCT FROM 'failed'`,
+      [String(status.id), code !== null ? String(code) : 'none']
+    )
   }
-  logger.info(`META_STATUS_FAILED tenant=${result.rows[0].tenant_id} code=${code ?? 'none'} msg=${message}`)
 }
 
 /**

@@ -1210,6 +1210,7 @@ router.post('/', async (req, res) => {
       }
 
 
+let assistantRow = null
 if (!isAIError && !isEscalated) {
   await ConversationService.saveInboundMessage(
     context.conversation.id,
@@ -1220,7 +1221,7 @@ if (!isAIError && !isEscalated) {
     conversationId: context.conversation.id,
     message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
   })
-  await ConversationService.saveOutboundMessage(
+  assistantRow = await ConversationService.saveOutboundMessage(
     context.conversation.id,
     aiResponse,
     'assistant'
@@ -1232,7 +1233,15 @@ if (!isAIError && !isEscalated) {
 }
 
 if (!isEscalated && !isInteractiveSent && aiResponse) {
-  await sendMessage(message.from, aiResponse)
+  // Delivery tracking of the main assistant reply: the Meta message id on success, the error code on failure
+  const { recordDelivery } = require('./whatsapp.meta')
+  try {
+    const aiSendResult = await sendMessage(message.from, aiResponse)
+    recordDelivery(assistantRow?.id, aiSendResult, null)
+  } catch (aiSendErr) {
+    recordDelivery(assistantRow?.id, null, aiSendErr)
+    throw aiSendErr
+  }
 }
 
 // After a blocked fake confirmation, resend the welcome menu so the patient can start over
