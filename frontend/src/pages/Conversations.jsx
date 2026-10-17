@@ -12,6 +12,17 @@ import { CardSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
 import api from '../utils/api';
 
+// Short reasons shown under an outbound message that WhatsApp did not deliver, keyed by the Meta error code
+const DELIVERY_FAILURE_REASONS = {
+  '131047': 'the patient has not replied in the last 24 hours',
+  '131026': 'number could not be reached on WhatsApp',
+  '131049': 'held by WhatsApp',
+  '131042': 'WhatsApp account payment problem',
+  '131048': 'WhatsApp sending limit reached',
+  '132001': 'message template is not approved',
+  '132000': 'message template details do not match'
+};
+
 function getMessageDateLabel(ts) {
   if (!ts) return ''
   const d = new Date(ts)
@@ -94,6 +105,7 @@ export default function Conversations() {
 
   const messagesEndRef = useRef(null);
   const selectedConversationIdRef = useRef(selectedConversationId);
+  const reloadTimerRef = useRef(null);
 
 
 
@@ -230,23 +242,43 @@ export default function Conversations() {
       c.id === selectedConversationId ? { ...c, needs_attention: false } : c
     ));
     api.patch(`/hitl/conversations/${selectedConversationId}/acknowledge`).catch(() => {});
-    const loadMessages = async () => {
-      try {
-        setLoadingThread(true);
-        const res = await getConversationMessages(selectedConversationId);
-        if (res.success) setMessages(res.data.messages || []);
-      } catch (err) {
-        console.error('Failed to load messages:', err);
-      } finally {
-        setLoadingThread(false);
+    loadMessages(selectedConversationId);
+  }, [selectedConversationId]);
+
+  // Keeps the open thread fresh without polling: reload when the tab becomes visible again, and drop the
+  // pending reload after a send when the conversation changes or the page unmounts
+  useEffect(() => {
+    if (!selectedConversationId) return undefined;
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') loadMessages(selectedConversationId, { silent: true });
+    };
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisible);
+      if (reloadTimerRef.current) {
+        clearTimeout(reloadTimerRef.current);
+        reloadTimerRef.current = null;
       }
     };
-    loadMessages();
   }, [selectedConversationId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Loads the messages of a conversation. silent: no spinner (used for the refreshes that keep delivery marks current).
+  // An answer for a conversation that is no longer open is ignored.
+  const loadMessages = async (conversationId, { silent = false } = {}) => {
+    try {
+      if (!silent) setLoadingThread(true);
+      const res = await getConversationMessages(conversationId);
+      if (res.success && selectedConversationIdRef.current === conversationId) setMessages(res.data.messages || []);
+    } catch (err) {
+      console.error('Failed to load messages:', err);
+    } finally {
+      if (!silent) setLoadingThread(false);
+    }
+  };
 
   const handleReply = async () => {
     if (!replyText.trim() || sending) return;
@@ -266,6 +298,13 @@ export default function Conversations() {
       setConversations(prev => prev.map(c =>
         c.id === selectedConversationId ? { ...c, needs_attention: false } : c
       ))
+      // Once, about 15 seconds later, reload the thread so a delivery failure reported by WhatsApp shows up
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      const sentConversationId = selectedConversation.id;
+      reloadTimerRef.current = setTimeout(() => {
+        reloadTimerRef.current = null;
+        loadMessages(sentConversationId, { silent: true });
+      }, 15000);
     } catch (err) {
       setReplyText(content);
       addToast(err?.error || 'Failed to send message', 'error');
@@ -540,6 +579,12 @@ export default function Conversations() {
                         }`}>
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                         </div>
+                        {/* Outbound message that WhatsApp did not deliver */}
+                        {!isPatient && msg.delivery_status === 'failed' && (
+                          <p className="text-[11px] text-red-700 mt-1 px-1">
+                            Not delivered{DELIVERY_FAILURE_REASONS[String(msg.delivery_error)] ? ` — ${DELIVERY_FAILURE_REASONS[String(msg.delivery_error)]}` : ''}
+                          </p>
+                        )}
                         {/* Timestamp */}
                         <p className="text-[10px] text-ink/40 mt-1 px-1">
                           {formatTime(msg.created_at)}
