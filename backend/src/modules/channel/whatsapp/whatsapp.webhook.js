@@ -209,6 +209,10 @@ router.post('/', async (req, res) => {
         }
       } catch {}
 
+      // Failed delivery status updates are recorded in send_failures (not awaited, never throws)
+      require('./whatsapp.statuses').handleStatusUpdates(body)
+        .catch(statusErr => logger.warn(`Status update handling failed: ${String(statusErr?.message || '').slice(0, 120)}`))
+
       const source = body.object === 'whatsapp_business_account' ? 'meta' : 'waha'
       const message = parseIncoming(body, source)
       if (!message) return
