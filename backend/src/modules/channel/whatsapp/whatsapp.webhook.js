@@ -275,6 +275,24 @@ router.post('/', async (req, res) => {
       const context = await ConversationService.handleIncomingMessage(tenant, message)
       logger.info(`Conversation ${context.conversation.id} updated`)
 
+      // Marketing consent keywords (STOP, SUBSCRIBE, ...) are answered here, in every mode (also human mode), before the AI or any flow.
+      // Exact whole-message matches only, for real text messages of a known customer.
+      const Consent = require('../../consent/consent.service')
+      if (message.type === 'text' && !message.interactiveId && context.customer?.id) {
+        const consentKeyword = Consent.keywordValue(message.message)
+        if (consentKeyword) {
+          await Consent.handleChoice({
+            tenant,
+            context,
+            message,
+            value: consentKeyword,
+            source: 'stop_keyword',
+            kind: consentKeyword === 'none' ? 'stop' : 'subscribe'
+          })
+          return
+        }
+      }
+
       const HITLModel = require('../../hitl/hitl.model')
       const HITLService = require('../../hitl/hitl.service')
       const convWithMode = await HITLModel.getConversationWithMode(
@@ -295,6 +313,16 @@ router.post('/', async (req, res) => {
           context.customer?.name || message.from
         )
         logger.info(`Conversation ${context.conversation.id} is in human mode — skipping AI`)
+        return
+      }
+
+      // Consent buttons (consent_all, consent_checkups, consent_none): stored and answered here, without touching
+      // the booking flow state or the AI. Unknown consent_ ids are ignored silently.
+      if (message.interactiveId && String(message.interactiveId).startsWith('consent_')) {
+        const buttonChoice = Consent.buttonValue(message.interactiveId)
+        if (buttonChoice && context.customer?.id) {
+          await Consent.handleChoice({ tenant, context, message, value: buttonChoice, source: 'whatsapp_button' })
+        }
         return
       }
 
@@ -464,6 +492,11 @@ router.post('/', async (req, res) => {
             } catch (cardErr) {
               logger.error('Contact card send failed (non-fatal):', JSON.stringify(cardErr.response?.data || cardErr.message))
             }
+          }
+
+          // Marketing consent question, once per customer, after the confirmed booking (never delays or breaks the booking)
+          if (source === 'meta' && outText.includes('Booking confirmed')) {
+            Consent.askConsentOnce(tenant, context.customer?.id, message.from, tenant.name, context.conversation.id).catch(() => {})
           }
 
           if (outcome === 'success') {
@@ -815,6 +848,11 @@ router.post('/', async (req, res) => {
                 } catch (cardErr) {
                   logger.error('Contact card send failed (non-fatal):', JSON.stringify(cardErr.response?.data || cardErr.message))
                 }
+              }
+
+              // Marketing consent question, once per customer, after the confirmed booking (never delays or breaks the booking)
+              if (source === 'meta' && outText.includes('Booking confirmed')) {
+                Consent.askConsentOnce(tenant, context.customer?.id, message.from, tenant.name, context.conversation.id).catch(() => {})
               }
 
               if (outcome === 'success') {
@@ -1281,6 +1319,11 @@ if (isBlockedConfirmation) {
         } catch (err) {
           logger.error('Contact card send failed (non-fatal):', JSON.stringify(err.response?.data || err.message))
         }
+      }
+
+      // Marketing consent question, once per customer, after the confirmed booking (never delays or breaks the booking)
+      if (source === 'meta' && isBookingConfirmation) {
+        Consent.askConsentOnce(tenant, context.customer?.id, message.from, tenant.name, context.conversation.id).catch(() => {})
       }
 
 

@@ -382,6 +382,14 @@ async function createManualBooking(req, res, next) {
       customerId = insertCus.rows[0].id;
     }
 
+    // Optional marketing consent recorded by staff (ignored unless it is one of the valid values)
+    if (customerId && ['all', 'checkups', 'none'].includes(req.body.marketing_consent)) {
+      await client.query(
+        `UPDATE customers SET marketing_consent = $1, consent_at = NOW(), consent_source = 'staff' WHERE id = $2 AND tenant_id = $3`,
+        [req.body.marketing_consent, customerId, tenantId]
+      );
+    }
+
     // Find or create patient record
     let patientId = null;
     const patientNameClean = cleanPatientName;

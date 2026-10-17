@@ -157,6 +157,14 @@ async function createPatient(req, res) {
       [tenantId, customerId, stripHtml(name.trim()), normalizedPhone, age || null, gender || null, blood_group || null]
     );
 
+    // Optional marketing consent recorded by staff (ignored unless it is one of the valid values)
+    if (['all', 'checkups', 'none'].includes(req.body.marketing_consent)) {
+      await pool.query(
+        `UPDATE customers SET marketing_consent = $1, consent_at = NOW(), consent_source = 'staff' WHERE id = $2 AND tenant_id = $3`,
+        [req.body.marketing_consent, customerId, tenantId]
+      );
+    }
+
     return res.json({ success: true, data: { patient: newPatient.rows[0] } });
   } catch (err) {
     logger.error('Error creating patient:', err.message);

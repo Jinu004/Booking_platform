@@ -23,6 +23,7 @@ function startRecallCron() {
           AND t.status = 'active'
           AND c.phone IS NOT NULL
           AND c.name IS NOT NULL
+          AND c.marketing_consent IN ('all', 'checkups')
           AND NOT EXISTS (
             SELECT 1 FROM tenant_configs tc
             WHERE tc.tenant_id = t.id
