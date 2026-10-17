@@ -43,6 +43,7 @@ export default function SuperAdmin() {
 
   const [stats, setStats] = useState(null);
   const [tenants, setTenants] = useState([]);
+  const [failureCounts, setFailureCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [industryFilter, setIndustryFilter] = useState('all');
   const [view, setView] = useState('tenants');
@@ -109,6 +110,14 @@ export default function SuperAdmin() {
       ]);
       setStats(statsRes.data || {});
       setTenants(Array.isArray(tenantsRes.data) ? tenantsRes.data : []);
+      // Failed sends of the last 24 hours per tenant; if this fails the list simply shows no badges
+      api.get('/superadmin/send-failures/summary')
+        .then(res => {
+          const counts = {};
+          (Array.isArray(res?.data) ? res.data : []).forEach(item => { counts[item.tenant_id] = item.count; });
+          setFailureCounts(counts);
+        })
+        .catch(() => setFailureCounts({}));
     } catch (err) {
       console.error(err);
     } finally {
@@ -373,7 +382,19 @@ export default function SuperAdmin() {
                   <td className="px-3 py-3 whitespace-nowrap">
                     <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800 capitalize">{t.plan}</span>
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap">{statusBadge(t.status)}</td>
+                  <td className="px-3 py-3 whitespace-nowrap">
+                    {statusBadge(t.status)}
+                    {failureCounts[t.id] > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/superadmin/tenants/${t.id}`)}
+                        title="Open the tenant page to see the failed sends"
+                        className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 hover:bg-red-200"
+                      >
+                        {failureCounts[t.id]} failed (24h)
+                      </button>
+                    )}
+                  </td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.whatsapp_number || <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.booking_count}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.conversation_count}</td>

@@ -5,6 +5,7 @@ import useStore from '../../store/useStore';
 import api from '../../utils/api';
 import CoexistenceConnect from '../../components/shared/CoexistenceConnect';
 import WhatsappTemplatesPanel from '../../components/shared/WhatsappTemplatesPanel';
+import SendFailuresPanel from '../../components/shared/SendFailuresPanel';
 
 const PLANS = ['starter', 'growth', 'pro'];
 
@@ -426,6 +427,11 @@ export default function TenantEdit() {
           <WhatsappTemplatesPanel tenantId={tenant.id} />
         </Card>
       )}
+
+      {/* Failed WhatsApp sends of this clinic (from our own database) */}
+      <Card flush>
+        <SendFailuresPanel tenantId={tenant.id} />
+      </Card>
     </div>
   );
 }
