@@ -6,6 +6,7 @@ import api from '../../utils/api';
 import CoexistenceConnect from '../../components/shared/CoexistenceConnect';
 import WhatsappTemplatesPanel from '../../components/shared/WhatsappTemplatesPanel';
 import SendFailuresPanel from '../../components/shared/SendFailuresPanel';
+import MetaInfoPanel from '../../components/shared/MetaInfoPanel';
 
 const PLANS = ['starter', 'growth', 'pro'];
 
@@ -335,6 +336,13 @@ export default function TenantEdit() {
       <Card flush>
         <SendFailuresPanel tenantId={tenant.id} />
       </Card>
+
+      {/* Account information from Meta: fetched on button press only, for a saved connection */}
+      {connectionSaved && (
+        <Card flush>
+          <MetaInfoPanel tenantId={tenant.id} />
+        </Card>
+      )}
     </div>
   );
 }
