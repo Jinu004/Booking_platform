@@ -16,6 +16,7 @@ const {
   rejectPosterRequest
 } = require('./superadmin.controller');
 const { getConfig, updateConfig } = require('./platform-config.controller');
+const { getTenantSendFailures, getSendFailuresSummary } = require('./sendFailures.controller');
 const { successResponse, errorResponse } = require('../../utils/response');
 const { createTemplatesForTenant, refreshTemplateStatuses, getTenantTemplates, TemplateError } = require('../waba/waba.templates.service');
 
@@ -53,6 +54,10 @@ const templateRoute = (action) => async (req, res) => {
 router.post('/tenants/:id/templates/create', templateRoute(createTemplatesForTenant));
 router.post('/tenants/:id/templates/refresh', templateRoute(refreshTemplateStatuses));
 router.get('/tenants/:id/templates', templateRoute(getTenantTemplates));
+
+// Failed WhatsApp sends (read only)
+router.get('/tenants/:id/send-failures', getTenantSendFailures);
+router.get('/send-failures/summary', getSendFailuresSummary);
 
 router.patch('/tenants/:id', updateTenant);
 router.delete('/tenants/:id', deleteTenant);
