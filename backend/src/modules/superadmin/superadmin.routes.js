@@ -17,6 +17,7 @@ const {
 } = require('./superadmin.controller');
 const { getConfig, updateConfig } = require('./platform-config.controller');
 const { getTenantSendFailures, getSendFailuresSummary } = require('./sendFailures.controller');
+const { fetchWabaInfo } = require('../waba/waba.info.service');
 const { successResponse, errorResponse } = require('../../utils/response');
 const { createTemplatesForTenant, refreshTemplateStatuses, getTenantTemplates, TemplateError } = require('../waba/waba.templates.service');
 
@@ -54,6 +55,9 @@ const templateRoute = (action) => async (req, res) => {
 router.post('/tenants/:id/templates/create', templateRoute(createTemplatesForTenant));
 router.post('/tenants/:id/templates/refresh', templateRoute(refreshTemplateStatuses));
 router.get('/tenants/:id/templates', templateRoute(getTenantTemplates));
+
+// WhatsApp account information fetched from Meta (read only: GET requests only)
+router.get('/tenants/:id/waba-info', templateRoute(fetchWabaInfo));
 
 // Failed WhatsApp sends (read only)
 router.get('/tenants/:id/send-failures', getTenantSendFailures);

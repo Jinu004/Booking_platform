@@ -36,7 +36,7 @@ async function loadConnection(tenantId) {
     throw new TemplateError('Invalid tenant id', 400);
   }
   const res = await pool.query(
-    'SELECT id, whatsapp_waba_id, whatsapp_access_token_enc FROM tenants WHERE id = $1',
+    'SELECT id, whatsapp_waba_id, whatsapp_phone_number_id, whatsapp_access_token_enc FROM tenants WHERE id = $1',
     [tenantId]
   );
   if (!res.rows.length) throw new TemplateError('Tenant not found', 404);
@@ -50,7 +50,11 @@ async function loadConnection(tenantId) {
   } catch (err) {
     throw new TemplateError('The stored token could not be decrypted (check TOKEN_ENCRYPTION_KEY)', 500);
   }
-  return { wabaId: String(row.whatsapp_waba_id), token };
+  return {
+    wabaId: String(row.whatsapp_waba_id),
+    phoneNumberId: row.whatsapp_phone_number_id ? String(row.whatsapp_phone_number_id) : null,
+    token
+  };
 }
 
 // All templates of the WABA, following paging
@@ -245,5 +249,9 @@ module.exports = {
   createTemplatesForTenant,
   refreshTemplateStatuses,
   getTenantTemplates,
-  TemplateError
+  TemplateError,
+  // shared with the read-only WABA info service
+  loadConnection,
+  metaFailure,
+  META_API_URL
 };
