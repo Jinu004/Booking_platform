@@ -55,6 +55,9 @@ async function reply(req, res, next) {
     const message = await HITLService.staffReply(id, tenantId, staffId, content.trim());
     return res.json({ success: true, data: message, error: null });
   } catch (err) {
+    if (err.statusCode === 409) {
+      return res.status(409).json({ success: false, data: null, error: err.message });
+    }
     next(err);
   }
 }

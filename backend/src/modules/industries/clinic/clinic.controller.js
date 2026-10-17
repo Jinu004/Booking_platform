@@ -1,7 +1,7 @@
 const ClinicModel = require('./clinic.model');
 const pool = require('../../../config/database');
 const { successResponse, errorResponse } = require('../../../utils/response');
-const { sendTemplateMessage, sendMessage } = require('../../channel/whatsapp/whatsapp.adapter');
+const { sendTemplateMessage } = require('../../channel/whatsapp/whatsapp.adapter');
 const { runAsTenant } = require('../../channel/whatsapp/senderContext');
 
 // Sentinel value used to soft-delete doctors from token queues
@@ -373,23 +373,15 @@ async function createProcedureBooking(req, res, next) {
           const procedureName = procRes.rows[0].name;
           const formattedDate = new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
           const formattedTime = (() => { const [h, m] = start_time.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; })();
-          const confirmationMsg = `Hi ${patient_name}! 🏥 Your ${procedureName} has been scheduled for ${formattedDate} at ${formattedTime}. Please arrive a few minutes early and contact us if you need to reschedule.`;
-          try {
-            await sendMessage(phone, confirmationMsg);
-          } catch (msgErr) {
-            const metaCode = msgErr.response?.data?.error?.code;
-            if (metaCode === 131047) {
-              await sendTemplateMessage(phone, 'procedure_scheduled', 'en', [
-                { type: 'body', parameters: [
-                  { type: 'text', text: procedureName },
-                  { type: 'text', text: formattedDate },
-                  { type: 'text', text: formattedTime }
-                ]}
-              ]);
-            } else {
-              throw msgErr;
-            }
-          }
+          // Only the approved template is sent: this confirmation is usually outside the 24-hour window.
+          // A failed send is logged and recorded by the send helper (META_SEND_FAILED and send_failures).
+          await sendTemplateMessage(phone, 'procedure_scheduled', 'en', [
+            { type: 'body', parameters: [
+              { type: 'text', text: procedureName },
+              { type: 'text', text: formattedDate },
+              { type: 'text', text: formattedTime }
+            ]}
+          ]);
         }
       } catch (err) {
         console.error('Procedure WhatsApp notification failed:', err.message);

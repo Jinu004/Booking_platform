@@ -7,6 +7,7 @@ const logger = require('../../utils/logger');
 const whatsappAdapter = require('../channel/whatsapp/whatsapp.adapter');
 const { runAsTenant } = require('../channel/whatsapp/senderContext');
 const { getOrCreateSession, updateSession } = require('./conversation.session');
+const { isWindowOpen, WINDOW_CLOSED_MESSAGE } = require('./conversation.window');
 
 /**
  * GET /conversations
@@ -170,6 +171,11 @@ async function sendManualMessage(req, res, next) {
     const conversation = await ConversationModel.getConversationById(pool, tenantId, id);
     if (!conversation) {
       return res.status(404).json({ success: false, error: 'Conversation not found' });
+    }
+
+    // Free text is only allowed within 24 hours of the patient's last message: nothing is saved or sent otherwise
+    if (!(await isWindowOpen(tenantId, { conversationId: id }))) {
+      return res.status(409).json({ success: false, data: null, error: WINDOW_CLOSED_MESSAGE });
     }
 
     // Save message to DB first (fast)
