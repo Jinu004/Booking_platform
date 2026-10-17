@@ -51,6 +51,13 @@ async function handleIncomingMessage(tenant, message) {
     await ConversationModel.touchConversation(pool, tenant.id, conversation.id);
   }
 
+  // Time of this patient message, for the 24-hour window check. Runs for every real inbound message whatever branch follows
+  // (the conversation exists here even for a first message). Not awaited and never throws: it cannot delay or fail the handling.
+  pool.query(
+    'UPDATE conversations SET last_inbound_at = NOW() WHERE id = $1 AND tenant_id = $2',
+    [conversation.id, tenant.id]
+  ).catch(err => logger.warn(`LAST_INBOUND_UPDATE_FAILED ${String(err?.message || 'error').slice(0, 120)}`));
+
   // 3. Save message to database
   // Deferred to webhook to ensure AI success
   // await MessageModel.saveMessage(pool, conversation.id, 'user', message.message, message.type);

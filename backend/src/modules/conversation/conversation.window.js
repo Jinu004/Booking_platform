@@ -15,7 +15,8 @@ class WindowClosedError extends Error {
 }
 
 /**
- * True when the patient's most recent message (messages.role = 'user') is less than 23 h 55 min old.
+ * True when the patient's most recent message is less than 23 h 55 min old, taking the newer of
+ * conversations.last_inbound_at and the latest stored message with role = 'user'.
  * False when there is none or it is older. The time comparison is done by PostgreSQL.
  *
  * @param {string} tenantId
@@ -25,11 +26,16 @@ class WindowClosedError extends Error {
 async function isWindowOpen(tenantId, { conversationId, phone } = {}) {
   let result;
   if (conversationId) {
+    // The newer of conversations.last_inbound_at and the latest stored patient message
+    // (messages.created_at is timestamp without time zone holding UTC, hence AT TIME ZONE 'UTC')
     result = await pool.query(
-      `SELECT COALESCE(MAX(m.created_at) > NOW() - INTERVAL '23 hours 55 minutes', false) AS open
-       FROM messages m
-       JOIN conversations c ON c.id = m.conversation_id
-       WHERE m.conversation_id = $2 AND c.tenant_id = $1 AND m.role = 'user'`,
+      `SELECT COALESCE(
+                GREATEST(
+                  c.last_inbound_at,
+                  (SELECT MAX(m.created_at) AT TIME ZONE 'UTC' FROM messages m WHERE m.conversation_id = c.id AND m.role = 'user')
+                ) > NOW() - INTERVAL '23 hours 55 minutes', false) AS open
+       FROM conversations c
+       WHERE c.id = $2 AND c.tenant_id = $1`,
       [tenantId, conversationId]
     );
   } else if (phone) {
@@ -38,10 +44,13 @@ async function isWindowOpen(tenantId, { conversationId, phone } = {}) {
     if (!digits) return false;
     const candidates = [String(phone), `+${digits}`, digits];
     result = await pool.query(
-      `SELECT COALESCE(MAX(m.created_at) > NOW() - INTERVAL '23 hours 55 minutes', false) AS open
+      `SELECT COALESCE(
+                MAX(GREATEST(
+                  c.last_inbound_at,
+                  (SELECT MAX(m.created_at) AT TIME ZONE 'UTC' FROM messages m WHERE m.conversation_id = c.id AND m.role = 'user')
+                )) > NOW() - INTERVAL '23 hours 55 minutes', false) AS open
        FROM customers cu
        JOIN conversations c ON c.customer_id = cu.id AND c.tenant_id = cu.tenant_id
-       JOIN messages m ON m.conversation_id = c.id AND m.role = 'user'
        WHERE cu.tenant_id = $1 AND cu.phone = ANY($2::text[])`,
       [tenantId, candidates]
     );
