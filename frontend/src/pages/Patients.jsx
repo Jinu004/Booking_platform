@@ -65,7 +65,7 @@ export default function Patients() {
   const [addPatientPhone, setAddPatientPhone] = useState('');
   const [addPatientSearch, setAddPatientSearch] = useState(null); // null = not searched yet, [] = no results
   const [addPatientSearching, setAddPatientSearching] = useState(false);
-  const [addPatientForm, setAddPatientForm] = useState({ name: '', age: '', gender: '', blood_group: '' });
+  const [addPatientForm, setAddPatientForm] = useState({ name: '', age: '', gender: '', blood_group: '', marketing_consent: '' });
   const [addPatientSaving, setAddPatientSaving] = useState(false);
 
   useEffect(() => {
@@ -111,13 +111,15 @@ export default function Patients() {
         phone: addPatientPhone.trim(),
         age: addPatientForm.age || null,
         gender: addPatientForm.gender || null,
-        blood_group: addPatientForm.blood_group || null
+        blood_group: addPatientForm.blood_group || null,
+        // Only sent when staff picked a choice the patient gave at reception
+        ...(addPatientForm.marketing_consent ? { marketing_consent: addPatientForm.marketing_consent } : {})
       });
       addToast('Patient added successfully', 'success');
       setShowAddPatient(false);
       setAddPatientPhone('');
       setAddPatientSearch(null);
-      setAddPatientForm({ name: '', age: '', gender: '', blood_group: '' });
+      setAddPatientForm({ name: '', age: '', gender: '', blood_group: '', marketing_consent: '' });
       fetchPatients();
     } catch (err) {
       addToast('Failed to add patient', 'error');
@@ -130,7 +132,7 @@ export default function Patients() {
     setShowAddPatient(false);
     setAddPatientPhone('');
     setAddPatientSearch(null);
-    setAddPatientForm({ name: '', age: '', gender: '', blood_group: '' });
+    setAddPatientForm({ name: '', age: '', gender: '', blood_group: '', marketing_consent: '' });
   };
 
   if (!isPro) {
@@ -483,6 +485,20 @@ export default function Patients() {
                         <option value="AB-">AB-</option>
                       </select>
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink/65 mb-1">WhatsApp updates</label>
+                    <select
+                      value={addPatientForm.marketing_consent}
+                      onChange={e => setAddPatientForm(p => ({ ...p, marketing_consent: e.target.value }))}
+                      className="w-full px-3 py-2 border border-ink/[0.12] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15"
+                    >
+                      <option value="">Not asked</option>
+                      <option value="all">Checkups + offers</option>
+                      <option value="checkups">Checkups only</option>
+                      <option value="none">No updates</option>
+                    </select>
+                    <p className="text-xs text-ink/40 mt-1">Only choose if the patient agreed when asked at reception.</p>
                   </div>
                 </div>
               )}

@@ -57,7 +57,8 @@ const Bookings = () => {
     doctorId: '',
     notes: '',
     isPresent: true,
-    sendWhatsapp: true
+    sendWhatsapp: true,
+    marketing_consent: '' // '' = not asked: the field is not sent
   });
 
   const [receiptBooking, setReceiptBooking] = useState(null);
@@ -266,10 +267,13 @@ const Bookings = () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const { data } = await api.post('/bookings/manual', newBooking);
+      // The consent choice is only sent when staff picked one (the patient agreed at reception)
+      const { marketing_consent: pickedConsent, ...bookingBody } = newBooking;
+      if (pickedConsent) bookingBody.marketing_consent = pickedConsent;
+      const { data } = await api.post('/bookings/manual', bookingBody);
       setReceiptBooking(data.data);
       setIsModalOpen(false);
-      setNewBooking({ patientName: '', patientPhone: '', doctorId: '', notes: '', isPresent: true, sendWhatsapp: true });
+      setNewBooking({ patientName: '', patientPhone: '', doctorId: '', notes: '', isPresent: true, sendWhatsapp: true, marketing_consent: '' });
       fetchData();
     } catch (err) {
       alert(err?.error || err?.message || 'Failed to create booking');
@@ -1006,6 +1010,21 @@ const Bookings = () => {
                   className="block w-full rounded-md border border-ink/[0.12] p-2 bg-ink/[0.02]"
                   rows="2"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-ink/80 mb-1">WhatsApp updates</label>
+                <select
+                  value={newBooking.marketing_consent}
+                  onChange={e => setNewBooking({...newBooking, marketing_consent: e.target.value})}
+                  className="block w-full rounded-md border border-ink/[0.12] p-2 bg-ink/[0.02] font-medium"
+                >
+                  <option value="">Not asked</option>
+                  <option value="all">Checkups + offers</option>
+                  <option value="checkups">Checkups only</option>
+                  <option value="none">No updates</option>
+                </select>
+                <p className="text-xs text-ink/40 mt-1">Only choose if the patient agreed when asked at reception.</p>
               </div>
 
               <div className="flex flex-col gap-2 mb-4">
