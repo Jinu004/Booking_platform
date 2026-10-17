@@ -63,13 +63,6 @@ export default function TenantEdit() {
   const [error, setError] = useState('');
   const [justConnected, setJustConnected] = useState(false);
 
-  // WhatsApp WABA registration (OTP)
-  const [wabaPhone, setWabaPhone] = useState('');
-  const [wabaPhoneNumberId, setWabaPhoneNumberId] = useState('');
-  const [wabaOtp, setWabaOtp] = useState('');
-  const [wabaStep, setWabaStep] = useState('idle'); // idle | sending | otp_sent | verifying | done
-  const [wabaError, setWabaError] = useState('');
-
   // The backend has no list-free way to get everything this page needs (recall and template flags, admin email,
   // connection flags), so the tenants list is loaded and this tenant is picked from it by id.
   const fetchTenantRow = async () => {
@@ -129,45 +122,6 @@ export default function TenantEdit() {
       setError(err?.error || err?.response?.data?.error || 'Failed to update clinic');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleSendOTP = async () => {
-    if (!wabaPhone || !tenant?.id) return;
-    setWabaStep('sending');
-    setWabaError('');
-    try {
-      const res = await api.post('/admin/waba/initiate', {
-        phone_number: wabaPhone,
-        tenant_id: tenant.id
-      });
-      setWabaPhoneNumberId(res.data?.phone_number_id || res.phone_number_id);
-      setWabaStep('otp_sent');
-    } catch (err) {
-      setWabaError(err.error || 'Failed to send OTP');
-      setWabaStep('idle');
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    if (!wabaOtp || !wabaPhoneNumberId) return;
-    setWabaStep('verifying');
-    setWabaError('');
-    try {
-      await api.post('/admin/waba/verify', {
-        phone_number_id: wabaPhoneNumberId,
-        code: wabaOtp,
-        tenant_id: tenant.id,
-        phone_number: wabaPhone
-      });
-      setWabaStep('done');
-      addToast('WhatsApp number registered successfully', 'success');
-      setForm(f => ({ ...f, whatsappPhoneNumberId: wabaPhoneNumberId }));
-      // Refresh the stored row only; the form keeps what is being edited
-      fetchTenantRow().then(row => { if (row) setTenant(row); }).catch(() => {});
-    } catch (err) {
-      setWabaError(err.error || 'Invalid OTP');
-      setWabaStep('otp_sent');
     }
   };
 
@@ -353,57 +307,6 @@ export default function TenantEdit() {
             >
               Delete Permanently
             </button>
-          </div>
-        )}
-      </Card>
-
-      {/* WhatsApp number (OTP) */}
-      <Card title="WhatsApp number (OTP)">
-        {wabaStep === 'done' ? (
-          <div className="text-sm text-green-600 font-medium">✅ WhatsApp number registered successfully</div>
-        ) : (
-          <div className="space-y-3">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
-              ⚠️ After registration, WhatsApp app will stop working on this number. All messages will be handled by ReceptionAI.
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="91XXXXXXXXXX"
-                value={wabaPhone}
-                onChange={e => setWabaPhone(e.target.value)}
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                disabled={wabaStep === 'otp_sent' || wabaStep === 'sending'}
-              />
-              <button
-                onClick={handleSendOTP}
-                disabled={wabaStep === 'sending' || wabaStep === 'otp_sent' || !wabaPhone}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {wabaStep === 'sending' ? 'Sending...' : 'Send OTP'}
-              </button>
-            </div>
-            {wabaStep === 'otp_sent' && (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Enter 6-digit OTP"
-                  value={wabaOtp}
-                  onChange={e => setWabaOtp(e.target.value)}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-                <button
-                  onClick={handleVerifyOTP}
-                  disabled={wabaStep === 'verifying' || !wabaOtp}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {wabaStep === 'verifying' ? 'Verifying...' : 'Verify OTP'}
-                </button>
-              </div>
-            )}
-            {wabaError && (
-              <p className="text-red-600 text-xs">{wabaError}</p>
-            )}
           </div>
         )}
       </Card>
