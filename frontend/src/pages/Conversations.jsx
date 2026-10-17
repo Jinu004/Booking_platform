@@ -268,7 +268,7 @@ export default function Conversations() {
       ))
     } catch (err) {
       setReplyText(content);
-      addToast('Failed to send message', 'error');
+      addToast(err?.error || 'Failed to send message', 'error');
     } finally {
       setSending(false);
     }
@@ -728,7 +728,7 @@ export default function Conversations() {
                     await sendTemplate(selectedConversationId, template.name, 'en', []);
                     setShowTemplateModal(false);
                   } catch (err) {
-                    setTemplateError(err?.response?.data?.error || 'Failed to send template. Please try again.');
+                    setTemplateError(err?.error || err?.response?.data?.error || 'Failed to send template. Please try again.');
                   } finally {
                     setTemplateSending(false);
                   }

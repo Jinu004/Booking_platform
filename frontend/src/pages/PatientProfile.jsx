@@ -12,6 +12,7 @@ import { getDoctors, getProcedures, getAvailableSlots, scheduleProcedureBooking 
 import { createManualBooking, completeBooking, cancelBooking } from '../services/booking.service';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
+import api from '../utils/api';
 import { CardSkeleton } from '../components/shared/Skeleton';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -585,13 +586,11 @@ export default function PatientProfile() {
   const handleSendPrescription = async (noteId) => {
     if (!window.confirm('Send prescription to patient WhatsApp?')) return;
     try {
-      await fetch(`/api/v1/ehr/patients/${customerId}/visit-notes/${noteId}/prescription/send`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
-      });
+      // The shared api helper rejects on any HTTP error, so success is shown only when the server accepted the send
+      await api.post(`/ehr/patients/${customerId}/visit-notes/${noteId}/prescription/send`);
       addToast('Prescription sent to patient WhatsApp', 'success');
-    } catch {
-      addToast('Failed to send prescription', 'error');
+    } catch (err) {
+      addToast(err?.error || 'Failed to send prescription', 'error');
     }
   };
 
