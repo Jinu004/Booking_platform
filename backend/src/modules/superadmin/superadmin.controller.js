@@ -286,7 +286,7 @@ async function deleteTenant(req, res) {
     await pool.query('DELETE FROM tenants WHERE id = $1', [id]);
     return successResponse(res, { message: 'Clinic deleted permanently' });
   } catch (err) {
-    logger.error('Error deleting tenant:', err.message);
+    logger.error(`Error deleting tenant: ${err.code || ''} ${err.constraint || ''} ${err.message}`);
     return errorResponse(res, 'Failed to delete clinic', 500);
   }
 }
