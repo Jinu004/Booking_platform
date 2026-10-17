@@ -26,7 +26,7 @@ const STOP_KEYWORDS = new Set(['stop', 'unsubscribe', 'opt out', 'optout', 'stop
 const SUBSCRIBE_KEYWORDS = new Set(['subscribe'])
 
 function askBody(clinicName) {
-  return `Thanks for booking with ${clinicName}! We'll message you about your appointments. Would you also like occasional updates from us?\n\nCheckups: a reminder when a visit is due.\nOffers: health tips and clinic news.\n\nReply STOP any time to opt out.`
+  return `Thanks for booking with ${clinicName}! We'll message you about your appointments. Would you also like occasional updates from us?\n\nCheckups: a reminder when a visit is due.\nOffers: special offers and health camps running at the clinic.\n\nReply STOP any time to opt out.`
 }
 
 const REPLIES = {
