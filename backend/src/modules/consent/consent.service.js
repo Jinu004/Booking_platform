@@ -109,7 +109,16 @@ async function askConsentOnce(tenant, customerId, phone, clinicName, conversatio
     if (!claim.rows.length) return
 
     const body = askBody(clinicName)
-    await sendButtons(phone, body, CONSENT_BUTTONS)
+    try {
+      await sendButtons(phone, body, CONSENT_BUTTONS)
+    } catch (sendErr) {
+      // Not delivered: release the claim so the next confirmed booking asks again (no loop and no timer: this runs once per booking)
+      await pool.query(
+        `UPDATE customers SET consent_asked_at = NULL WHERE id = $1 AND tenant_id = $2 AND marketing_consent IS NULL`,
+        [customerId, tenant.id]
+      )
+      throw sendErr
+    }
     if (conversationId) {
       const ConversationService = require('../conversation/conversation.service')
       await ConversationService.saveOutboundMessage(conversationId, body, 'assistant')

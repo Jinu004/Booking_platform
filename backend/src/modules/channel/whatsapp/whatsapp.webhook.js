@@ -293,6 +293,16 @@ router.post('/', async (req, res) => {
         }
       }
 
+      // Consent buttons (consent_all, consent_checkups, consent_none): stored and answered here, in every mode (also human mode),
+      // without touching the booking flow state, Redis state or the AI. Unknown consent_ ids are ignored silently.
+      if (message.interactiveId && String(message.interactiveId).startsWith('consent_')) {
+        const buttonChoice = Consent.buttonValue(message.interactiveId)
+        if (buttonChoice && context.customer?.id) {
+          await Consent.handleChoice({ tenant, context, message, value: buttonChoice, source: 'whatsapp_button' })
+        }
+        return
+      }
+
       const HITLModel = require('../../hitl/hitl.model')
       const HITLService = require('../../hitl/hitl.service')
       const convWithMode = await HITLModel.getConversationWithMode(
@@ -313,16 +323,6 @@ router.post('/', async (req, res) => {
           context.customer?.name || message.from
         )
         logger.info(`Conversation ${context.conversation.id} is in human mode — skipping AI`)
-        return
-      }
-
-      // Consent buttons (consent_all, consent_checkups, consent_none): stored and answered here, without touching
-      // the booking flow state or the AI. Unknown consent_ ids are ignored silently.
-      if (message.interactiveId && String(message.interactiveId).startsWith('consent_')) {
-        const buttonChoice = Consent.buttonValue(message.interactiveId)
-        if (buttonChoice && context.customer?.id) {
-          await Consent.handleChoice({ tenant, context, message, value: buttonChoice, source: 'whatsapp_button' })
-        }
         return
       }
 
