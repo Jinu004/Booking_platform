@@ -51,6 +51,166 @@ function Card({ title, children, flush = false }) {
   );
 }
 
+const POSTER_TEMPLATE_NAME = 'clinic_poster';
+
+const posterStatusClasses = (status) => {
+  const s = String(status || '').toUpperCase();
+  if (s === 'APPROVED') return 'bg-green-100 text-green-700';
+  if (s === 'PENDING' || s === 'IN_REVIEW') return 'bg-amber-100 text-amber-700';
+  if (s === 'REJECTED' || s === 'ERROR' || s === 'NOT_FOUND' || s === 'DISABLED' || s === 'PAUSED') return 'bg-red-100 text-red-700';
+  return 'bg-gray-100 text-gray-600';
+};
+
+// One reusable poster template (image header) per clinic, created on the clinic's own WhatsApp account from an approved poster.
+// Posters come from the super admin list (all tenants, filtered here); the poster template row comes from the tenant's templates.
+function PosterTemplatePanel({ tenantId, connected }) {
+  const [posters, setPosters] = useState([]);
+  const [posterTemplate, setPosterTemplate] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [selectedId, setSelectedId] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [brokenThumbs, setBrokenThumbs] = useState({});
+
+  const loadData = async () => {
+    setLoadError('');
+    try {
+      const [postersRes, templatesRes] = await Promise.all([
+        api.get('/superadmin/poster-requests?status=approved'),
+        api.get(`/superadmin/tenants/${tenantId}/templates`)
+      ]);
+      const approved = (Array.isArray(postersRes?.data) ? postersRes.data : [])
+        .filter(pr => pr.tenant_id === tenantId && pr.status === 'approved');
+      setPosters(approved);
+      setSelectedId(prev => (prev && approved.some(pr => pr.id === prev) ? prev : (approved[0]?.id || '')));
+      const rows = Array.isArray(templatesRes?.data) ? templatesRes.data : [];
+      setPosterTemplate(rows.find(row => row.name === POSTER_TEMPLATE_NAME) || null);
+    } catch (err) {
+      setLoadError(err?.error || 'Failed to load the poster information');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setMessage('');
+    setError('');
+    if (!connected) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    loadData();
+  }, [tenantId, connected]);
+
+  const createPosterTemplate = async () => {
+    if (!selectedId) return;
+    const confirmed = window.confirm(
+      "This asks Meta to create a marketing template for this clinic's WhatsApp account using the selected poster as the sample image. Nothing is sent to patients. Continue?"
+    );
+    if (!confirmed) return;
+    setCreating(true);
+    setMessage('');
+    setError('');
+    try {
+      const res = await api.post(`/superadmin/tenants/${tenantId}/poster-template`, { poster_request_id: selectedId });
+      const status = res?.data?.status || 'PENDING';
+      setMessage(`Template created. Status: ${status}. Meta usually approves marketing templates within minutes to a day.`);
+      await loadData();
+    } catch (err) {
+      setError(err?.error || 'Failed to create the poster template');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="border-t pt-3 space-y-3">
+      <h5 className="text-sm font-semibold text-gray-700">Poster template</h5>
+
+      {!connected && (
+        <p className="text-xs text-gray-400">WhatsApp is not connected for this clinic.</p>
+      )}
+
+      {connected && loading && <p className="text-xs text-gray-500">Loading...</p>}
+      {connected && loadError && <p className="text-red-600 text-xs">{loadError}</p>}
+
+      {connected && !loading && !loadError && (
+        <>
+          {posterTemplate ? (
+            <div className="space-y-1">
+              <p className="text-xs text-gray-700">
+                Poster template already created
+                <span className={`ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-medium ${posterStatusClasses(posterTemplate.status)}`}>
+                  {posterTemplate.status}
+                </span>
+              </p>
+              {posterTemplate.last_error && <p className="text-xs text-red-600">{posterTemplate.last_error}</p>}
+            </div>
+          ) : posters.length === 0 ? (
+            <p className="text-xs text-gray-500">No approved poster yet. The clinic uploads one in Settings, Posters, and you approve it first.</p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {posters.map(pr => (
+                  <div key={pr.id} className="flex items-center gap-3 text-xs">
+                    {brokenThumbs[pr.id] ? (
+                      <span className="w-12 h-12 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-400 text-lg flex-shrink-0">📄</span>
+                    ) : (
+                      <img
+                        src={pr.image_url}
+                        alt="Poster"
+                        onError={() => setBrokenThumbs(b => ({ ...b, [pr.id]: true }))}
+                        className="w-12 h-12 object-cover rounded-lg border border-gray-200 flex-shrink-0"
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-gray-700 truncate">{pr.caption || <span className="text-gray-400">No caption</span>}</p>
+                      <p className="text-gray-400">Submitted {new Date(pr.created_at).toLocaleDateString('en-IN')}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {posters.length > 1 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Poster used as the sample image</label>
+                  <select
+                    value={selectedId}
+                    onChange={e => setSelectedId(e.target.value)}
+                    disabled={creating}
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    {posters.map(pr => (
+                      <option key={pr.id} value={pr.id}>
+                        {(pr.caption || 'No caption').slice(0, 40)} ({new Date(pr.created_at).toLocaleDateString('en-IN')})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={createPosterTemplate}
+                disabled={creating || !selectedId}
+                className="px-4 py-2 border border-indigo-600 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-50 disabled:opacity-50"
+              >
+                {creating ? 'Creating...' : 'Create poster template'}
+              </button>
+            </>
+          )}
+        </>
+      )}
+
+      {message && <p className="text-green-600 text-xs">{message}</p>}
+      {error && <p className="text-red-600 text-xs">{error}</p>}
+    </div>
+  );
+}
+
 export default function TenantEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -331,6 +491,11 @@ export default function TenantEdit() {
           <WhatsappTemplatesPanel tenantId={tenant.id} />
         </Card>
       )}
+
+      {/* Poster template: one image-header marketing template per clinic, from an approved poster */}
+      <Card flush>
+        <PosterTemplatePanel tenantId={tenant.id} connected={connectionSaved} />
+      </Card>
 
       {/* Failed WhatsApp sends of this clinic (from our own database) */}
       <Card flush>
