@@ -3,6 +3,7 @@ const pool = require('../../config/database');
 const logger = require('../../utils/logger');
 const { decrypt } = require('../../utils/secretBox');
 const { TEMPLATES } = require('./waba.templates');
+const { uploadTemplateSample, UploadError } = require('./waba.upload');
 
 const META_API_URL = 'https://graph.facebook.com/v24.0';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -81,7 +82,12 @@ function buildComponents(template) {
   if (template.bodyExamples && template.bodyExamples.length) {
     body.example = { body_text: [template.bodyExamples] };
   }
-  const components = [body];
+  const components = [];
+  // Optional image header (before the body); templates without a header produce exactly the same components as before
+  if (template.header && template.header.format === 'IMAGE' && template.header.sampleHandle) {
+    components.push({ type: 'HEADER', format: 'IMAGE', example: { header_handle: [template.header.sampleHandle] } });
+  }
+  components.push(body);
   if (template.buttons && template.buttons.length) {
     components.push({
       type: 'BUTTONS',
@@ -245,10 +251,148 @@ async function getTenantTemplates(tenantId) {
   return res.rows;
 }
 
+// ---------------------------------------------------------------------------
+// One reusable poster template per clinic: an image header, three body variables and a "Stop offers" button.
+// The sample image is the clinic's approved poster (poster_requests), uploaded to Meta with the Resumable Upload API.
+// ---------------------------------------------------------------------------
+
+const POSTER_TEMPLATE = {
+  name: 'clinic_poster',
+  language: 'en',
+  category: 'MARKETING',
+  body: 'Hello {{1}}, here is the latest from {{2}}.\n\n{{3}}\n\nReply STOP to stop receiving offers.',
+  bodyExamples: ['Priya', 'Skin Clinic', 'Free skin check-up camp this Saturday, 10 am to 1 pm'],
+  buttons: ['Stop offers']
+};
+const POSTER_BUCKET = 'receptionai-poster-uploads';
+const POSTER_URL_PREFIX = `https://storage.googleapis.com/${POSTER_BUCKET}/`;
+const POSTER_MIME_BY_EXTENSION = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+
+// Downloads the poster bytes from the bucket (default credentials). The object name is recovered from image_url:
+// the stored value is not URL-encoded, so the raw name is tried first and the decoded one second.
+async function downloadPoster(imageUrl) {
+  if (!imageUrl || !String(imageUrl).startsWith(POSTER_URL_PREFIX)) {
+    throw new TemplateError('The poster file is not in the poster bucket', 400);
+  }
+  const rawName = String(imageUrl).slice(POSTER_URL_PREFIX.length);
+  let decodedName = rawName;
+  try { decodedName = decodeURIComponent(rawName); } catch (_) { /* keep the raw name */ }
+
+  const { Storage } = require('@google-cloud/storage');
+  const bucket = new Storage().bucket(POSTER_BUCKET);
+  let lastErr = null;
+  for (const objectName of [...new Set([rawName, decodedName])]) {
+    try {
+      const file = bucket.file(objectName);
+      const [buffer] = await file.download();
+      let mimeType = null;
+      try {
+        const [metadata] = await file.getMetadata();
+        mimeType = metadata?.contentType || null;
+      } catch (_) { /* fall back to the extension */ }
+      if (!mimeType) {
+        mimeType = POSTER_MIME_BY_EXTENSION[objectName.split('.').pop().toLowerCase()] || null;
+      }
+      return { buffer, mimeType, fileName: objectName.split('/').pop() };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw new TemplateError(`Could not read the poster file (${String(lastErr?.message || 'unknown').slice(0, 120)})`, 502);
+}
+
+async function createPosterTemplateInner(tenantId, posterRequestId) {
+  const { wabaId, token } = await loadConnection(tenantId);
+  if (!posterRequestId || !UUID_PATTERN.test(String(posterRequestId))) {
+    throw new TemplateError('poster_request_id is required and must be a valid id', 400);
+  }
+
+  const posterRes = await pool.query(
+    'SELECT id, tenant_id, image_url, status FROM poster_requests WHERE id = $1 AND tenant_id = $2',
+    [posterRequestId, tenantId]
+  );
+  if (!posterRes.rows.length) throw new TemplateError('Poster request not found for this clinic', 404);
+  const poster = posterRes.rows[0];
+  if (poster.status !== 'approved') throw new TemplateError('The poster request is not approved', 409);
+
+  const existing = await pool.query(
+    'SELECT status FROM tenant_templates WHERE tenant_id = $1 AND name = $2 AND language = $3',
+    [tenantId, POSTER_TEMPLATE.name, POSTER_TEMPLATE.language]
+  );
+  if (existing.rows.length) {
+    throw new TemplateError(`This clinic already has a poster template (${POSTER_TEMPLATE.name}, status ${existing.rows[0].status})`, 409);
+  }
+
+  const appId = process.env.META_APP_ID;
+  if (!appId) throw new TemplateError('META_APP_ID is not configured on the server', 500);
+
+  const { buffer, mimeType, fileName } = await downloadPoster(poster.image_url);
+  if (mimeType !== 'image/jpeg' && mimeType !== 'image/png') {
+    throw new TemplateError('The poster must be JPEG or PNG for a WhatsApp template', 400);
+  }
+
+  let sampleHandle;
+  try {
+    sampleHandle = await uploadTemplateSample({ appId, token, buffer, mimeType, fileName });
+  } catch (err) {
+    const upload = new TemplateError(`Meta upload failed${err.metaCode ? ` (code ${err.metaCode})` : ''}: ${String(err.message).slice(0, 200)}`, 502);
+    upload.metaCode = err.metaCode ?? null;
+    throw upload;
+  }
+
+  let created;
+  try {
+    const res = await axios.post(
+      `${META_API_URL}/${wabaId}/message_templates`,
+      {
+        name: POSTER_TEMPLATE.name,
+        language: POSTER_TEMPLATE.language,
+        category: POSTER_TEMPLATE.category,
+        components: buildComponents({ ...POSTER_TEMPLATE, header: { format: 'IMAGE', sampleHandle } })
+      },
+      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, timeout: 20000 }
+    );
+    created = res.data || {};
+  } catch (err) {
+    const failure = new TemplateError(`Meta rejected the poster template: ${metaFailure(err)}`, 502);
+    failure.metaCode = Number.isInteger(Number(err.response?.data?.error?.code)) ? Number(err.response.data.error.code) : null;
+    throw failure;
+  }
+
+  await upsertTemplateRow(tenantId, POSTER_TEMPLATE, {
+    category: created.category || POSTER_TEMPLATE.category,
+    metaTemplateId: created.id ? String(created.id) : null,
+    status: created.status || 'PENDING'
+  });
+  const row = await pool.query(
+    `SELECT id, name, language, category, meta_template_id, status, last_error, created_at, updated_at
+     FROM tenant_templates WHERE tenant_id = $1 AND name = $2 AND language = $3`,
+    [tenantId, POSTER_TEMPLATE.name, POSTER_TEMPLATE.language]
+  );
+  return { status: created.status || 'PENDING', template: row.rows[0] };
+}
+
+/**
+ * Creates the clinic's poster template from an approved poster request. One Meta call to upload the sample, one to create.
+ * @returns {Promise<{status, template}>}
+ */
+async function createPosterTemplate(tenantId, posterRequestId) {
+  try {
+    const result = await createPosterTemplateInner(tenantId, posterRequestId);
+    logger.info(`META_POSTER_TEMPLATE tenant=${tenantId} result=ok code=none`);
+    return result;
+  } catch (err) {
+    logger.info(`META_POSTER_TEMPLATE tenant=${tenantId} result=failed code=${err?.metaCode ?? 'none'}`);
+    throw err;
+  }
+}
+
 module.exports = {
   createTemplatesForTenant,
   refreshTemplateStatuses,
   getTenantTemplates,
+  createPosterTemplate,
+  buildComponents,
   TemplateError,
   // shared with the read-only WABA info service
   loadConnection,

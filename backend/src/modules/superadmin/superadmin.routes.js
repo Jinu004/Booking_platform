@@ -19,7 +19,7 @@ const { getConfig, updateConfig } = require('./platform-config.controller');
 const { getTenantSendFailures, getSendFailuresSummary } = require('./sendFailures.controller');
 const { fetchWabaInfo } = require('../waba/waba.info.service');
 const { successResponse, errorResponse } = require('../../utils/response');
-const { createTemplatesForTenant, refreshTemplateStatuses, getTenantTemplates, TemplateError } = require('../waba/waba.templates.service');
+const { createTemplatesForTenant, refreshTemplateStatuses, getTenantTemplates, createPosterTemplate, TemplateError } = require('../waba/waba.templates.service');
 
 const router = express.Router();
 
@@ -55,6 +55,17 @@ const templateRoute = (action) => async (req, res) => {
 router.post('/tenants/:id/templates/create', templateRoute(createTemplatesForTenant));
 router.post('/tenants/:id/templates/refresh', templateRoute(refreshTemplateStatuses));
 router.get('/tenants/:id/templates', templateRoute(getTenantTemplates));
+// One reusable poster template (image header) per clinic, from an approved poster request
+router.post('/tenants/:id/poster-template', async (req, res) => {
+  try {
+    const result = await createPosterTemplate(req.params.id, req.body?.poster_request_id);
+    return successResponse(res, { ok: true, status: result.status, template: result.template });
+  } catch (err) {
+    if (err instanceof TemplateError) return errorResponse(res, err.message, err.status);
+    logger.error(`SuperAdmin poster template failed: ${err.message}`);
+    return errorResponse(res, 'Poster template request failed', 500);
+  }
+});
 
 // WhatsApp account information fetched from Meta (read only: GET requests only)
 router.get('/tenants/:id/waba-info', templateRoute(fetchWabaInfo));
