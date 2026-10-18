@@ -213,6 +213,11 @@ router.post('/', async (req, res) => {
       require('./whatsapp.statuses').handleStatusUpdates(body)
         .catch(statusErr => logger.warn(`Status update handling failed: ${String(statusErr?.message || '').slice(0, 120)}`))
 
+      // Template approval, rejection and pause events (not awaited, never throws). Such a payload has no messages,
+      // so parseIncoming below returns nothing for it and the handler ends.
+      require('./whatsapp.templates.webhook').handleTemplateStatusUpdates(body)
+        .catch(templateErr => logger.warn(`Template status handling failed: ${String(templateErr?.message || '').slice(0, 120)}`))
+
       const source = body.object === 'whatsapp_business_account' ? 'meta' : 'waha'
       const message = parseIncoming(body, source)
       if (!message) return
