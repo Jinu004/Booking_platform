@@ -91,7 +91,10 @@ export default function Settings() {
   const kbOverLimit = knowledgeBase.length > kbLimit;
 
   useEffect(() => {
-    if (activeTab === 'posters') fetchPosterRequests();
+    if (activeTab === 'posters') {
+      fetchPosterRequests();
+      if (['admin', 'manager'].includes(staff?.role)) fetchCampaigns();
+    }
   }, [activeTab]);
 
   useEffect(() => {
@@ -255,6 +258,79 @@ export default function Settings() {
     } finally {
       setPosterUploading(false);
     }
+  };
+
+  // Campaign drafts (audience only, nothing is sent). The routes allow admin and manager only.
+  const canUseCampaigns = ['admin', 'manager'].includes(staff?.role);
+  const [campaigns, setCampaigns] = useState([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [buildingPosterId, setBuildingPosterId] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [draftCounts, setDraftCounts] = useState({});
+  const [campaignError, setCampaignError] = useState('');
+  const [brokenPosters, setBrokenPosters] = useState({});
+
+  const fetchCampaigns = async () => {
+    try {
+      setCampaignsLoading(true);
+      const res = await api.get(`/tenants/${staff?.tenantId}/campaigns`);
+      setCampaigns(res.data || []);
+    } catch {
+    } finally {
+      setCampaignsLoading(false);
+    }
+  };
+
+  const handleCreateCampaign = async (posterId) => {
+    if (!window.confirm('This builds the list of patients who would receive this poster. Nothing is sent. Continue?')) return;
+    setCampaignError('');
+    try {
+      setBuildingPosterId(posterId);
+      const res = await api.post(`/tenants/${staff?.tenantId}/campaigns`, { poster_request_id: posterId });
+      const created = res.data;
+      if (created?.campaign?.id) {
+        setDraftCounts(prev => ({ ...prev, [created.campaign.id]: created.counts }));
+      }
+      fetchCampaigns();
+    } catch (err) {
+      setCampaignError(err?.error || 'Failed to build the campaign');
+    } finally {
+      setBuildingPosterId(null);
+    }
+  };
+
+  const handleCancelCampaign = async (campaignId) => {
+    if (!window.confirm('Cancel this campaign? It will not be sent.')) return;
+    setCampaignError('');
+    try {
+      setCancellingId(campaignId);
+      await api.post(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/cancel`);
+      fetchCampaigns();
+    } catch (err) {
+      setCampaignError(err?.error || 'Failed to cancel the campaign');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  // Plain-language audience lines. Full counts exist right after a draft is built; the list API returns totals only.
+  const audienceLines = (campaign) => {
+    const full = draftCounts[campaign.id];
+    if (full) {
+      const lines = [
+        [full.pending, `${full.pending} patients would receive this poster`, true],
+        [full.not_asked, `${full.not_asked} have not been asked about offers yet`],
+        [full.opted_out, `${full.opted_out} chose checkups only or no updates`],
+        [full.skipped?.invalid_number, `${full.skipped?.invalid_number} skipped: number looks invalid`],
+        [full.skipped?.recent_campaign, `${full.skipped?.recent_campaign} skipped: got a campaign recently`],
+        [full.skipped?.undeliverable, `${full.skipped?.undeliverable} skipped: an earlier message could not be delivered`],
+      ];
+      return lines.filter(([n, , always]) => always || n > 0).map(([, text]) => text);
+    }
+    const c = campaign.counts || {};
+    const lines = [`${c.pending ?? 0} patients would receive this poster`];
+    if (c.skipped > 0) lines.push(`${c.skipped} skipped`);
+    return lines;
   };
 
   const tabs = [
@@ -738,7 +814,16 @@ export default function Settings() {
               <div className="space-y-3">
                 {posterRequests.map(pr => (
                   <div key={pr.id} className="flex items-start gap-4 p-4 border border-gray-100 rounded-lg">
-                    <img src={pr.image_url} alt="Poster" className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0" />
+                    {brokenPosters[pr.id] ? (
+                      <span className="w-16 h-16 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-400 text-xl flex-shrink-0">📄</span>
+                    ) : (
+                      <img
+                        src={pr.image_url}
+                        alt="Poster"
+                        onError={() => setBrokenPosters(b => ({ ...b, [pr.id]: true }))}
+                        className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0"
+                      />
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
@@ -751,11 +836,74 @@ export default function Settings() {
                       {pr.caption && <p className="text-sm text-gray-700 mt-1 truncate">{pr.caption}</p>}
                       {pr.notes && <p className="text-xs text-red-500 mt-1">{pr.notes}</p>}
                     </div>
+                    {canUseCampaigns && pr.status === 'approved' && (
+                      <button
+                        onClick={() => handleCreateCampaign(pr.id)}
+                        disabled={buildingPosterId !== null}
+                        className="px-3 py-1.5 border border-indigo-600 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-50 disabled:opacity-50 flex-shrink-0"
+                      >
+                        {buildingPosterId === pr.id ? 'Building...' : 'Create campaign'}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {canUseCampaigns && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Campaigns</h2>
+                <button onClick={fetchCampaigns} className="text-sm text-indigo-600 hover:text-indigo-800">Refresh</button>
+              </div>
+              {campaignError && <p className="text-sm text-red-600 mb-3">{campaignError}</p>}
+              {campaignsLoading ? (
+                <p className="text-sm text-gray-400">Loading...</p>
+              ) : campaigns.length === 0 ? (
+                <p className="text-sm text-gray-400">No campaigns yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {campaigns.map(cp => (
+                    <div key={cp.id} className="p-4 border border-gray-100 rounded-lg space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                          cp.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          cp.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                          cp.status === 'running' ? 'bg-blue-100 text-blue-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>{cp.status}</span>
+                        <span className="text-xs text-gray-400">{new Date(cp.created_at).toLocaleDateString('en-IN')}</span>
+                      </div>
+                      {cp.caption && (
+                        <p className="text-sm text-gray-700 truncate">{cp.caption.length > 60 ? `${cp.caption.slice(0, 60)}...` : cp.caption}</p>
+                      )}
+                      <p className="text-xs text-gray-500">
+                        Pending {cp.counts?.pending ?? 0} · Sent {cp.counts?.sent ?? 0} · Failed {cp.counts?.failed ?? 0} · Skipped {cp.counts?.skipped ?? 0}
+                      </p>
+                      {cp.status === 'draft' && (
+                        <div className="space-y-1">
+                          {audienceLines(cp).map(line => (
+                            <p key={line} className="text-sm text-gray-700">{line}</p>
+                          ))}
+                          <p className="text-xs text-gray-500">Draft. Nothing has been sent.</p>
+                        </div>
+                      )}
+                      {cp.status === 'draft' && (
+                        <button
+                          onClick={() => handleCancelCampaign(cp.id)}
+                          disabled={cancellingId === cp.id}
+                          className="px-3 py-1.5 border border-red-300 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {cancellingId === cp.id ? 'Cancelling...' : 'Cancel campaign'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
