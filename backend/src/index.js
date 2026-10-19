@@ -99,6 +99,10 @@ app.get('/health', async (req, res) => {
 const tenantRoutes = require('./modules/tenant/tenant.routes');
 app.use('/api/v1/tenants', tenantRoutes);
 
+// Campaign audience routes (also under /api/v1/tenants/:id/campaigns)
+const campaignRoutes = require('./modules/campaign/campaign.routes');
+app.use('/api/v1/tenants', campaignRoutes);
+
 // Super Admin Routes
 const superAdminRoutes = require('./modules/superadmin/superadmin.routes');
 app.use('/api/v1/superadmin', superAdminRoutes);
