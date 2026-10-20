@@ -211,6 +211,88 @@ function PosterTemplatePanel({ tenantId, connected }) {
   );
 }
 
+const READINESS_REASON_TEXT = {
+  clinic_not_active: 'The clinic is not active.',
+  poster_template_not_approved: 'The poster template is not approved by Meta yet.',
+  phone_not_connected: 'The WhatsApp number is not connected.',
+  quality_not_green: "The number's quality rating is not green.",
+  account_blocked: 'WhatsApp has blocked sending for this account.',
+  payment_problem: 'Meta reported a payment problem in the last 24 hours.',
+  meta_unreachable: 'Could not reach Meta to check. Try again.'
+};
+
+// Read only: each check calls Meta, so it runs on the button, never on page load
+function SendReadinessPanel({ tenantId }) {
+  const [result, setResult] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState('');
+
+  const checkNow = async () => {
+    setChecking(true);
+    setError('');
+    try {
+      const res = await api.get(`/superadmin/tenants/${tenantId}/send-readiness`);
+      setResult(res?.data || null);
+    } catch (err) {
+      setResult(null);
+      setError(err?.error || 'Failed to check readiness');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const d = result?.details || {};
+  const lines = [
+    ['Quality rating', d.quality_rating],
+    ['Phone status', d.phone_status],
+    ['Messaging tier', d.tier],
+    ['Daily limit', 'daily_limit' in d ? (d.daily_limit === null ? 'Unlimited' : d.daily_limit) : undefined],
+    ['Can send message', d.can_send_message]
+  ].filter(([, value]) => value !== undefined && value !== null && value !== '');
+
+  return (
+    <div className="border-t pt-3 space-y-3">
+      <h5 className="text-sm font-semibold text-gray-700">Can this clinic send campaigns?</h5>
+      <button
+        type="button"
+        onClick={checkNow}
+        disabled={checking}
+        className="px-4 py-2 border border-indigo-600 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-50 disabled:opacity-50"
+      >
+        {checking ? 'Checking...' : 'Check now'}
+      </button>
+
+      {error && <p className="text-red-600 text-xs">{error}</p>}
+
+      {result && (
+        <div className="space-y-2">
+          {result.ok ? (
+            <p className="text-green-600 text-sm font-medium">Ready to send campaigns</p>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-red-600 text-sm font-medium">Not ready</p>
+              {(result.reasons || []).map(reason => (
+                <p key={reason} className="text-red-600 text-xs">{READINESS_REASON_TEXT[reason] || reason}</p>
+              ))}
+            </div>
+          )}
+          {lines.length > 0 && (
+            <div className="space-y-0.5">
+              {lines.map(([label, value]) => (
+                <p key={label} className="text-xs text-gray-500">{label}: <span className="text-gray-700">{String(value)}</span></p>
+              ))}
+              {d.phone_status && d.tier_known === false && (
+                <p className="text-xs text-gray-500">Tier not reported by Meta, assuming 250 a day.</p>
+              )}
+            </div>
+          )}
+          <p className="text-xs text-gray-400">Checked just now</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TenantEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -495,6 +577,11 @@ export default function TenantEdit() {
       {/* Poster template: one image-header marketing template per clinic, from an approved poster */}
       <Card flush>
         <PosterTemplatePanel tenantId={tenant.id} connected={connectionSaved} />
+      </Card>
+
+      {/* Campaign readiness: checked on demand (each check calls Meta) */}
+      <Card flush>
+        <SendReadinessPanel tenantId={tenant.id} />
       </Card>
 
       {/* Failed WhatsApp sends of this clinic (from our own database) */}
