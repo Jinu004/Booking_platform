@@ -16,12 +16,15 @@ function isPro(req) {
 async function getPatients(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
-    const { search } = req.query;
+    const { search, consent } = req.query;
+    // Consent belongs to the phone number (customers), so patients who share a phone share the value
     let query = `
       SELECT p.id, p.name, p.phone, p.age, p.gender, p.blood_group, p.created_at,
              MAX(b.booking_date) as last_visit,
-             COUNT(DISTINCT b.id) as total_visits
+             COUNT(DISTINCT b.id) as total_visits,
+             cu.marketing_consent, cu.consent_source, cu.consent_at
       FROM patients p
+      LEFT JOIN customers cu ON cu.id = p.customer_id AND cu.tenant_id = p.tenant_id
       LEFT JOIN bookings b ON b.patient_id = p.id AND b.tenant_id = p.tenant_id AND b.status = 'completed'
       WHERE p.tenant_id = $1
     `;
@@ -29,6 +32,13 @@ async function getPatients(req, res, next) {
     if (search) {
       query += ` AND (p.name ILIKE $2 OR p.phone ILIKE $2)`;
       params.push(`%${search}%`);
+    }
+    // Optional consent filter (an invalid value is ignored): all, checkups, none, or not_asked (never asked)
+    if (consent === 'not_asked') {
+      query += ` AND cu.marketing_consent IS NULL`;
+    } else if (['all', 'checkups', 'none'].includes(consent)) {
+      params.push(consent);
+      query += ` AND cu.marketing_consent = $${params.length}`;
     }
     // Doctors only see patients who have had a booking with them
     if (req.staff.role === 'doctor' && req.staff.doctor_id) {
@@ -39,9 +49,46 @@ async function getPatients(req, res, next) {
       )`;
       params.push(req.staff.doctor_id);
     }
-    query += ` GROUP BY p.id ORDER BY last_visit DESC NULLS LAST, p.created_at DESC`;
+    query += ` GROUP BY p.id, cu.id ORDER BY last_visit DESC NULLS LAST, p.created_at DESC`;
     const result = await pool.query(query, params);
     return successResponse(res, { customers: result.rows, total: result.rows.length });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /ehr/patients/consent-summary -- how many patients have each marketing consent value.
+// Counts patient rows (the unit the patient list shows), with the same doctor restriction as the list.
+async function getConsentSummary(req, res, next) {
+  if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
+  try {
+    let query = `
+      SELECT
+        COUNT(*) FILTER (WHERE cu.marketing_consent = 'all')::int AS all_count,
+        COUNT(*) FILTER (WHERE cu.marketing_consent = 'checkups')::int AS checkups_count,
+        COUNT(*) FILTER (WHERE cu.marketing_consent = 'none')::int AS none_count,
+        COUNT(*) FILTER (WHERE cu.marketing_consent IS NULL)::int AS not_asked_count,
+        COUNT(*)::int AS total_count
+      FROM patients p
+      LEFT JOIN customers cu ON cu.id = p.customer_id AND cu.tenant_id = p.tenant_id
+      WHERE p.tenant_id = $1
+    `;
+    const params = [req.tenantId];
+    if (req.staff.role === 'doctor' && req.staff.doctor_id) {
+      query += ` AND p.id IN (
+        SELECT DISTINCT patient_id FROM bookings
+        WHERE tenant_id = $1 AND doctor_id = $2 AND patient_id IS NOT NULL
+      )`;
+      params.push(req.staff.doctor_id);
+    }
+    const row = (await pool.query(query, params)).rows[0];
+    return successResponse(res, {
+      all: row.all_count,
+      checkups: row.checkups_count,
+      none: row.none_count,
+      not_asked: row.not_asked_count,
+      total: row.total_count
+    });
   } catch (err) {
     next(err);
   }
@@ -85,8 +132,19 @@ async function getPatient(req, res, next) {
       `, [patientId, customerIdForBookings, req.tenantId])
     ]);
     const patientRow = patientRes.rows[0];
+    // Marketing consent lives on the customer (phone number)
+    const consentRes = await pool.query(
+      `SELECT marketing_consent, consent_source, consent_at FROM customers WHERE id = $1 AND tenant_id = $2`,
+      [patientRow.customer_id, req.tenantId]
+    );
+    const consentRow = consentRes.rows[0] || {};
     return successResponse(res, {
-      customer: patientRow,
+      customer: {
+        ...patientRow,
+        marketing_consent: consentRow.marketing_consent ?? null,
+        consent_source: consentRow.consent_source ?? null,
+        consent_at: consentRow.consent_at ?? null
+      },
       profile: {
         age: patientRow.age,
         gender: patientRow.gender,
@@ -294,4 +352,4 @@ async function updateVisitNote(req, res, next) {
   }
 }
 
-module.exports = { getPatients, getPatient, createPatient, upsertProfile, addCondition, deleteCondition, addVisitNote, updateVisitNote };
+module.exports = { getPatients, getConsentSummary, getPatient, createPatient, upsertProfile, addCondition, deleteCondition, addVisitNote, updateVisitNote };

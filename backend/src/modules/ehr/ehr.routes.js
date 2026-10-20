@@ -2,6 +2,7 @@ const express = require('express');
 const { requireAuth, requireRole } = require('../auth/auth.middleware');
 const {
   getPatients,
+  getConsentSummary,
   getPatient,
   createPatient,
   upsertProfile,
@@ -16,6 +17,7 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get('/patients', getPatients);
+router.get('/patients/consent-summary', getConsentSummary); // before /patients/:patientId so "consent-summary" is not read as an id
 router.post('/patients', requireAuth, createPatient);
 router.get('/patients/:patientId', getPatient);
 router.put('/patients/:patientId/profile', requireRole('admin', 'manager', 'receptionist'), upsertProfile);
