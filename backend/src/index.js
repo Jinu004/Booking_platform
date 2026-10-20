@@ -193,6 +193,7 @@ const { startNoShowCron } = require('./cron/noshow.cron');
 const { startRecallCron } = require('./cron/recall.cron');
 const { startRetryCron }  = require('./cron/retry.cron');
 const { startSendFailuresCleanupCron } = require('./cron/sendFailures.cron');
+const { startCampaignCron } = require('./cron/campaign.cron');
 const { broadcastToTenant } = require('./modules/hitl/hitl.service');
 
 setTimeout(() => {
@@ -206,6 +207,7 @@ setTimeout(() => {
   startRecallCron();
   startRetryCron();
   startSendFailuresCleanupCron();
+  startCampaignCron();
 }, 5000);
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
