@@ -6,7 +6,8 @@ const senderContext = require('../channel/whatsapp/senderContext')
 const { sendTemplateMessage, extractWamid } = require('../channel/whatsapp/whatsapp.meta')
 const { getSendReadiness } = require('./campaign.readiness')
 const { ensureCampaignMedia } = require('./campaign.media')
-const { classifyRecipient } = require('./campaign.service')
+const { classifyRecipient, cleanCaption } = require('./campaign.service')
+const { getBudgetSnapshot, isSendWindowOpen } = require('./campaign.budget')
 const C = require('./campaign.config')
 
 // Sends the clinic_poster template to the recipients of RUNNING campaigns, slowly, with safety stops.
@@ -25,14 +26,7 @@ const withTimeout = (promise) => Promise.race([
   new Promise((_, reject) => setTimeout(() => reject(new Error('redis timeout')), REDIS_TIMEOUT_MS))
 ])
 
-function istHour() {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours()
-}
-
-function inWindow() {
-  const hour = istHour()
-  return hour >= C.WINDOW_START_HOUR && hour < C.WINDOW_END_HOUR
-}
+const inWindow = isSendWindowOpen
 
 // Marker for errors that must pause the campaign instead of counting as an ordinary send error
 class PauseError extends Error {
@@ -286,39 +280,19 @@ async function processCampaign(campaign) {
       }
     }
 
-    const caption = collapse(state.caption).slice(0, 500)
+    const caption = cleanCaption(state.caption)
     if (!caption) {
       await pauseCampaign(tenantId, campaignId, 'caption_empty')
       return
     }
     const clinicName = collapse(state.clinic_name)
 
-    // Budget: the rolling 24 hours of every template send of this clinic
-    const dailyLimit = readiness.details?.daily_limit
-    let remaining = Infinity
-    if (dailyLimit !== null && dailyLimit !== undefined) {
-      const usedRes = await pool.query(
-        `SELECT
-           (SELECT COUNT(*)::int FROM campaign_recipients WHERE tenant_id = $1 AND sent_at > now() - interval '24 hours') +
-           (SELECT COUNT(*)::int FROM notifications WHERE tenant_id = $1 AND status = 'sent' AND sent_at > now() - interval '24 hours') AS used`,
-        [tenantId]
-      )
-      remaining = Math.floor(dailyLimit * C.BUDGET_FRACTION) - usedRes.rows[0].used
-      if (remaining <= 0) return // resumes when the rolling window frees up
-    }
-
-    // First campaign of the clinic: capped in total
-    const firstRes = await pool.query(
-      `SELECT NOT EXISTS (SELECT 1 FROM campaigns WHERE tenant_id = $1 AND id <> $2 AND status = 'completed') AS is_first,
-              (SELECT COUNT(*)::int FROM campaign_recipients WHERE campaign_id = $2 AND sent_at IS NOT NULL) AS sent_total,
-              (SELECT COUNT(*)::int FROM campaign_recipients WHERE campaign_id = $2 AND sent_at > now() - interval '24 hours') AS sent_24h`,
-      [tenantId, campaignId]
-    )
-    const { is_first: isFirst, sent_total: sentTotal, sent_24h: sent24h } = firstRes.rows[0]
-    let size = Math.min(C.BATCH_SIZE, remaining)
-    if (isFirst) {
-      const firstRemaining = C.FIRST_CAMPAIGN_LIMIT - sentTotal
-      if (firstRemaining <= 0) {
+    // Budget and first-campaign cap: shared with the preview and confirm endpoints (campaign.budget.js)
+    const snap = await getBudgetSnapshot(tenantId, campaignId, readiness.details)
+    if (snap.remaining !== null && snap.remaining <= 0) return // resumes when the rolling window frees up
+    let size = Math.min(C.BATCH_SIZE, snap.remaining === null ? Infinity : snap.remaining)
+    if (snap.isFirstCampaign) {
+      if (snap.firstCampaignRemaining <= 0) {
         await pool.query(
           `UPDATE campaign_recipients SET status = 'skipped', skip_reason = 'first_campaign_limit'
            WHERE campaign_id = $1 AND status = 'pending' AND claimed_at IS NULL`,
@@ -327,9 +301,9 @@ async function processCampaign(campaign) {
         await completeCampaign(tenantId, campaignId)
         return
       }
-      size = Math.min(size, firstRemaining)
+      size = Math.min(size, snap.firstCampaignRemaining)
     }
-    if (state.daily_cap && state.daily_cap > 0) size = Math.min(size, state.daily_cap - sent24h)
+    if (snap.dailyCapRemaining !== null) size = Math.min(size, snap.dailyCapRemaining)
     if (size <= 0) return
 
     // Claim atomically; rows are released again in the finally block if they are not attempted

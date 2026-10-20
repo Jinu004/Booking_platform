@@ -31,5 +31,9 @@ module.exports = {
   STALE_CLAIM_MINUTES: 15,
 
   // Redis lock per campaign
-  LOCK_SECONDS: 600
+  LOCK_SECONDS: 600,
+
+  // Cost shown in the campaign preview. This is an ESTIMATE: check it against Meta's current India marketing rate card.
+  MARKETING_RATE_INR: 0.86,
+  GST_RATE: 0.18
 }

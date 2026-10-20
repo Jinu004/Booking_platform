@@ -13,7 +13,11 @@ function tenantMismatch(req, res) {
 }
 
 function handleError(res, err, what) {
-  if (err instanceof service.CampaignError) return errorResponse(res, err.message, err.status)
+  if (err instanceof service.CampaignError) {
+    // Some errors carry extra fields (for example { preview } for preview_changed, { reasons } for a not-ready clinic)
+    if (err.extra) return res.status(err.status).json({ success: false, data: null, error: err.message, ...err.extra })
+    return errorResponse(res, err.message, err.status)
+  }
   logger.error(`Campaign ${what} failed: ${err.message}`)
   return errorResponse(res, `Failed to ${what}`, 500)
 }
@@ -55,4 +59,28 @@ async function cancelCampaign(req, res) {
   }
 }
 
-module.exports = { createCampaign, listCampaigns, getCampaign, cancelCampaign }
+async function previewCampaign(req, res) {
+  if (tenantMismatch(req, res)) return
+  try {
+    return successResponse(res, await service.previewCampaign(req.params.id, req.params.campaignId))
+  } catch (err) {
+    return handleError(res, err, 'load the campaign preview')
+  }
+}
+
+async function confirmCampaign(req, res) {
+  if (tenantMismatch(req, res)) return
+  try {
+    const result = await service.confirmCampaign(
+      req.params.id,
+      req.params.campaignId,
+      req.staff?.id || null,
+      req.body?.expected_to_send
+    )
+    return successResponse(res, result)
+  } catch (err) {
+    return handleError(res, err, 'confirm the campaign')
+  }
+}
+
+module.exports = { createCampaign, listCampaigns, getCampaign, cancelCampaign, previewCampaign, confirmCampaign }
