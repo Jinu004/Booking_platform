@@ -59,6 +59,19 @@ async function recordFailedStatus(value, status) {
     logger.info(`META_STATUS_FAILED tenant=unknown code=${code ?? 'none'}`)
   }
 
+  // Campaign recipient of this send, if any. Its own error is only logged and never stops the updates around it.
+  if (status.id && tenantId) {
+    try {
+      await pool.query(
+        `UPDATE campaign_recipients SET status = 'failed', error_code = $3, error_message = $4
+         WHERE wa_message_id = $1 AND tenant_id = $2 AND status = 'sent'`,
+        [String(status.id), tenantId, code !== null ? String(code) : null, message]
+      )
+    } catch (campaignErr) {
+      logger.warn(`META_STATUS_FAILED campaign update error ${campaignErr?.code || ''} ${String(campaignErr?.message || '').slice(0, 120)}`)
+    }
+  }
+
   // Mark the stored message of this send as failed, if we tracked it. The Meta message id is only a query parameter (never logged).
   // No match (status arrived before the send was recorded, or an untracked send): nothing more to do.
   if (status.id) {

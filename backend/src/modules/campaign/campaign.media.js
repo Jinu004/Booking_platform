@@ -13,7 +13,7 @@ function logResult(tenantId, campaignId, result) {
 }
 
 /**
- * Makes sure the draft campaign's poster is uploaded to the clinic's own WhatsApp account and returns the Meta media id.
+ * Makes sure the (draft, running or paused) campaign's poster is uploaded to the clinic's own WhatsApp account and returns the Meta media id.
  * The clinic's own token and phone number id are required: the shared platform token is never used.
  * Nothing calls this yet.
  * @returns {Promise<string>} campaigns.meta_media_id
@@ -29,7 +29,9 @@ async function ensureCampaignMedia(tenantId, campaignId) {
   )
   const campaign = campaignRes.rows[0]
   if (!campaign) throw new CampaignError('Campaign not found', 404)
-  if (campaign.status !== 'draft') throw new CampaignError('Only a draft campaign can have its poster uploaded', 409)
+  if (!['draft', 'running', 'paused'].includes(campaign.status)) {
+    throw new CampaignError('The poster cannot be uploaded for a completed or cancelled campaign', 409)
+  }
   if (campaign.meta_media_id) {
     logResult(tenantId, campaignId, 'already_uploaded')
     return campaign.meta_media_id

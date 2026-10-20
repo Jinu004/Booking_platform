@@ -450,7 +450,7 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en', compon
         }
       }
     )
-    logger.info(`Meta template message sent to ${to} using template: ${templateName}`)
+    logger.info(`Meta template message sent to ******${String(to).slice(-4)} using template: ${templateName}`)
     return response.data
   } catch (err) {
     recordSendFailure('template', templateName, err)

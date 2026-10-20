@@ -283,7 +283,8 @@ router.post('/', async (req, res) => {
       // Marketing consent keywords (STOP, SUBSCRIBE, ...) are answered here, in every mode (also human mode), before the AI or any flow.
       // Exact whole-message matches only, for real text messages of a known customer.
       const Consent = require('../../consent/consent.service')
-      if (message.type === 'text' && !message.interactiveId && context.customer?.id) {
+      // A template quick-reply ("Stop offers") arrives as type 'button' with its text in message.message; other buttons match no keyword and fall through.
+      if ((message.type === 'text' || message.type === 'button') && !message.interactiveId && context.customer?.id) {
         const consentKeyword = Consent.keywordValue(message.message)
         if (consentKeyword) {
           await Consent.handleChoice({
@@ -291,7 +292,7 @@ router.post('/', async (req, res) => {
             context,
             message,
             value: consentKeyword,
-            source: 'stop_keyword',
+            source: message.type === 'button' && consentKeyword === 'none' ? 'stop_button' : 'stop_keyword',
             kind: consentKeyword === 'none' ? 'stop' : 'subscribe'
           })
           return
