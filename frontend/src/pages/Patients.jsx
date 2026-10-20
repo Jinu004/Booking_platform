@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getEHRPatients } from '../services/ehr.service';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import { TableRowSkeleton } from '../components/shared/Skeleton';
@@ -48,6 +47,45 @@ const BLOOD_COLORS = {
   'AB-': 'bg-purple-50 text-purple-400',
 };
 
+// Marketing consent badge (customers.marketing_consent: all, checkups, none, or null = never asked)
+const CONSENT_BADGE = {
+  all: { label: 'Offers and checkups', cls: 'bg-green-100 text-green-700' },
+  checkups: { label: 'Checkups only', cls: 'bg-blue-100 text-blue-700' },
+  none: { label: 'Opted out', cls: 'bg-red-100 text-red-700' },
+  not_asked: { label: 'Not asked', cls: 'bg-ink/[0.05] text-ink/55' },
+};
+
+// Every value the backend writes to customers.consent_source
+const CONSENT_SOURCE_LABEL = {
+  staff: 'Added by staff',
+  stop_keyword: 'Typed STOP or SUBSCRIBE',
+  stop_button: 'Pressed Stop offers',
+  whatsapp_button: 'Answered the WhatsApp consent question',
+};
+
+function consentBadge(p) {
+  const badge = CONSENT_BADGE[p.marketing_consent] || CONSENT_BADGE.not_asked;
+  const parts = [];
+  if (p.consent_source) parts.push(`Source: ${CONSENT_SOURCE_LABEL[p.consent_source] || p.consent_source}`);
+  if (p.consent_at) parts.push(new Date(p.consent_at).toLocaleDateString('en-IN'));
+  return (
+    <span
+      title={parts.join(' · ') || undefined}
+      className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${badge.cls}`}
+    >
+      {badge.label}
+    </span>
+  );
+}
+
+const CONSENT_CHIPS = [
+  { key: '', label: 'All patients', field: 'total' },
+  { key: 'all', label: 'Offers and checkups', field: 'all' },
+  { key: 'checkups', label: 'Checkups only', field: 'checkups' },
+  { key: 'none', label: 'Opted out', field: 'none' },
+  { key: 'not_asked', label: 'Not asked', field: 'not_asked' },
+];
+
 export default function Patients() {
   const navigate = useNavigate();
   const { addToast } = useStore();
@@ -59,6 +97,8 @@ export default function Patients() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
+  const [consentFilter, setConsentFilter] = useState(''); // '', all, checkups, none, not_asked
+  const [consentSummary, setConsentSummary] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
   const [showAddPatient, setShowAddPatient] = useState(false);
@@ -72,14 +112,24 @@ export default function Patients() {
     if (!isPro) return;
     const timer = setTimeout(fetchPatients, 500);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, consentFilter]);
 
-  useEffect(() => { setCurrentPage(1); }, [search, activeFilter]);
+  useEffect(() => { setCurrentPage(1); }, [search, activeFilter, consentFilter]);
+
+  // Counts for the whole clinic; if the call fails the chips are simply hidden
+  const fetchConsentSummary = async () => {
+    try {
+      const res = await api.get('/ehr/patients/consent-summary');
+      setConsentSummary(res?.data || null);
+    } catch {
+      setConsentSummary(null);
+    }
+  };
 
   const fetchPatients = async () => {
     try {
       setLoading(true);
-      const res = await getEHRPatients(search);
+      const res = await api.get('/ehr/patients', { params: { search, ...(consentFilter ? { consent: consentFilter } : {}) } });
       setPatients(res?.data?.customers || []);
       setTotal(res?.data?.total || 0);
     } catch {
@@ -87,6 +137,7 @@ export default function Patients() {
     } finally {
       setLoading(false);
     }
+    fetchConsentSummary();
   };
 
   const handleSearchPhone = async () => {
@@ -225,12 +276,39 @@ export default function Patients() {
         ))}
       </div>
 
+      {/* Marketing consent counts: click a chip to filter the list */}
+      {consentSummary && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {CONSENT_CHIPS.map(chip => {
+              const active = consentFilter === chip.key;
+              return (
+                <button
+                  key={chip.label}
+                  onClick={() => setConsentFilter(active && chip.key !== '' ? '' : chip.key)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                    active
+                      ? 'border-accent bg-accent text-white'
+                      : 'border-ink/[0.12] text-ink/65 hover:bg-ink/[0.03]'
+                  }`}
+                >
+                  {chip.label} <span className="ml-1">{consentSummary[chip.field] ?? 0}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-ink/45">
+            Offers campaigns reach only patients who chose Offers and checkups. Patients who share a phone number share one consent.
+          </p>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-2xl border border-ink/[0.08] shadow-card overflow-x-auto hidden md:block">
         {loading ? (
           <TableRowSkeleton rows={6} />
         ) : filtered.length === 0 ? (
-          <div className="p-16 text-center text-ink/40 text-sm">No patients found</div>
+          <div className="p-16 text-center text-ink/40 text-sm">{consentFilter ? 'No patients match this filter.' : 'No patients found'}</div>
         ) : (
           <table className="min-w-full divide-y divide-ink/[0.06]">
             <thead className="bg-ink/[0.02]">
@@ -257,6 +335,7 @@ export default function Patients() {
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-ink">{p.name || '—'}</p>
+                          <div className="mt-0.5">{consentBadge(p)}</div>
                         </div>
                       </div>
                     </td>
@@ -298,7 +377,7 @@ export default function Patients() {
       {/* Mobile patient list */}
       <div className="block md:hidden bg-white rounded-2xl border border-ink/[0.08] shadow-card overflow-hidden divide-y divide-ink/[0.06]">
         {!loading && filtered.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-ink/40">No patients found.</div>
+          <div className="px-4 py-8 text-center text-sm text-ink/40">{consentFilter ? 'No patients match this filter.' : 'No patients found.'}</div>
         ) : (
           paginatedPatients.map(p => {
             const isNew = parseInt(p.total_visits || 0) === 0;
@@ -322,6 +401,7 @@ export default function Patients() {
                     </span>
                   </div>
                   <div className="text-xs text-ink/55 mt-0.5">{p.phone}</div>
+                  <div className="mt-0.5">{consentBadge(p)}</div>
                   <div className="flex items-center gap-3 mt-0.5 text-xs text-ink/40">
                     {p.last_visit && <span>Last: {relativeDate(p.last_visit)}</span>}
                     <span>{parseInt(p.total_visits || 0)} visits</span>
