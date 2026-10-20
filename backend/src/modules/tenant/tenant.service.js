@@ -140,6 +140,15 @@ const getTenantByWhatsapp = async (number) => {
 };
 
 /**
+ * Gets tenant by the Meta phone number id of a webhook (metadata.phone_number_id). Not cached: one indexed query,
+ * and the clinic's status and connection are always current.
+ */
+const getTenantByPhoneNumberId = async (phoneNumberId) => {
+  if (!phoneNumberId || !/^\d{8,20}$/.test(String(phoneNumberId))) return null;
+  return tenantModel.getTenantByPhoneNumberId(pool, String(phoneNumberId));
+};
+
+/**
  * Updates tenant fields
  * Prevents changing industry or slug
  */
@@ -227,6 +236,7 @@ module.exports = {
   createTenant,
   getTenantById,
   getTenantByWhatsapp,
+  getTenantByPhoneNumberId,
   updateTenant,
   setConfig,
   getAllConfigs,

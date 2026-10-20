@@ -58,6 +58,15 @@ const getTenantByWhatsapp = async (pool, whatsappNumber) => {
 };
 
 /**
+ * Gets a tenant by the Meta phone number id (unique index idx_tenants_whatsapp_phone_number_id). Same shape as getTenantByWhatsapp.
+ */
+const getTenantByPhoneNumberId = async (pool, phoneNumberId) => {
+  const sql = `SELECT * FROM tenants WHERE whatsapp_phone_number_id = $1`;
+  const result = await pool.query(sql, [phoneNumberId]);
+  return omitTenantSecrets(result.rows[0]) || null;
+};
+
+/**
  * Allowlisted column names for tenant UPDATE.
  * Any key not in this set is rejected to prevent SQL injection
  * via dynamic column name interpolation.
@@ -171,6 +180,7 @@ module.exports = {
   getTenantById,
   getTenantBySlug,
   getTenantByWhatsapp,
+  getTenantByPhoneNumberId,
   updateTenant,
   setTenantConfig,
   getTenantConfigs,

@@ -260,9 +260,20 @@ router.post('/', async (req, res) => {
           return
         }
       } else {
-        tenant = await TenantService.getTenantByWhatsapp(message.to)
+        // The clinic is found by the Meta phone number id first (unique per clinic), then by the display number
+        const tenantById = await TenantService.getTenantByPhoneNumberId(incomingPhoneId)
+        let tenantByNumber = null
+        try {
+          tenantByNumber = await TenantService.getTenantByWhatsapp(message.to)
+        } catch (lookupErr) {
+          tenantByNumber = null
+        }
+        tenant = tenantById || tenantByNumber
+        if (tenantById && tenantByNumber && tenantById.id !== tenantByNumber.id) {
+          logger.warn(`TENANT_LOOKUP_MISMATCH by_phone_number_id=${tenantById.id} by_display_number=${tenantByNumber.id} (using phone_number_id)`)
+        }
         if (!tenant) {
-          logger.warn(`No tenant found for number: ${message.from}`)
+          logger.warn(`No tenant found for display number ending ${String(message.to || '').slice(-4)} phone_number_id=${incomingPhoneId || 'none'} (sender ending ${String(message.from || '').slice(-4)})`)
           return
         }
       }
