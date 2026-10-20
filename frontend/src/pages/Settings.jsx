@@ -19,6 +19,29 @@ const DAYS = [
 
 
 
+const CAMPAIGN_STATUS_LABEL = { draft: 'Draft', running: 'Sending', paused: 'Paused', completed: 'Completed', cancelled: 'Cancelled' };
+
+const CAMPAIGN_READINESS_TEXT = {
+  clinic_not_active: 'Your clinic account is not active.',
+  poster_template_not_approved: 'The poster message is not approved by WhatsApp yet.',
+  phone_not_connected: 'Your WhatsApp number is not connected.',
+  quality_not_green: "Your WhatsApp number's quality rating needs attention. Please contact support.",
+  account_blocked: 'WhatsApp has paused sending for this account. Please contact support.',
+  payment_problem: 'WhatsApp reported a payment problem. Please contact support.',
+  meta_unreachable: 'We could not check with WhatsApp. Try again in a minute.'
+};
+
+const pausedReasonText = (reason) => {
+  const r = String(reason || '');
+  if (r.startsWith('meta_error_') || r === 'many_undeliverable' || r === 'repeated_send_errors') {
+    return 'Paused automatically to protect your WhatsApp number. Please contact support.';
+  }
+  if (['no_tenant_token', 'media_upload_failed', 'caption_empty'].includes(r)) return 'Paused automatically. Please contact support.';
+  return 'Paused. Please contact support.';
+};
+
+const inr = (value) => Number(value || 0).toFixed(2);
+
 export default function Settings() {
   const staff = getStoredStaff();
   const plan = staff?.tenantPlan || 'starter';
@@ -270,6 +293,17 @@ export default function Settings() {
   const [campaignError, setCampaignError] = useState('');
   const [brokenPosters, setBrokenPosters] = useState({});
 
+  // "Review and send" panel of one draft campaign
+  const [reviewId, setReviewId] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [ack, setAck] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [previewChanged, setPreviewChanged] = useState(false);
+  const [sendNote, setSendNote] = useState('');
+  const confirmingRef = useRef(false);
+
   const fetchCampaigns = async () => {
     try {
       setCampaignsLoading(true);
@@ -299,9 +333,10 @@ export default function Settings() {
     }
   };
 
-  const handleCancelCampaign = async (campaignId) => {
-    if (!window.confirm('Cancel this campaign? It will not be sent.')) return;
+  const handleCancelCampaign = async (campaignId, confirmText = 'Cancel this campaign? It will not be sent.') => {
+    if (!window.confirm(confirmText)) return;
     setCampaignError('');
+    setSendNote('');
     try {
       setCancellingId(campaignId);
       await api.post(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/cancel`);
@@ -310,6 +345,51 @@ export default function Settings() {
       setCampaignError(err?.error || 'Failed to cancel the campaign');
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const openReview = async (campaignId) => {
+    setReviewId(campaignId);
+    setPreview(null);
+    setReviewError('');
+    setAck(false);
+    setPreviewChanged(false);
+    setSendNote('');
+    setCampaignError('');
+    try {
+      setPreviewLoading(true);
+      const res = await api.get(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/preview`);
+      setPreview(res.data || null);
+    } catch (err) {
+      setReviewError(err?.error || 'Failed to load the review');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleConfirmCampaign = async (campaignId) => {
+    if (confirmingRef.current || !preview) return;
+    confirmingRef.current = true;
+    setConfirming(true);
+    setReviewError('');
+    try {
+      await api.post(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/confirm`, { expected_to_send: preview.will_send_now });
+      setReviewId(null);
+      setSendNote('Sending has started.');
+      fetchCampaigns();
+    } catch (err) {
+      if (err?.error === 'preview_changed' && err.preview) {
+        setPreview(err.preview);
+        setAck(false);
+        setPreviewChanged(true);
+      } else if (Array.isArray(err?.reasons)) {
+        setPreview(p => (p ? { ...p, readiness: { ok: false, reasons: err.reasons } } : p));
+      } else {
+        setReviewError(err?.error || 'Failed to start sending');
+      }
+    } finally {
+      confirmingRef.current = false;
+      setConfirming(false);
     }
   };
 
@@ -858,6 +938,7 @@ export default function Settings() {
                 <button onClick={fetchCampaigns} className="text-sm text-indigo-600 hover:text-indigo-800">Refresh</button>
               </div>
               {campaignError && <p className="text-sm text-red-600 mb-3">{campaignError}</p>}
+              {sendNote && <p className="text-sm text-green-600 mb-3">{sendNote}</p>}
               {campaignsLoading ? (
                 <p className="text-sm text-gray-400">Loading...</p>
               ) : campaigns.length === 0 ? (
@@ -872,7 +953,7 @@ export default function Settings() {
                           cp.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                           cp.status === 'running' ? 'bg-blue-100 text-blue-800' :
                           'bg-yellow-100 text-yellow-800'
-                        }`}>{cp.status}</span>
+                        }`}>{CAMPAIGN_STATUS_LABEL[cp.status] || cp.status}</span>
                         <span className="text-xs text-gray-400">{new Date(cp.created_at).toLocaleDateString('en-IN')}</span>
                       </div>
                       {cp.caption && (
@@ -889,14 +970,101 @@ export default function Settings() {
                           <p className="text-xs text-gray-500">Draft. Nothing has been sent.</p>
                         </div>
                       )}
+                      {cp.status === 'paused' && (
+                        <p className="text-sm text-amber-700">{pausedReasonText(cp.paused_reason)}</p>
+                      )}
                       {cp.status === 'draft' && (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => openReview(cp.id)}
+                            disabled={previewLoading && reviewId === cp.id}
+                            className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                          >
+                            Review and send
+                          </button>
+                          <button
+                            onClick={() => handleCancelCampaign(cp.id)}
+                            disabled={cancellingId === cp.id}
+                            className="px-3 py-1.5 border border-red-300 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+                          >
+                            {cancellingId === cp.id ? 'Cancelling...' : 'Cancel campaign'}
+                          </button>
+                        </div>
+                      )}
+                      {(cp.status === 'running' || cp.status === 'paused') && (
                         <button
-                          onClick={() => handleCancelCampaign(cp.id)}
+                          onClick={() => handleCancelCampaign(cp.id, 'Stop this campaign? Messages not sent yet will not be sent.')}
                           disabled={cancellingId === cp.id}
                           className="px-3 py-1.5 border border-red-300 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50"
                         >
-                          {cancellingId === cp.id ? 'Cancelling...' : 'Cancel campaign'}
+                          {cancellingId === cp.id ? 'Cancelling...' : 'Cancel sending'}
                         </button>
+                      )}
+                      {cp.status === 'draft' && reviewId === cp.id && (
+                        <div className="mt-2 p-4 border border-indigo-200 bg-indigo-50/40 rounded-lg space-y-2">
+                          {previewLoading && <p className="text-sm text-gray-500">Loading...</p>}
+                          {reviewError && <p className="text-sm text-red-600">{reviewError}</p>}
+                          {previewChanged && <p className="text-sm text-amber-700">The numbers changed. Please review them again.</p>}
+                          {preview && (
+                            <>
+                              <p className="text-sm font-medium text-gray-900">This campaign will be sent to {preview.will_send_now} patients now.</p>
+                              {preview.left_over_after_cap > 0 && (
+                                <p className="text-sm text-gray-700">
+                                  {preview.is_first_campaign
+                                    ? `As this is your first campaign, it is limited to ${preview.first_campaign_limit} patients. ${preview.left_over_after_cap} patients will not be sent this time.`
+                                    : `${preview.left_over_after_cap} patients will be sent later, as your daily allowance frees up.`}
+                                </p>
+                              )}
+                              <p className="text-sm text-gray-700">
+                                {preview.daily?.remaining === null || preview.daily?.remaining === undefined
+                                  ? 'No daily limit.'
+                                  : `Messages left in today's allowance: ${Math.max(0, preview.daily.remaining)} of ${preview.daily.budget}.`}
+                              </p>
+                              <p className="text-sm text-gray-700">
+                                Estimated cost: ₹{inr(preview.cost?.total_inr)} (₹{inr(preview.cost?.subtotal_inr)} + ₹{inr(preview.cost?.gst_inr)} GST). This is an estimate. The actual charge is set by Meta.
+                              </p>
+                              <p className="text-sm text-gray-700">
+                                Messages are sent slowly between 10 am and 7 pm, about {preview.estimated_minutes} minutes.
+                                {preview.window && !preview.window.open_now && ' Sending will begin at 10 am.'}
+                              </p>
+                              <p className="text-xs text-gray-500">Only patients who agreed to receive offers are included. Patients can reply STOP to stop.</p>
+                              {preview.readiness && !preview.readiness.ok && (
+                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg space-y-1">
+                                  <p className="text-sm font-medium text-red-700">We can't send right now</p>
+                                  {(preview.readiness.reasons || []).map(reason => (
+                                    <p key={reason} className="text-xs text-red-700">{CAMPAIGN_READINESS_TEXT[reason] || reason}</p>
+                                  ))}
+                                </div>
+                              )}
+                              {!preview.caption_ok && (
+                                <p className="text-sm text-red-600">The message text is empty. Cancel and create the campaign again.</p>
+                              )}
+                              {preview.will_send_now === 0 && (
+                                <p className="text-sm text-gray-700">There is nobody to send to right now.</p>
+                              )}
+                              <label className="flex items-start gap-2 text-sm text-gray-700">
+                                <input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} disabled={confirming} className="mt-0.5" />
+                                I understand that messages will start sending and cannot be recalled.
+                              </label>
+                            </>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() => handleConfirmCampaign(cp.id)}
+                              disabled={previewLoading || confirming || !preview || !ack || !preview.readiness?.ok || !preview.caption_ok || preview.will_send_now === 0}
+                              className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                              {confirming ? 'Starting...' : 'Confirm and send'}
+                            </button>
+                            <button
+                              onClick={() => setReviewId(null)}
+                              disabled={confirming}
+                              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                            >
+                              Close
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   ))}
