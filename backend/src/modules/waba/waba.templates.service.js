@@ -395,6 +395,7 @@ module.exports = {
   buildComponents,
   TemplateError,
   // shared with the read-only WABA info service
+  downloadPoster,
   loadConnection,
   metaFailure,
   META_API_URL

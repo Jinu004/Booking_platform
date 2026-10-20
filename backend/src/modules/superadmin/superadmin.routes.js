@@ -18,6 +18,7 @@ const {
 const { getConfig, updateConfig } = require('./platform-config.controller');
 const { getTenantSendFailures, getSendFailuresSummary } = require('./sendFailures.controller');
 const { fetchWabaInfo } = require('../waba/waba.info.service');
+const { getSendReadiness } = require('../campaign/campaign.readiness');
 const { successResponse, errorResponse } = require('../../utils/response');
 const { createTemplatesForTenant, refreshTemplateStatuses, getTenantTemplates, createPosterTemplate, TemplateError } = require('../waba/waba.templates.service');
 
@@ -69,6 +70,9 @@ router.post('/tenants/:id/poster-template', async (req, res) => {
 
 // WhatsApp account information fetched from Meta (read only: GET requests only)
 router.get('/tenants/:id/waba-info', templateRoute(fetchWabaInfo));
+
+// Pre-send readiness for a poster campaign (read only, always a fresh check)
+router.get('/tenants/:id/send-readiness', templateRoute((tenantId) => getSendReadiness(tenantId, { fresh: true })));
 
 // Failed WhatsApp sends (read only)
 router.get('/tenants/:id/send-failures', getTenantSendFailures);
