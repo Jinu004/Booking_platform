@@ -382,6 +382,14 @@ async function createManualBooking(req, res, next) {
       customerId = insertCus.rows[0].id;
     }
 
+    // Optional marketing consent recorded by staff (ignored unless it is one of the valid values)
+    if (customerId && ['all', 'checkups', 'none'].includes(req.body.marketing_consent)) {
+      await client.query(
+        `UPDATE customers SET marketing_consent = $1, consent_at = NOW(), consent_source = 'staff' WHERE id = $2 AND tenant_id = $3`,
+        [req.body.marketing_consent, customerId, tenantId]
+      );
+    }
+
     // Find or create patient record
     let patientId = null;
     const patientNameClean = cleanPatientName;
@@ -446,7 +454,7 @@ async function createManualBooking(req, res, next) {
          AND (
            (slot_time IS NOT NULL AND slot_time >= $4 AND slot_time < $5)
            OR
-           (slot_time IS NULL AND (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $4::time AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $5::time)
+           (slot_time IS NULL AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time >= $4::time AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time < $5::time)
          )`,
         [tenantId, doctorId, targetDate, sessionStart, sessionEnd]
       );
@@ -486,12 +494,15 @@ async function createManualBooking(req, res, next) {
     // Send WhatsApp confirmation in background only if requested
     if (sendWhatsapp) {
       setImmediate(async () => {
+        const { runAsTenant } = require('../channel/whatsapp/senderContext')
+        await runAsTenant(tenantId, async () => {
         try {
           const { sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter')
           await sendTemplateMessage(normalizedPhone, 'appointment_confirmation', 'en', [])
         } catch (waErr) {
           logger.warn('WhatsApp confirmation failed for manual booking:', waErr.message)
         }
+        })
       })
     }
     return successResponse(res, booking, 201);

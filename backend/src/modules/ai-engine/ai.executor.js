@@ -6,6 +6,36 @@ function escapeLike(str) {
   return str.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
+// Records the pending "Who is this booking for?" step. Never throws.
+async function recordPatientChoiceFlow(ctx, { kind, doctorId, doctorName, date, sessionStart }) {
+  try {
+    const { setFlow } = require('../conversation/conversation.flow')
+    const phone = ctx.customer?.phone
+    if (!phone) return
+    await setFlow(ctx.tenant.id, phone, {
+      state: 'choose_patient',
+      kind: kind || null,
+      doctorId: doctorId || null,
+      doctorName: doctorName || null,
+      date: date || null,
+      sessionStart: sessionStart || null
+    })
+    logger.info(`CODE_BOOKING_FLOW step=choose_patient tenant=${ctx.tenant.id} conversation=${ctx.conversation?.id || null} doctor=${doctorId || null} date=${date || null} session=${sessionStart || null}`)
+  } catch (err) {
+    logger.warn('recordPatientChoiceFlow failed:', err.message)
+  }
+}
+
+// Internal-only: returns the patient row if it belongs to this customer and tenant, else null.
+async function findOwnedPatient(tenantId, customerId, patientId) {
+  if (!customerId) return null
+  const res = await pool.query(
+    `SELECT id, name FROM patients WHERE id = $1 AND tenant_id = $2 AND customer_id = $3 LIMIT 1`,
+    [patientId, tenantId, customerId]
+  )
+  return res.rows[0] || null
+}
+
 /**
  * Executes a named AI function with given arguments.
  * All functions query PostgreSQL and return plain text results
@@ -424,6 +454,7 @@ async function executeFunction(name, args, ctx) {
                 const nameListGDS = patResGDS.rows.map(p => `• ${p.name}`).join('\n')
                 const ctxGDS = `${doctorGDS.name} (${doctorGDS.specialization}) available on ${day.dayLabel}.\nSession: ${fmtGDS(s.start)} - ${fmtGDS(s.end)}\n\nWho is this booking for?\n${nameListGDS}\n• Book for someone else [date:${bookingDate}]`
                 const bodyTextGDS = `${doctorGDS.name} available on ${day.dayLabel}.\nWho is this booking for?`
+                await recordPatientChoiceFlow(ctx, { kind: 'future', doctorId: doctorIdGDS, doctorName: doctorGDS.name, date: bookingDate, sessionStart: s.start })
                 let sentGDS = false
                 try {
                   await sendDLGDS(custPhoneGDS, bodyTextGDS, listItemsGDS, 'Select Patient')
@@ -488,6 +519,26 @@ async function executeFunction(name, args, ctx) {
               description: sessionInfo.slice(0, 72)
             }
           })
+          // Code flow only: remember the doctor and each offered date's session starts so a day tap can resolve a single session
+          try {
+            const codeFlowConfigsGDS = await require('../tenant/tenant.service').getAllConfigs(tenant.id)
+            if (codeFlowConfigsGDS?.code_booking_flow === 'true' && conversation?.id) {
+              const daysByDateGDS = {}
+              for (const d of days) {
+                daysByDateGDS[getBookingDate(d.dayOfWeek)] = d.sessions.map(s => {
+                  const startStr = String(s.start)
+                  return startStr.length === 5 ? `${startStr}:00` : startStr
+                })
+              }
+              await require('../../config/redis').set(
+                `anotherday_days:${conversation.id}`,
+                JSON.stringify({ doctor_id: doctorIdGDS, doctor_name: doctorGDS.name, days: daysByDateGDS }),
+                { EX: 1800 }
+              )
+            }
+          } catch (anotherDayKeyErr) {
+            logger.warn('Redis write failed for another-day day list:', anotherDayKeyErr.message)
+          }
           await sendDoctorList(customerPhone, `When would you like to see ${doctorGDS.name}?`, dayListItems, 'Select Day')
           const contextText = days.map(d => {
             const bookingDate = getBookingDate(d.dayOfWeek)
@@ -634,8 +685,8 @@ async function executeFunction(name, args, ctx) {
              AND (
                (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
                OR (slot_time IS NULL AND
-                   (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $3::time
-                   AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
+                   ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time >= $3::time
+                   AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
              )`,
             [tenant.id, doctor.id, sessStart, sessEnd]
           );
@@ -643,6 +694,19 @@ async function executeFunction(name, args, ctx) {
           if (sessCount < maxCap) availableSessions.push(sess);
         }
         if (availableSessions.length === 0) {
+          // Code flow only: remember the doctor so a TOMORROW reply can show the tomorrow patient list
+          try {
+            const codeFlowConfigsCDA = await require('../tenant/tenant.service').getAllConfigs(tenant.id)
+            if (codeFlowConfigsCDA?.code_booking_flow === 'true' && conversation?.id) {
+              await require('../../config/redis').set(
+                `tomorrow_booking:${conversation.id}`,
+                JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization }),
+                { EX: 3600 }
+              )
+            }
+          } catch (tomorrowKeyErr) {
+            logger.warn('Redis write failed for tomorrow offer (all sessions full):', tomorrowKeyErr.message)
+          }
           return { available: false, message: `${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply TOMORROW to confirm tomorrow's booking or ignore to cancel.` }
         }
 
@@ -687,6 +751,7 @@ async function executeFunction(name, args, ctx) {
             const nameListCDA = patResCDA.rows.map(p => `• ${p.name}`).join('\n')
             const ctxCDA = `${doctor.name} (${doctor.specialization})\nSession: ${sessionTime} [session_start:${selectedSessionStart}]\n\nWho is this booking for?\n${nameListCDA}\n• Book for someone else`
             const bodyTextCDA = `${doctor.name} is available.\nWho is this booking for?`
+            await recordPatientChoiceFlow(ctx, { kind: 'today', doctorId: doctor.id, doctorName: doctor.name, date: null, sessionStart: selectedSessionStart })
             let sentCDA = false
             try {
               await sendDLCDA(custPhoneCDA, bodyTextCDA, listItemsCDA, 'Select Patient')
@@ -717,13 +782,24 @@ Please reply with your name to confirm booking.`
       }
 
       case 'create_token_booking': {
-  const { doctor_name, patient_name, session_start_time } = args
+  const { doctor_name, patient_name: patientNameArgCTB, session_start_time, patient_id: patientIdArgCTB, doctor_id: doctorIdArgCTB } = args
+  // Internal-only patient_id: use the stored name of a patient owned by this customer
+  let patient_name = patientNameArgCTB
+  if (patientIdArgCTB) {
+    const ownedPatientCTB = await findOwnedPatient(tenant.id, customer?.id, patientIdArgCTB)
+    if (!ownedPatientCTB) return { success: false, message: 'Patient not found' }
+    patient_name = ownedPatientCTB.name
+  }
   const formattedName = (patient_name || '')
     .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')  // allow Latin, Malayalam, spaces, hyphens
     .trim()
     .slice(0, 100)
     .replace(/\b\w/g, c => c.toUpperCase())
-  
+  // Refuse before any lookup, capacity check or booking insert when there is no usable patient name
+  if (!formattedName) {
+    return { success: false, message: 'Please provide a valid patient name.' }
+  }
+
   // Check working hours
   const HITLService = require('../hitl/hitl.service')
   const HITLModel = require('../hitl/hitl.model')
@@ -736,14 +812,21 @@ Please reply with your name to confirm booking.`
   } catch {}
 
   // Find doctor
-  const doctorRes = await pool.query(
-    `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
-     WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND available_today = true AND is_active = true
-     LIMIT 1`,
-    [tenant.id, `%${escapeLike(doctor_name)}%`]
-  )
+  const doctorRes = doctorIdArgCTB
+    ? await pool.query(
+        `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
+         WHERE tenant_id = $1 AND id = $2 AND available_today = true AND is_active = true
+         LIMIT 1`,
+        [tenant.id, doctorIdArgCTB]
+      )
+    : await pool.query(
+        `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
+         WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND available_today = true AND is_active = true
+         LIMIT 1`,
+        [tenant.id, `%${escapeLike(doctor_name)}%`]
+      )
   if (!doctorRes.rows.length) {
-    return { success: false, message: `Dr. ${doctor_name} is not available today.` }
+    return { success: false, message: `Dr. ${doctor_name || 'that doctor'} is not available today.` }
   }
   const doctor = doctorRes.rows[0]
 
@@ -811,7 +894,7 @@ Please reply with your name to confirm booking.`
     countSqlCTB += ` AND (
       (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
       OR
-      (slot_time IS NULL AND (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
+      (slot_time IS NULL AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
     )`;
     countParamsCTB.push(sessionStartCTB, sessionEndCTB);
   }
@@ -820,7 +903,7 @@ Please reply with your name to confirm booking.`
   if (currentCount >= maxTokensCTB) {
     // Today fully booked — store pending intent and offer tomorrow
     try {
-      const redisClient = require('../../../config/redis')
+      const redisClient = require('../../config/redis')
       if (redisClient && conversation?.id) {
         await redisClient.set(
           `tomorrow_booking:${conversation.id}`,
@@ -873,6 +956,24 @@ Please reply with your name to confirm booking.`
       'SELECT id FROM clinic_doctors WHERE id = $1 FOR UPDATE',
       [doctor.id]
     )
+    // Authoritative capacity re-check under the doctor-row lock (the count above runs before the lock)
+    const lockedCountRes = await bookingClient.query(countSqlCTB, countParamsCTB)
+    if (parseInt(lockedCountRes.rows[0].count || 0) >= maxTokensCTB) {
+      await bookingClient.query('ROLLBACK')
+      try {
+        const redisClient = require('../../config/redis')
+        if (redisClient && conversation?.id) {
+          await redisClient.set(
+            `tomorrow_booking:${conversation.id}`,
+            JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization, patient_name: formattedName }),
+            { EX: 3600 }
+          )
+        }
+      } catch (redisErr) {
+        logger.warn('Redis write failed for tomorrow booking intent:', redisErr.message)
+      }
+      return `${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply *TOMORROW* to confirm tomorrow's booking or ignore to cancel.`
+    }
     const bookingRes = await bookingClient.query(
       `INSERT INTO bookings
          (tenant_id, customer_id, conversation_id, doctor_id,
@@ -909,24 +1010,26 @@ Please reply with your name to confirm booking.`
         : (() => { const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return now.getHours() * 60 + now.getMinutes(); })();
       const matched = sess.find(s => { const ss = toMins(s.start_time); const se = toMins(s.end_time); return slotMins >= ss && slotMins < se; });
       if (matched) { sessionStart = matched.start_time.toString().slice(0, 5); sessionEnd = matched.end_time.toString().slice(0, 5); }
-    } catch {}
+    } catch (err) {
+      logger.error(`Session scope lookup failed in create_token_booking: ${err.message}`)
+    }
 
     let tokenQuery, tokenParams;
     if (sessionStart && sessionEnd) {
       tokenQuery = `UPDATE bookings SET token_number = (
-         SELECT COUNT(*) FROM bookings
+         SELECT COALESCE(MAX(token_number), 0) + 1 FROM bookings
          WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
          AND status != 'cancelled'
          AND (
            (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
            OR
-           (slot_time IS NULL AND (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
+           (slot_time IS NULL AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
          )
        ) WHERE id = $5 RETURNING token_number`;
       tokenParams = [tenant.id, doctor.id, sessionStart, sessionEnd, booking.id];
     } else {
       tokenQuery = `UPDATE bookings SET token_number = (
-         SELECT COUNT(*) FROM bookings
+         SELECT COALESCE(MAX(token_number), 0) + 1 FROM bookings
          WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
          AND status != 'cancelled'
        ) WHERE id = $3 RETURNING token_number`;
@@ -976,22 +1079,6 @@ Please reply with your name to confirm booking.`
       sessionStart = fmtTime(resolvedStart)
     } else {
       sessionStart = '9:00 AM'
-    }
-  }
-
-  // If outside working hours, store tomorrow option — non-critical, isolated from booking success
-  if (!withinHours) {
-    try {
-      const redisClient = require('../../../config/redis')
-      if (redisClient && conversation?.id) {
-        await redisClient.set(
-          `tomorrow_booking:${conversation.id}`,
-          JSON.stringify({ doctor_id: doctor.id, doctor_name: doctor.name, doctor_specialization: doctor.specialization, patient_name: formattedName }),
-          { EX: 3600 }
-        )
-      }
-    } catch (redisErr) {
-      logger.warn('Redis write failed for outside-hours tomorrow offer:', redisErr.message)
     }
   }
 
@@ -1046,12 +1133,23 @@ For queries, contact us: ${contactPhone}`
 }
 
       case 'create_tomorrow_booking': {
-        const { doctor_name, patient_name } = args
+        const { doctor_name, patient_name: patientNameArgTMR, patient_id: patientIdArgTMR, doctor_id: doctorIdArgTMR } = args
+        // Internal-only patient_id: use the stored name of a patient owned by this customer
+        let patient_name = patientNameArgTMR
+        if (patientIdArgTMR) {
+          const ownedPatientTMR = await findOwnedPatient(tenant.id, customer?.id, patientIdArgTMR)
+          if (!ownedPatientTMR) return { success: false, message: 'Patient not found' }
+          patient_name = ownedPatientTMR.name
+        }
         const formattedName = (patient_name || '')
           .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')  // allow Latin, Malayalam, spaces, hyphens
           .trim()
           .slice(0, 100)
           .replace(/\b\w/g, c => c.toUpperCase())
+        // Refuse before any lookup or insert when there is no usable patient name
+        if (!formattedName) {
+          return { success: false, message: 'Please provide a valid patient name.' }
+        }
 
         // Compute tomorrow in IST to avoid UTC/IST date boundary errors
         // (server runs UTC; between 12 AM–5:30 AM IST, UTC is still on the previous date)
@@ -1064,14 +1162,21 @@ For queries, contact us: ${contactPhone}`
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
         // Find doctor
-        const doctorRes = await pool.query(
-          `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
-           WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND is_active = true
-           LIMIT 1`,
-          [tenant.id, `%${escapeLike(doctor_name)}%`]
-        )
+        const doctorRes = doctorIdArgTMR
+          ? await pool.query(
+              `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
+               WHERE tenant_id = $1 AND id = $2 AND is_active = true
+               LIMIT 1`,
+              [tenant.id, doctorIdArgTMR]
+            )
+          : await pool.query(
+              `SELECT id, name, specialization, max_tokens_daily, avg_consultation_minutes FROM clinic_doctors
+               WHERE tenant_id = $1 AND LOWER(name) LIKE LOWER($2) AND is_active = true
+               LIMIT 1`,
+              [tenant.id, `%${escapeLike(doctor_name)}%`]
+            )
         if (!doctorRes.rows.length) {
-          return { success: false, message: `No doctor found matching "${doctor_name}"` }
+          return { success: false, message: `No doctor found matching "${doctor_name || 'that doctor'}"` }
         }
         const doctor = doctorRes.rows[0]
 
@@ -1084,18 +1189,31 @@ For queries, contact us: ${contactPhone}`
           return { success: false, message: `${doctor.name} is on leave tomorrow (${dayNames[tomorrowDow]}). Please choose another doctor.` }
         }
 
-        // Check doctor schedule for tomorrow
-        const scheduleRes = await pool.query(
-          `SELECT start_time, end_time FROM doctor_schedules
-           WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
-           LIMIT 1`,
-          [tenant.id, doctor.id, tomorrowDow]
+        // Tomorrow's sessions: schedule_overrides first (procedure carve-outs), then doctor_schedules; earliest session wins
+        let tomorrowSessions = []
+        const overrideResTmr = await pool.query(
+          `SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`,
+          [tenant.id, doctor.id, tomorrowDate]
         )
-        if (!scheduleRes.rows.length) {
+        if (overrideResTmr.rows.length > 0) {
+          tomorrowSessions = (overrideResTmr.rows[0].sessions || []).map(s => ({ start_time: s.start_time, end_time: s.end_time }))
+        } else {
+          const scheduleRes = await pool.query(
+            `SELECT start_time, end_time FROM doctor_schedules
+             WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
+             ORDER BY start_time ASC`,
+            [tenant.id, doctor.id, tomorrowDow]
+          )
+          tomorrowSessions = scheduleRes.rows
+        }
+        tomorrowSessions.sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)))
+        if (!tomorrowSessions.length) {
           return { success: false, message: `${doctor.name} is not available tomorrow (${dayNames[tomorrowDow]}). Please choose another doctor or a different day.` }
         }
 
-        const { start_time, end_time } = scheduleRes.rows[0]
+        const { start_time, end_time } = tomorrowSessions[0]
+        // slot_time is stored as HH:MM:SS text, like the other booking flows
+        const slotTimeTomorrow = start_time.toString().length === 5 ? `${start_time}:00` : start_time.toString()
         const fmt = (t) => {
           const [h, m] = t.split(':')
           const hour = parseInt(h)
@@ -1105,15 +1223,17 @@ For queries, contact us: ${contactPhone}`
         }
         const sessionTime = `${fmt(start_time)} - ${fmt(end_time)}`
 
-        // Check tomorrow token count
-        const tokenRes = await pool.query(
-          `SELECT COUNT(*) AS count FROM bookings
-           WHERE doctor_id = $1 AND booking_date = $2 AND status != 'cancelled'`,
-          [doctor.id, tomorrowDate]
-        )
-        const currentCount = parseInt(tokenRes.rows[0].count || 0)
-        if (currentCount >= doctor.max_tokens_daily) {
-          return { success: false, message: `${doctor.name} is fully booked for tomorrow. Please choose another doctor.` }
+        // Tomorrow token count: same bookings create_token_booking counts (tenant, not cancelled, no procedures).
+        // A null max_tokens_daily means no limit; 0 means no bookings.
+        const tomorrowCountSql = `SELECT COUNT(*) AS count FROM bookings
+           WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
+           AND status != 'cancelled' AND (booking_type IS NULL OR booking_type != 'procedure')`
+        const tomorrowIsFull = (count) => doctor.max_tokens_daily !== null && doctor.max_tokens_daily !== undefined && count >= doctor.max_tokens_daily
+        const fullTomorrowMessage = { success: false, message: `${doctor.name} is fully booked for tomorrow. Please choose another doctor.` }
+        // Quick check before creating anything; the authoritative check runs again under the doctor-row lock below
+        const tokenRes = await pool.query(tomorrowCountSql, [tenant.id, doctor.id, tomorrowDate])
+        if (tomorrowIsFull(parseInt(tokenRes.rows[0].count || 0))) {
+          return fullTomorrowMessage
         }
 
         // Check duplicate booking for tomorrow — scoped to patient name so family members sharing a number can each book
@@ -1162,16 +1282,22 @@ For queries, contact us: ${contactPhone}`
             'SELECT id FROM clinic_doctors WHERE id = $1 FOR UPDATE',
             [doctor.id]
           )
+          // Authoritative capacity check under the doctor-row lock
+          const lockedTomorrowRes = await tomorrowClient.query(tomorrowCountSql, [tenant.id, doctor.id, tomorrowDate])
+          if (tomorrowIsFull(parseInt(lockedTomorrowRes.rows[0].count || 0))) {
+            await tomorrowClient.query('ROLLBACK')
+            return fullTomorrowMessage
+          }
           const bookingRes = await tomorrowClient.query(
             `INSERT INTO bookings
                (tenant_id, customer_id, conversation_id, doctor_id,
-                source, status, booking_date, token_number, notes, patient_name, patient_id)
+                source, status, booking_date, token_number, notes, patient_name, patient_id, slot_time)
              VALUES ($1, $2, $3, $4, 'whatsapp', 'pending', $5,
-               (SELECT COUNT(*) + 1 FROM bookings WHERE tenant_id = $1 AND doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
-               $6, $7, $8)
+               (SELECT COALESCE(MAX(token_number), 0) + 1 FROM bookings WHERE tenant_id = $1 AND doctor_id = $4 AND booking_date = $5 AND status != 'cancelled'),
+               $6, $7, $8, $9)
              RETURNING id, token_number`,
             [tenant.id, customer?.id || null, conversation?.id || null, doctor.id,
-             tomorrowDate, `Booked via WhatsApp for ${formattedName}`, formattedName, patientId]
+             tomorrowDate, `Booked via WhatsApp for ${formattedName}`, formattedName, patientId, slotTimeTomorrow]
           )
           tokenNumber = bookingRes.rows[0].token_number
           booking = bookingRes.rows[0]
@@ -1256,6 +1382,22 @@ For queries, contact us: ${contactPhoneTmr}`
       const sessionLabel = sessionMatch ? `\nSelected session: ${sessionMatch[2]}:${sessionMatch[3]}` : ''
       const contextText = `Who is this booking for?${sessionLabel}\n${nameList}\n• Book for someone else${sessionSuffix}`
       const patientVisibleText = `Who is this booking for?${sessionLabel}\n${nameList}\n• Book for someone else`
+      const dayMatchGPP = (ctx.interactiveId || '').match(/^\d::(\d{4}-\d{2}-\d{2})$/)
+      // Internal-only (never from Gemini): tomorrow list for a known doctor
+      const isInternalTomorrowGPP = args?.internal_kind === 'tomorrow' && !!args.doctor_id && /^\d{4}-\d{2}-\d{2}$/.test(args.internal_date || '')
+      // Internal-only (never from Gemini): future date with a single known session for a known doctor
+      const isInternalFutureGPP = args?.internal_kind === 'future' && !!args.doctor_id && /^\d{4}-\d{2}-\d{2}$/.test(args.internal_date || '') && /^\d{2}:\d{2}:\d{2}$/.test(args.internal_session || '')
+      await recordPatientChoiceFlow(ctx, isInternalTomorrowGPP
+        ? { kind: 'tomorrow', doctorId: args.doctor_id, doctorName: null, date: args.internal_date, sessionStart: null }
+        : isInternalFutureGPP
+        ? { kind: 'future', doctorId: args.doctor_id, doctorName: null, date: args.internal_date, sessionStart: args.internal_session }
+        : {
+            kind: dayMatchGPP ? 'future' : (sessionMatch ? 'today' : null),
+            doctorId: sessionMatch ? sessionMatch[1] : null,
+            doctorName: null,
+            date: dayMatchGPP ? dayMatchGPP[1] : null,
+            sessionStart: sessionMatch ? `${sessionMatch[2]}:${sessionMatch[3]}:${sessionMatch[4]}` : null
+          })
       if (customerPhone) {
         let sentGPP = false
         try {
@@ -1279,13 +1421,33 @@ For queries, contact us: ${contactPhoneTmr}`
     }
 
     case 'create_future_booking': {
-      const { doctor_name: doctorNameFB, patient_name: patientNameFB, booking_date: bookingDateFB, session_start_time: sessionStartFB } = args
-      if (!doctorNameFB || !patientNameFB || !bookingDateFB) {
+      const { doctor_name: doctorNameFB, patient_name: patientNameArgFB, booking_date: bookingDateFB, session_start_time: sessionStartFB, patient_id: patientIdArgFB, doctor_id: doctorIdArgFB } = args
+      // Internal-only patient_id: use the stored name of a patient owned by this customer
+      let patientNameFB = patientNameArgFB
+      if (patientIdArgFB) {
+        const ownedPatientFB = await findOwnedPatient(tenant.id, customer?.id, patientIdArgFB)
+        if (!ownedPatientFB) return { success: false, message: 'Patient not found' }
+        patientNameFB = ownedPatientFB.name
+      }
+      if ((!doctorNameFB && !doctorIdArgFB) || !patientNameFB || !bookingDateFB) {
         return `DIRECT:Sorry, I need the doctor name, your name, and booking date to complete this booking.`
       }
       const targetDate = new Date(bookingDateFB)
       if (isNaN(targetDate.getTime())) {
         return `DIRECT:Sorry, I couldn't process that date. Please try again.`
+      }
+      // The date must be YYYY-MM-DD, after today (IST) and within the 6 days ahead that get_doctor_schedule can offer
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(bookingDateFB))) {
+        return `DIRECT:Sorry, I couldn't process that date. Please try again.`
+      }
+      const istTodayFB = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+      const istDateStrFB = (daysAhead) => {
+        const d = new Date(istTodayFB)
+        d.setDate(d.getDate() + daysAhead)
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      }
+      if (bookingDateFB < istDateStrFB(1) || bookingDateFB > istDateStrFB(6)) {
+        return `DIRECT:That date is no longer available. Please choose another day.`
       }
       const targetDow = targetDate.getDay()
       const formattedNameFB = patientNameFB.replace(/[^a-zA-Z\sഀ-ൿ-]/g, '').trim().slice(0, 100).replace(/\b\w/g, c => c.toUpperCase())
@@ -1295,37 +1457,82 @@ For queries, contact us: ${contactPhoneTmr}`
 
       // Find doctor (outside transaction — read-only)
       const sessionFilterFB = sessionStartFB && /^\d{2}:\d{2}(:\d{2})?$/.test(sessionStartFB)
-      const docResFB = sessionFilterFB
-        ? await pool.query(
-            `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily, cd.avg_consultation_minutes,
-                    ds.start_time, ds.end_time
-             FROM clinic_doctors cd
-             JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
-             WHERE cd.tenant_id = $1 AND cd.is_active = true AND LOWER(cd.name) LIKE LOWER($3)
-               AND ds.start_time::text LIKE $4 || '%'
-             LIMIT 1`,
-            [tenant.id, targetDow, `%${doctorNameFB}%`, sessionStartFB]
-          )
-        : await pool.query(
-            `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily, cd.avg_consultation_minutes,
-                    ds.start_time, ds.end_time
-             FROM clinic_doctors cd
-             JOIN doctor_schedules ds ON ds.doctor_id = cd.id AND ds.day_of_week = $2 AND ds.is_available = true
-             WHERE cd.tenant_id = $1 AND cd.is_active = true AND LOWER(cd.name) LIKE LOWER($3)
-             ORDER BY ds.start_time ASC
-             LIMIT 1`,
-            [tenant.id, targetDow, `%${doctorNameFB}%`]
-          )
-      if (!docResFB.rows.length) {
-        return `DIRECT:Sorry, ${doctorNameFB} is not available on that day. Please choose another day.`
+      // Internal-only doctor_id replaces the name LIKE match; $2 is the id or the name pattern
+      const doctorCondFB = doctorIdArgFB ? `cd.id = $2` : `LOWER(cd.name) LIKE LOWER($2)`
+      const doctorParamFB = doctorIdArgFB || `%${doctorNameFB}%`
+      const docRowResFB = await pool.query(
+        `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily, cd.avg_consultation_minutes
+         FROM clinic_doctors cd
+         WHERE cd.tenant_id = $1 AND cd.is_active = true AND ${doctorCondFB}
+         LIMIT 1`,
+        [tenant.id, doctorParamFB]
+      )
+      if (!docRowResFB.rows.length) {
+        return `DIRECT:Sorry, ${doctorNameFB || 'that doctor'} is not available on that day. Please choose another day.`
       }
-      const doctorFB = docResFB.rows[0]
+      const doctorRowFB = docRowResFB.rows[0]
+
+      // That date's sessions, same lookup as create_tomorrow_booking: schedule_overrides first, then doctor_schedules
+      let sessionsFB = []
+      const overrideResFB = await pool.query(
+        `SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`,
+        [tenant.id, doctorRowFB.id, bookingDateFB]
+      )
+      if (overrideResFB.rows.length > 0) {
+        sessionsFB = (overrideResFB.rows[0].sessions || []).map(s => ({ start_time: s.start_time, end_time: s.end_time }))
+      } else {
+        const scheduleResFB = await pool.query(
+          `SELECT start_time, end_time FROM doctor_schedules
+           WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true
+           ORDER BY start_time ASC`,
+          [tenant.id, doctorRowFB.id, targetDow]
+        )
+        sessionsFB = scheduleResFB.rows
+      }
+      sessionsFB.sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)))
+      // The given session when there is one, otherwise the earliest
+      const pickedSessionFB = sessionFilterFB
+        ? sessionsFB.find(s => String(s.start_time).slice(0, 5) === String(sessionStartFB).slice(0, 5))
+        : sessionsFB[0]
+      if (!pickedSessionFB) {
+        return `DIRECT:Sorry, ${doctorNameFB || 'that doctor'} is not available on that day. Please choose another day.`
+      }
+      const pickedStartFB = String(pickedSessionFB.start_time)
+      const doctorFB = {
+        ...doctorRowFB,
+        start_time: pickedStartFB.length === 5 ? `${pickedStartFB}:00` : pickedStartFB,
+        end_time: pickedSessionFB.end_time
+      }
+
+      // Check doctor leave for that date (same check as create_tomorrow_booking)
+      const leaveCheckFB = await pool.query(
+        `SELECT id FROM doctor_leaves WHERE doctor_id = $1 AND leave_date = $2 LIMIT 1`,
+        [doctorFB.id, bookingDateFB]
+      )
+      if (leaveCheckFB.rows.length > 0) {
+        const dayNamesFB = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        return { success: false, message: `${doctorFB.name} is on leave on that date (${dayNamesFB[targetDow]}). Please choose another day.` }
+      }
+
+      // Capacity count for that date: same bookings create_tomorrow_booking counts. A null max means no limit; 0 means no bookings.
+      const futureCountSqlFB = `SELECT COUNT(*) AS count FROM bookings
+         WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
+         AND status != 'cancelled' AND (booking_type IS NULL OR booking_type != 'procedure')`
+      const futureIsFullFB = (count) => doctorFB.max_tokens_daily !== null && doctorFB.max_tokens_daily !== undefined && count >= doctorFB.max_tokens_daily
+      const fullFutureMessageFB = { success: false, message: `${doctorFB.name} is fully booked on that date. Please choose another day or doctor.` }
+      // Quick check before creating anything; the authoritative check runs again under the doctor-row lock below
+      const futureCountResFB = await pool.query(futureCountSqlFB, [tenant.id, doctorFB.id, bookingDateFB])
+      if (futureIsFullFB(parseInt(futureCountResFB.rows[0].count || 0))) {
+        return fullFutureMessageFB
+      }
 
       // Check duplicate booking for future date — scoped to patient name so family members sharing a number can each book
+      // (compared with the cleaned name, which is the value that gets stored)
+      const futureDuplicateSqlFB = `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = $3 AND LOWER(patient_name) = LOWER($4) AND status NOT IN ('cancelled', 'completed') LIMIT 1`
       if (customer?.id) {
         const activeBookingResFB = await pool.query(
-          `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = $3 AND LOWER(patient_name) = LOWER($4) AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
-          [customer.id, doctorFB.id, bookingDateFB, patientNameFB]
+          futureDuplicateSqlFB,
+          [customer.id, doctorFB.id, bookingDateFB, formattedNameFB]
         )
         if (activeBookingResFB.rows.length > 0) {
           return { success: false, message: `${patientNameFB} already has a booking with ${doctorFB.name} on that date.` }
@@ -1373,6 +1580,20 @@ For queries, contact us: ${contactPhoneTmr}`
           `SELECT id FROM clinic_doctors WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
           [doctorFB.id, tenant.id]
         )
+
+        // Authoritative capacity and duplicate checks under the doctor-row lock
+        const lockedCountResFB = await clientFB.query(futureCountSqlFB, [tenant.id, doctorFB.id, bookingDateFB])
+        if (futureIsFullFB(parseInt(lockedCountResFB.rows[0].count || 0))) {
+          await clientFB.query('ROLLBACK')
+          return fullFutureMessageFB
+        }
+        if (customer?.id) {
+          const lockedDuplicateResFB = await clientFB.query(futureDuplicateSqlFB, [customer.id, doctorFB.id, bookingDateFB, formattedNameFB])
+          if (lockedDuplicateResFB.rows.length > 0) {
+            await clientFB.query('ROLLBACK')
+            return { success: false, message: `${patientNameFB} already has a booking with ${doctorFB.name} on that date.` }
+          }
+        }
 
         // MAX-based token number inside transaction
         const tokenResFB = await clientFB.query(

@@ -3,6 +3,7 @@ const HITLService = require('./hitl.service');
 const logger = require('../../utils/logger');
 const pool = require('../../config/database');
 const { sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter');
+const { runAsTenant } = require('../channel/whatsapp/senderContext');
 const ConversationService = require('../conversation/conversation.service');
 const { broadcastToTenant } = require('./sse');
 
@@ -54,6 +55,9 @@ async function reply(req, res, next) {
     const message = await HITLService.staffReply(id, tenantId, staffId, content.trim());
     return res.json({ success: true, data: message, error: null });
   } catch (err) {
+    if (err.statusCode === 409) {
+      return res.status(409).json({ success: false, data: null, error: err.message });
+    }
     next(err);
   }
 }
@@ -118,7 +122,7 @@ async function sendTemplate(req, res) {
     if (!convRow.rows.length) return res.status(404).json({ error: 'Conversation not found' })
     const phone = convRow.rows[0].phone
 
-    await sendTemplateMessage(phone, templateName, languageCode, components)
+    await runAsTenant(req.tenantId, () => sendTemplateMessage(phone, templateName, languageCode, components))
     const savedMessage = await ConversationService.saveOutboundMessage(conversationId, `[Template sent: ${templateName}]`, 'staff')
     broadcastToTenant(req.tenantId, 'new_message', {
       conversationId,

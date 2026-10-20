@@ -5,3 +5,7 @@
 html, body {
   overscroll-behavior: none;
 }
+
+body {
+  @apply font-sans antialiased;
+}

@@ -96,11 +96,20 @@ async function getBookings(pool, tenantId, filters = {}) {
     paramCount++;
   }
   
+  // Day view (date) and upcoming view: active first, then by doctor and token, with a stable tiebreaker.
+  // Customer history and unfiltered requests keep the original newest-first order.
+  let orderBy = `ORDER BY b.booking_date DESC, b.slot_time ASC NULLS LAST, b.token_number ASC`;
+  if (!filters.customerId && (filters.upcoming || filters.date)) {
+    orderBy = `ORDER BY ${filters.upcoming ? 'b.booking_date ASC, ' : ''}
+      CASE b.status WHEN 'cancelled' THEN 3 WHEN 'noshow' THEN 2 WHEN 'completed' THEN 1 ELSE 0 END,
+      cd.name ASC NULLS LAST, b.doctor_id, b.token_number ASC, b.created_at ASC, b.id ASC`;
+  }
+
   if (filters.page && filters.limit) {
-    sql += ` ORDER BY b.booking_date DESC, b.slot_time ASC NULLS LAST, b.token_number ASC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    sql += ` ${orderBy} LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
     params.push(filters.limit, (filters.page - 1) * filters.limit);
   } else {
-    sql += ` ORDER BY b.booking_date DESC, b.slot_time ASC NULLS LAST, b.token_number ASC`;
+    sql += ` ${orderBy}`;
   }
 
   const result = await tenantQuery(tenantId, pool, sql, params);
@@ -168,7 +177,7 @@ async function getDoctorTokenCount(pool, tenantId, doctorId, sessionStart = null
     sql += ` AND (
       (slot_time IS NOT NULL AND slot_time >= $3 AND slot_time < $4)
       OR
-      (slot_time IS NULL AND (created_at AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND (created_at AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
+      (slot_time IS NULL AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time >= $3::time AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::time < $4::time)
     )`;
     params.push(sessionStart, sessionEnd);
   }

@@ -284,13 +284,14 @@ const SCRIPT = [
   { side: 'in', text: 'Hi', delay: 600 },
   { side: 'typing', delay: 800 },
   { side: 'out', card: 'menu', delay: 400 },
-  { side: 'in', text: '1', delay: 1800 },
+  { side: 'out', card: 'more', delay: 600 },
+  { side: 'in', text: 'Dr. Rajan Kumar · General Medicine', delay: 2200 },
   { side: 'typing', delay: 900 },
   { side: 'out', card: 'doctors', delay: 400 },
-  { side: 'in', text: 'Rajan Kumar', delay: 2400 },
+  { side: 'in', text: '9:00 AM - 1:00 PM', delay: 1800 },
   { side: 'typing', delay: 800 },
   { side: 'out', card: 'askName', delay: 400 },
-  { side: 'in', text: 'Anjali', delay: 1800 },
+  { side: 'in', text: 'Anjali · Existing profile', delay: 1800 },
   { side: 'typing', delay: 1000 },
   { side: 'out', card: 'confirmed', delay: 400 },
 ];
@@ -342,32 +343,24 @@ function AnimatedWABody({ bodyRef }) {
         );
         if (m.card === 'menu') return (
           <div className="rai-wa-card" key={m.id}>
-            <div style={{ fontSize: 12, color: '#111', lineHeight: 1.45 }}>Hello! Welcome to <strong>Menon Family Clinic</strong> 👋</div>
-            <div style={{ marginTop: 8, fontSize: 11.5, color: '#444' }}>Reply with:</div>
-            <div className="rai-wa-menu">
-              <div className="rai-wa-menu-row"><span className="rai-wa-menu-num">1</span> Book appointment</div>
-              <div className="rai-wa-menu-row"><span className="rai-wa-menu-num">2</span> Check my booking</div>
-              <div className="rai-wa-menu-row"><span className="rai-wa-menu-num">3</span> Talk to staff</div>
-            </div>
+            <div style={{ fontSize: 12, color: '#111', lineHeight: 1.45 }}>Hello! Welcome to <strong>Menon Family Clinic</strong> 👋<br />Here are today's available doctors:</div>
             <div className="rai-wa-meta"><span>10:42 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
+            <div style={{ marginTop: 6, paddingTop: 7, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>☰&nbsp;&nbsp;Book Today</div>
+          </div>
+        );
+        if (m.card === 'more') return (
+          <div className="rai-wa-card" key={m.id}>
+            <div style={{ fontSize: 12, color: '#111', lineHeight: 1.45 }}>Need something else?</div>
+            <div className="rai-wa-meta"><span>10:42 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
+            <div style={{ marginTop: 6, paddingTop: 7, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>↩&nbsp;&nbsp;Book Another Day</div>
+            <div style={{ marginTop: 7, paddingTop: 7, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>↩&nbsp;&nbsp;Talk to Staff</div>
+            <div style={{ marginTop: 7, paddingTop: 7, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>↩&nbsp;&nbsp;Check My Booking</div>
           </div>
         );
         if (m.card === 'doctors') return (
           <div className="rai-wa-card" key={m.id}>
-            <div className="rai-wa-card-title">Which doctor would you like to see?</div>
-            <div className="rai-wa-doctors">
-              {[{ n: 'Dr. Rajan Kumar', s: 'General Medicine', t: '9:00 AM', tk: '15 left' }, { n: 'Dr. Priya Menon', s: 'Gynaecology', t: '9:00 AM', tk: '8 left' }, { n: 'Dr. Suresh Nair', s: 'Orthopaedics', t: '10:00 AM', tk: '20 left' }].map((d, i) => (
-                <div className="rai-wa-doctor" key={i}>
-                  <div style={{ fontSize: 16 }}>🩺</div>
-                  <div className="rai-wa-doctor-info">
-                    <strong>{d.n}</strong>
-                    <span>{d.s}</span>
-                    <span className="rai-wa-doctor-meta">{d.t} · {d.tk}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize: 11, color: '#667781', marginTop: 8 }}>Reply with doctor name</div>
+            <div style={{ fontSize: 12, color: '#111', lineHeight: 1.45 }}><strong>Dr. Rajan Kumar</strong> has session(s) available today. Select one:</div>
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>↩&nbsp;&nbsp;9:00 AM - 1:00 PM</div>
             <div className="rai-wa-meta"><span>10:42 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
           </div>
         );
@@ -379,7 +372,8 @@ function AnimatedWABody({ bodyRef }) {
               <div><span>Session starts</span><strong>9:00 AM</strong></div>
               <div><span>Tokens remaining</span><strong>15</strong></div>
             </div>
-            <div style={{ fontSize: 11.5, color: '#111', marginTop: 10, lineHeight: 1.4 }}>Reply with your name to confirm booking.</div>
+            <div style={{ fontSize: 11.5, color: '#111', marginTop: 10, lineHeight: 1.4 }}>Who is this booking for?</div>
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>☰&nbsp;&nbsp;Select Patient</div>
             <div className="rai-wa-meta"><span>10:43 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
           </div>
         );
@@ -401,7 +395,7 @@ function AnimatedWABody({ bodyRef }) {
               <div><span>Department</span><strong>General Medicine</strong></div>
               <div><span>Starts</span><strong>🕘 9:00 AM</strong></div>
             </div>
-            <div style={{ fontSize: 11, color: '#667781', marginTop: 8, lineHeight: 1.4 }}>Please arrive before session begins.<br />Reply <strong style={{ color: '#111' }}>CANCEL</strong> to cancel.</div>
+            <div style={{ fontSize: 11, color: '#667781', marginTop: 8, lineHeight: 1.4 }}>📍 Please arrive at the clinic and show your token number to reception.</div>
             <div className="rai-wa-meta"><span>10:43 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
           </div>
         );
@@ -526,13 +520,6 @@ function Hero({ onNavigate }) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                 See how it works
               </button>
-            </div>
-            <div className="rai-hero-microtrust">
-              <span className="rai-pulse">Live in 24 hours</span>
-              <span style={{ opacity: 0.4 }}>·</span>
-              <span>WhatsApp setup included</span>
-              <span style={{ opacity: 0.4 }}>·</span>
-              <span>Setup in 20 min</span>
             </div>
           </div>
           <div className="rai-hero-visual">
@@ -732,7 +719,7 @@ function Features() {
             <span className="rai-eyebrow"><span className="dot" />Features</span>
             <h2 className="rai-h2" style={{ marginTop: 16 }}>Built around how clinics actually work.</h2>
           </div>
-          <p className="rai-lead">Not a generic chatbot bolted onto WhatsApp. Every feature is shaped by reception teams, doctors, and patients in Kerala.</p>
+          <p className="rai-lead">Not a generic chatbot bolted onto WhatsApp. Every feature is shaped by reception teams, doctors, and patients.</p>
         </div>
         <div className="rai-feature-hero">
           <div className="rai-feature-hero-copy">
@@ -780,7 +767,7 @@ function HowtoPreview({ step }) {
     <WAChrome>
       <div style={waBodyStyle}>
         <div className="rai-wa-msg in">
-          Hi, I need to see Dr. Menon this week. Any morning slots?
+          Hi, I'd like to book an appointment
         </div>
         <div style={{ fontSize: 11, color: 'var(--fg-muted)', textAlign: 'right', padding: '0 4px' }}>delivered · 11:42 PM</div>
       </div>
@@ -789,14 +776,20 @@ function HowtoPreview({ step }) {
 
   if (step === 1) return (
     <WAChrome>
-      <div style={{ ...waBodyStyle, background: 'var(--bg-soft)', justifyContent: 'center', gap: 10 }}>
-        <div style={{ fontSize: 10, color: 'var(--fg-faint)', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'monospace', marginBottom: 4 }}>AI Parsing</div>
-        {[{ k: 'Intent', v: 'book_appointment' }, { k: 'Doctor', v: 'Dr. Menon' }, { k: 'Time', v: 'this week, morning' }, { k: 'Patient', v: 'returning · Priya R.' }].map(r => (
-          <div key={r.k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '10px 14px', borderRadius: 8, background: 'var(--bg-elev)', border: '1px solid var(--border)' }}>
-            <span style={{ color: 'var(--fg-muted)' }}>{r.k}</span>
-            <span style={{ fontFamily: 'monospace', color: 'var(--accent)', fontWeight: 500 }}>{r.v}</span>
+      <div style={{ ...waBodyStyle, background: 'var(--bg-soft)', justifyContent: 'flex-end', gap: 0, padding: 0 }}>
+        <div style={{ background: 'var(--bg-elev)', borderTopLeftRadius: 14, borderTopRightRadius: 14, border: '1px solid var(--border)', borderBottom: 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 12px' }}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Book Today</span>
+            <span style={{ fontSize: 15, color: 'var(--fg-muted)', lineHeight: 1 }}>✕</span>
           </div>
-        ))}
+          {[{ n: 'Dr. Rajan Kumar', s: 'General Medicine — 9:00 AM - 1:00 PM' }, { n: 'Dr. Priya Menon', s: 'Gynaecology — 9:00 AM - 12:00 PM' }, { n: 'Dr. Suresh Nair', s: 'Orthopaedics — 10:00 AM - 2:00 PM' }].map(d => (
+            <div key={d.n} style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13.5, fontWeight: 500 }}>{d.n}</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 2 }}>{d.s}</div>
+            </div>
+          ))}
+          <div style={{ fontSize: 11.5, color: 'var(--fg-faint)', textAlign: 'center', padding: '14px 16px 18px', borderTop: '1px solid var(--border)' }}>Tap an item to select it</div>
+        </div>
       </div>
     </WAChrome>
   );
@@ -943,7 +936,7 @@ function FinalCTA({ onNavigate }) {
         <span className="rai-eyebrow" style={{ justifyContent: 'center', display: 'inline-flex' }}><span className="dot" />Get started</span>
         <h2 style={{ marginTop: 20 }}>Stop missing patients<br />after 6 PM.</h2>
         <p className="rai-lead" style={{ marginTop: 20, margin: '20px auto 0' }}>
-          Set up takes 20 minutes. Your first overnight booking arrives while you're asleep. That's the pitch.
+          Your first overnight booking arrives while you're asleep. That's the pitch.
         </p>
         <div className="rai-final-ctas">
           <button className="rai-btn rai-btn-accent rai-btn-lg" onClick={() => onNavigate('/onboarding')}>Get Started <span className="arr">→</span></button>
@@ -976,7 +969,7 @@ function Footer() {
           </div>
           <div className="rai-footer-col">
             <h4>Legal</h4>
-            <ul><li><a href="#">Privacy</a></li><li><a href="#">Terms</a></li></ul>
+            <ul><li><a href="/privacy.html">Privacy</a></li><li><a href="/terms.html">Terms</a></li></ul>
           </div>
         </div>
         <div className="rai-footer-bottom">

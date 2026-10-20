@@ -22,6 +22,7 @@ const ResetPassword  = React.lazy(() => import('./pages/ResetPassword'));
 const NotFound       = React.lazy(() => import('./pages/NotFound'));
 const SuperAdmin          = React.lazy(() => import('./pages/SuperAdmin'));
 const PricingCalculator   = React.lazy(() => import('./pages/superadmin/PricingCalculator'));
+const TenantEdit          = React.lazy(() => import('./pages/superadmin/TenantEdit'));
 const EnquiryDashboard    = React.lazy(() => import('./pages/enquiry/EnquiryDashboard'));
 const Catalogue           = React.lazy(() => import('./pages/enquiry/Catalogue'));
 const Leads               = React.lazy(() => import('./pages/enquiry/Leads'));
@@ -31,7 +32,7 @@ const PatientProfile = React.lazy(() => import('./pages/PatientProfile'));
 
 const PageLoader = (
   <div className="flex items-center justify-center h-screen">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
   </div>
 );
 
@@ -69,6 +70,7 @@ const App = () => {
               <Route path="/leads" element={<Leads />} />
               <Route element={<RoleRoute allowedRoles={['super_admin']} />}>
                 <Route path="/superadmin" element={<SuperAdmin />} />
+                <Route path="/superadmin/tenants/:id" element={<TenantEdit />} />
                 <Route path="/superadmin/pricing-calculator" element={<PricingCalculator />} />
               </Route>
             </Route>

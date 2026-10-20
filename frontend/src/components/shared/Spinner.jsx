@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Spinner = ({ size = 'md', color = 'blue', className = '' }) => {
+const Spinner = ({ size = 'md', color = 'indigo', className = '' }) => {
   const sizes = {
     sm: 'w-4 h-4',
     md: 'w-6 h-6',
@@ -8,13 +8,14 @@ const Spinner = ({ size = 'md', color = 'blue', className = '' }) => {
   };
 
   const colors = {
-    blue: 'text-blue-600',
+    indigo: 'text-indigo-600',
+    blue: 'text-indigo-600',
     white: 'text-white',
     gray: 'text-gray-500'
   };
 
   const currentSize = sizes[size] || sizes.md;
-  const currentColor = colors[color] || colors.blue;
+  const currentColor = colors[color] || colors.indigo;
 
   return (
     <svg 

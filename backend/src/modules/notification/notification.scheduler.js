@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const pool = require('../../config/database');
 const { sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter');
+const { runAsTenant } = require('../channel/whatsapp/senderContext');
 const logger = require('../../utils/logger');
 
 /**
@@ -22,6 +23,7 @@ cron.schedule('0 8 * * *', async () => {
          JOIN tenants t ON t.id = b.tenant_id
          WHERE b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
          AND b.status IN ('pending', 'confirmed')
+         AND t.status = 'active'
          AND NOT EXISTS (
            SELECT 1 FROM notifications n
            WHERE n.booking_id = b.id
@@ -35,7 +37,7 @@ cron.schedule('0 8 * * *', async () => {
           const appointmentTime = booking.slot_time
             ? `${booking.slot_time} session, Token #${booking.token_number}`
             : `Token #${booking.token_number}`
-          await sendTemplateMessage(booking.phone, 'appointment_reminder_v2_', 'en', [
+          await runAsTenant(booking.tenant_id, () => sendTemplateMessage(booking.phone, 'appointment_reminder_v2_', 'en', [
             {
               type: 'body',
               parameters: [
@@ -43,7 +45,7 @@ cron.schedule('0 8 * * *', async () => {
                 { type: 'text', text: appointmentTime }
               ]
             }
-          ])
+          ]))
           await pool.query(
             `INSERT INTO notifications
              (tenant_id, booking_id, customer_id,

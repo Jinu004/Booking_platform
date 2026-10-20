@@ -3,6 +3,8 @@ const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 const { sendDocument } = require('../channel/whatsapp/whatsapp.adapter');
+const { runAsTenant } = require('../channel/whatsapp/senderContext');
+const { isWindowOpen, PRESCRIPTION_WINDOW_CLOSED_MESSAGE } = require('../conversation/conversation.window');
 
 function isPro(req) {
   return req.tenant?.plan === 'pro';
@@ -326,11 +328,16 @@ async function sendPrescriptionToWhatsApp(req, res, next) {
     if (!data) return errorResponse(res, 'Visit note not found', 404);
     if (!data.patient_phone) return errorResponse(res, 'Patient has no phone number', 400);
 
+    // A document is free-form media, so it needs the patient to have written within 24 hours: nothing is uploaded or sent otherwise
+    if (!(await isWindowOpen(req.tenantId, { phone: data.patient_phone }))) {
+      return errorResponse(res, PRESCRIPTION_WINDOW_CLOSED_MESSAGE, 409);
+    }
+
     const pdfBuffer = await generatePDF(data);
     const filename = `prescription-${data.patient_name?.replace(/\s+/g, '-')}-${noteId.slice(0, 8)}.pdf`;
     const caption = `Prescription from ${data.clinic_name}\nPatient: ${data.patient_name}\nDate: ${new Date(data.visit_date).toLocaleDateString('en-IN')}`;
 
-    await sendDocument(data.patient_phone, pdfBuffer, filename, caption);
+    await runAsTenant(req.tenantId, () => sendDocument(data.patient_phone, pdfBuffer, filename, caption));
     return successResponse(res, { message: 'Prescription sent to patient WhatsApp' });
   } catch (err) {
     logger.error('Prescription WhatsApp send failed:', err.message);

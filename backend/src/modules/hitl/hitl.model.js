@@ -34,7 +34,7 @@ async function setMode(conversationId, tenantId, mode, staffId) {
 // Messages have no tenant_id — scoped via conversation ownership check above
 async function getMessages(conversationId, limit = 200) {
   const { rows } = await pool.query(
-    `SELECT m.id, m.role, m.content, m.type, m.created_at
+    `SELECT m.id, m.role, m.content, m.type, m.created_at, m.delivery_status, m.delivery_error
      FROM messages m
      WHERE m.conversation_id = $1
      ORDER BY m.created_at ASC

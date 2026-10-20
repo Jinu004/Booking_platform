@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getClinicSettings, updateClinicSettings, getHITLSettings, updateHITLSettings, getSettings, updateSettings } from '../services/settings.service';
 import { getDoctors, updateDoctor } from '../services/clinic.service';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import { PLANS } from '../constants';
 import { useIndustry } from '../hooks/useIndustry';
+import api from '../utils/api';
 
 const DAYS = [
   { key: 'mon', label: 'Monday' },
@@ -86,6 +87,15 @@ export default function Settings() {
   const [hitlLoading, setHITLLoading] = useState(true);
 
   const kbUnlocked = plan === 'growth' || plan === 'pro';
+  const kbLimit = plan === 'pro' ? 3500 : 1000;
+  const kbOverLimit = knowledgeBase.length > kbLimit;
+
+  useEffect(() => {
+    if (activeTab === 'posters') {
+      fetchPosterRequests();
+      if (['admin', 'manager'].includes(staff?.role)) fetchCampaigns();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     getClinicSettings()
@@ -207,16 +217,133 @@ export default function Settings() {
     }));
   };
 
+  // Poster upload state
+  const [posterFile, setPosterFile] = useState(null);
+  const [posterPreview, setPosterPreview] = useState(null);
+  const [posterCaption, setPosterCaption] = useState('');
+  const [posterUploading, setPosterUploading] = useState(false);
+  const [posterRequests, setPosterRequests] = useState([]);
+  const [posterLoading, setPosterLoading] = useState(false);
+  const posterInputRef = useRef(null);
+
+  const fetchPosterRequests = async () => {
+    try {
+      setPosterLoading(true);
+      const res = await api.get(`/tenants/${staff?.tenantId}/poster-requests`);
+      setPosterRequests(res.data || []);
+    } catch {
+    } finally {
+      setPosterLoading(false);
+    }
+  };
+
+  const handlePosterUpload = async () => {
+    if (!posterFile) return;
+    try {
+      setPosterUploading(true);
+      const formData = new FormData();
+      formData.append('poster', posterFile);
+      if (posterCaption.trim()) formData.append('caption', posterCaption.trim());
+      await api.post(`/tenants/${staff?.tenantId}/poster-request`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      addToast('Poster submitted for review', 'success');
+      setPosterFile(null);
+      setPosterPreview(null);
+      setPosterCaption('');
+      if (posterInputRef.current) posterInputRef.current.value = '';
+      fetchPosterRequests();
+    } catch {
+      addToast('Failed to upload poster', 'error');
+    } finally {
+      setPosterUploading(false);
+    }
+  };
+
+  // Campaign drafts (audience only, nothing is sent). The routes allow admin and manager only.
+  const canUseCampaigns = ['admin', 'manager'].includes(staff?.role);
+  const [campaigns, setCampaigns] = useState([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [buildingPosterId, setBuildingPosterId] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [draftCounts, setDraftCounts] = useState({});
+  const [campaignError, setCampaignError] = useState('');
+  const [brokenPosters, setBrokenPosters] = useState({});
+
+  const fetchCampaigns = async () => {
+    try {
+      setCampaignsLoading(true);
+      const res = await api.get(`/tenants/${staff?.tenantId}/campaigns`);
+      setCampaigns(res.data || []);
+    } catch {
+    } finally {
+      setCampaignsLoading(false);
+    }
+  };
+
+  const handleCreateCampaign = async (posterId) => {
+    if (!window.confirm('This builds the list of patients who would receive this poster. Nothing is sent. Continue?')) return;
+    setCampaignError('');
+    try {
+      setBuildingPosterId(posterId);
+      const res = await api.post(`/tenants/${staff?.tenantId}/campaigns`, { poster_request_id: posterId });
+      const created = res.data;
+      if (created?.campaign?.id) {
+        setDraftCounts(prev => ({ ...prev, [created.campaign.id]: created.counts }));
+      }
+      fetchCampaigns();
+    } catch (err) {
+      setCampaignError(err?.error || 'Failed to build the campaign');
+    } finally {
+      setBuildingPosterId(null);
+    }
+  };
+
+  const handleCancelCampaign = async (campaignId) => {
+    if (!window.confirm('Cancel this campaign? It will not be sent.')) return;
+    setCampaignError('');
+    try {
+      setCancellingId(campaignId);
+      await api.post(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/cancel`);
+      fetchCampaigns();
+    } catch (err) {
+      setCampaignError(err?.error || 'Failed to cancel the campaign');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  // Plain-language audience lines. Full counts exist right after a draft is built; the list API returns totals only.
+  const audienceLines = (campaign) => {
+    const full = draftCounts[campaign.id];
+    if (full) {
+      const lines = [
+        [full.pending, `${full.pending} patients would receive this poster`, true],
+        [full.not_asked, `${full.not_asked} have not been asked about offers yet`],
+        [full.opted_out, `${full.opted_out} chose checkups only or no updates`],
+        [full.skipped?.invalid_number, `${full.skipped?.invalid_number} skipped: number looks invalid`],
+        [full.skipped?.recent_campaign, `${full.skipped?.recent_campaign} skipped: got a campaign recently`],
+        [full.skipped?.undeliverable, `${full.skipped?.undeliverable} skipped: an earlier message could not be delivered`],
+      ];
+      return lines.filter(([n, , always]) => always || n > 0).map(([, text]) => text);
+    }
+    const c = campaign.counts || {};
+    const lines = [`${c.pending ?? 0} patients would receive this poster`];
+    if (c.skipped > 0) lines.push(`${c.skipped} skipped`);
+    return lines;
+  };
+
   const tabs = [
     { key: 'clinic', label: 'Clinic Profile' },
     { key: 'ai', label: 'AI & HITL' },
     { key: 'whatsapp', label: 'WhatsApp' },
     ...(plan === 'pro' ? [{ key: 'doctors', label: 'Doctor Profiles' }] : []),
+    { key: 'posters', label: 'Posters' },
     { key: 'billing', label: 'Billing' },
   ];
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-0 md:p-8 max-w-4xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
 
       <div className="border-b border-gray-200">
@@ -249,7 +376,7 @@ export default function Settings() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Business Phone</label>
                   <input
                     type="tel"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="+91XXXXXXXXXX"
                     value={hitl.business_phone || ''}
                     onChange={e => setHITL(h => ({ ...h, business_phone: e.target.value }))}
@@ -280,7 +407,7 @@ export default function Settings() {
                   {DAYS.map(({ key, label }) => {
                     const day = hitl.working_hours[key] || { enabled: false, open: '09:00', close: '18:00' };
                     return (
-                      <div key={key} className="flex items-center gap-4">
+                      <div key={key} className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
                         <div className="w-28">
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
@@ -317,6 +444,27 @@ export default function Settings() {
                     );
                   })}
                 </div>
+                {hitl.working_hours.mon?.enabled && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const { open, close } = hitl.working_hours.mon;
+                      setHITL(prev => ({
+                        ...prev,
+                        working_hours: {
+                          ...prev.working_hours,
+                          tue: { ...prev.working_hours.tue, open, close },
+                          wed: { ...prev.working_hours.wed, open, close },
+                          thu: { ...prev.working_hours.thu, open, close },
+                          fri: { ...prev.working_hours.fri, open, close },
+                        }
+                      }));
+                    }}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 mt-1"
+                  >
+                    Apply Monday's hours to weekdays (Tue–Fri)
+                  </button>
+                )}
                 <div className="flex justify-end pt-4">
                   <button
                     onClick={handleSaveWorkingHours}
@@ -326,6 +474,7 @@ export default function Settings() {
                     {savingHours ? 'Saving...' : 'Save Working Hours'}
                   </button>
                 </div>
+                <p className="text-xs text-gray-400 mt-1">Times are in 24-hour format — e.g. 09:00 for 9 AM, 18:00 for 6 PM</p>
               </div>
             </>
           )}
@@ -501,14 +650,16 @@ export default function Settings() {
                   rows={6}
                   value={knowledgeBase}
                   onChange={e => setKnowledgeBase(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-y ${kbOverLimit ? 'border-red-400 focus:ring-red-400' : 'border-gray-300 focus:ring-indigo-500'}`}
                   placeholder="Example: Consultation fee is ₹300. We have X-ray and ECG facilities. Free parking available. Patients should bring previous reports for follow-up visits."
                 />
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">{knowledgeBase.length} characters</span>
+                  <span className={`text-xs ${kbOverLimit ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                    {knowledgeBase.length} / {kbLimit} characters{kbOverLimit ? ' — exceeds limit, cannot save' : ''}
+                  </span>
                   <button
                     onClick={handleSaveKnowledgeBase}
-                    disabled={savingKB}
+                    disabled={savingKB || kbOverLimit}
                     className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                   >
                     {savingKB ? 'Saving...' : 'Save Knowledge Base'}
@@ -596,6 +747,165 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+      {activeTab === 'posters' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+            <h2 className="text-lg font-semibold text-gray-900">Upload Poster</h2>
+            <p className="text-sm text-gray-500">Upload a poster image for your WhatsApp marketing template. Our team will review and set it up for you.</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Poster Image</label>
+              <input
+                ref={posterInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (file.size > 5 * 1024 * 1024) {
+                      addToast('Image must be under 5MB', 'error');
+                      e.target.value = '';
+                      return;
+                    }
+                    setPosterFile(file);
+                    setPosterPreview(URL.createObjectURL(file));
+                  }
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              />
+              <p className="text-xs text-gray-400 mt-1">JPEG, PNG or WebP. Max 5MB.</p>
+            </div>
+            {posterPreview && (
+              <div className="mt-3">
+                <img src={posterPreview} alt="Preview" className="max-w-xs rounded-lg border border-gray-200 shadow-sm" />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Caption (optional)</label>
+              <input
+                type="text"
+                value={posterCaption}
+                onChange={e => setPosterCaption(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="e.g. Diwali health check-up offer"
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={handlePosterUpload}
+                disabled={!posterFile || posterUploading}
+                className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {posterUploading ? 'Uploading...' : 'Submit for Review'}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Your Poster Requests</h2>
+              <button onClick={fetchPosterRequests} className="text-sm text-indigo-600 hover:text-indigo-800">Refresh</button>
+            </div>
+            {posterLoading ? (
+              <p className="text-sm text-gray-400">Loading...</p>
+            ) : posterRequests.length === 0 ? (
+              <p className="text-sm text-gray-400">No poster requests yet. Upload one above to get started.</p>
+            ) : (
+              <div className="space-y-3">
+                {posterRequests.map(pr => (
+                  <div key={pr.id} className="flex items-start gap-4 p-4 border border-gray-100 rounded-lg">
+                    {brokenPosters[pr.id] ? (
+                      <span className="w-16 h-16 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-400 text-xl flex-shrink-0">📄</span>
+                    ) : (
+                      <img
+                        src={pr.image_url}
+                        alt="Poster"
+                        onError={() => setBrokenPosters(b => ({ ...b, [pr.id]: true }))}
+                        className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                          pr.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          pr.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>{pr.status}</span>
+                        <span className="text-xs text-gray-400">{new Date(pr.created_at).toLocaleDateString('en-IN')}</span>
+                      </div>
+                      {pr.caption && <p className="text-sm text-gray-700 mt-1 truncate">{pr.caption}</p>}
+                      {pr.notes && <p className="text-xs text-red-500 mt-1">{pr.notes}</p>}
+                    </div>
+                    {canUseCampaigns && pr.status === 'approved' && (
+                      <button
+                        onClick={() => handleCreateCampaign(pr.id)}
+                        disabled={buildingPosterId !== null}
+                        className="px-3 py-1.5 border border-indigo-600 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-50 disabled:opacity-50 flex-shrink-0"
+                      >
+                        {buildingPosterId === pr.id ? 'Building...' : 'Create campaign'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {canUseCampaigns && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Campaigns</h2>
+                <button onClick={fetchCampaigns} className="text-sm text-indigo-600 hover:text-indigo-800">Refresh</button>
+              </div>
+              {campaignError && <p className="text-sm text-red-600 mb-3">{campaignError}</p>}
+              {campaignsLoading ? (
+                <p className="text-sm text-gray-400">Loading...</p>
+              ) : campaigns.length === 0 ? (
+                <p className="text-sm text-gray-400">No campaigns yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {campaigns.map(cp => (
+                    <div key={cp.id} className="p-4 border border-gray-100 rounded-lg space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                          cp.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          cp.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                          cp.status === 'running' ? 'bg-blue-100 text-blue-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>{cp.status}</span>
+                        <span className="text-xs text-gray-400">{new Date(cp.created_at).toLocaleDateString('en-IN')}</span>
+                      </div>
+                      {cp.caption && (
+                        <p className="text-sm text-gray-700 truncate">{cp.caption.length > 60 ? `${cp.caption.slice(0, 60)}...` : cp.caption}</p>
+                      )}
+                      <p className="text-xs text-gray-500">
+                        Pending {cp.counts?.pending ?? 0} · Sent {cp.counts?.sent ?? 0} · Failed {cp.counts?.failed ?? 0} · Skipped {cp.counts?.skipped ?? 0}
+                      </p>
+                      {cp.status === 'draft' && (
+                        <div className="space-y-1">
+                          {audienceLines(cp).map(line => (
+                            <p key={line} className="text-sm text-gray-700">{line}</p>
+                          ))}
+                          <p className="text-xs text-gray-500">Draft. Nothing has been sent.</p>
+                        </div>
+                      )}
+                      {cp.status === 'draft' && (
+                        <button
+                          onClick={() => handleCancelCampaign(cp.id)}
+                          disabled={cancellingId === cp.id}
+                          className="px-3 py-1.5 border border-red-300 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {cancellingId === cp.id ? 'Cancelling...' : 'Cancel campaign'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {activeTab === 'billing' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">

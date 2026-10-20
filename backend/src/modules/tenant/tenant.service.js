@@ -231,5 +231,6 @@ module.exports = {
   setConfig,
   getAllConfigs,
   getConfig,
-  setDefaultConfigs
+  setDefaultConfigs,
+  normalizeNumber
 };

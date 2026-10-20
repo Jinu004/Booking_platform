@@ -39,11 +39,13 @@ const Layout = () => {
   const staff = (() => { try { return JSON.parse(localStorage.getItem('staff') || '{}'); } catch { return {}; } })();
 
   const isDashboard = location.pathname === '/dashboard';
+  const headerSurface = isEnquiry ? 'bg-white border-gray-200' : 'bg-bg border-ink/[0.08]';
 
   const getPageTitle = () => {
     const path = location.pathname;
     if (path === '/dashboard') return tenant?.name || staff?.tenantName || 'Dashboard';
     if (path.startsWith('/bookings')) return 'Bookings';
+    if (path.startsWith('/queue')) return 'Token Queue';
     if (path.startsWith('/patients')) return 'Patients';
     if (path.startsWith('/doctors')) return 'Doctors';
     if (path.startsWith('/staff')) return 'Staff';
@@ -115,9 +117,9 @@ const Layout = () => {
   }, []);
 
   return (
-    <div className={`flex h-screen w-full overflow-hidden relative ${updateAvailable ? 'pt-9' : ''} ${isEnquiry ? 'bg-[#F0F4F8] text-[#1E2E45]' : 'bg-gray-50 text-gray-900'}`}>
+    <div className={`flex h-screen w-full overflow-hidden relative ${updateAvailable ? 'pt-9' : ''} ${isEnquiry ? 'bg-[#F0F4F8] text-[#1E2E45]' : 'bg-bg text-ink'}`}>
       {updateAvailable && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-teal-600 text-white px-4 py-2 flex items-center justify-between text-sm shadow-md">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-indigo-600 text-white px-4 py-2 flex items-center justify-between text-sm shadow-md">
           <span className="truncate">🆕 A new version of ReceptionAI is available — please update to get the latest features.</span>
           <button
             onClick={async () => {
@@ -131,7 +133,7 @@ const Layout = () => {
                   window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now()
                 }
               }}
-            className="ml-4 flex-shrink-0 px-3 py-1 bg-white text-teal-600 rounded font-semibold hover:bg-teal-50 transition"
+            className="ml-4 flex-shrink-0 px-3 py-1 bg-white text-indigo-600 rounded font-semibold hover:bg-indigo-50 transition"
           >
             Update Now
           </button>
@@ -143,7 +145,7 @@ const Layout = () => {
 
         {/* Mobile-only header for dashboard */}
         {isDashboard && (
-          <header className="md:hidden bg-white border-b border-gray-200 h-16 flex-shrink-0 flex items-center px-4">
+          <header className={`md:hidden ${headerSurface} border-b h-16 flex-shrink-0 flex items-center px-4`}>
             <button
               className="text-gray-600 hover:text-gray-900 focus:outline-none"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -152,13 +154,13 @@ const Layout = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
               </svg>
             </button>
-            <span className="ml-4 text-xl font-black text-gray-800">ReceptionAI</span>
+            <span className="ml-4 text-lg font-semibold tracking-tight">ReceptionAI</span>
           </header>
         )}
 
         {/* Header — hidden on dashboard, dashboard has its own top bar */}
         {!isDashboard && (
-          <header className="bg-white border-b border-gray-200 h-16 flex-shrink-0 flex items-center justify-between px-4 md:px-6 relative global-search-container">
+          <header className={`${headerSurface} border-b h-16 flex-shrink-0 flex items-center justify-between px-4 md:px-6 relative global-search-container`}>
             <div className="flex items-center flex-1">
               {!searchOpen && (
                 <button
@@ -168,7 +170,7 @@ const Layout = () => {
                   <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                 </button>
               )}
-              <h2 className={`text-xl font-black text-gray-800 tracking-tight ${searchOpen ? 'hidden md:block' : 'block'}`}>
+              <h2 className={`text-xl font-semibold tracking-[-0.03em] ${searchOpen ? 'hidden md:block' : 'block'}`}>
                 {getPageTitle()}
               </h2>
             </div>
@@ -197,14 +199,15 @@ const Layout = () => {
               ) : (
                 <button
                   type="button"
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-400 text-sm transition w-48"
+                  aria-label="Search patients"
+                  className="flex items-center justify-center gap-2 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-lg border border-ink/10 bg-white hover:bg-ink/[0.03] text-ink/50 text-sm transition sm:w-48 sm:justify-start flex-shrink-0"
                   onClick={(e) => {
                     e.stopPropagation();
                     setSearchOpen(true);
                   }}
                 >
                   <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                  <span>Search patients...</span>
+                  <span className="hidden sm:inline">Search patients...</span>
                 </button>
               )}
             </div>

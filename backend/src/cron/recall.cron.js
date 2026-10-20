@@ -2,6 +2,7 @@ const cron = require('node-cron')
 const pool = require('../config/database')
 const logger = require('../utils/logger')
 const { sendTemplateMessage } = require('../modules/channel/whatsapp/whatsapp.adapter')
+const { runAsTenant } = require('../modules/channel/whatsapp/senderContext')
 
 function startRecallCron() {
   // Runs every Monday at 10:00 AM IST
@@ -22,6 +23,7 @@ function startRecallCron() {
           AND t.status = 'active'
           AND c.phone IS NOT NULL
           AND c.name IS NOT NULL
+          AND c.marketing_consent IN ('all', 'checkups')
           AND NOT EXISTS (
             SELECT 1 FROM tenant_configs tc
             WHERE tc.tenant_id = t.id
@@ -40,7 +42,7 @@ function startRecallCron() {
 
       for (const row of result.rows) {
         try {
-          await sendTemplateMessage(row.phone, 'recall_checkup', 'en', [
+          await runAsTenant(row.tenant_id, () => sendTemplateMessage(row.phone, 'recall_checkup', 'en', [
             {
               type: 'body',
               parameters: [
@@ -49,7 +51,7 @@ function startRecallCron() {
                 { type: 'text', text: row.clinic_name }
               ]
             }
-          ])
+          ]))
           await pool.query(`
             INSERT INTO notifications (tenant_id, customer_id, type, channel, status, scheduled_at, sent_at)
             VALUES ($1, $2, 'recall_checkup', 'whatsapp', 'sent', NOW(), NOW())

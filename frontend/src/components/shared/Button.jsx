@@ -5,10 +5,10 @@ const Button = ({ children, onClick, variant = 'primary', size = 'md', loading =
   const baseStyle = "inline-flex flex-row items-center justify-center font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2";
   
   const variants = {
-    primary: "bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500 border-transparent",
-    secondary: "bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 focus:ring-blue-500",
+    primary: "bg-indigo-600 hover:bg-indigo-700 text-white focus:ring-indigo-500 border-transparent",
+    secondary: "bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 focus:ring-indigo-500",
     danger: "bg-red-600 hover:bg-red-700 text-white focus:ring-red-500 border-transparent",
-    ghost: "bg-transparent hover:bg-blue-50 text-blue-600 focus:ring-blue-500 border-transparent"
+    ghost: "bg-transparent hover:bg-indigo-50 text-indigo-600 focus:ring-indigo-500 border-transparent"
   };
 
   const sizes = {
@@ -29,7 +29,7 @@ const Button = ({ children, onClick, variant = 'primary', size = 'md', loading =
       disabled={disabled || loading}
       className={`${baseStyle} ${currentVariantStyle} ${currentSizeStyle} ${disabledStyle} ${widthStyle}`}
     >
-      {loading && <Spinner size="sm" color={variant === 'primary' || variant === 'danger' ? 'white' : 'blue'} className="mr-2" />}
+      {loading && <Spinner size="sm" color={variant === 'primary' || variant === 'danger' ? 'white' : 'indigo'} className="mr-2" />}
       {loading ? 'Loading...' : children}
     </button>
   );

@@ -55,6 +55,13 @@ const corsOptions = {
   credentials: true
 };
 app.use(cors(corsOptions));
+// WhatsApp webhook only: larger JSON bodies (history sync chunks). Registered before the global parser, which then skips the already parsed body.
+app.use('/webhook', express.json({
+  limit: '5mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.json({
   verify: (req, res, buf) => {
     req.rawBody = buf;
@@ -91,6 +98,10 @@ app.get('/health', async (req, res) => {
 // 5. /api/v1/tenants routes
 const tenantRoutes = require('./modules/tenant/tenant.routes');
 app.use('/api/v1/tenants', tenantRoutes);
+
+// Campaign audience routes (also under /api/v1/tenants/:id/campaigns)
+const campaignRoutes = require('./modules/campaign/campaign.routes');
+app.use('/api/v1/tenants', campaignRoutes);
 
 // Super Admin Routes
 const superAdminRoutes = require('./modules/superadmin/superadmin.routes');
@@ -181,6 +192,7 @@ const { startRetentionCron } = require('./cron/retention.cron');
 const { startNoShowCron } = require('./cron/noshow.cron');
 const { startRecallCron } = require('./cron/recall.cron');
 const { startRetryCron }  = require('./cron/retry.cron');
+const { startSendFailuresCleanupCron } = require('./cron/sendFailures.cron');
 const { broadcastToTenant } = require('./modules/hitl/hitl.service');
 
 setTimeout(() => {
@@ -193,6 +205,7 @@ setTimeout(() => {
   console.log('Starting Recall cron...');
   startRecallCron();
   startRetryCron();
+  startSendFailuresCleanupCron();
 }, 5000);
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);

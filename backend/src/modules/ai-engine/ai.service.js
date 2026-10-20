@@ -17,6 +17,16 @@ const MODELS = {
 }
 const MODEL = 'gemini-2.5-flash' // default fallback
 
+// One log line per Gemini response with its token usage. Never throws, so it cannot affect a reply.
+function logGeminiUsage(tenant, conversation, modelName, geminiResult) {
+  try {
+    const usage = geminiResult?.usageMetadata
+    logger.info(`GEMINI_USAGE tenant=${tenant?.id || 'unknown'} conv=${conversation?.id || 'none'} model=${modelName || 'unknown'} prompt=${usage?.promptTokenCount ?? 0} cached=${usage?.cachedContentTokenCount ?? 0} output=${usage?.candidatesTokenCount ?? 0} total=${usage?.totalTokenCount ?? 0}`)
+  } catch (usageLogErr) {
+    // ignore: usage logging is best effort
+  }
+}
+
 /**
  * Processes an incoming message through Gemini
  * Handles multi-turn function calling loop
@@ -246,12 +256,14 @@ async function processMessage(context) {
         // Send the latest patient message
         let response = await chat.sendMessage(latestMessage, { signal: AbortSignal.timeout(25000) })
         let result = response.response
+        logGeminiUsage(tenant, conversation, currentModel, result)
 
         // Function calling loop — Gemini may call multiple functions
         const maxIterations = 5
         let iteration = 0
         let escalated = false;
         const escalationMessage = 'I am connecting you with a staff member who can better assist you. Please wait a moment.';
+        let patientBookingsCalled = false;
 
         while (iteration < maxIterations) {
           iteration++
@@ -272,7 +284,15 @@ async function processMessage(context) {
 
           for (const part of functionCallParts) {
             const { name, args } = part.functionCall
-            
+            // patient_id / doctor_id are internal-only; never accept them from Gemini
+            if (args) {
+              delete args.patient_id
+              delete args.doctor_id
+              delete args.internal_kind
+              delete args.internal_date
+              delete args.internal_session
+            }
+
             if (executedFunctions.has(name)) {
               continue;
             }
@@ -285,6 +305,8 @@ async function processMessage(context) {
               args,
               { tenant, customer, conversation, latestMessage, interactiveId, doctorProfiles: additionalData.doctorProfiles || [] }
             )
+
+            if (name === 'get_patient_bookings') patientBookingsCalled = true
 
             // Handle direct-return signal — bypass Gemini rewrite
             if (typeof functionResult === 'string' && functionResult.startsWith('DIRECT:')) {
@@ -331,6 +353,7 @@ async function processMessage(context) {
           // Feed function results back to Gemini
           response = await chat.sendMessage(functionResponses)
           result = response.response
+          logGeminiUsage(tenant, conversation, currentModel, result)
         }
 
         if (escalated) {
@@ -346,6 +369,13 @@ async function processMessage(context) {
         }
         if (!text || !text.trim()) {
           throw new Error('Empty text response from Gemini');
+        }
+
+        // Guard: a real booking confirmation is always returned as a DIRECT: result above (it exits the loop),
+        // so a confirmation-looking reply written by Gemini here was never backed by a booking.
+        if (/booking confirmed/i.test(text) && /token number/i.test(text) && !patientBookingsCalled) {
+          logger.warn(`AI_FAKE_CONFIRMATION_BLOCKED tenant=${tenant.id} conversation=${conversation?.id} phone_last4=${String(customer?.phone || '').slice(-4)}`)
+          return { blockedConfirmation: true, text: 'Sorry, I could not complete your booking. Please tap Book Appointment to try again, or tap Talk to Staff.' }
         }
 
         // Output filter — strip any leaked UUIDs or phone numbers before sending to patient

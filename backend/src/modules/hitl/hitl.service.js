@@ -1,6 +1,9 @@
 const HITLModel = require('./hitl.model');
 const { sendMessage, sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter');
+const { runAsTenant } = require('../channel/whatsapp/senderContext');
 const ConversationService = require('../conversation/conversation.service');
+const { isWindowOpen, WindowClosedError } = require('../conversation/conversation.window');
+const { recordDelivery } = require('../channel/whatsapp/whatsapp.meta');
 const logger = require('../../utils/logger');
 const pool = require('../../config/database');
 const { sendPushToTenant } = require('../push/push.service');
@@ -101,6 +104,19 @@ async function staffReply(conversationId, tenantId, staffId, content) {
   if (!conv) throw new Error('Conversation not found');
   if (conv.mode !== 'human') throw new Error('Conversation is not in human mode');
 
+  // Outside the 24-hour window free text cannot be delivered: send the follow_up template when the clinic allows
+  // proactive templates, otherwise refuse (nothing is saved or sent)
+  let useFollowUpTemplate = false;
+  if (!(await isWindowOpen(tenantId, { conversationId }))) {
+    const proactive = await pool.query(
+      `SELECT value FROM tenant_configs WHERE tenant_id = $1 AND key = 'proactive_templates_enabled'`,
+      [tenantId]
+    );
+    if (proactive.rows[0]?.value !== 'true') throw new WindowClosedError();
+    useFollowUpTemplate = true;
+    content = '[Template sent: follow_up]';
+  }
+
   // Save to DB (fast — must complete before we return)
   const message = await ConversationService.saveOutboundMessage(conversationId, content, 'staff');
 
@@ -111,11 +127,18 @@ async function staffReply(conversationId, tenantId, staffId, content) {
 
   // WhatsApp send and DB update run in background (non-blocking)
   setImmediate(async () => {
+    await runAsTenant(tenantId, async () => {
     try {
-      if (phone) await sendMessage(phone, content);
+      if (phone) {
+        const sendResult = useFollowUpTemplate
+          ? await sendTemplateMessage(phone, 'follow_up', 'en')
+          : await sendMessage(phone, content);
+        recordDelivery(message.id, sendResult, null);
+      }
     } catch (err) {
+      recordDelivery(message.id, null, err);
       const metaCode = err.response?.data?.error?.code;
-      if (metaCode === 131026) {
+      if (metaCode === 131047) {
         logger.warn('24-hour window expired for staffReply — sending follow_up template instead');
         try {
           await sendTemplateMessage(phone, 'follow_up', 'en');
@@ -139,6 +162,7 @@ async function staffReply(conversationId, tenantId, staffId, content) {
     } catch (err) {
       logger.error('Background DB update failed:', err.message);
     }
+    });
   });
 
   return message;

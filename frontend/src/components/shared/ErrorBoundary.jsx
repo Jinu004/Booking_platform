@@ -1,5 +1,6 @@
 import React from 'react'
 import * as Sentry from '@sentry/react'
+import { isChunkLoadError, isReloading, reloadOnceForChunkError } from '../../utils/chunkReload'
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -12,6 +13,9 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
+    if (isChunkLoadError(error) && (reloadOnceForChunkError() || isReloading())) {
+      return
+    }
     console.error('ErrorBoundary caught:', error, errorInfo)
     Sentry.captureException(error, { extra: { componentStack: errorInfo?.componentStack } })
   }
@@ -29,7 +33,7 @@ class ErrorBoundary extends React.Component {
             </p>
             <button
               onClick={() => window.location.reload()}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium">
+              className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 font-medium">
               Refresh Page
             </button>
           </div>

@@ -1,16 +1,19 @@
 const cron = require('node-cron');
 const pool = require('../config/database');
 const whatsapp = require('../modules/channel/whatsapp/whatsapp.adapter');
+const { runAsTenant } = require('../modules/channel/whatsapp/senderContext');
 const logger = require('../utils/logger');
 
 async function processRetryQueue() {
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM whatsapp_retry_queue
-       WHERE status = 'pending'
-         AND next_retry_at <= NOW()
-         AND attempts < max_attempts
-       ORDER BY next_retry_at ASC
+      `SELECT q.* FROM whatsapp_retry_queue q
+       LEFT JOIN tenants t ON t.id = q.tenant_id
+       WHERE q.status = 'pending'
+         AND q.next_retry_at <= NOW()
+         AND q.attempts < q.max_attempts
+         AND (q.tenant_id IS NULL OR t.status = 'active')
+       ORDER BY q.next_retry_at ASC
        LIMIT 20`
     );
     for (const job of rows) {
@@ -22,11 +25,13 @@ async function processRetryQueue() {
           [job.id]
         );
         const p = job.payload;
-        if (job.message_type === 'text') {
-          await whatsapp.sendMessage(job.to_number, p.message);
-        } else if (job.message_type === 'template') {
-          await whatsapp.sendTemplateMessage(job.to_number, p.templateName, p.languageCode, p.components);
-        }
+        await runAsTenant(job.tenant_id, async () => {
+          if (job.message_type === 'text') {
+            await whatsapp.sendMessage(job.to_number, p.message);
+          } else if (job.message_type === 'template') {
+            await whatsapp.sendTemplateMessage(job.to_number, p.templateName, p.languageCode, p.components);
+          }
+        });
         await pool.query(
           `UPDATE whatsapp_retry_queue SET status = 'sent' WHERE id = $1`,
           [job.id]

@@ -82,7 +82,7 @@ export default function Login() {
                     required
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setError(''); }}
-                    className={`appearance-none block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${error ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                    className={`appearance-none block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${error ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   />
                 </div>
               </div>
@@ -95,7 +95,7 @@ export default function Login() {
                     required
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                    className={`appearance-none block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${error ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                    className={`appearance-none block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${error ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   />
                   <button
                     type="button"
@@ -109,7 +109,7 @@ export default function Login() {
 
               <div className="flex items-center justify-end">
                 <div className="text-sm">
-                  <button type="button" onClick={() => setShowForgot(true)} className="font-medium text-blue-600 hover:text-blue-500">
+                  <button type="button" onClick={() => setShowForgot(true)} className="font-medium text-indigo-600 hover:text-indigo-500">
                     Forgot your password?
                   </button>
                 </div>
@@ -119,7 +119,7 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
                   {loading ? 'Signing in...' : 'Sign in'}
                 </button>
@@ -131,7 +131,7 @@ export default function Login() {
                 <div className="text-center">
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Check your email</h3>
                   <p className="text-sm text-gray-500 mb-6">If the email exists, we've sent you a reset link.</p>
-                  <button type="button" onClick={() => { setShowForgot(false); setForgotSent(false); }} className="text-blue-600 hover:text-blue-500 font-medium text-sm">
+                  <button type="button" onClick={() => { setShowForgot(false); setForgotSent(false); }} className="text-indigo-600 hover:text-indigo-500 font-medium text-sm">
                     Back to login
                   </button>
                 </div>
@@ -145,7 +145,7 @@ export default function Login() {
                         required
                         value={forgotEmail}
                         onChange={(e) => setForgotEmail(e.target.value)}
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                       />
                     </div>
                   </div>
@@ -153,13 +153,13 @@ export default function Login() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
                     >
                       {loading ? 'Sending...' : 'Send Reset Link'}
                     </button>
                   </div>
                   <div className="text-center text-sm mt-4">
-                    <button type="button" onClick={() => setShowForgot(false)} className="font-medium text-blue-600 hover:text-blue-500">
+                    <button type="button" onClick={() => setShowForgot(false)} className="font-medium text-indigo-600 hover:text-indigo-500">
                       Back to login
                     </button>
                   </div>

@@ -2,6 +2,7 @@ const { verifyToken } = require('../../config/auth')
 const crypto = require('crypto')
 const pool = require('../../config/database')
 const logger = require('../../utils/logger')
+const { omitTenantSecrets } = require('../../utils/secretBox')
 const {
   errorResponse
 } = require('../../utils/response')
@@ -27,7 +28,7 @@ async function requireAuth(req, res, next) {
           [tenantId]
         )
         if (tenantResult.rows.length) {
-          req.tenant = tenantResult.rows[0]
+          req.tenant = omitTenantSecrets(tenantResult.rows[0])
           req.staff = {
             id: 'dev-staff-id',
             name: 'Dev User',

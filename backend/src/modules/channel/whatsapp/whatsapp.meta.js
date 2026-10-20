@@ -1,9 +1,103 @@
 const axios = require('axios')
 const logger = require('../../../utils/logger')
+const pool = require('../../../config/database')
+const senderContext = require('./senderContext')
 
 const META_TOKEN = process.env.META_WHATSAPP_TOKEN || ''
-const META_PHONE_ID = process.env.META_PHONE_NUMBER_ID || ''
-const META_API_URL = 'https://graph.facebook.com/v18.0'
+const META_API_URL = 'https://graph.facebook.com/v24.0'
+
+// Every send needs a tenant sender context with that clinic's own phone number id; there is no platform-wide fallback number.
+// The context only holds the phone number id and token, so the tenant id is not available here.
+const getPhoneId = () => {
+  if (!senderContext.hasContext()) {
+    logger.warn('TENANT_NO_NUMBER tenant=unknown result=blocked (no sender context)')
+    throw new Error('No WhatsApp sender context - message not sent')
+  }
+  const id = senderContext.getPhoneNumberId()
+  if (!id) {
+    logger.warn('TENANT_NO_NUMBER tenant=unknown result=blocked')
+    throw new Error('No WhatsApp Phone Number ID set for this clinic - message not sent')
+  }
+  return id
+}
+
+// The clinic's own Meta token when the sender context has one, otherwise the shared env token
+const getToken = () => {
+  if (senderContext.hasContext()) {
+    const tenantToken = senderContext.getAccessToken()
+    if (tenantToken) return tenantToken
+  }
+  return META_TOKEN
+}
+
+// Safe summary of a failed send: HTTP status, Meta error code/subcode, a trimmed message and the fbtrace id.
+// Never the Authorization header, request body, phone numbers, tokens or message text.
+function summariseSendError(err) {
+  const metaError = err?.response?.data?.error
+  const message = String(metaError?.message || err?.message || 'unknown error')
+    .replace(/\s+/g, ' ')
+    .replace(/EA[A-Za-z0-9]{20,}/g, '[token]')
+    .replace(/\+?\d{7,}/g, '[number]')
+    .slice(0, 200)
+  const asInt = (value) => (Number.isInteger(Number(value)) && value !== null && value !== undefined && value !== '' ? Number(value) : null)
+  return {
+    http: asInt(err?.response?.status),
+    code: asInt(metaError?.code),
+    subcode: asInt(metaError?.error_subcode),
+    message,
+    trace: metaError?.fbtrace_id ? String(metaError.fbtrace_id).slice(0, 40) : null
+  }
+}
+
+// Logs one line for a failed send (part of the message text, so it is always printed) and records a send_failures row.
+// Never throws and never waits for the database, so it cannot break or delay a send.
+function recordSendFailure(ctx, templateName, err) {
+  try {
+    const s = summariseSendError(err)
+    const tenantId = senderContext.hasContext() ? senderContext.getTenantId() : null
+    logger.error(`META_SEND_FAILED tenant=${tenantId || 'unknown'} ctx=${ctx} template=${templateName || 'none'} code=${s.code ?? 'none'} subcode=${s.subcode ?? 'none'} http=${s.http ?? 'none'} msg=${s.message}${s.trace ? ` trace=${s.trace}` : ''}`)
+    const phoneNumberId = senderContext.hasContext() ? senderContext.getPhoneNumberId() : null
+    pool.query(
+      `INSERT INTO send_failures (tenant_id, ctx, template_name, meta_code, meta_subcode, http_status, error_message)
+       VALUES (COALESCE($1::uuid, (SELECT id FROM tenants WHERE whatsapp_phone_number_id = $2 LIMIT 1)), $3, $4, $5, $6, $7, $8)`,
+      [tenantId, phoneNumberId, ctx, templateName || null, s.code, s.subcode, s.http, s.message]
+    ).catch(dbErr => {
+      logger.warn(`SEND_FAILURE_RECORD_FAILED ctx=${ctx} ${String(dbErr?.message || 'error').slice(0, 120)}`)
+    })
+  } catch (recordErr) {
+    try { logger.warn(`SEND_FAILURE_RECORD_FAILED ctx=${ctx}`) } catch {}
+  }
+}
+
+// Meta message id of an accepted send. The send functions return Meta's response body, so the id is at messages[0].id.
+function extractWamid(result) {
+  return result?.messages?.[0]?.id ?? result?.data?.messages?.[0]?.id ?? null
+}
+
+// Records the outcome of one send on the stored message row: sent (with the Meta message id) or failed (with the Meta error code).
+// A row already marked failed by a status update stays failed. Callers do not await it; it never throws, and the id is never logged.
+function recordDelivery(messageId, result, err) {
+  try {
+    if (!messageId) return
+    const update = err
+      ? pool.query(
+          `UPDATE messages SET delivery_status = 'failed', delivery_error = $2 WHERE id = $1`,
+          [messageId, summariseSendError(err).code !== null ? String(summariseSendError(err).code) : 'none']
+        )
+      : pool.query(
+          `UPDATE messages
+           SET wa_message_id = COALESCE($2::text, wa_message_id),
+               delivery_status = CASE WHEN delivery_status = 'failed' THEN delivery_status ELSE 'sent' END
+           WHERE id = $1`,
+          [messageId, extractWamid(result)]
+        )
+    update.catch(dbErr => {
+      logger.warn(`MESSAGE_DELIVERY_UPDATE_FAILED ${String(dbErr?.message || 'error').slice(0, 120)}`)
+    })
+  } catch (recordErr) {
+    try { logger.warn('MESSAGE_DELIVERY_UPDATE_FAILED') } catch {}
+  }
+}
 
 /**
  * Sends a text message via Meta Cloud API
@@ -15,7 +109,7 @@ const META_API_URL = 'https://graph.facebook.com/v18.0'
 async function sendTextMessage(to, message) {
   try {
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      `${META_API_URL}/${getPhoneId()}/messages`,
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
@@ -25,7 +119,7 @@ async function sendTextMessage(to, message) {
       },
       {
         headers: {
-          'Authorization': `Bearer ${META_TOKEN}`,
+          'Authorization': `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
         }
       }
@@ -34,8 +128,36 @@ async function sendTextMessage(to, message) {
     logger.info(`Meta message sent to ${to.toString().slice(0, 2)}XXXXXX${to.toString().slice(-3)}`)
     return response.data
   } catch (err) {
-    logger.error('Meta send failed:', err.response?.data || err.message)
+    recordSendFailure('text', null, err)
     throw err
+  }
+}
+
+/**
+ * Parses a smb_message_echoes webhook value (messages the clinic sent from the WhatsApp Business app).
+ * "to" is the patient, "from" is the clinic, the reverse of a normal inbound message.
+ *
+ * @param {object} value - changes[].value of the smb_message_echoes field
+ * @returns {object|null} { type: 'echo', provider, phoneNumberId, echoes: [...] } or null
+ */
+function parseEchoEvent(value) {
+  const items = Array.isArray(value?.message_echoes) ? value.message_echoes : []
+  const echoes = items
+    .filter(item => item && item.to && item.id)
+    .map(item => ({
+      customerPhone: `+${String(item.to).replace(/\D/g, '')}`,
+      wamid: item.id,
+      timestamp: item.timestamp,
+      echoType: item.type || 'unknown',
+      text: item.type === 'text' ? (item.text?.body || '') : '',
+      originalId: item.revoke?.original_message_id || item.edit?.original_message_id || null
+    }))
+  if (!echoes.length) return null
+  return {
+    type: 'echo',
+    provider: 'meta',
+    phoneNumberId: value?.metadata?.phone_number_id || null,
+    echoes
   }
 }
 
@@ -50,6 +172,7 @@ function parseIncomingMessage(payload) {
   try {
     const entry = payload.entry?.[0]
     const changes = entry?.changes?.[0]
+    if (changes?.field === 'smb_message_echoes') return parseEchoEvent(changes.value)
     if (changes?.field && changes.field !== 'messages') return null
     const value = changes?.value
     const message = value?.messages?.[0]
@@ -59,6 +182,7 @@ function parseIncomingMessage(payload) {
 
     let messageText = ''
     let interactiveId = null
+    let interactiveDescription = null
     if (message.type === 'text') {
       messageText = message.text?.body || ''
     } else if (message.type === 'interactive') {
@@ -66,6 +190,7 @@ function parseIncomingMessage(payload) {
         || message.interactive?.list_reply?.title
         || ''
       interactiveId = message.interactive?.list_reply?.id || message.interactive?.button_reply?.id || null
+      interactiveDescription = message.interactive?.list_reply?.description || null
     } else if (message.type === 'button') {
       messageText = message.button?.text || ''
     }
@@ -82,7 +207,8 @@ function parseIncomingMessage(payload) {
       type: message.type,
       customerName: contact?.profile?.name || '',
       provider: 'meta',
-      interactiveId: interactiveId || null
+      interactiveId: interactiveId || null,
+      interactiveDescription
     }
   } catch (err) {
     logger.error('Meta parse failed:', err.message)
@@ -125,7 +251,7 @@ function verifyWebhook(query) {
 async function sendInteractiveButtons(to, bodyText, buttons) {
   try {
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      `${META_API_URL}/${getPhoneId()}/messages`,
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
@@ -147,7 +273,7 @@ async function sendInteractiveButtons(to, bodyText, buttons) {
       },
       {
         headers: {
-          Authorization: `Bearer ${META_TOKEN}`,
+          Authorization: `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
         }
       }
@@ -155,8 +281,7 @@ async function sendInteractiveButtons(to, bodyText, buttons) {
     logger.info(`Meta interactive buttons sent to ${to}`)
     return response.data
   } catch (err) {
-    const metaError = err.response?.data?.error;
-    logger.error(`Meta interactive buttons failed — code: ${metaError?.code || 'unknown'}, message: ${metaError?.message || err.message}`)
+    recordSendFailure('buttons', null, err)
     throw err
   }
 }
@@ -176,7 +301,7 @@ async function sendInteractiveButtons(to, bodyText, buttons) {
 async function sendListMessage(to, bodyText, buttonText, items, sectionTitle = 'Options') {
   try {
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      `${META_API_URL}/${getPhoneId()}/messages`,
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
@@ -202,7 +327,7 @@ async function sendListMessage(to, bodyText, buttonText, items, sectionTitle = '
       },
       {
         headers: {
-          Authorization: `Bearer ${META_TOKEN}`,
+          Authorization: `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
         }
       }
@@ -210,7 +335,7 @@ async function sendListMessage(to, bodyText, buttonText, items, sectionTitle = '
     logger.info(`Meta list message sent to ${to}`)
     return response.data
   } catch (err) {
-    logger.error('Meta list message failed:', err.message)
+    recordSendFailure('list', null, err)
     throw err
   }
 }
@@ -223,11 +348,11 @@ async function uploadMedia(fileBuffer, mimeType, filename) {
     form.append('file', fileBuffer, { filename, contentType: mimeType });
     form.append('messaging_product', 'whatsapp');
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/media`,
+      `${META_API_URL}/${getPhoneId()}/media`,
       form,
       {
         headers: {
-          Authorization: `Bearer ${META_TOKEN}`,
+          Authorization: `Bearer ${getToken()}`,
           ...form.getHeaders()
         }
       }
@@ -235,7 +360,7 @@ async function uploadMedia(fileBuffer, mimeType, filename) {
     logger.info('Media uploaded to Meta:', response.data.id);
     return response.data.id;
   } catch (err) {
-    logger.error('Meta media upload failed:', err.message);
+    recordSendFailure('media_upload', null, err);
     throw err;
   }
 }
@@ -243,7 +368,7 @@ async function uploadMedia(fileBuffer, mimeType, filename) {
 async function sendDocument(to, mediaId, filename, caption) {
   try {
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      `${META_API_URL}/${getPhoneId()}/messages`,
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
@@ -257,7 +382,7 @@ async function sendDocument(to, mediaId, filename, caption) {
       },
       {
         headers: {
-          Authorization: `Bearer ${META_TOKEN}`,
+          Authorization: `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
         }
       }
@@ -265,18 +390,18 @@ async function sendDocument(to, mediaId, filename, caption) {
     logger.info(`Meta document sent to ${to}`);
     return response.data;
   } catch (err) {
-    logger.error('Meta document send failed:', err.message);
+    recordSendFailure('document', null, err);
     throw err;
   }
 }
 
-async function sendContact(to, clinicName, phoneNumber, wabaId, accessToken) {
+async function sendContact(to, clinicName, phoneNumber) {
   const waId = phoneNumber.replace(/\D/g, '');
-  const url = `https://graph.facebook.com/v18.0/${wabaId}/messages`;
+  const url = `${META_API_URL}/${getPhoneId()}/messages`;
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
-    to: to,
+    to: to.replace('+', ''),
     type: 'contacts',
     contacts: [{
       name: {
@@ -293,20 +418,20 @@ async function sendContact(to, clinicName, phoneNumber, wabaId, accessToken) {
   try {
     await axios.post(url, payload, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${getToken()}`,
         'Content-Type': 'application/json'
       }
     });
     logger.info(`Contact card sent to ${to}`);
   } catch (err) {
-    logger.error('sendContact failed:', JSON.stringify(err.response?.data || err.message));
+    recordSendFailure('contact', null, err);
   }
 }
 
 async function sendTemplateMessage(to, templateName, languageCode = 'en', components = []) {
   try {
     const response = await axios.post(
-      `${META_API_URL}/${META_PHONE_ID}/messages`,
+      `${META_API_URL}/${getPhoneId()}/messages`,
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
@@ -320,7 +445,7 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en', compon
       },
       {
         headers: {
-          'Authorization': `Bearer ${META_TOKEN}`,
+          'Authorization': `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
         }
       }
@@ -328,12 +453,14 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en', compon
     logger.info(`Meta template message sent to ${to} using template: ${templateName}`)
     return response.data
   } catch (err) {
-    logger.error('Meta template send failed:', err.response?.data || err.message)
+    recordSendFailure('template', templateName, err)
     throw err
   }
 }
 
 module.exports = {
+  extractWamid,
+  recordDelivery,
   sendTextMessage,
   sendInteractiveButtons,
   sendListMessage,

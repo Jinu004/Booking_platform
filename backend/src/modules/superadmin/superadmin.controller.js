@@ -2,6 +2,8 @@ const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 const { bcrypt } = require('../../config/auth');
+const { normalizeNumber } = require('../tenant/tenant.service');
+const { omitTenantSecrets } = require('../../utils/secretBox');
 
 /**
  * GET /superadmin/tenants
@@ -10,11 +12,13 @@ const { bcrypt } = require('../../config/auth');
 async function getAllTenants(req, res) {
   try {
     const sql = `
-      SELECT t.id, t.name, t.plan, t.status, t.industry, t.whatsapp_number, t.created_at, t.ai_model,
+      SELECT t.id, t.name, t.plan, t.status, t.industry, t.whatsapp_number, t.whatsapp_phone_number_id, t.created_at, t.ai_model,
+             t.whatsapp_waba_id, t.whatsapp_connected_at, (t.whatsapp_access_token_enc IS NOT NULL) AS whatsapp_token_set,
              (SELECT COUNT(*) FROM bookings b WHERE b.tenant_id = t.id AND b.created_at >= DATE_TRUNC('month', NOW())) AS booking_count,
              (SELECT COUNT(*) FROM conversations c WHERE c.tenant_id = t.id AND c.started_at >= DATE_TRUNC('month', NOW())) AS conversation_count,
              (SELECT COUNT(*) FROM customers cu WHERE cu.tenant_id = t.id) AS customer_count,
              (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'proactive_templates_enabled') AS proactive_templates_enabled,
+             (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'recall_enabled') AS recall_enabled,
              (SELECT email FROM staff s WHERE s.tenant_id = t.id AND s.role = 'admin' LIMIT 1) AS email
       FROM tenants t
       ORDER BY t.created_at DESC
@@ -41,7 +45,7 @@ async function getTenantDetails(req, res) {
       return errorResponse(res, 'Tenant not found', 404);
     }
 
-    return successResponse(res, result.rows[0]);
+    return successResponse(res, omitTenantSecrets(result.rows[0]));
   } catch (err) {
     logger.error('Error fetching tenant details:', err.message);
     return errorResponse(res, 'Failed to fetch tenant', 500);
@@ -69,7 +73,14 @@ async function updateTenantStatus(req, res) {
       return errorResponse(res, 'Tenant not found', 404);
     }
 
-    return successResponse(res, result.rows[0]);
+    // The webhook caches the tenant by number for 5 minutes: drop it so the new status takes effect at once
+    try {
+      const redisClient = require('../../config/redis');
+      const statusWhatsapp = result.rows[0].whatsapp_number;
+      if (statusWhatsapp) await redisClient.del(`tenant_wa:${normalizeNumber(statusWhatsapp)}`);
+    } catch (_) {}
+
+    return successResponse(res, omitTenantSecrets(result.rows[0]));
   } catch (err) {
     logger.error('Error updating tenant status:', err.message);
     return errorResponse(res, 'Failed to update tenant status', 500);
@@ -174,7 +185,7 @@ async function createTenant(req, res) {
     );
 
     await client.query('COMMIT');
-    return successResponse(res, tenant, 201);
+    return successResponse(res, omitTenantSecrets(tenant), 201);
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === '23505') {
@@ -195,11 +206,23 @@ async function createTenant(req, res) {
 async function updateTenant(req, res) {
   try {
     const { id } = req.params;
-    const { clinicName, plan, whatsappNumber, industry, aiModel, email } = req.body;
+    const { clinicName, plan, whatsappNumber, industry, aiModel, email, whatsappPhoneNumberId } = req.body;
     const VALID_AI_MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
     if (aiModel && !VALID_AI_MODELS.includes(aiModel)) {
       return errorResponse(res, 'Invalid AI model. Must be one of: ' + VALID_AI_MODELS.join(', '), 400)
     }
+
+    const hasPhoneNumberId = whatsappPhoneNumberId !== undefined && whatsappPhoneNumberId !== null;
+    const phoneNumberIdValue = hasPhoneNumberId ? String(whatsappPhoneNumberId).trim() : '';
+    if (phoneNumberIdValue && !/^\d{8,20}$/.test(phoneNumberIdValue)) {
+      return errorResponse(res, 'Invalid Phone Number ID. Must be 8-20 digits', 400);
+    }
+
+    const normalizedWhatsapp = whatsappNumber ? normalizeNumber(String(whatsappNumber)) : null;
+
+    const existing = await pool.query('SELECT whatsapp_number FROM tenants WHERE id = $1', [id]);
+    const oldWhatsapp = existing.rows[0]?.whatsapp_number || null;
+
     const result = await pool.query(
       `UPDATE tenants
        SET name = COALESCE($1, name),
@@ -207,15 +230,23 @@ async function updateTenant(req, res) {
            whatsapp_number = COALESCE($3, whatsapp_number),
            industry = COALESCE($4, industry),
            ai_model = COALESCE($6, ai_model),
+           whatsapp_phone_number_id = CASE WHEN $7::boolean THEN $8 ELSE whatsapp_phone_number_id END,
            updated_at = NOW()
        WHERE id = $5
        RETURNING *`,
-      [clinicName || null, plan || null, whatsappNumber || null, industry || null, id, aiModel || null]
+      [clinicName || null, plan || null, normalizedWhatsapp, industry || null, id, aiModel || null, hasPhoneNumberId, phoneNumberIdValue || null]
     );
 
     if (result.rows.length === 0) {
       return errorResponse(res, 'Tenant not found', 404);
     }
+
+    try {
+      const redisClient = require('../../config/redis');
+      const newWhatsapp = result.rows[0].whatsapp_number;
+      if (oldWhatsapp) await redisClient.del(`tenant_wa:${normalizeNumber(oldWhatsapp)}`);
+      if (newWhatsapp) await redisClient.del(`tenant_wa:${normalizeNumber(newWhatsapp)}`);
+    } catch (_) {}
     if (email) {
       await pool.query(
         `UPDATE staff SET email = $1 WHERE tenant_id = $2 AND role = 'admin'`,
@@ -232,8 +263,11 @@ async function updateTenant(req, res) {
       await redisClient.del(`tenant_configs:${id}`);
     } catch (_) {}
 
-    return successResponse(res, result.rows[0]);
+    return successResponse(res, omitTenantSecrets(result.rows[0]));
   } catch (err) {
+    if (err.code === '23505' && err.constraint === 'idx_tenants_whatsapp_phone_number_id') {
+      return errorResponse(res, 'This Phone Number ID is already assigned to another clinic', 409);
+    }
     logger.error('Error updating tenant:', err.message);
     return errorResponse(res, 'Failed to update tenant', 500);
   }
@@ -252,7 +286,7 @@ async function deleteTenant(req, res) {
     await pool.query('DELETE FROM tenants WHERE id = $1', [id]);
     return successResponse(res, { message: 'Clinic deleted permanently' });
   } catch (err) {
-    logger.error('Error deleting tenant:', err.message);
+    logger.error(`Error deleting tenant: ${err.code || ''} ${err.constraint || ''} ${err.message}`);
     return errorResponse(res, 'Failed to delete clinic', 500);
   }
 }
@@ -274,6 +308,59 @@ async function clearTenantConversations(req, res) {
   }
 }
 
+async function getPosterRequests(req, res) {
+  try {
+    const { status } = req.query;
+    let sql = `SELECT pr.*, t.name AS tenant_name FROM poster_requests pr JOIN tenants t ON t.id = pr.tenant_id`;
+    const params = [];
+    if (status) {
+      sql += ` WHERE pr.status = $1`;
+      params.push(status);
+    }
+    sql += ` ORDER BY pr.created_at DESC`;
+    const result = await pool.query(sql, params);
+    return successResponse(res, result.rows);
+  } catch (err) {
+    logger.error('Error fetching poster requests:', err.message);
+    return errorResponse(res, 'Failed to fetch poster requests', 500);
+  }
+}
+
+async function approvePosterRequest(req, res) {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `UPDATE poster_requests SET status = 'approved', reviewed_at = NOW() WHERE id = $1 AND status = 'pending' RETURNING *`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return errorResponse(res, 'Poster request not found or already reviewed', 409);
+    }
+    return successResponse(res, result.rows[0]);
+  } catch (err) {
+    logger.error('Error approving poster request:', err.message);
+    return errorResponse(res, 'Failed to approve poster request', 500);
+  }
+}
+
+async function rejectPosterRequest(req, res) {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const result = await pool.query(
+      `UPDATE poster_requests SET status = 'rejected', reviewed_at = NOW(), notes = $2 WHERE id = $1 AND status = 'pending' RETURNING *`,
+      [id, notes || null]
+    );
+    if (result.rows.length === 0) {
+      return errorResponse(res, 'Poster request not found or already reviewed', 409);
+    }
+    return successResponse(res, result.rows[0]);
+  } catch (err) {
+    logger.error('Error rejecting poster request:', err.message);
+    return errorResponse(res, 'Failed to reject poster request', 500);
+  }
+}
+
 module.exports = {
   getAllTenants,
   getTenantDetails,
@@ -282,5 +369,8 @@ module.exports = {
   createTenant,
   getPlatformStats,
   clearTenantConversations,
-  deleteTenant
+  deleteTenant,
+  getPosterRequests,
+  approvePosterRequest,
+  rejectPosterRequest
 };

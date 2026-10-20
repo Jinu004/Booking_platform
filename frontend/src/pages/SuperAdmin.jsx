@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getAllTenants, getPlatformStats, updateTenantStatus, updateTenant, createTenant, clearTenantConversations } from '../services/superadmin.service';
+import { useNavigate } from 'react-router-dom';
+import { getAllTenants, getPlatformStats, updateTenantStatus, createTenant, clearTenantConversations } from '../services/superadmin.service';
 import useStore from '../store/useStore';
 import api from '../utils/api';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/shared/Skeleton';
@@ -37,13 +38,57 @@ const industryBadge = (industry) => {
 
 export default function SuperAdmin() {
   const { staff, addToast } = useStore();
-
+  const navigate = useNavigate();
 
 
   const [stats, setStats] = useState(null);
   const [tenants, setTenants] = useState([]);
+  const [failureCounts, setFailureCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [industryFilter, setIndustryFilter] = useState('all');
+  const [view, setView] = useState('tenants');
+
+  // Poster requests state
+  const [posterRequests, setPosterRequests] = useState([]);
+  const [posterLoading, setPosterLoading] = useState(false);
+  const [posterStatusFilter, setPosterStatusFilter] = useState('pending');
+  const [rejectingId, setRejectingId] = useState(null);
+  const [rejectNotes, setRejectNotes] = useState('');
+
+  const fetchPosterRequests = async () => {
+    try {
+      setPosterLoading(true);
+      const params = posterStatusFilter !== 'all' ? `?status=${posterStatusFilter}` : '';
+      const res = await api.get(`/superadmin/poster-requests${params}`);
+      setPosterRequests(res.data || []);
+    } catch {
+      addToast('Failed to load poster requests', 'error');
+    } finally {
+      setPosterLoading(false);
+    }
+  };
+
+  const handleApprovePoster = async (id) => {
+    try {
+      await api.patch(`/superadmin/poster-requests/${id}/approve`);
+      addToast('Poster approved', 'success');
+      fetchPosterRequests();
+    } catch {
+      addToast('Failed to approve poster', 'error');
+    }
+  };
+
+  const handleRejectPoster = async (id) => {
+    try {
+      await api.patch(`/superadmin/poster-requests/${id}/reject`, { notes: rejectNotes || null });
+      addToast('Poster rejected', 'success');
+      setRejectingId(null);
+      setRejectNotes('');
+      fetchPosterRequests();
+    } catch {
+      addToast('Failed to reject poster', 'error');
+    }
+  };
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false);
@@ -51,22 +96,10 @@ export default function SuperAdmin() {
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
 
-  // Edit modal
-  const [editTenant, setEditTenant] = useState(null);
-  const [editForm, setEditForm] = useState({ clinicName: '', plan: '', whatsappNumber: '', industry: 'clinic', aiModel: '', proactiveTemplates: false, recallEnabled: true, email: '' });
-  const [editLoading, setEditLoading] = useState(false);
-  const [editError, setEditError] = useState('');
-
-  // WhatsApp WABA registration
-  const [wabaPhone, setWabaPhone] = useState('');
-  const [wabaPhoneNumberId, setWabaPhoneNumberId] = useState('');
-  const [wabaOtp, setWabaOtp] = useState('');
-  const [wabaStep, setWabaStep] = useState('idle'); // idle | sending | otp_sent | verifying | done
-  const [wabaError, setWabaError] = useState('');
-
   const ownTenantId = staff?.tenantId;
 
   useEffect(() => { fetchData(); }, []);
+  useEffect(() => { if (view === 'posters') fetchPosterRequests(); }, [view, posterStatusFilter]);
 
   const fetchData = async () => {
     try {
@@ -77,6 +110,14 @@ export default function SuperAdmin() {
       ]);
       setStats(statsRes.data || {});
       setTenants(Array.isArray(tenantsRes.data) ? tenantsRes.data : []);
+      // Failed sends of the last 24 hours per tenant; if this fails the list simply shows no badges
+      api.get('/superadmin/send-failures/summary')
+        .then(res => {
+          const counts = {};
+          (Array.isArray(res?.data) ? res.data : []).forEach(item => { counts[item.tenant_id] = item.count; });
+          setFailureCounts(counts);
+        })
+        .catch(() => setFailureCounts({}));
     } catch (err) {
       console.error(err);
     } finally {
@@ -119,105 +160,9 @@ export default function SuperAdmin() {
       setCreateForm({ clinicName: '', email: '', password: '', plan: 'starter', industry: 'clinic' });
       fetchData();
     } catch (err) {
-      setCreateError(err?.response?.data?.error || 'Failed to create clinic');
+      setCreateError(err?.error || err?.response?.data?.error || 'Failed to create clinic');
     } finally {
       setCreateLoading(false);
-    }
-  };
-
-  const openEdit = (t) => {
-    setEditTenant(t);
-    setEditForm({ clinicName: t.name, plan: t.plan, whatsappNumber: t.whatsapp_number || '', industry: t.industry || 'clinic', aiModel: t.ai_model || '', proactiveTemplates: t.proactive_templates_enabled === 'true',
-    recallEnabled: t.recall_enabled !== 'false', email: t.email || '' });
-    setEditError('');
-  };
-
-  const handleEdit = async () => {
-    setEditError('');
-    if (editForm.industry !== editTenant.industry) {
-      const confirmed = window.confirm(
-        `Changing industry from "${editTenant.industry}" to "${editForm.industry}" will change the AI behaviour, pages, and theme for this tenant immediately. Are you sure?`
-      );
-      if (!confirmed) return;
-    }
-    try {
-      setEditLoading(true);
-      const { proactiveTemplates, ...tenantForm } = editForm;
-      await updateTenant(editTenant.id, tenantForm);
-      await api.patch(`/superadmin/tenants/${editTenant.id}/config`, {
-        key: 'proactive_templates_enabled',
-        value: String(proactiveTemplates)
-      });
-      await api.patch(`/superadmin/tenants/${editTenant.id}/config`, { key: 'recall_enabled', value: String(editForm.recallEnabled) });
-      await fetchData();
-      closeEditModal();
-    } catch (err) {
-      setEditError(err?.response?.data?.error || 'Failed to update clinic');
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-
-  const closeEditModal = () => {
-    setEditTenant(null);
-    setWabaStep('idle');
-    setWabaPhone('');
-    setWabaOtp('');
-    setWabaPhoneNumberId('');
-    setWabaError('');
-  };
-
-  const handleSendOTP = async () => {
-    if (!wabaPhone || !editTenant?.id) return;
-    setWabaStep('sending');
-    setWabaError('');
-    try {
-      const res = await api.post('/admin/waba/initiate', {
-        phone_number: wabaPhone,
-        tenant_id: editTenant.id
-      });
-      setWabaPhoneNumberId(res.data?.phone_number_id || res.phone_number_id);
-      setWabaStep('otp_sent');
-    } catch (err) {
-      setWabaError(err.error || 'Failed to send OTP');
-      setWabaStep('idle');
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    if (!wabaOtp || !wabaPhoneNumberId) return;
-    setWabaStep('verifying');
-    setWabaError('');
-    try {
-      await api.post('/admin/waba/verify', {
-        phone_number_id: wabaPhoneNumberId,
-        code: wabaOtp,
-        tenant_id: editTenant.id,
-        phone_number: wabaPhone
-      });
-      setWabaStep('done');
-      addToast('WhatsApp number registered successfully', 'success');
-      fetchData();
-    } catch (err) {
-      setWabaError(err.error || 'Invalid OTP');
-      setWabaStep('otp_sent');
-    }
-  };
-
-  const handleDeleteClinic = async (tenantId, clinicName) => {
-    const confirmed = window.prompt(`Type "${clinicName}" to confirm permanent deletion:`);
-    if (confirmed !== clinicName) {
-      if (confirmed !== null) addToast('Clinic name did not match', 'error');
-      return;
-    }
-    try {
-      await api.delete(`/superadmin/tenants/${tenantId}`);
-      addToast('Clinic deleted permanently', 'success');
-      closeEditModal();
-      fetchData();
-    } catch {
-      addToast('Failed to delete clinic', 'error');
     }
   };
 
@@ -233,7 +178,7 @@ export default function SuperAdmin() {
   }
   if (loading) {
     return (
-      <div className="p-8 space-y-8">
+      <div className="p-0 md:p-8 space-y-8">
         <h1 className="text-2xl font-bold text-gray-900">Platform Admin</h1>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
@@ -257,17 +202,122 @@ export default function SuperAdmin() {
     : tenants.filter(t => t.industry === industryFilter);
 
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="p-0 md:p-8 space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Platform Admin</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          + New Tenant
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex bg-gray-100 rounded-lg p-0.5">
+            {[{ key: 'tenants', label: 'Tenants' }, { key: 'posters', label: 'Posters' }].map(v => (
+              <button
+                key={v.key}
+                onClick={() => setView(v.key)}
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  view === v.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+          {view === 'tenants' && (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap"
+            >
+              + New Tenant
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* Posters View */}
+      {view === 'posters' && (
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            {['all', 'pending', 'approved', 'rejected'].map(s => (
+              <button
+                key={s}
+                onClick={() => setPosterStatusFilter(s)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                  posterStatusFilter === s ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+          <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Caption</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {posterLoading ? (
+                    <tr><td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-400">Loading...</td></tr>
+                  ) : posterRequests.length === 0 ? (
+                    <tr><td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">No poster requests</td></tr>
+                  ) : posterRequests.map(pr => (
+                    <tr key={pr.id}>
+                      <td className="px-4 py-3">
+                        <a href={pr.image_url} target="_blank" rel="noopener noreferrer">
+                          <img src={pr.image_url} alt="Poster" className="w-14 h-14 object-cover rounded-lg border border-gray-200 hover:opacity-80 transition" />
+                        </a>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{pr.tenant_name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{pr.caption || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3">{statusBadge(pr.status)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{new Date(pr.created_at).toLocaleDateString('en-IN')}</td>
+                      <td className="px-4 py-3 text-right text-sm font-medium">
+                        {pr.status === 'pending' && (
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => handleApprovePoster(pr.id)} className="text-green-600 hover:text-green-900">Approve</button>
+                            <button onClick={() => { setRejectingId(pr.id); setRejectNotes(''); }} className="text-red-600 hover:text-red-900">Reject</button>
+                          </div>
+                        )}
+                        {pr.status === 'rejected' && pr.notes && (
+                          <span className="text-xs text-red-500">{pr.notes}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {rejectingId && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+                <h2 className="text-lg font-semibold text-gray-900">Reject Poster Request</h2>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+                  <textarea
+                    rows={3}
+                    value={rejectNotes}
+                    onChange={e => setRejectNotes(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    placeholder="e.g. Image quality too low, please re-upload"
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => { setRejectingId(null); setRejectNotes(''); }} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+                  <button onClick={() => handleRejectPoster(rejectingId)} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Reject</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {view === 'tenants' && <>
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
@@ -295,7 +345,7 @@ export default function SuperAdmin() {
               onClick={() => setIndustryFilter(tab.key)}
               className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                 industryFilter === tab.key
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-indigo-600 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -330,15 +380,27 @@ export default function SuperAdmin() {
                   <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{t.name}</td>
                   <td className="px-3 py-3 whitespace-nowrap">{industryBadge(t.industry)}</td>
                   <td className="px-3 py-3 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 capitalize">{t.plan}</span>
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800 capitalize">{t.plan}</span>
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap">{statusBadge(t.status)}</td>
+                  <td className="px-3 py-3 whitespace-nowrap">
+                    {statusBadge(t.status)}
+                    {failureCounts[t.id] > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/superadmin/tenants/${t.id}`)}
+                        title="Open the tenant page to see the failed sends"
+                        className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 hover:bg-red-200"
+                      >
+                        {failureCounts[t.id]} failed (24h)
+                      </button>
+                    )}
+                  </td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.whatsapp_number || <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.booking_count}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.conversation_count}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                    <button onClick={() => openEdit(t)} className="text-blue-600 hover:text-blue-900">Edit</button>
+                    <button onClick={() => navigate(`/superadmin/tenants/${t.id}`)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
                     {t.id === ownTenantId && (
                       <span className="inline-flex text-xs leading-5 font-semibold text-gray-400">(You)</span>
                     )}
@@ -377,7 +439,7 @@ export default function SuperAdmin() {
                 type="text"
                 value={createForm.clinicName}
                 onChange={e => setCreateForm(f => ({ ...f, clinicName: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Apollo Medical Centre"
               />
             </div>
@@ -387,7 +449,7 @@ export default function SuperAdmin() {
                 type="email"
                 value={createForm.email}
                 onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="doctor@clinic.com"
               />
             </div>
@@ -397,7 +459,7 @@ export default function SuperAdmin() {
                 type="password"
                 value={createForm.password}
                 onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Min 8 characters"
               />
             </div>
@@ -406,7 +468,7 @@ export default function SuperAdmin() {
               <select
                 value={createForm.plan}
                 onChange={e => setCreateForm(f => ({ ...f, plan: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 {PLANS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
               </select>
@@ -416,7 +478,7 @@ export default function SuperAdmin() {
               <select
                 value={createForm.industry}
                 onChange={e => setCreateForm(f => ({ ...f, industry: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="clinic">Clinic</option>
                 <option value="enquiry">Enquiry</option>
@@ -432,7 +494,7 @@ export default function SuperAdmin() {
               <button
                 onClick={handleCreate}
                 disabled={createLoading}
-                className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
               >
                 {createLoading ? 'Creating...' : 'Create Clinic'}
               </button>
@@ -441,191 +503,7 @@ export default function SuperAdmin() {
         </div>
       )}
 
-      {/* Edit Clinic Modal */}
-      {editTenant && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
-          <div className="p-6 space-y-4 overflow-y-auto flex-1">
-            <h2 className="text-lg font-semibold text-gray-900">Edit Clinic</h2>
-            {editError && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{editError}</p>}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Name</label>
-              <input
-                type="text"
-                value={editForm.clinicName}
-                onChange={e => setEditForm(f => ({ ...f, clinicName: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
-              <select
-                value={editForm.plan}
-                onChange={e => setEditForm(f => ({ ...f, plan: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                {PLANS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
-              <select
-                value={editForm.industry}
-                onChange={e => setEditForm(f => ({ ...f, industry: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                <option value="clinic">Clinic</option>
-                <option value="enquiry">Enquiry</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
-              <input
-                type="text"
-                value={editForm.whatsappNumber}
-                onChange={e => setEditForm(f => ({ ...f, whatsappNumber: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                placeholder="+919876543210"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Email</label>
-              <input
-                type="email"
-                value={editForm.email}
-                onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                placeholder="clinic@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">AI Model Override <span className="text-gray-400 font-normal">(optional — overrides plan default)</span></label>
-              <select
-                value={editForm.aiModel}
-                onChange={e => setEditForm(f => ({ ...f, aiModel: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                <option value="">Use plan default</option>
-                <option value="gemini-2.5-pro">gemini-2.5-pro (Pro quality)</option>
-                <option value="gemini-2.5-flash">gemini-2.5-flash (Balanced)</option>
-                <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Fast)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Proactive Template Messaging</label>
-              <div className="flex items-center gap-3 mt-1">
-                <input
-                  type="checkbox"
-                  id="proactiveTemplates"
-                  checked={editForm.proactiveTemplates}
-                  onChange={e => setEditForm(f => ({ ...f, proactiveTemplates: e.target.checked }))}
-                  className="w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
-                />
-                <label htmlFor="proactiveTemplates" className="text-sm text-gray-600">
-                  Allow staff to send template messages when 24-hour window is closed
-                </label>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Recall Checkup Messages</label>
-              <div className="flex items-center gap-3 mt-1">
-                <input
-                  type="checkbox"
-                  id="recallEnabled"
-                  checked={editForm.recallEnabled}
-                  onChange={e => setEditForm(f => ({ ...f, recallEnabled: e.target.checked }))}
-                  className="w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
-                />
-                <label htmlFor="recallEnabled" className="text-sm text-gray-600">
-                  Send recall checkup WhatsApp reminders to patients not seen in 90 days (every Monday)
-                </label>
-              </div>
-            </div>
-
-            {/* WhatsApp WABA Registration */}
-            <div className="border-t pt-4 mt-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">📱 Register WhatsApp Number</h4>
-              {wabaStep === 'done' ? (
-                <div className="text-sm text-green-600 font-medium">✅ WhatsApp number registered successfully</div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
-                    ⚠️ After registration, WhatsApp app will stop working on this number. All messages will be handled by ReceptionAI.
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="91XXXXXXXXXX"
-                      value={wabaPhone}
-                      onChange={e => setWabaPhone(e.target.value)}
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      disabled={wabaStep === 'otp_sent' || wabaStep === 'sending'}
-                    />
-                    <button
-                      onClick={handleSendOTP}
-                      disabled={wabaStep === 'sending' || wabaStep === 'otp_sent' || !wabaPhone}
-                      className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
-                    >
-                      {wabaStep === 'sending' ? 'Sending...' : 'Send OTP'}
-                    </button>
-                  </div>
-                  {wabaStep === 'otp_sent' && (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Enter 6-digit OTP"
-                        value={wabaOtp}
-                        onChange={e => setWabaOtp(e.target.value)}
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      />
-                      <button
-                        onClick={handleVerifyOTP}
-                        disabled={wabaStep === 'verifying' || !wabaOtp}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-                      >
-                        {wabaStep === 'verifying' ? 'Verifying...' : 'Verify OTP'}
-                      </button>
-                    </div>
-                  )}
-                  {wabaError && (
-                    <p className="text-red-600 text-xs">{wabaError}</p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            </div>{/* end scrollable body */}
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
-              <div>
-                {editTenant?.status === 'suspended' && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteClinic(editTenant.id, editTenant.name)}
-                    className="px-4 py-2 text-red-600 border border-red-200 rounded-md hover:bg-red-50 text-sm font-medium"
-                  >
-                    Delete Permanently
-                  </button>
-                )}
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => closeEditModal()}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleEdit}
-                  disabled={editLoading}
-                  className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
-                >
-                  {editLoading ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      </>}
     </div>
   );
 }
