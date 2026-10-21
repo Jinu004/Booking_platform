@@ -6,6 +6,7 @@ import useStore from '../store/useStore';
 import { PLANS } from '../constants';
 import { useIndustry } from '../hooks/useIndustry';
 import api from '../utils/api';
+import PosterImage from '../components/shared/PosterImage';
 
 const DAYS = [
   { key: 'mon', label: 'Monday' },
@@ -291,7 +292,6 @@ export default function Settings() {
   const [cancellingId, setCancellingId] = useState(null);
   const [draftCounts, setDraftCounts] = useState({});
   const [campaignError, setCampaignError] = useState('');
-  const [brokenPosters, setBrokenPosters] = useState({});
 
   // "Review and send" panel of one draft campaign
   const [reviewId, setReviewId] = useState(null);
@@ -894,16 +894,10 @@ export default function Settings() {
               <div className="space-y-3">
                 {posterRequests.map(pr => (
                   <div key={pr.id} className="flex items-start gap-4 p-4 border border-gray-100 rounded-lg">
-                    {brokenPosters[pr.id] ? (
-                      <span className="w-16 h-16 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-400 text-xl flex-shrink-0">📄</span>
-                    ) : (
-                      <img
-                        src={pr.image_url}
-                        alt="Poster"
-                        onError={() => setBrokenPosters(b => ({ ...b, [pr.id]: true }))}
-                        className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0"
-                      />
-                    )}
+                    <PosterImage
+                      path={`/tenants/${staff?.tenantId}/poster-requests/${pr.id}/image`}
+                      className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${

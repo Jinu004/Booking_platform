@@ -4,6 +4,7 @@ import { getAllTenants, getPlatformStats, updateTenantStatus, createTenant, clea
 import useStore from '../store/useStore';
 import api from '../utils/api';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/shared/Skeleton';
+import PosterImage from '../components/shared/PosterImage';
 
 const PLANS = ['starter', 'growth', 'pro'];
 
@@ -267,9 +268,7 @@ export default function SuperAdmin() {
                   ) : posterRequests.map(pr => (
                     <tr key={pr.id}>
                       <td className="px-4 py-3">
-                        <a href={pr.image_url} target="_blank" rel="noopener noreferrer">
-                          <img src={pr.image_url} alt="Poster" className="w-14 h-14 object-cover rounded-lg border border-gray-200 hover:opacity-80 transition" />
-                        </a>
+                        <PosterImage path={`/superadmin/poster-requests/${pr.id}/image`} className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{pr.tenant_name}</td>
                       <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{pr.caption || <span className="text-gray-300">—</span>}</td>
