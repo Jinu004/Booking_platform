@@ -44,7 +44,7 @@ async function getDailyAllowance(tenantId, readinessDetails) {
   const usedRes = await pool.query(
     `SELECT
        (SELECT COUNT(*)::int FROM campaign_recipients WHERE tenant_id = $1 AND sent_at > now() - interval '24 hours') +
-       (SELECT COUNT(*)::int FROM notifications WHERE tenant_id = $1 AND status = 'sent' AND sent_at > now() - interval '24 hours') AS used`,
+       (SELECT COUNT(*)::int FROM notifications WHERE tenant_id = $1 AND status IN ('sent', 'unknown') AND sent_at > now() - interval '24 hours') AS used`,
     [tenantId]
   )
   const used = usedRes.rows[0].used

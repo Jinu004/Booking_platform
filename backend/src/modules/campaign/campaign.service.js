@@ -65,7 +65,7 @@ const ELIGIBILITY_SQL = `
     WHEN EXISTS (
       SELECT 1 FROM campaign_recipients cr
       WHERE cr.tenant_id = c.tenant_id AND cr.customer_id = c.id
-        AND cr.status = 'sent' AND cr.sent_at > now() - ($2::int * interval '1 day')
+        AND cr.sent_at > now() - ($2::int * interval '1 day') -- any row with sent_at counts, including an unknown-state send (status failed)
     ) THEN 'recent_campaign'
     WHEN EXISTS (
       SELECT 1 FROM campaign_recipients cr

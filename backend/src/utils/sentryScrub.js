@@ -19,6 +19,32 @@ function cleanUrl(url) {
 // Header names removed completely: authorization, cookies, anything that looks like a token, key, secret or signature
 const SENSITIVE_HEADER = /^(authorization|proxy-authorization|cookie|set-cookie)$|token|secret|api[-_]?key|signature|auth/i;
 
+// Client address headers, removed by exact name (they carry the caller's ip)
+const IP_HEADERS = ['x-forwarded-for', 'x-real-ip', 'forwarded', 'cf-connecting-ip'];
+
+// Non-global copies: a global regex keeps lastIndex between test() calls and would skip matches
+const PHONE_TEST = /\b\d{10,15}\b/;
+const EMAIL_TEST = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+
+function looksPersonal(text) {
+  return PHONE_TEST.test(text) || EMAIL_TEST.test(text);
+}
+
+// Deletes every entry whose key or value looks like a phone number or an email
+function dropPersonalEntries(obj) {
+  if (!obj || typeof obj !== 'object') return;
+  for (const key of Object.keys(obj)) {
+    const value = obj[key];
+    let text = '';
+    if (typeof value === 'string') text = value;
+    else if (typeof value === 'number') text = String(value);
+    else if (value && typeof value === 'object') {
+      try { text = JSON.stringify(value) || ''; } catch (e) { text = ''; } // circular objects: judge by key only
+    }
+    if (looksPersonal(key) || looksPersonal(text)) delete obj[key];
+  }
+}
+
 function scrubEvent(event) {
   try {
     if (event.exception && event.exception.values) {
@@ -35,10 +61,14 @@ function scrubEvent(event) {
       if (event.request.url) event.request.url = cleanUrl(event.request.url);
       if (event.request.headers && typeof event.request.headers === 'object') {
         for (const name of Object.keys(event.request.headers)) {
-          if (SENSITIVE_HEADER.test(name)) delete event.request.headers[name];
+          if (SENSITIVE_HEADER.test(name) || IP_HEADERS.includes(name.toLowerCase())) delete event.request.headers[name];
         }
       }
     }
+
+    dropPersonalEntries(event.extra);
+    if (event.contexts) dropPersonalEntries(event.contexts.request);
+    dropPersonalEntries(event.tags);
 
     if (event.user) delete event.user.ip_address;
 

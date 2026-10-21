@@ -236,10 +236,16 @@ async function processRecipient({ tenantId, campaignId, recipient, clinicName, c
     const { code, message } = safeError(err)
     // An error without a Meta error code (timeout, dropped connection, odd response) may still have been delivered:
     // the row is failed, never retried and never left pending, the same treatment as a stale claim
-    const storedMessage = code === null ? 'interrupted_unknown_state' : message
+    const unknownState = code === null
+    const storedMessage = unknownState ? 'interrupted_unknown_state' : message
+    // An unknown-state row also gets sent_at (now): Meta may have delivered it, so the daily allowance, the 21-day frequency
+    // rule, the first-campaign check and the campaign caps must count it. The status stays 'failed' for the screen.
     await pool.query(
-      `UPDATE campaign_recipients SET status = 'failed', error_code = $2, error_message = $3 WHERE id = $1`,
-      [recipient.id, code !== null ? String(code) : null, storedMessage]
+      `UPDATE campaign_recipients
+       SET status = 'failed', error_code = $2, error_message = $3,
+           sent_at = CASE WHEN $4::boolean THEN COALESCE(sent_at, now()) ELSE sent_at END
+       WHERE id = $1`,
+      [recipient.id, code !== null ? String(code) : null, storedMessage, unknownState]
     )
     log('failed', code)
     counters.consecutiveErrors += 1
@@ -264,7 +270,8 @@ async function processCampaign(campaign) {
 
     // A claim older than the limit with no Meta message id may or may not have been sent: never retry it
     await pool.query(
-      `UPDATE campaign_recipients SET status = 'failed', error_message = 'interrupted_unknown_state'
+      `UPDATE campaign_recipients
+       SET status = 'failed', error_message = 'interrupted_unknown_state', sent_at = COALESCE(sent_at, claimed_at)
        WHERE campaign_id = $1 AND status = 'pending' AND wa_message_id IS NULL
          AND claimed_at IS NOT NULL AND claimed_at < now() - ($2::int * interval '1 minute')`,
       [campaignId, C.STALE_CLAIM_MINUTES]
