@@ -150,30 +150,38 @@ router.get('/', (req, res) => {
   return res.status(403).send('Forbidden')
 })
 
+// Production must never accept an unsigned webhook. Said once at startup: without the app secret every POST is rejected.
+if (process.env.NODE_ENV === 'production' && !process.env.META_APP_SECRET) {
+  logger.error('WEBHOOK_CONFIG META_APP_SECRET is not set in production: every WhatsApp webhook POST will be rejected until it is set');
+}
+
 router.post('/', async (req, res) => {
-  // Verify X-Hub-Signature-256 for Meta webhooks only
+  // Verify X-Hub-Signature-256. In production EVERY payload needs a valid Meta signature, whatever its shape;
+  // outside production only Meta-shaped payloads are checked (so the WAHA development flow keeps working).
   const signature = req.headers['x-hub-signature-256'];
   const appSecret = process.env.META_APP_SECRET;
   const isMetaPayload = req.body?.object === 'whatsapp_business_account';
-  if (isMetaPayload && !appSecret && process.env.NODE_ENV === 'production') {
-    logger.error('META_APP_SECRET not set — rejecting Meta webhook');
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction && !appSecret) {
+    logger.error('META_APP_SECRET not set — rejecting webhook');
     return res.status(503).json({ success: false, error: 'Webhook not configured' });
   }
-  if (appSecret && isMetaPayload) {
-    if (!signature) {
-      logger.warn('Webhook request missing signature header — rejected');
+  if (appSecret && (isProduction || isMetaPayload)) {
+    // The raw body is the exact bytes received (captured by the JSON parser's verify hook in index.js, never re-serialised)
+    if (!signature || !Buffer.isBuffer(req.rawBody)) {
+      logger.warn(`WEBHOOK_REJECTED_UNSIGNED ip=${req.ip} reason=${signature ? 'no_raw_body' : 'missing_signature'}`);
       return res.status(403).json({ success: false, error: 'Missing signature' });
     }
     const expectedSignature = 'sha256=' + crypto
       .createHmac('sha256', appSecret)
       .update(req.rawBody)
       .digest('hex');
-    const sigBuffer = Buffer.from(signature);
+    const sigBuffer = Buffer.from(String(signature));
     const expectedBuffer = Buffer.from(expectedSignature);
     const valid = sigBuffer.length === expectedBuffer.length &&
       crypto.timingSafeEqual(sigBuffer, expectedBuffer);
     if (!valid) {
-      logger.warn('Webhook signature mismatch — possible forged request rejected');
+      logger.warn(`WEBHOOK_REJECTED_UNSIGNED ip=${req.ip} reason=invalid_signature`);
       return res.status(403).json({ success: false, error: 'Invalid signature' });
     }
   }
@@ -220,6 +228,11 @@ router.post('/', async (req, res) => {
         .catch(templateErr => logger.warn(`Template status handling failed: ${String(templateErr?.message || '').slice(0, 120)}`))
 
       const source = body.object === 'whatsapp_business_account' ? 'meta' : 'waha'
+      // The WAHA development path does not exist in production, whatever WAHA_DEFAULT_TENANT_ID says
+      if (source === 'waha' && process.env.NODE_ENV === 'production') {
+        logger.warn('WEBHOOK_WAHA_IGNORED_IN_PRODUCTION')
+        return
+      }
       const message = parseIncoming(body, source)
       if (!message) return
 
