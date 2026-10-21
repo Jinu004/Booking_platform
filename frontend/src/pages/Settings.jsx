@@ -7,6 +7,7 @@ import { PLANS } from '../constants';
 import { useIndustry } from '../hooks/useIndustry';
 import api from '../utils/api';
 import PosterImage from '../components/shared/PosterImage';
+import { plural, hourLabel } from '../utils/plural';
 
 const DAYS = [
   { key: 'mon', label: 'Monday' },
@@ -75,7 +76,13 @@ export default function Settings() {
   const { addToast } = useStore();
   const { industry } = useIndustry();
 
+  // The Posters tab, its upload form and the poster and campaign calls are for admin and manager only (the backend allows nobody else)
+  const canUsePosters = ['admin', 'manager'].includes(staff?.role);
   const [activeTab, setActiveTab] = useState('clinic');
+  // A role that may not use the Posters tab never stays on it: fall back to the first tab
+  useEffect(() => {
+    if (activeTab === 'posters' && !canUsePosters) setActiveTab('clinic');
+  }, [activeTab, canUsePosters]);
   const [saving, setSaving] = useState(false);
   const [savingAI, setSavingAI] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
@@ -115,11 +122,30 @@ export default function Settings() {
   const kbOverLimit = knowledgeBase.length > kbLimit;
 
   useEffect(() => {
-    if (activeTab === 'posters') {
+    if (activeTab === 'posters' && canUsePosters) {
       fetchPosterRequests();
-      if (['admin', 'manager'].includes(staff?.role)) fetchCampaigns();
+      fetchCampaigns();
     }
   }, [activeTab]);
+
+  // Refetch the campaign list when the browser tab comes back into view (no timers, no polling), only on the Posters tab
+  useEffect(() => {
+    if (activeTab !== 'posters' || !canUsePosters) return undefined;
+    let last = 0;
+    const refresh = () => {
+      if (document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (now - last < 1000) return; // focus and visibilitychange often fire together
+      last = now;
+      fetchCampaigns();
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [activeTab, canUsePosters]);
 
   useEffect(() => {
     getClinicSettings()
@@ -309,15 +335,26 @@ export default function Settings() {
   const [sendNote, setSendNote] = useState('');
   const confirmingRef = useRef(false);
 
+  // Returns the loaded list (or null when the call failed) so callers can look at the fresh data
   const fetchCampaigns = async () => {
     try {
       setCampaignsLoading(true);
       const res = await api.get(`/tenants/${staff?.tenantId}/campaigns`);
-      setCampaigns(res.data || []);
+      const list = res.data || [];
+      setCampaigns(list);
+      return list;
     } catch {
+      return null;
     } finally {
       setCampaignsLoading(false);
     }
+  };
+
+  // The shared api helper already shows its own toast for these two failures, so they are not repeated as a page message
+  const campaignErrorText = (err, fallback) => {
+    const message = err?.error;
+    if (message === 'Cannot connect to server' || String(message || '').startsWith('Forbidden')) return '';
+    return message || fallback;
   };
 
   const handleCreateCampaign = async (posterId) => {
@@ -325,14 +362,15 @@ export default function Settings() {
     setCampaignError('');
     try {
       setBuildingPosterId(posterId);
-      const res = await api.post(`/tenants/${staff?.tenantId}/campaigns`, { poster_request_id: posterId });
+      // silent: the api helper adds no "Something went wrong" toast for a 500; this page shows the message itself
+      const res = await api.post(`/tenants/${staff?.tenantId}/campaigns`, { poster_request_id: posterId }, { silent: true });
       const created = res.data;
       if (created?.campaign?.id) {
         setDraftCounts(prev => ({ ...prev, [created.campaign.id]: created.counts }));
       }
       fetchCampaigns();
     } catch (err) {
-      setCampaignError(err?.error || 'Failed to build the campaign');
+      setCampaignError(campaignErrorText(err, 'Failed to build the campaign'));
     } finally {
       setBuildingPosterId(null);
     }
@@ -344,10 +382,10 @@ export default function Settings() {
     setSendNote('');
     try {
       setCancellingId(campaignId);
-      await api.post(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/cancel`);
+      await api.post(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/cancel`, undefined, { silent: true });
       fetchCampaigns();
     } catch (err) {
-      setCampaignError(err?.error || 'Failed to cancel the campaign');
+      setCampaignError(campaignErrorText(err, 'Failed to cancel the campaign'));
     } finally {
       setCancellingId(null);
     }
@@ -363,10 +401,10 @@ export default function Settings() {
     setCampaignError('');
     try {
       setPreviewLoading(true);
-      const res = await api.get(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/preview`);
+      const res = await api.get(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/preview`, { silent: true });
       setPreview(res.data || null);
     } catch (err) {
-      setReviewError(err?.error || 'Failed to load the review');
+      setReviewError(campaignErrorText(err, 'Failed to load the review'));
     } finally {
       setPreviewLoading(false);
     }
@@ -378,7 +416,7 @@ export default function Settings() {
     setConfirming(true);
     setReviewError('');
     try {
-      await api.post(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/confirm`, { expected_to_send: preview.will_send_now });
+      await api.post(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/confirm`, { expected_to_send: preview.will_send_now }, { silent: true });
       setReviewId(null);
       setSendNote('Sending has started.');
       fetchCampaigns();
@@ -390,7 +428,15 @@ export default function Settings() {
       } else if (Array.isArray(err?.reasons)) {
         setPreview(p => (p ? { ...p, readiness: { ok: false, reasons: err.reasons } } : p));
       } else {
-        setReviewError(err?.error || 'Failed to start sending');
+        setReviewError(campaignErrorText(err, 'Failed to start sending'));
+      }
+      // After ANY error the request may still have reached the server: look at the real status of the campaign
+      const list = await fetchCampaigns();
+      const current = list ? list.find(c => c.id === campaignId) : null;
+      if (current && current.status !== 'draft') {
+        setReviewId(null);
+        setReviewError('');
+        setSendNote(`The campaign status changed. It is now: ${(CAMPAIGN_STATUS_LABEL[current.status] || current.status).toLowerCase()}.`);
       }
     } finally {
       confirmingRef.current = false;
@@ -403,7 +449,7 @@ export default function Settings() {
     const full = draftCounts[campaign.id];
     if (full) {
       const lines = [
-        [full.pending, `${full.pending} patients would receive this poster`, true],
+        [full.pending, `${plural(full.pending, 'patient')} would receive this poster`, true],
         [full.not_asked, `${full.not_asked} have not been asked about offers yet`],
         [full.opted_out, `${full.opted_out} chose checkups only or no updates`],
         [full.skipped?.invalid_number, `${full.skipped?.invalid_number} skipped: number looks invalid`],
@@ -413,7 +459,7 @@ export default function Settings() {
       return lines.filter(([n, , always]) => always || n > 0).map(([, text]) => text);
     }
     const c = campaign.counts || {};
-    const lines = [`${c.pending ?? 0} patients would receive this poster`];
+    const lines = [`${plural(c.pending ?? 0, 'patient')} would receive this poster`];
     if (c.skipped > 0) lines.push(`${c.skipped} skipped`);
     return lines;
   };
@@ -423,7 +469,7 @@ export default function Settings() {
     { key: 'ai', label: 'AI & HITL' },
     { key: 'whatsapp', label: 'WhatsApp' },
     ...(plan === 'pro' ? [{ key: 'doctors', label: 'Doctor Profiles' }] : []),
-    { key: 'posters', label: 'Posters' },
+    ...(canUsePosters ? [{ key: 'posters', label: 'Posters' }] : []),
     { key: 'billing', label: 'Billing' },
   ];
 
@@ -833,7 +879,7 @@ export default function Settings() {
           </div>
         )}
 
-      {activeTab === 'posters' && (
+      {activeTab === 'posters' && canUsePosters && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
             <h2 className="text-lg font-semibold text-gray-900">Upload Poster</h2>
@@ -843,10 +889,16 @@ export default function Settings() {
               <input
                 ref={posterInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png"
                 onChange={e => {
                   const file = e.target.files?.[0];
                   if (file) {
+                    // WhatsApp templates and campaigns cannot use WebP, so only JPEG and PNG are taken
+                    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+                      addToast('Please choose a JPEG or PNG image. Other formats, including WebP, cannot be used for WhatsApp campaigns.', 'error');
+                      e.target.value = '';
+                      return;
+                    }
                     if (file.size > 5 * 1024 * 1024) {
                       addToast('Image must be under 5MB', 'error');
                       e.target.value = '';
@@ -858,7 +910,7 @@ export default function Settings() {
                 }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
               />
-              <p className="text-xs text-gray-400 mt-1">JPEG, PNG or WebP. Max 5MB.</p>
+              <p className="text-xs text-gray-400 mt-1">JPEG or PNG. Max 5MB.</p>
             </div>
             {posterPreview && (
               <div className="mt-3">
@@ -1011,12 +1063,12 @@ export default function Settings() {
                           {previewChanged && <p className="text-sm text-amber-700">The numbers changed. Please review them again.</p>}
                           {preview && (
                             <>
-                              <p className="text-sm font-medium text-gray-900">This campaign will be sent to {preview.will_send_now} patients now.</p>
+                              <p className="text-sm font-medium text-gray-900">This campaign will be sent to {plural(preview.will_send_now, 'patient')} now.</p>
                               {preview.left_over_after_cap > 0 && (
                                 <p className="text-sm text-gray-700">
                                   {preview.is_first_campaign
-                                    ? `As this is your first campaign, it is limited to ${preview.first_campaign_limit} patients. ${preview.left_over_after_cap} patients will not be sent this time.`
-                                    : `${preview.left_over_after_cap} patients will be sent later, as your daily allowance frees up.`}
+                                    ? `As this is your first campaign, it is limited to ${plural(preview.first_campaign_limit, 'patient')}. ${plural(preview.left_over_after_cap, 'patient')} will not be sent this time.`
+                                    : `${plural(preview.left_over_after_cap, 'patient')} will be sent later, as your daily allowance frees up.`}
                                 </p>
                               )}
                               <p className="text-sm text-gray-700">
@@ -1028,8 +1080,14 @@ export default function Settings() {
                                 Estimated cost: ₹{inr(preview.cost?.total_inr)} (₹{inr(preview.cost?.subtotal_inr)} + ₹{inr(preview.cost?.gst_inr)} GST). This is an estimate. The actual charge is set by Meta.
                               </p>
                               <p className="text-sm text-gray-700">
-                                Messages are sent slowly between 10 am and 7 pm, about {preview.estimated_minutes} minutes.
-                                {preview.window && !preview.window.open_now && ' Sending will begin at 10 am.'}
+                                {(() => {
+                                  // The sending hours come from the preview, never from fixed text
+                                  const start = hourLabel(preview.window?.start_hour);
+                                  const end = hourLabel(preview.window?.end_hour);
+                                  const minutes = preview.estimated_minutes > 0 ? `, about ${plural(preview.estimated_minutes, 'minute')}` : '';
+                                  if (!start || !end) return `Messages are sent slowly during the daytime${minutes}.`;
+                                  return `Messages are sent slowly between ${start} and ${end} Indian time${minutes}.${preview.window.open_now ? '' : ` It is outside those hours now: sending starts at ${start} (tomorrow if it is already past ${end}).`}`;
+                                })()}
                               </p>
                               <p className="text-xs text-gray-500">Only patients who agreed to receive offers are included. Patients can reply STOP to stop.</p>
                               {preview.readiness && !preview.readiness.ok && (

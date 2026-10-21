@@ -7,6 +7,7 @@ import { StatCardSkeleton, TableRowSkeleton, CardSkeleton } from '../components/
 import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
 import { saveToCache, loadFromCache } from '../utils/offlineCache';
+import { plural } from '../utils/plural';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({ bookingsToday: 0, activeConversations: 0, availableDoctors: 0, pendingTokens: 0 });
@@ -355,7 +356,7 @@ const Dashboard = () => {
           </div>
 
           <div className="px-6 py-3 border-t border-ink/[0.08] bg-ink/[0.02]">
-            <p className="text-sm text-ink/55">Showing {filteredTokens.length} of {tokenQueue.length} tokens today</p>
+            <p className="text-sm text-ink/55">Showing {filteredTokens.length} of {plural(tokenQueue.length, 'token')} today</p>
           </div>
         </div>
 

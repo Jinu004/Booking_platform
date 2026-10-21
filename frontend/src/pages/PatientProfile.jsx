@@ -1403,7 +1403,8 @@ export default function PatientProfile() {
                     setShowProcedureModal(false);
                     alert(`Procedure scheduled: ${selectedProcedure.name} on ${procedureDate} at ${selectedSlot}`);
                   } catch (err) {
-                    setProcedureError(err?.response?.data?.error || 'Failed to schedule procedure. Please try again.');
+                    // The api helper rejects with the server's response body, so the message is err.error
+                    setProcedureError(err?.error || err?.response?.data?.error || 'Failed to schedule procedure. Please try again.');
                   } finally {
                     setProcedureLoading(false);
                   }

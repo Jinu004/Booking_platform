@@ -4,6 +4,7 @@ import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import { TableRowSkeleton } from '../components/shared/Skeleton';
 import api from '../utils/api';
+import { plural } from '../utils/plural';
 
 const AVATAR_COLORS = [
   'bg-indigo-100 text-indigo-700',
@@ -144,7 +145,8 @@ export default function Patients() {
     if (!addPatientPhone.trim()) return;
     setAddPatientSearching(true);
     try {
-      const res = await api.get(`/ehr/patients?search=${addPatientPhone.trim()}`);
+      // The value is encoded: a leading "+" would otherwise be read as a space and the existing patient would be missed
+      const res = await api.get('/ehr/patients', { params: { search: addPatientPhone.trim() } });
       setAddPatientSearch(res.data?.customers || []);
     } catch (err) {
       setAddPatientSearch([]);
@@ -404,7 +406,7 @@ export default function Patients() {
                   <div className="mt-0.5">{consentBadge(p)}</div>
                   <div className="flex items-center gap-3 mt-0.5 text-xs text-ink/40">
                     {p.last_visit && <span>Last: {relativeDate(p.last_visit)}</span>}
-                    <span>{parseInt(p.total_visits || 0)} visits</span>
+                    <span>{plural(parseInt(p.total_visits || 0), 'visit')}</span>
                   </div>
                 </div>
                 <svg className="w-4 h-4 text-ink/40 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

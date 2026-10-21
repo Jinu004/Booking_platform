@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAllTenants, getPlatformStats, updateTenantStatus, createTenant, clearTenantConversations } from '../services/superadmin.service';
 import useStore from '../store/useStore';
@@ -69,17 +69,33 @@ export default function SuperAdmin() {
     }
   };
 
+  // One approve or reject request at a time: the buttons are disabled while it runs and a second click is ignored
+  const [posterBusyId, setPosterBusyId] = useState(null);
+  const posterBusyRef = useRef(null);
+
+  // The list response has the stored file name (image_url) but no content type: a .webp name is the only way to tell
+  const isWebpPoster = (pr) => /\.webp(\?|$)/i.test(String(pr?.image_url || ''));
+
   const handleApprovePoster = async (id) => {
+    if (posterBusyRef.current) return;
+    posterBusyRef.current = id;
+    setPosterBusyId(id);
     try {
       await api.patch(`/superadmin/poster-requests/${id}/approve`);
       addToast('Poster approved', 'success');
       fetchPosterRequests();
     } catch {
       addToast('Failed to approve poster', 'error');
+    } finally {
+      posterBusyRef.current = null;
+      setPosterBusyId(null);
     }
   };
 
   const handleRejectPoster = async (id) => {
+    if (posterBusyRef.current) return;
+    posterBusyRef.current = id;
+    setPosterBusyId(id);
     try {
       await api.patch(`/superadmin/poster-requests/${id}/reject`, { notes: rejectNotes || null });
       addToast('Poster rejected', 'success');
@@ -88,6 +104,9 @@ export default function SuperAdmin() {
       fetchPosterRequests();
     } catch {
       addToast('Failed to reject poster', 'error');
+    } finally {
+      posterBusyRef.current = null;
+      setPosterBusyId(null);
     }
   };
 
@@ -279,8 +298,9 @@ export default function SuperAdmin() {
                       <td className="px-4 py-3 text-right text-sm font-medium">
                         {pr.status === 'pending' && (
                           <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => handleApprovePoster(pr.id)} className="text-green-600 hover:text-green-900">Approve</button>
-                            <button onClick={() => { setRejectingId(pr.id); setRejectNotes(''); }} className="text-red-600 hover:text-red-900">Reject</button>
+                            {isWebpPoster(pr) && <span className="text-xs text-amber-600">WebP: cannot be used for campaigns</span>}
+                            <button onClick={() => handleApprovePoster(pr.id)} disabled={posterBusyId !== null} className="text-green-600 hover:text-green-900 disabled:opacity-50">{posterBusyId === pr.id ? 'Working...' : 'Approve'}</button>
+                            <button onClick={() => { setRejectingId(pr.id); setRejectNotes(''); }} disabled={posterBusyId !== null} className="text-red-600 hover:text-red-900 disabled:opacity-50">Reject</button>
                           </div>
                         )}
                         {pr.status === 'rejected' && pr.notes && (
@@ -310,7 +330,7 @@ export default function SuperAdmin() {
                 </div>
                 <div className="flex gap-3 pt-2">
                   <button onClick={() => { setRejectingId(null); setRejectNotes(''); }} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
-                  <button onClick={() => handleRejectPoster(rejectingId)} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Reject</button>
+                  <button onClick={() => handleRejectPoster(rejectingId)} disabled={posterBusyId !== null} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{posterBusyId === rejectingId ? 'Rejecting...' : 'Reject'}</button>
                 </div>
               </div>
             </div>

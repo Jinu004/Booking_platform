@@ -91,7 +91,9 @@ export default function WhatsappTemplatesPanel({ tenantId }) {
     }
   };
 
-  const approved = rows.filter(row => String(row.status).toUpperCase() === 'APPROVED').length;
+  // The count covers the 7 standard templates only; the clinic's poster template (clinic_poster) is shown next to it, not in it
+  const posterRow = rows.find(row => row.name === 'clinic_poster');
+  const approved = rows.filter(row => row.name !== 'clinic_poster' && String(row.status).toUpperCase() === 'APPROVED').length;
   const disabled = busy !== '';
 
   return (
@@ -104,7 +106,10 @@ export default function WhatsappTemplatesPanel({ tenantId }) {
 
       {rows.length > 0 && (
         <>
-          <p className="text-xs text-gray-600">{approved} of {EXPECTED_TEMPLATES} approved</p>
+          <p className="text-xs text-gray-600">
+            {approved} of {EXPECTED_TEMPLATES} approved
+            {posterRow && <span className="text-gray-400"> · poster template: {String(posterRow.status).toLowerCase()}</span>}
+          </p>
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-gray-500">

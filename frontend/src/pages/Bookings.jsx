@@ -11,6 +11,7 @@ import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
 import { TableRowSkeleton, StatCardSkeleton } from '../components/shared/Skeleton';
 import { saveToCache, loadFromCache } from '../utils/offlineCache';
+import { plural } from '../utils/plural';
 
 const Bookings = () => {
   const { addToast } = useStore();
@@ -760,7 +761,8 @@ const Bookings = () => {
                     setIsProcedureModalOpen(false);
                     fetchData();
                   } catch (err) {
-                    setProcedureError(err?.response?.data?.error || 'Failed to schedule procedure.');
+                    // The api helper rejects with the server's response body, so the message is err.error
+                    setProcedureError(err?.error || err?.response?.data?.error || 'Failed to schedule procedure.');
                   } finally {
                     setProcedureSubmitting(false);
                   }
@@ -997,7 +999,7 @@ const Bookings = () => {
                 >
                   <option value="">Select Doctor...</option>
                   {modalDoctors.map(d => (
-                    <option key={d.id} value={d.id}>{d.name} ({d.specialization}) - max {d.max_tokens_daily} tokens</option>
+                    <option key={d.id} value={d.id}>{d.name} ({d.specialization}) - max {plural(d.max_tokens_daily, 'token')}</option>
                   ))}
                 </select>
               </div>

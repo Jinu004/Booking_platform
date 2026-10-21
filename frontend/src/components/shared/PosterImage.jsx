@@ -15,9 +15,16 @@ export default function PosterImage({ path, alt = 'Poster', className = 'w-16 h-
     setSrc(null);
     setFailed(false);
     setOpen(false);
-    api.get(path, { responseType: 'blob', silent: true })
+    // validateStatus: every HTTP answer (403, 404, 500...) comes back as a normal response instead of going through the api helper's
+    // error handling, which would show a toast per thumbnail. A real image has an image/* type; anything else (the JSON error body)
+    // shows the fallback icon. Only a failed connection still reaches the helper's "Cannot connect" toast.
+    api.get(path, { responseType: 'blob', silent: true, validateStatus: () => true })
       .then(blob => {
         if (cancelled) return;
+        if (!(blob instanceof Blob) || !String(blob.type).startsWith('image/')) {
+          setFailed(true);
+          return;
+        }
         objectUrl = URL.createObjectURL(blob);
         setSrc(objectUrl);
       })

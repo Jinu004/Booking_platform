@@ -36,7 +36,7 @@ const Layout = () => {
   }, [])
   const { industry } = useIndustry();
   const isEnquiry = industry === 'enquiry';
-  const staff = (() => { try { return JSON.parse(localStorage.getItem('staff') || '{}'); } catch { return {}; } })();
+  const staff = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.STAFF_DATA) || '{}'); } catch { return {}; } })();
 
   const isDashboard = location.pathname === '/dashboard';
   const headerSurface = isEnquiry ? 'bg-white border-gray-200' : 'bg-bg border-ink/[0.08]';

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getTokenQueue, updateTokenStatus } from '../services/clinic.service';
 import { getStoredStaff } from '../services/auth.service';
+import { plural } from '../utils/plural';
 
 const getStatusPill = (status) => {
   switch (status) {
@@ -200,7 +201,7 @@ const TokenQueue = () => {
                         className="px-4 py-2 bg-ink/[0.03] font-mono text-[11px] font-medium text-ink/55 uppercase tracking-[0.08em] border-b border-ink/[0.06] flex items-center justify-between cursor-pointer select-none"
                         onClick={() => setCollapsedSessions(prev => ({ ...prev, [key]: !isCollapsed }))}
                       >
-                        <span>{label} <span className="ml-2 font-normal text-ink/40">({group.length} tokens)</span></span>
+                        <span>{label} <span className="ml-2 font-normal text-ink/40">({plural(group.length, 'token')})</span></span>
                         <span>{isCollapsed ? '▸' : '▾'}</span>
                       </div>
                       {!isCollapsed && group.map(t => renderToken(t))}
@@ -214,7 +215,7 @@ const TokenQueue = () => {
         )}
 
         <div className="px-6 py-3 border-t border-ink/[0.06] bg-ink/[0.02] text-sm text-ink/55">
-          Showing {filteredTokens.length} of {tokenQueue.length} tokens today
+          Showing {filteredTokens.length} of {plural(tokenQueue.length, 'token')} today
         </div>
       </div>
     </div>

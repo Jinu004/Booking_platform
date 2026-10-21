@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getStaff, inviteStaff, updateStaff, deleteStaff, activateStaff, deleteStaffPermanently } from '../services/staff.service';
 import useStore from '../store/useStore';
 import { CardSkeleton } from '../components/shared/Skeleton';
+import { plural } from '../utils/plural';
 
 const Staff = () => {
   const { addToast } = useStore();
@@ -161,7 +162,7 @@ const Staff = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Staff Management</h1>
           <p className="text-sm text-indigo-600 mt-0.5">
-            {staffList.length} staff members · Manage team access, roles &amp; permissions
+            {plural(staffList.length, 'staff member')} · Manage team access, roles &amp; permissions
           </p>
         </div>
         <button
