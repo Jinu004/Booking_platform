@@ -116,22 +116,31 @@ async function stopCheck(tenantId, campaignId) {
 const lockKey = (campaignId) => `campaign:send:lock:${campaignId}`
 const UNLOCK_SCRIPT = `if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end`
 
-async function acquireLock(campaignId) {
+// Generic lock on any key (SET NX EX with a random token). The default lifetime is the campaign one; the weekly recall cron
+// passes its own longer lifetime. Returns the token, or null when the lock is held or Redis is unavailable (fail closed).
+async function acquireLockByKey(key, seconds = C.LOCK_SECONDS) {
   const token = crypto.randomBytes(16).toString('hex')
   try {
-    const stored = await withTimeout(redis.set(lockKey(campaignId), token, { NX: true, EX: C.LOCK_SECONDS }))
+    const stored = await withTimeout(redis.set(key, token, { NX: true, EX: seconds }))
     return stored === 'OK' ? token : null
   } catch (err) {
-    logger.warn(`CAMPAIGN_LOCK_UNAVAILABLE campaign=${campaignId} ${String(err.message || '').slice(0, 80)}`)
+    logger.warn(`LOCK_UNAVAILABLE key=${key} ${String(err.message || '').slice(0, 80)}`)
     return null
   }
 }
 
-async function releaseLock(campaignId, token) {
+// Releases the lock only if it still holds this run's own token
+async function releaseLockByKey(key, token) {
   try {
-    await withTimeout(redis.eval(UNLOCK_SCRIPT, { keys: [lockKey(campaignId)], arguments: [token] }))
+    await withTimeout(redis.eval(UNLOCK_SCRIPT, { keys: [key], arguments: [token] }))
   } catch (_) { /* the lock expires on its own */ }
 }
+
+const acquireLock = (campaignId) => acquireLockByKey(lockKey(campaignId))
+const releaseLock = (campaignId, token) => releaseLockByKey(lockKey(campaignId), token)
+
+// Random pause between two sends
+const randomGapMs = () => C.GAP_MIN_MS + Math.random() * (C.GAP_MAX_MS - C.GAP_MIN_MS)
 
 // ---------------------------------------------------------------------------
 // One recipient
@@ -348,7 +357,7 @@ async function processCampaign(campaign) {
       recipient.processed = result.processed
 
       if (result.attempted && i < claimed.length - 1) {
-        await sleep(C.GAP_MIN_MS + Math.random() * (C.GAP_MAX_MS - C.GAP_MIN_MS))
+        await sleep(randomGapMs())
       }
     }
 
@@ -396,4 +405,5 @@ async function runCampaignTick() {
   }
 }
 
-module.exports = { runCampaignTick }
+// The lock, gap and error helpers are shared with the weekly recall cron
+module.exports = { runCampaignTick, acquireLockByKey, releaseLockByKey, randomGapMs, sleep, safeError }

@@ -33,6 +33,11 @@ module.exports = {
   // Redis lock per campaign
   LOCK_SECONDS: 600,
 
+  // Weekly recall cron (cron/recall.cron.js): at most this many recall messages per clinic per run,
+  // and a run lock that outlives the whole sending window (10 hours)
+  RECALL_MAX_PER_CLINIC_PER_RUN: 50,
+  RECALL_LOCK_SECONDS: 36000,
+
   // Cost shown in the campaign preview. This is an ESTIMATE: check it against Meta's current India marketing rate card.
   MARKETING_RATE_INR: 0.86,
   GST_RATE: 0.18

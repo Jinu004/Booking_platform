@@ -32,14 +32,14 @@ async function isFirstCampaign(tenantId, campaignId) {
 }
 
 /**
+ * The clinic's daily allowance: the tier limit, the share of it we may use, what the last 24 hours already used
+ * (campaign sends plus the notifications table, which also holds the weekly recall sends) and what is left.
+ * Used by the campaign budget below and by the weekly recall cron.
  * @param {string} tenantId
- * @param {string} campaignId
  * @param {object} readinessDetails - getSendReadiness(...).details (daily_limit: number, or null for unlimited)
- * @returns {Promise<{ limit, budget, used, remaining, isFirstCampaign, firstCampaignLimit, firstCampaignRemaining, dailyCap, dailyCapRemaining, canSendNow }>}
- *   limit, budget and remaining are null when the tier has no limit; firstCampaignRemaining is null when this is not the first campaign;
- *   dailyCapRemaining is null when campaigns.daily_cap is not set.
+ * @returns {Promise<{ limit, budget, used, remaining }>} limit, budget and remaining are null when the tier has no limit
  */
-async function getBudgetSnapshot(tenantId, campaignId, readinessDetails) {
+async function getDailyAllowance(tenantId, readinessDetails) {
   // The rolling 24 hours of every template send of this clinic: campaign sends and the notifications table
   const usedRes = await pool.query(
     `SELECT
@@ -53,6 +53,19 @@ async function getBudgetSnapshot(tenantId, campaignId, readinessDetails) {
   const limit = rawLimit === null ? null : (Number.isFinite(rawLimit) ? rawLimit : DEFAULT_DAILY_LIMIT)
   const budget = limit === null ? null : Math.floor(limit * C.BUDGET_FRACTION)
   const remaining = budget === null ? null : budget - used
+  return { limit, budget, used, remaining }
+}
+
+/**
+ * @param {string} tenantId
+ * @param {string} campaignId
+ * @param {object} readinessDetails - getSendReadiness(...).details (daily_limit: number, or null for unlimited)
+ * @returns {Promise<{ limit, budget, used, remaining, isFirstCampaign, firstCampaignLimit, firstCampaignRemaining, dailyCap, dailyCapRemaining, canSendNow }>}
+ *   limit, budget and remaining are null when the tier has no limit; firstCampaignRemaining is null when this is not the first campaign;
+ *   dailyCapRemaining is null when campaigns.daily_cap is not set.
+ */
+async function getBudgetSnapshot(tenantId, campaignId, readinessDetails) {
+  const { limit, budget, used, remaining } = await getDailyAllowance(tenantId, readinessDetails)
 
   // First campaign of the clinic: capped in total
   const isFirst = await isFirstCampaign(tenantId, campaignId)
@@ -97,4 +110,4 @@ function willSendNow(snapshot, pending) {
   return Math.max(0, count)
 }
 
-module.exports = { getBudgetSnapshot, isFirstCampaign, willSendNow, isSendWindowOpen, DEFAULT_DAILY_LIMIT }
+module.exports = { getBudgetSnapshot, getDailyAllowance, isFirstCampaign, willSendNow, isSendWindowOpen, DEFAULT_DAILY_LIMIT }
