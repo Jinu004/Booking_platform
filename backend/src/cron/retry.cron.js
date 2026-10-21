@@ -3,6 +3,7 @@ const pool = require('../config/database');
 const whatsapp = require('../modules/channel/whatsapp/whatsapp.adapter');
 const { runAsTenant } = require('../modules/channel/whatsapp/senderContext');
 const logger = require('../utils/logger');
+const { maskPhone } = require('../utils/phone');
 
 async function processRetryQueue() {
   try {
@@ -36,7 +37,7 @@ async function processRetryQueue() {
           `UPDATE whatsapp_retry_queue SET status = 'sent' WHERE id = $1`,
           [job.id]
         );
-        logger.info(`Retry queue: sent job ${job.id} to ${job.to_number}`);
+        logger.info(`Retry queue: sent job ${job.id} to ${maskPhone(job.to_number)}`);
       } catch (err) {
         const nextAttempt = job.attempts + 1;
         const delayMinutes = Math.pow(2, nextAttempt) * 5;

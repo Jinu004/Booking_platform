@@ -25,7 +25,8 @@ const tenantQuery = async (tenantId, pool, sql, params = []) => {
   const queryParams = [tenantId, ...params];
 
   if (env.NODE_ENV === 'development') {
-    logger.info(`Executing tenant query: ${sql} | Params: ${JSON.stringify(queryParams)}`);
+    // Development only. The parameters can hold phone numbers or names, so only their count is logged.
+    logger.info(`Executing tenant query: ${sql} | Params: ${queryParams.length}`);
   }
 
   return await pool.query(sql, queryParams);

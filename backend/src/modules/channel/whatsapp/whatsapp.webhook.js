@@ -4,6 +4,7 @@ const { parseIncoming, sendMessage, sendButtons } = require('./whatsapp.adapter'
 const { executeFunction } = require('../../ai-engine/ai.executor')
 const { successResponse } = require('../../../utils/response')
 const logger = require('../../../utils/logger')
+const { maskPhone } = require('../../../utils/phone')
 const crypto = require('crypto');
 
 // Typed-name validation for the code booking flow. The cleaning below is the same rule
@@ -238,7 +239,7 @@ router.post('/', async (req, res) => {
         await redisClient.set(`msg_dedup:${message.messageId}`, '1', { EX: 300 })
       }
 
-      logger.info(`Incoming ${source} message from ${message.from.toString().slice(0, 2)}XXXXXX${message.from.toString().slice(-3)}`)
+      logger.info(`Incoming ${source} message from ${maskPhone(message.from)}`)
 
       const TenantService = require('../../tenant/tenant.service')
       let tenant = null
@@ -273,7 +274,7 @@ router.post('/', async (req, res) => {
           logger.warn(`TENANT_LOOKUP_MISMATCH by_phone_number_id=${tenantById.id} by_display_number=${tenantByNumber.id} (using phone_number_id)`)
         }
         if (!tenant) {
-          logger.warn(`No tenant found for display number ending ${String(message.to || '').slice(-4)} phone_number_id=${incomingPhoneId || 'none'} (sender ending ${String(message.from || '').slice(-4)})`)
+          logger.warn(`No tenant found for display number ${maskPhone(message.to)} phone_number_id=${incomingPhoneId || 'none'} (sender ${maskPhone(message.from)})`)
           return
         }
       }

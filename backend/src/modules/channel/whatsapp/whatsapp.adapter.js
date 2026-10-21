@@ -2,6 +2,7 @@ const waha = require('./whatsapp.waha')
 const meta = require('./whatsapp.meta')
 const { randomDelay } = require('../../../utils/delay')
 const logger = require('../../../utils/logger')
+const { maskPhone } = require('../../../utils/phone')
 
 /**
  * Determines which provider to use
@@ -29,7 +30,7 @@ async function sendMessage(to, message) {
   await randomDelay(800, 1500)
 
   const provider = getProvider()
-  logger.info(`Sending via ${provider} to ${to.toString().slice(0, 2)}XXXXXX${to.toString().slice(-3)}`)
+  logger.info(`Sending via ${provider} to ${maskPhone(to)}`)
 
   if (provider === 'meta') {
     return meta.sendTextMessage(to, message)

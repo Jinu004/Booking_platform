@@ -2,6 +2,7 @@ const axios = require('axios');
 const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
+const { maskPhone } = require('../../utils/phone');
 const { encrypt, decrypt } = require('../../utils/secretBox');
 const { normalizeNumber } = require('../tenant/tenant.service');
 
@@ -25,7 +26,7 @@ async function initiateRegistration(req, res) {
       number = number.slice(2);
     }
 
-    logger.info('Sending to Meta:', { cc, phone_number: number, WABA_ID });
+    logger.info(`Sending to Meta: cc=${cc} phone=${maskPhone(number)}`);
     const response = await axios.post(
       `${META_API_URL}/${WABA_ID}/phone_numbers`,
       {
@@ -42,7 +43,7 @@ async function initiateRegistration(req, res) {
       }
     );
 
-    logger.info(`WABA registration initiated for ${phone_number}`);
+    logger.info(`WABA registration initiated for ${maskPhone(phone_number)}`);
     return successResponse(res, {
       phone_number_id: response.data.id,
       message: 'OTP sent successfully'

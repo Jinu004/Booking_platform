@@ -2,6 +2,7 @@ const axios = require('axios')
 const logger = require('../../../utils/logger')
 const pool = require('../../../config/database')
 const senderContext = require('./senderContext')
+const { maskPhone } = require('../../../utils/phone')
 
 const META_TOKEN = process.env.META_WHATSAPP_TOKEN || ''
 const META_API_URL = 'https://graph.facebook.com/v24.0'
@@ -127,7 +128,7 @@ async function sendTextMessage(to, message) {
       }
     )
 
-    logger.info(`Meta message sent to ${to.toString().slice(0, 2)}XXXXXX${to.toString().slice(-3)}`)
+    logger.info(`Meta message sent to ${maskPhone(to)}`)
     return response.data
   } catch (err) {
     recordSendFailure('text', null, err)
@@ -280,7 +281,7 @@ async function sendInteractiveButtons(to, bodyText, buttons) {
         }
       }
     )
-    logger.info(`Meta interactive buttons sent to ${to}`)
+    logger.info(`Meta interactive buttons sent to ${maskPhone(to)}`)
     return response.data
   } catch (err) {
     recordSendFailure('buttons', null, err)
@@ -334,7 +335,7 @@ async function sendListMessage(to, bodyText, buttonText, items, sectionTitle = '
         }
       }
     )
-    logger.info(`Meta list message sent to ${to}`)
+    logger.info(`Meta list message sent to ${maskPhone(to)}`)
     return response.data
   } catch (err) {
     recordSendFailure('list', null, err)
@@ -390,7 +391,7 @@ async function sendDocument(to, mediaId, filename, caption) {
         }
       }
     );
-    logger.info(`Meta document sent to ${to}`);
+    logger.info(`Meta document sent to ${maskPhone(to)}`);
     return response.data;
   } catch (err) {
     recordSendFailure('document', null, err);
@@ -425,7 +426,7 @@ async function sendContact(to, clinicName, phoneNumber) {
         'Content-Type': 'application/json'
       }
     });
-    logger.info(`Contact card sent to ${to}`);
+    logger.info(`Contact card sent to ${maskPhone(to)}`);
   } catch (err) {
     recordSendFailure('contact', null, err);
   }
@@ -455,7 +456,7 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en', compon
         timeout: META_CALL_TIMEOUT_MS
       }
     )
-    logger.info(`Meta template message sent to ******${String(to).slice(-4)} using template: ${templateName}`)
+    logger.info(`Meta template message sent to ${maskPhone(to)} using template: ${templateName}`)
     return response.data
   } catch (err) {
     recordSendFailure('template', templateName, err)

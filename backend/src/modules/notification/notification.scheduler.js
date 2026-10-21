@@ -3,6 +3,7 @@ const pool = require('../../config/database');
 const { sendTemplateMessage } = require('../channel/whatsapp/whatsapp.adapter');
 const { runAsTenant } = require('../channel/whatsapp/senderContext');
 const logger = require('../../utils/logger');
+const { maskPhone } = require('../../utils/phone');
 
 /**
  * Sends 24 hour appointment reminders
@@ -58,7 +59,7 @@ cron.schedule('0 8 * * *', async () => {
               booking.customer_id
             ]
           )
-          logger.info(`Appointment reminder sent to ${booking.phone} for booking ${booking.id}`)
+          logger.info(`Appointment reminder sent to ${maskPhone(booking.phone)} for booking ${booking.id}`)
         } catch (err) {
           logger.error(`Appointment reminder failed for booking ${booking.id}:`, err.response?.data || err.message)
         }

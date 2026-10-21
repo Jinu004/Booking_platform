@@ -3,6 +3,7 @@ const { getSystemPrompt } = require('./ai.prompts')
 const { getFunctionDefinitions } = require('./ai.functions')
 const { executeFunction } = require('./ai.executor')
 const logger = require('../../utils/logger')
+const { maskPhone } = require('../../utils/phone')
 const pool = require('../../config/database')
 const redisClient = require('../../config/redis')
 
@@ -374,7 +375,7 @@ async function processMessage(context) {
         // Guard: a real booking confirmation is always returned as a DIRECT: result above (it exits the loop),
         // so a confirmation-looking reply written by Gemini here was never backed by a booking.
         if (/booking confirmed/i.test(text) && /token number/i.test(text) && !patientBookingsCalled) {
-          logger.warn(`AI_FAKE_CONFIRMATION_BLOCKED tenant=${tenant.id} conversation=${conversation?.id} phone_last4=${String(customer?.phone || '').slice(-4)}`)
+          logger.warn(`AI_FAKE_CONFIRMATION_BLOCKED tenant=${tenant.id} conversation=${conversation?.id} phone=${maskPhone(customer?.phone)}`)
           return { blockedConfirmation: true, text: 'Sorry, I could not complete your booking. Please tap Book Appointment to try again, or tap Talk to Staff.' }
         }
 

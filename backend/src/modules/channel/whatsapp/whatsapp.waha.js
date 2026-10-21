@@ -1,5 +1,6 @@
 const axios = require('axios')
 const logger = require('../../../utils/logger')
+const { maskPhone } = require('../../../utils/phone')
 
 const WAHA_BASE_URL = process.env.WAHA_BASE_URL
   || 'http://localhost:3000'
@@ -32,7 +33,7 @@ async function sendTextMessage(to, message) {
       }
     )
 
-    logger.info(`WAHA message sent to ${to}`)
+    logger.info(`WAHA message sent to ${maskPhone(to)}`)
     return response.data
   } catch (err) {
     logger.error('WAHA send failed:', err.message)

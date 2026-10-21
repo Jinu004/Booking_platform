@@ -32,4 +32,20 @@ function normalizeCustomerPhone(input) {
   return null;
 }
 
-module.exports = { normalizeCustomerPhone };
+/**
+ * A phone number made safe for logs: the country code, stars, then only the last 4 digits, for example +91******3210.
+ * Use it for every phone number that goes into a log line. Empty values give '[no phone]'.
+ * @param {string|number|null|undefined} value
+ * @returns {string}
+ */
+function maskPhone(value) {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  if (!digits) return '[no phone]';
+  const last4 = digits.slice(-4);
+  // A number with a country code (more than 10 digits) keeps the code; a 10-digit local number shows no code
+  const code = digits.length > 10 ? digits.slice(0, digits.length - 10) : '';
+  if (digits.length <= 4) return '******';
+  return `${code ? `+${code}` : ''}******${last4}`;
+}
+
+module.exports = { normalizeCustomerPhone, maskPhone };
