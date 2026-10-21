@@ -271,7 +271,9 @@ export default function SuperAdmin() {
                         <PosterImage path={`/superadmin/poster-requests/${pr.id}/image`} className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{pr.tenant_name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{pr.caption || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        <div className="max-w-xs whitespace-pre-wrap break-words">{pr.caption || <span className="text-gray-300">—</span>}</div>
+                      </td>
                       <td className="px-4 py-3">{statusBadge(pr.status)}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">{new Date(pr.created_at).toLocaleDateString('en-IN')}</td>
                       <td className="px-4 py-3 text-right text-sm font-medium">
