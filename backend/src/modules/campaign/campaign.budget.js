@@ -14,6 +14,24 @@ function isSendWindowOpen() {
 }
 
 /**
+ * The ONE definition of "first campaign" (preview, confirm and sender all get it through getBudgetSnapshot below).
+ * A campaign is the first one only if no OTHER campaign of the clinic has sent anything (a recipient with sent_at set),
+ * whatever that campaign's status is: completed, cancelled or paused all count once they sent. The campaign's own sent rows
+ * do not count, so it stays "first" (and capped) until it ends.
+ */
+async function isFirstCampaign(tenantId, campaignId) {
+  const res = await pool.query(
+    `SELECT NOT EXISTS (
+       SELECT 1 FROM campaigns cp
+       WHERE cp.tenant_id = $1 AND cp.id <> $2
+         AND EXISTS (SELECT 1 FROM campaign_recipients r WHERE r.campaign_id = cp.id AND r.sent_at IS NOT NULL)
+     ) AS is_first`,
+    [tenantId, campaignId]
+  )
+  return res.rows[0].is_first === true
+}
+
+/**
  * @param {string} tenantId
  * @param {string} campaignId
  * @param {object} readinessDetails - getSendReadiness(...).details (daily_limit: number, or null for unlimited)
@@ -37,15 +55,15 @@ async function getBudgetSnapshot(tenantId, campaignId, readinessDetails) {
   const remaining = budget === null ? null : budget - used
 
   // First campaign of the clinic: capped in total
+  const isFirst = await isFirstCampaign(tenantId, campaignId)
   const firstRes = await pool.query(
-    `SELECT NOT EXISTS (SELECT 1 FROM campaigns WHERE tenant_id = $1 AND id <> $2 AND status = 'completed') AS is_first,
-            (SELECT COUNT(*)::int FROM campaign_recipients WHERE campaign_id = $2 AND sent_at IS NOT NULL) AS sent_total,
+    `SELECT (SELECT COUNT(*)::int FROM campaign_recipients WHERE campaign_id = $2 AND sent_at IS NOT NULL) AS sent_total,
             (SELECT COUNT(*)::int FROM campaign_recipients WHERE campaign_id = $2 AND sent_at > now() - interval '24 hours') AS sent_24h,
             (SELECT daily_cap FROM campaigns WHERE id = $2 AND tenant_id = $1) AS daily_cap`,
     [tenantId, campaignId]
   )
-  const { is_first: isFirstCampaign, sent_total: sentTotal, sent_24h: sent24h, daily_cap: dailyCap } = firstRes.rows[0]
-  const firstCampaignRemaining = isFirstCampaign ? C.FIRST_CAMPAIGN_LIMIT - sentTotal : null
+  const { sent_total: sentTotal, sent_24h: sent24h, daily_cap: dailyCap } = firstRes.rows[0]
+  const firstCampaignRemaining = isFirst ? C.FIRST_CAMPAIGN_LIMIT - sentTotal : null
   const dailyCapRemaining = dailyCap && dailyCap > 0 ? dailyCap - sent24h : null
 
   const canSendNow =
@@ -58,7 +76,7 @@ async function getBudgetSnapshot(tenantId, campaignId, readinessDetails) {
     budget,
     used,
     remaining,
-    isFirstCampaign,
+    isFirstCampaign: isFirst,
     firstCampaignLimit: C.FIRST_CAMPAIGN_LIMIT,
     firstCampaignRemaining,
     dailyCap: dailyCap || null,
@@ -79,4 +97,4 @@ function willSendNow(snapshot, pending) {
   return Math.max(0, count)
 }
 
-module.exports = { getBudgetSnapshot, willSendNow, isSendWindowOpen, DEFAULT_DAILY_LIMIT }
+module.exports = { getBudgetSnapshot, isFirstCampaign, willSendNow, isSendWindowOpen, DEFAULT_DAILY_LIMIT }

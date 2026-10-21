@@ -5,6 +5,8 @@ const senderContext = require('./senderContext')
 
 const META_TOKEN = process.env.META_WHATSAPP_TOKEN || ''
 const META_API_URL = 'https://graph.facebook.com/v24.0'
+// Timeout for the media upload and the template send, so a hung Meta call cannot freeze the campaign sender or a request
+const META_CALL_TIMEOUT_MS = 20000
 
 // Every send needs a tenant sender context with that clinic's own phone number id; there is no platform-wide fallback number.
 // The context only holds the phone number id and token, so the tenant id is not available here.
@@ -354,7 +356,8 @@ async function uploadMedia(fileBuffer, mimeType, filename) {
         headers: {
           Authorization: `Bearer ${getToken()}`,
           ...form.getHeaders()
-        }
+        },
+        timeout: META_CALL_TIMEOUT_MS
       }
     );
     logger.info('Media uploaded to Meta:', response.data.id);
@@ -447,7 +450,9 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en', compon
         headers: {
           'Authorization': `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
-        }
+        },
+        // A timed-out send may still have been delivered by Meta: callers must never retry it
+        timeout: META_CALL_TIMEOUT_MS
       }
     )
     logger.info(`Meta template message sent to ******${String(to).slice(-4)} using template: ${templateName}`)

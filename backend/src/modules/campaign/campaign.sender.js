@@ -225,9 +225,12 @@ async function processRecipient({ tenantId, campaignId, recipient, clinicName, c
   } catch (err) {
     if (err instanceof PauseError) throw err
     const { code, message } = safeError(err)
+    // An error without a Meta error code (timeout, dropped connection, odd response) may still have been delivered:
+    // the row is failed, never retried and never left pending, the same treatment as a stale claim
+    const storedMessage = code === null ? 'interrupted_unknown_state' : message
     await pool.query(
       `UPDATE campaign_recipients SET status = 'failed', error_code = $2, error_message = $3 WHERE id = $1`,
-      [recipient.id, code !== null ? String(code) : null, message]
+      [recipient.id, code !== null ? String(code) : null, storedMessage]
     )
     log('failed', code)
     counters.consecutiveErrors += 1
