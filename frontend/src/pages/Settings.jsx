@@ -319,6 +319,7 @@ export default function Settings() {
   const canUseCampaigns = ['admin', 'manager'].includes(staff?.role);
   const [campaigns, setCampaigns] = useState([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaignsLoaded, setCampaignsLoaded] = useState(false); // true once a list has arrived; later refetches keep it on screen
   const [buildingPosterId, setBuildingPosterId] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
   const [draftCounts, setDraftCounts] = useState({});
@@ -333,6 +334,7 @@ export default function Settings() {
   const [confirming, setConfirming] = useState(false);
   const [previewChanged, setPreviewChanged] = useState(false);
   const [sendNote, setSendNote] = useState('');
+  const [confirmUncertain, setConfirmUncertain] = useState(false);
   const confirmingRef = useRef(false);
 
   // Returns the loaded list (or null when the call failed) so callers can look at the fresh data
@@ -342,6 +344,7 @@ export default function Settings() {
       const res = await api.get(`/tenants/${staff?.tenantId}/campaigns`);
       const list = res.data || [];
       setCampaigns(list);
+      setCampaignsLoaded(true);
       return list;
     } catch {
       return null;
@@ -395,6 +398,7 @@ export default function Settings() {
     setReviewId(campaignId);
     setPreview(null);
     setReviewError('');
+    setConfirmUncertain(false);
     setAck(false);
     setPreviewChanged(false);
     setSendNote('');
@@ -415,6 +419,7 @@ export default function Settings() {
     confirmingRef.current = true;
     setConfirming(true);
     setReviewError('');
+    setConfirmUncertain(false);
     try {
       await api.post(`/tenants/${staff?.tenantId}/campaigns/${campaignId}/confirm`, { expected_to_send: preview.will_send_now }, { silent: true });
       setReviewId(null);
@@ -429,6 +434,8 @@ export default function Settings() {
         setPreview(p => (p ? { ...p, readiness: { ok: false, reasons: err.reasons } } : p));
       } else {
         setReviewError(campaignErrorText(err, 'Failed to start sending'));
+        // No answer from the server (network error or timeout): we do not know whether it started
+        if (err?.error === 'Cannot connect to server') setConfirmUncertain(true);
       }
       // After ANY error the request may still have reached the server: look at the real status of the campaign
       const list = await fetchCampaigns();
@@ -436,6 +443,7 @@ export default function Settings() {
       if (current && current.status !== 'draft') {
         setReviewId(null);
         setReviewError('');
+        setConfirmUncertain(false);
         setSendNote(`The campaign status changed. It is now: ${(CAMPAIGN_STATUS_LABEL[current.status] || current.status).toLowerCase()}.`);
       }
     } finally {
@@ -995,7 +1003,7 @@ export default function Settings() {
               </div>
               {campaignError && <p className="text-sm text-red-600 mb-3">{campaignError}</p>}
               {sendNote && <p className="text-sm text-green-600 mb-3">{sendNote}</p>}
-              {campaignsLoading ? (
+              {campaignsLoading && !campaignsLoaded ? (
                 <p className="text-sm text-gray-400">Loading...</p>
               ) : campaigns.length === 0 ? (
                 <p className="text-sm text-gray-400">No campaigns yet.</p>
@@ -1061,6 +1069,7 @@ export default function Settings() {
                           {previewLoading && <p className="text-sm text-gray-500">Loading...</p>}
                           {reviewError && <p className="text-sm text-red-600">{reviewError}</p>}
                           {previewChanged && <p className="text-sm text-amber-700">The numbers changed. Please review them again.</p>}
+                          {confirmUncertain && <p className="text-sm text-amber-700">We could not confirm that the campaign started. Check your connection, press Refresh, and look at the status before trying again.</p>}
                           {preview && (
                             <>
                               <p className="text-sm font-medium text-gray-900">This campaign will be sent to {plural(preview.will_send_now, 'patient')} now.</p>

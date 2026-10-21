@@ -259,7 +259,7 @@ const Bookings = () => {
       await actionFn(id);
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.error || 'Action failed');
+      alert(err?.error || err?.response?.data?.error || 'Action failed');
     }
   };
 
@@ -762,7 +762,8 @@ const Bookings = () => {
                     fetchData();
                   } catch (err) {
                     // The api helper rejects with the server's response body, so the message is err.error
-                    setProcedureError(err?.error || err?.response?.data?.error || 'Failed to schedule procedure.');
+                    const serverMessage = err?.error || err?.response?.data?.error;
+                    setProcedureError(serverMessage && serverMessage !== 'Internal Server Error' ? serverMessage : 'Failed to schedule procedure.');
                   } finally {
                     setProcedureSubmitting(false);
                   }
@@ -999,7 +1000,7 @@ const Bookings = () => {
                 >
                   <option value="">Select Doctor...</option>
                   {modalDoctors.map(d => (
-                    <option key={d.id} value={d.id}>{d.name} ({d.specialization}) - max {plural(d.max_tokens_daily, 'token')}</option>
+                    <option key={d.id} value={d.id}>{d.name} ({d.specialization}){d.max_tokens_daily > 0 ? ` - max ${plural(d.max_tokens_daily, 'token')}` : ''}</option>
                   ))}
                 </select>
               </div>

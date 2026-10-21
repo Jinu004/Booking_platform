@@ -496,7 +496,7 @@ export default function PatientProfile() {
       await loadData()
       addToast('Appointment scheduled and WhatsApp confirmation sent!', 'success')
     } catch (err) {
-      setScheduleError(err?.response?.data?.error || 'Failed to schedule appointment.')
+      setScheduleError(err?.error || err?.response?.data?.error || 'Failed to schedule appointment.')
     } finally {
       setScheduleSaving(false)
     }
@@ -1404,7 +1404,8 @@ export default function PatientProfile() {
                     alert(`Procedure scheduled: ${selectedProcedure.name} on ${procedureDate} at ${selectedSlot}`);
                   } catch (err) {
                     // The api helper rejects with the server's response body, so the message is err.error
-                    setProcedureError(err?.error || err?.response?.data?.error || 'Failed to schedule procedure. Please try again.');
+                    const serverMessage = err?.error || err?.response?.data?.error;
+                    setProcedureError(serverMessage && serverMessage !== 'Internal Server Error' ? serverMessage : 'Failed to schedule procedure. Please try again.');
                   } finally {
                     setProcedureLoading(false);
                   }

@@ -311,7 +311,7 @@ const Dashboard = () => {
                           const tokens = res?.data || [];
                           setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
                         } catch (err) {
-                          alert(err.response?.data?.error || 'Failed to mark arrived');
+                          alert(err?.error || err?.response?.data?.error || 'Failed to mark arrived');
                         } finally { setLoadingToken(null); }
                       }}
                       className="px-3 py-1 text-xs font-semibold text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition"
@@ -328,7 +328,7 @@ const Dashboard = () => {
                           const tokens = res?.data || [];
                           setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
                         } catch (err) {
-                          alert(err.response?.data?.error || 'Doctor already has a patient in consult');
+                          alert(err?.error || err?.response?.data?.error || 'Doctor already has a patient in consult');
                         } finally { setLoadingToken(null); }
                       }}
                       className="px-3 py-1 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition"
