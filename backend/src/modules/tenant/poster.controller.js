@@ -19,7 +19,14 @@ async function submitPosterRequest(req, res) {
       return errorResponse(res, 'Poster image is required', 400)
     }
 
-    const caption = req.body.caption || null
+    // The caption is the text patients see under the poster: required, checked before anything is uploaded
+    const caption = String(req.body.caption || '').trim()
+    if (!caption) {
+      return errorResponse(res, 'Please add a caption. It is the text patients see under the poster.', 400)
+    }
+    if (caption.length > 300) {
+      return errorResponse(res, 'Caption is too long (maximum 300 characters).', 400)
+    }
     const ext = req.file.originalname.split('.').pop()
     const filename = `${tenantId}/${uuidv4()}-${req.file.originalname}`
 
