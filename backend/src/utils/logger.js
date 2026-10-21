@@ -14,8 +14,10 @@ const logger = winston.createLogger({
     logFormat
   ),
   transports: [
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' })
+    // Rotation: at 10 MB the file is rolled (combined.log stays the newest, older ones are combined1.log, combined2.log, ...), 10 files kept.
+    // Safe because pm2 runs one process (fork mode); several processes writing the same file would clash.
+    new winston.transports.File({ filename: 'error.log', level: 'error', maxsize: 10485760, maxFiles: 10, tailable: true }),
+    new winston.transports.File({ filename: 'combined.log', maxsize: 10485760, maxFiles: 10, tailable: true })
   ]
 });
 
