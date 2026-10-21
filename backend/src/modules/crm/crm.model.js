@@ -154,7 +154,11 @@ async function updateCustomer(pool, tenantId, customerId, data) {
         phone = COALESCE($3, phone),
         email = COALESCE($4, email),
         date_of_birth = COALESCE($5, date_of_birth),
-        notes = COALESCE($6, notes)
+        notes = COALESCE($6, notes),
+        -- A different phone number starts with no consent (the right-hand sides below see the old row)
+        marketing_consent = CASE WHEN $3::text IS NOT NULL AND $3::text IS DISTINCT FROM phone THEN NULL ELSE marketing_consent END,
+        consent_source = CASE WHEN $3::text IS NOT NULL AND $3::text IS DISTINCT FROM phone THEN NULL ELSE consent_source END,
+        consent_at = CASE WHEN $3::text IS NOT NULL AND $3::text IS DISTINCT FROM phone THEN NULL ELSE consent_at END
     WHERE tenant_id = $1 AND id = $7
     RETURNING *
   `;

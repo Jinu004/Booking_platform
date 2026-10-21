@@ -46,8 +46,10 @@ router.use(requireAuth);
 router.post('/', requireRole('super_admin'), validateCreateTenant, validate, createTenant);
 router.get('/slug/:slug', getTenantBySlug);
 router.get('/:id', getTenantById);
-router.put('/:id', validateUpdateTenant, validate, updateTenant);
-router.post('/:id/config', validateSetConfig, validate, setConfig);
+// Renaming the clinic and writing config keys: admin and manager of the clinic (the controller still limits a clinic
+// user to their own clinic), and a super admin as before. No screen calls PUT /:id, and the only caller of POST /:id/config is the unused useTenant hook.
+router.put('/:id', requireRole('admin', 'manager', 'super_admin'), validateUpdateTenant, validate, updateTenant);
+router.post('/:id/config', requireRole('admin', 'manager', 'super_admin'), validateSetConfig, validate, setConfig);
 router.get('/:id/config', getAllConfigs);
 router.get('/:id/poster-requests', requireRole('admin', 'manager'), getPosterRequests);
 router.get('/:id/poster-requests/:requestId/image', requireRole('admin', 'manager'), getPosterImage);

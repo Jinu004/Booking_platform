@@ -14,6 +14,11 @@ const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 // ISO 8601 date (YYYY-MM-DD) validation helper
 const isISODate = (str) => /^\d{4}-\d{2}-\d{2}$/.test(str) && !isNaN(Date.parse(str));
 
+// True only when the doctor exists in this clinic (an id from another clinic is treated as unknown)
+async function doctorInTenant(tenantId, doctorId) {
+  return !!(await ClinicModel.getDoctorById(pool, tenantId, doctorId));
+}
+
 /**
  * GET /clinic/doctors
  * Lists all doctors
@@ -125,6 +130,8 @@ async function addLeave(req, res, next) {
     if (!isISODate(leaveDate)) {
       return errorResponse(res, 'leaveDate must be a valid date in YYYY-MM-DD format', 400);
     }
+
+    if (!(await doctorInTenant(tenantId, id))) return errorResponse(res, 'Not found', 404);
 
     const leave = await ClinicModel.addDoctorLeave(pool, tenantId, id, leaveDate, reason);
     return successResponse(res, leave, 201);
@@ -269,6 +276,7 @@ async function saveDoctorSchedule(req, res, next) {
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const { schedules } = req.body;
+    if (!(await doctorInTenant(tenantId, id))) return errorResponse(res, 'Not found', 404);
     const result = await ClinicModel.saveDoctorSchedule(pool, tenantId, id, schedules);
     const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
     await pool.query('UPDATE clinic_doctors SET available_today = false WHERE id = $1 AND tenant_id = $2 AND leave_days != 999', [id, tenantId]);
@@ -305,6 +313,7 @@ async function createProcedure(req, res, next) {
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const { name, duration_minutes } = req.body;
     if (!name || !duration_minutes) return errorResponse(res, 'name and duration_minutes are required', 400);
+    if (!(await doctorInTenant(tenantId, id))) return errorResponse(res, 'Not found', 404);
     const procedure = await ClinicModel.createProcedure(pool, tenantId, id, name, duration_minutes);
     return successResponse(res, procedure, 201);
   } catch (err) { next(err); }
@@ -360,14 +369,34 @@ async function createProcedureBooking(req, res, next) {
       if (startMins <= nowMins) return errorResponse(res, 'Cannot book a procedure at a time that has already passed', 400);
     }
 
+    // The doctor, procedure, customer and patient must all belong to this clinic. Any miss answers the same 404,
+    // so nothing reveals whether an id exists in another clinic.
+    const notFound = () => errorResponse(res, 'Not found', 404);
+    if (!isUUID(procedure_id) || (customer_id && !isUUID(customer_id)) || (patient_id && !isUUID(patient_id))) return notFound();
+    if (!(await doctorInTenant(tenantId, id))) return notFound();
+    const procOwn = await pool.query('SELECT 1 FROM procedures WHERE id = $1 AND tenant_id = $2 AND doctor_id = $3', [procedure_id, tenantId, id]);
+    if (!procOwn.rows.length) return notFound();
+    if (customer_id) {
+      const custOwn = await pool.query('SELECT 1 FROM customers WHERE id = $1 AND tenant_id = $2', [customer_id, tenantId]);
+      if (!custOwn.rows.length) return notFound();
+    }
+    if (patient_id) {
+      // A patient belongs to one customer: when both ids are sent they must match
+      const patOwn = await pool.query(
+        'SELECT 1 FROM patients WHERE id = $1 AND tenant_id = $2 AND ($3::uuid IS NULL OR customer_id = $3::uuid)',
+        [patient_id, tenantId, customer_id || null]
+      );
+      if (!patOwn.rows.length) return notFound();
+    }
+
     const booking = await ClinicModel.createProcedureBooking(pool, tenantId, id, procedure_id, customer_id, patient_id, patient_name, date, start_time, end_time);
 
     // Send WhatsApp notification to patient
     setImmediate(async () => {
       await runAsTenant(tenantId, async () => {
       try {
-        const phoneRes = await pool.query(`SELECT phone FROM customers WHERE id = $1`, [customer_id]);
-        const procRes = await pool.query(`SELECT name FROM procedures WHERE id = $1`, [procedure_id]);
+        const phoneRes = await pool.query(`SELECT phone FROM customers WHERE id = $1 AND tenant_id = $2`, [customer_id, tenantId]);
+        const procRes = await pool.query(`SELECT name FROM procedures WHERE id = $1 AND tenant_id = $2`, [procedure_id, tenantId]);
         if (phoneRes.rows.length && procRes.rows.length) {
           const phone = phoneRes.rows[0].phone;
           const procedureName = procRes.rows[0].name;

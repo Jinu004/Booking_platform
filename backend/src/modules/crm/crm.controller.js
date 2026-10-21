@@ -3,6 +3,8 @@ const CRMModel = require('./crm.model');
 const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
+const { normalizeCustomerPhone } = require('../../utils/phone');
+const { logAction } = require('../../utils/audit');
 
 // UUID v4 format validation helper
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -65,12 +67,40 @@ async function updateCustomer(req, res, next) {
     const tenantId = req.tenant.id;
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid customer ID', 400);
-    const customer = await CRMModel.updateCustomer(pool, tenantId, id, req.body);
+
+    const data = { ...req.body };
+    let phoneChanged = false;
+    if (data.phone !== undefined && data.phone !== null && String(data.phone).trim() !== '') {
+      const normalized = normalizeCustomerPhone(data.phone);
+      if (!normalized) {
+        return errorResponse(res, 'Please enter a valid phone number: +91 and 10 digits for India, or + and the country code for other countries.', 400);
+      }
+      const existing = await CRMModel.getCustomerById(pool, tenantId, id);
+      if (!existing) return errorResponse(res, 'Customer not found', 404);
+      phoneChanged = existing.phone !== normalized;
+      data.phone = normalized;
+    }
+
+    // When the number really changes, the model clears the marketing consent in the same UPDATE:
+    // consent belongs to the phone number, not to the person.
+    const customer = await CRMModel.updateCustomer(pool, tenantId, id, data);
     if (!customer) {
       return errorResponse(res, 'Customer not found', 404);
     }
+    if (phoneChanged) {
+      await logAction({
+        tenantId,
+        staffId: req.staff?.id,
+        action: 'customer.phone_changed',
+        entityType: 'customer',
+        entityId: id,
+        metadata: { consent_reset: true },
+        ipAddress: req.ip
+      });
+    }
     return successResponse(res, customer);
   } catch (error) {
+    if (error.code === '23505') return errorResponse(res, 'Another patient already uses this phone number', 409);
     next(error);
   }
 }

@@ -1,5 +1,14 @@
 const tenantQuery = require('../../../utils/tenantQuery');
 
+// An error that carries the HTTP status the global error handler should answer with (409 for a double booking, 404 for an unknown id)
+class BookingError extends Error {
+  constructor(message, statusCode = 409) {
+    super(message);
+    this.name = 'BookingError';
+    this.statusCode = statusCode;
+  }
+}
+
 /**
  * Gets all doctors for a tenant
  * @param {object} pool
@@ -262,18 +271,34 @@ async function createProcedureBooking(pool, tenantId, doctorId, procedureId, cus
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Check for normal token bookings overlapping the procedure slot
+    // Lock the doctor row first, the same first step as the normal booking flow (createManualBooking and the AI booking tools),
+    // so two procedure bookings, or a procedure and a normal booking, for the same doctor are handled one after the other.
+    const doctorLock = await client.query(
+      'SELECT id FROM clinic_doctors WHERE id = $1 AND tenant_id = $2 FOR UPDATE',
+      [doctorId, tenantId]
+    );
+    if (!doctorLock.rows.length) {
+      throw new BookingError('Not found', 404);
+    }
+
+    // Overlap with normal bookings (their slot_time falls inside the procedure window) or with another procedure of this
+    // doctor (the two time windows overlap). Cancelled and no-show bookings are ignored, as in getAvailableSlots,
+    // so a slot the screen offers as free is never refused here.
     const conflictRes = await client.query(
       `SELECT id FROM bookings
        WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
-       AND status != 'cancelled'
-       AND (booking_type IS NULL OR booking_type != 'procedure')
+       AND status NOT IN ('cancelled', 'noshow')
        AND slot_time IS NOT NULL
-       AND slot_time >= $4 AND slot_time < $5`,
+       AND (
+         ((booking_type IS NULL OR booking_type != 'procedure') AND slot_time::time >= $4::time AND slot_time::time < $5::time)
+         OR
+         (booking_type = 'procedure' AND end_time IS NOT NULL AND slot_time::time < $5::time AND end_time::time > $4::time)
+       )
+       LIMIT 1`,
       [tenantId, doctorId, date, startTime, endTime]
     );
     if (conflictRes.rows.length > 0) {
-      throw new Error('A patient appointment already exists in this time slot. Please choose a different time.');
+      throw new BookingError('That time is already booked for this doctor', 409);
     }
     const bookingRes = await client.query(
       `INSERT INTO bookings (tenant_id, doctor_id, customer_id, patient_id, patient_name, booking_date, slot_time, end_time, booking_type, procedure_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'procedure', $9, 'confirmed') RETURNING *`,
