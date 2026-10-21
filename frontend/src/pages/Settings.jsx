@@ -269,7 +269,8 @@ export default function Settings() {
       formData.append('poster', posterFile);
       if (posterCaption.trim()) formData.append('caption', posterCaption.trim());
       await api.post(`/tenants/${staff?.tenantId}/poster-request`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        silent: true // the api helper then adds no toast of its own for a 500
       });
       addToast('Poster submitted for review', 'success');
       setPosterFile(null);
@@ -277,8 +278,12 @@ export default function Settings() {
       setPosterCaption('');
       if (posterInputRef.current) posterInputRef.current.value = '';
       fetchPosterRequests();
-    } catch {
-      addToast('Failed to upload poster', 'error');
+    } catch (err) {
+      // The api helper adds no toast for a 400 (or a silent 500), so this is the only message and it uses the server's text.
+      // "Cannot connect to server" and 403 already get a toast from the helper, so those are not repeated here.
+      if (err?.error !== 'Cannot connect to server' && !String(err?.error || '').startsWith('Forbidden')) {
+        addToast(err?.error || 'Failed to upload poster', 'error');
+      }
     } finally {
       setPosterUploading(false);
     }
@@ -861,19 +866,24 @@ export default function Settings() {
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Caption (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Caption <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={posterCaption}
+                maxLength={300}
                 onChange={e => setPosterCaption(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="e.g. Diwali health check-up offer"
+                placeholder="e.g. Free check-up camp this Saturday, 10 am to 1 pm"
               />
+              <div className="flex items-start justify-between gap-3 mt-1">
+                <p className="text-xs text-gray-400">This is the text patients see under the poster. Do not mention medicines or products.</p>
+                <span className={`text-xs flex-shrink-0 ${posterCaption.length >= 300 ? 'text-red-600' : 'text-gray-400'}`}>{posterCaption.length} / 300</span>
+              </div>
             </div>
             <div className="flex justify-end">
               <button
                 onClick={handlePosterUpload}
-                disabled={!posterFile || posterUploading}
+                disabled={!posterFile || !posterCaption.trim() || posterUploading}
                 className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
               >
                 {posterUploading ? 'Uploading...' : 'Submit for Review'}
