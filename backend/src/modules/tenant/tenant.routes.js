@@ -10,7 +10,7 @@ const {
   setConfig,
   getAllConfigs
 } = require('./tenant.controller');
-const { submitPosterRequest, getPosterRequests } = require('./poster.controller');
+const { submitPosterRequest, getPosterRequests, getPosterImage } = require('./poster.controller');
 const {
   validateCreateTenant,
   validateUpdateTenant,
@@ -50,6 +50,7 @@ router.put('/:id', validateUpdateTenant, validate, updateTenant);
 router.post('/:id/config', validateSetConfig, validate, setConfig);
 router.get('/:id/config', getAllConfigs);
 router.get('/:id/poster-requests', requireRole('admin', 'manager'), getPosterRequests);
+router.get('/:id/poster-requests/:requestId/image', requireRole('admin', 'manager'), getPosterImage);
 router.post('/:id/poster-request', requireRole('admin', 'manager'), upload.single('poster'), submitPosterRequest);
 
 module.exports = router;

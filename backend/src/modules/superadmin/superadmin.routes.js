@@ -19,6 +19,7 @@ const { getConfig, updateConfig } = require('./platform-config.controller');
 const { getTenantSendFailures, getSendFailuresSummary } = require('./sendFailures.controller');
 const { fetchWabaInfo } = require('../waba/waba.info.service');
 const { getSendReadiness } = require('../campaign/campaign.readiness');
+const { getPosterImageAsSuperAdmin } = require('../tenant/poster.controller');
 const { successResponse, errorResponse } = require('../../utils/response');
 const { createTemplatesForTenant, refreshTemplateStatuses, getTenantTemplates, createPosterTemplate, TemplateError } = require('../waba/waba.templates.service');
 
@@ -87,6 +88,7 @@ router.get('/platform-config', getConfig);
 router.put('/platform-config', updateConfig);
 
 router.get('/poster-requests', getPosterRequests);
+router.get('/poster-requests/:id/image', getPosterImageAsSuperAdmin);
 router.patch('/poster-requests/:id/approve', approvePosterRequest);
 router.patch('/poster-requests/:id/reject', rejectPosterRequest);
 
