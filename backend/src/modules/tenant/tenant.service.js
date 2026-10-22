@@ -61,6 +61,29 @@ const normalizeNumber = (num) => {
 };
 
 /**
+ * True when the number is empty or a placeholder (+9100000000...), i.e. not a real clinic number
+ */
+const isPlaceholderWhatsappNumber = (num) => {
+  const normalized = normalizeNumber(String(num ?? ''));
+  return !normalized || normalized.startsWith('+9100000000');
+};
+
+const WHATSAPP_NUMBER_MANAGED_MESSAGE = 'WhatsApp number is managed by the Meta connection. Use Sync from Meta.';
+const WHATSAPP_NUMBER_IN_USE_MESSAGE = 'This WhatsApp number is already used by another clinic';
+
+/**
+ * True when a tenant connected to Meta (it has a phone number id) is asked to change its WhatsApp number.
+ * A value equal to the stored one (after normalizing) is not a change.
+ * @param {object} tenantRow - needs whatsapp_number and whatsapp_phone_number_id
+ * @param {*} incoming - the number from the request
+ */
+const isManagedNumberChange = (tenantRow, incoming) => {
+  if (!tenantRow || !tenantRow.whatsapp_phone_number_id) return false;
+  const stored = tenantRow.whatsapp_number ? normalizeNumber(String(tenantRow.whatsapp_number)) : '';
+  return normalizeNumber(String(incoming ?? '')) !== stored;
+};
+
+/**
  * Creates a new tenant with default configs
  */
 const createTenant = async (tenantData) => {
@@ -157,20 +180,40 @@ const updateTenant = async (id, updateData) => {
   delete safeData.industry;
   delete safeData.slug;
 
-  if (safeData.whatsappNumber) {
-    const oldTenant = await tenantModel.getTenantById(pool, id);
-    if (oldTenant?.whatsapp_number) {
-      try { await redisClient.del(`tenant_wa:${oldTenant.whatsapp_number}`); } catch {}
-    }
-    safeData.whatsapp_number = normalizeNumber(safeData.whatsappNumber);
+  // The route sends whatsapp_number; whatsappNumber is still accepted from other callers
+  const hasNumber = safeData.whatsapp_number !== undefined || safeData.whatsappNumber !== undefined;
+  let oldNumber = null;
+  if (hasNumber) {
+    const incoming = safeData.whatsapp_number !== undefined ? safeData.whatsapp_number : safeData.whatsappNumber;
     delete safeData.whatsappNumber;
+    const oldTenant = await tenantModel.getTenantById(pool, id);
+    oldNumber = oldTenant?.whatsapp_number || null;
+    if (isManagedNumberChange(oldTenant, incoming)) {
+      const err = new Error(WHATSAPP_NUMBER_MANAGED_MESSAGE);
+      err.status = 409;
+      throw err;
+    }
+    if (oldTenant?.whatsapp_phone_number_id) {
+      // Connected tenant and an unchanged value: ignored
+      delete safeData.whatsapp_number;
+    } else if (incoming) {
+      safeData.whatsapp_number = normalizeNumber(String(incoming));
+    }
   }
 
   if (Object.keys(safeData).length === 0) {
      return getTenantById(id);
   }
 
-  return await tenantModel.updateTenant(pool, id, safeData);
+  const updated = await tenantModel.updateTenant(pool, id, safeData);
+  if (hasNumber) {
+    // The webhook caches the tenant by number: drop the old and the new key
+    try {
+      if (oldNumber) await redisClient.del(`tenant_wa:${normalizeNumber(String(oldNumber))}`);
+      if (updated?.whatsapp_number) await redisClient.del(`tenant_wa:${normalizeNumber(String(updated.whatsapp_number))}`);
+    } catch {}
+  }
+  return updated;
 };
 
 /**
@@ -242,5 +285,9 @@ module.exports = {
   getAllConfigs,
   getConfig,
   setDefaultConfigs,
-  normalizeNumber
+  normalizeNumber,
+  isPlaceholderWhatsappNumber,
+  isManagedNumberChange,
+  WHATSAPP_NUMBER_MANAGED_MESSAGE,
+  WHATSAPP_NUMBER_IN_USE_MESSAGE
 };

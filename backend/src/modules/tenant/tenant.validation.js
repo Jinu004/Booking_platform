@@ -34,14 +34,15 @@ const validateUpdateTenant = [
     .isLength({ min: 2, max: 100 }).withMessage('Name must be between 2 and 100 characters')
     .trim(),
     
-  body('whatsappNumber')
+  // The update controller reads whatsapp_number (snake_case); the create route above still uses whatsappNumber
+  body('whatsapp_number')
     .optional()
     .matches(indianMobileRegex).withMessage('Must be a valid Indian mobile number'),
-    
+
   body('plan')
     .optional()
     .isIn(allowedPlans).withMessage(`Plan must be one of: ${allowedPlans.join(', ')}`),
-    
+
   body('status')
     .optional()
     .isIn(allowedStatuses).withMessage(`Status must be one of: ${allowedStatuses.join(', ')}`)

@@ -7,6 +7,7 @@ const {
   getTenantDetails,
   updateTenantStatus,
   updateTenant,
+  syncWhatsappNumber,
   createTenant,
   getPlatformStats,
   clearTenantConversations,
@@ -80,6 +81,7 @@ router.get('/tenants/:id/send-failures', getTenantSendFailures);
 router.get('/send-failures/summary', getSendFailuresSummary);
 
 router.patch('/tenants/:id', updateTenant);
+router.post('/tenants/:id/sync-whatsapp-number', syncWhatsappNumber);
 router.delete('/tenants/:id', deleteTenant);
 router.get('/stats', getPlatformStats);
 router.delete('/tenants/:id/conversations', clearTenantConversations);

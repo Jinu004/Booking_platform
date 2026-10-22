@@ -75,14 +75,15 @@ async function verifyRegistration(req, res) {
       }
     );
 
-    // Update tenant whatsapp_number in DB
+    // Update tenant whatsapp_number in DB, but never overwrite the number of a tenant that already has a Meta connection
     if (phone_number) {
       let normalized = phone_number.replace(/[^\d+]/g, '');
       if (!normalized.startsWith('+')) {
         normalized = '+91' + (normalized.startsWith('91') ? normalized.slice(2) : normalized);
       }
       await pool.query(
-        'UPDATE tenants SET whatsapp_number = $1 WHERE id = $2',
+        `UPDATE tenants SET whatsapp_number = $1
+         WHERE id = $2 AND (whatsapp_phone_number_id IS NULL OR whatsapp_phone_number_id = '')`,
         [normalized, tenant_id]
       );
     }
@@ -371,19 +372,21 @@ async function connectClinicNumber(req, res) {
       logger.warn(`WABA connect: number details failed for tenant ${tenantId}: ${metaFailure(detailsErr)}`);
     }
 
-    // 8. The visible number is only filled in when the tenant has none (a separate small update: the connection is already stored)
+    // 8. Meta is the source of truth for the visible number: always write what Meta shows (a separate small update: the connection is already stored)
     const normalizedDisplay = displayNumber ? normalizeNumber(String(displayNumber)) : null;
     if (normalizedDisplay) {
       try {
         await pool.query(
           `UPDATE tenants
            SET whatsapp_number = $1::text, updated_at = NOW()
-           WHERE id = $2 AND (whatsapp_number IS NULL OR whatsapp_number = '')`,
+           WHERE id = $2`,
           [normalizedDisplay, tenantId]
         );
       } catch (numberErr) {
         if (numberErr.code === '23505') {
-          detailsWarning = 'The number shown by Meta is already assigned to another clinic, so the clinic number was not set';
+          // Another clinic holds this number: Connect still succeeds and the old value stays
+          logger.warn(`WHATSAPP_NUMBER_CONFLICT tenant=${tenantId}`);
+          detailsWarning = 'The number shown by Meta is already assigned to another clinic, so the clinic number was not changed';
         } else {
           logger.warn(`WABA connect: setting the clinic number failed for tenant ${tenantId}: ${numberErr.message}`);
         }

@@ -2,8 +2,25 @@ const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 const { bcrypt } = require('../../config/auth');
-const { normalizeNumber } = require('../tenant/tenant.service');
+const {
+  normalizeNumber,
+  isPlaceholderWhatsappNumber,
+  isManagedNumberChange,
+  WHATSAPP_NUMBER_MANAGED_MESSAGE,
+  WHATSAPP_NUMBER_IN_USE_MESSAGE
+} = require('../tenant/tenant.service');
 const { omitTenantSecrets } = require('../../utils/secretBox');
+const { fetchWabaInfo } = require('../waba/waba.info.service');
+const { TemplateError } = require('../waba/waba.templates.service');
+
+// Connection flags for the tenant screens (the phone number id itself is not added to the response)
+function withWhatsappFlags(row) {
+  return {
+    ...row,
+    whatsapp_connected: !!row.whatsapp_phone_number_id,
+    whatsapp_number_placeholder: isPlaceholderWhatsappNumber(row.whatsapp_number)
+  };
+}
 
 /**
  * GET /superadmin/tenants
@@ -24,7 +41,7 @@ async function getAllTenants(req, res) {
       ORDER BY t.created_at DESC
     `;
     const result = await pool.query(sql);
-    return successResponse(res, result.rows);
+    return successResponse(res, result.rows.map(withWhatsappFlags));
   } catch (err) {
     logger.error('Error fetching all tenants:', err.message);
     return errorResponse(res, 'Failed to fetch tenants', 500);
@@ -45,7 +62,7 @@ async function getTenantDetails(req, res) {
       return errorResponse(res, 'Tenant not found', 404);
     }
 
-    return successResponse(res, omitTenantSecrets(result.rows[0]));
+    return successResponse(res, withWhatsappFlags(omitTenantSecrets(result.rows[0])));
   } catch (err) {
     logger.error('Error fetching tenant details:', err.message);
     return errorResponse(res, 'Failed to fetch tenant', 500);
@@ -218,10 +235,18 @@ async function updateTenant(req, res) {
       return errorResponse(res, 'Invalid Phone Number ID. Must be 8-20 digits', 400);
     }
 
-    const normalizedWhatsapp = whatsappNumber ? normalizeNumber(String(whatsappNumber)) : null;
+    let normalizedWhatsapp = whatsappNumber ? normalizeNumber(String(whatsappNumber)) : null;
 
-    const existing = await pool.query('SELECT whatsapp_number FROM tenants WHERE id = $1', [id]);
+    const existing = await pool.query('SELECT whatsapp_number, whatsapp_phone_number_id FROM tenants WHERE id = $1', [id]);
     const oldWhatsapp = existing.rows[0]?.whatsapp_number || null;
+
+    // A tenant connected to Meta keeps the number Meta shows: a different value is refused, the same value is ignored
+    if (normalizedWhatsapp && existing.rows[0]?.whatsapp_phone_number_id) {
+      if (isManagedNumberChange(existing.rows[0], normalizedWhatsapp)) {
+        return errorResponse(res, WHATSAPP_NUMBER_MANAGED_MESSAGE, 409);
+      }
+      normalizedWhatsapp = null;
+    }
 
     const result = await pool.query(
       `UPDATE tenants
@@ -268,8 +293,67 @@ async function updateTenant(req, res) {
     if (err.code === '23505' && err.constraint === 'idx_tenants_whatsapp_phone_number_id') {
       return errorResponse(res, 'This Phone Number ID is already assigned to another clinic', 409);
     }
+    if (err.code === '23505' && err.constraint === 'tenants_whatsapp_number_key') {
+      return errorResponse(res, WHATSAPP_NUMBER_IN_USE_MESSAGE, 409);
+    }
     logger.error('Error updating tenant:', err.message);
     return errorResponse(res, 'Failed to update tenant', 500);
+  }
+}
+
+/**
+ * POST /superadmin/tenants/:id/sync-whatsapp-number
+ * Copies the display number that Meta shows for the clinic's phone number id into tenants.whatsapp_number
+ */
+async function syncWhatsappNumber(req, res) {
+  try {
+    const { id } = req.params;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id))) {
+      return errorResponse(res, 'Invalid tenant id', 400);
+    }
+    const tenantRes = await pool.query('SELECT whatsapp_number, whatsapp_phone_number_id FROM tenants WHERE id = $1', [id]);
+    if (tenantRes.rows.length === 0) {
+      return errorResponse(res, 'Tenant not found', 404);
+    }
+    const row = tenantRes.rows[0];
+    if (!row.whatsapp_phone_number_id) {
+      return errorResponse(res, 'This clinic has no phone number id saved. Connect the number first.', 400);
+    }
+
+    let info;
+    try {
+      info = await fetchWabaInfo(id);
+    } catch (err) {
+      if (err instanceof TemplateError) return errorResponse(res, err.message, err.status);
+      throw err;
+    }
+    const display = info?.phone?.display_phone_number;
+    if (!display || !display.ok || !display.value) {
+      return errorResponse(res, 'Could not read the display number from Meta', 502);
+    }
+
+    const normalized = normalizeNumber(String(display.value));
+    const stored = row.whatsapp_number ? normalizeNumber(String(row.whatsapp_number)) : '';
+    if (normalized === stored) {
+      return successResponse(res, { changed: false, whatsapp_number: row.whatsapp_number });
+    }
+
+    await pool.query('UPDATE tenants SET whatsapp_number = $1, updated_at = NOW() WHERE id = $2', [normalized, id]);
+
+    try {
+      const redisClient = require('../../config/redis');
+      if (stored) await redisClient.del(`tenant_wa:${stored}`);
+      await redisClient.del(`tenant_wa:${normalized}`);
+    } catch (_) {}
+
+    logger.info(`WHATSAPP_NUMBER_SYNCED tenant=${id} number=****${normalized.slice(-4)}`);
+    return successResponse(res, { changed: true, whatsapp_number: normalized });
+  } catch (err) {
+    if (err.code === '23505' && err.constraint === 'tenants_whatsapp_number_key') {
+      return errorResponse(res, WHATSAPP_NUMBER_IN_USE_MESSAGE, 409);
+    }
+    logger.error('Error syncing WhatsApp number:', err.message);
+    return errorResponse(res, 'Failed to sync the WhatsApp number', 500);
   }
 }
 
@@ -366,6 +450,7 @@ module.exports = {
   getTenantDetails,
   updateTenantStatus,
   updateTenant,
+  syncWhatsappNumber,
   createTenant,
   getPlatformStats,
   clearTenantConversations,

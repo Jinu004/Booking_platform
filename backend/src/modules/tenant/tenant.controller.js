@@ -76,6 +76,10 @@ const updateTenant = async (req, res) => {
     const tenant = await tenantService.updateTenant(id, updateData);
     return successResponse(res, tenant, 200);
   } catch (error) {
+    if (error.status === 409) return errorResponse(res, error.message, 409);
+    if (error.code === '23505' && error.constraint === 'tenants_whatsapp_number_key') {
+      return errorResponse(res, 'This WhatsApp number is already used by another clinic', 409);
+    }
     return errorResponse(res, error.message, 500);
   }
 };
