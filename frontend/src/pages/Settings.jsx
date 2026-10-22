@@ -73,6 +73,8 @@ export default function Settings() {
     }
   }
   const whatsappNumber = staff?.tenantWhatsapp || null;
+  // A placeholder number (+9100000000...) is not a real clinic number: the card shows the connected state without it
+  const whatsappNumberIsPlaceholder = !!whatsappNumber && String(whatsappNumber).startsWith('+9100000000');
   const { addToast } = useStore();
   const { industry } = useIndustry();
 
@@ -828,7 +830,7 @@ export default function Settings() {
                 {whatsappNumber ? 'WhatsApp Connected' : 'WhatsApp Not Connected'}
               </p>
               <p className="text-sm text-gray-500 mt-0.5">
-                {whatsappNumber ? whatsappNumber : 'Contact support@receptionai.in to connect your number'}
+                {whatsappNumber ? (whatsappNumberIsPlaceholder ? '' : whatsappNumber) : 'Contact support@receptionai.in to connect your number'}
               </p>
             </div>
           </div>

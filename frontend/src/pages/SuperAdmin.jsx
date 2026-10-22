@@ -416,7 +416,15 @@ export default function SuperAdmin() {
                       </button>
                     )}
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.whatsapp_number || <span className="text-gray-300">—</span>}</td>
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                    {t.whatsapp_number || <span className="text-gray-300">—</span>}
+                    {t.whatsapp_number_placeholder && (
+                      <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">Placeholder</span>
+                    )}
+                    {t.whatsapp_connected === false && (
+                      <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-500">Not connected</span>
+                    )}
+                  </td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.booking_count}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.conversation_count}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>

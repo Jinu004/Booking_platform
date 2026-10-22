@@ -305,6 +305,7 @@ export default function TenantEdit() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [justConnected, setJustConnected] = useState(false);
+  const [syncingNumber, setSyncingNumber] = useState(false);
 
   // The backend has no list-free way to get everything this page needs (recall and template flags, admin email,
   // connection flags), so the tenants list is loaded and this tenant is picked from it by id.
@@ -342,6 +343,27 @@ export default function TenantEdit() {
 
   const goToList = () => navigate('/superadmin');
 
+  // Reloads this tenant's row and shows the stored WhatsApp number (the other form fields keep what was typed)
+  const refreshTenantNumber = async () => {
+    const row = await fetchTenantRow();
+    if (!row) return;
+    setTenant(row);
+    setForm(f => (f ? { ...f, whatsappNumber: row.whatsapp_number || '' } : f));
+  };
+
+  const handleSyncNumber = async () => {
+    try {
+      setSyncingNumber(true);
+      const res = await api.post(`/superadmin/tenants/${tenant.id}/sync-whatsapp-number`);
+      addToast(res?.data?.changed ? 'Number updated from Meta' : 'Already in sync', 'success');
+      await refreshTenantNumber();
+    } catch (err) {
+      addToast(err?.error || err?.response?.data?.error || 'Failed to sync the number from Meta', 'error');
+    } finally {
+      setSyncingNumber(false);
+    }
+  };
+
   const handleSave = async () => {
     setError('');
     if (form.industry !== tenant.industry) {
@@ -353,6 +375,8 @@ export default function TenantEdit() {
     try {
       setSaving(true);
       const { proactiveTemplates, ...tenantForm } = form;
+      // The number of a connected tenant comes from Meta: it is not sent
+      if (tenant.whatsapp_connected === true) delete tenantForm.whatsappNumber;
       await updateTenant(tenant.id, tenantForm);
       await api.patch(`/superadmin/tenants/${tenant.id}/config`, {
         key: 'proactive_templates_enabled',
@@ -477,13 +501,41 @@ export default function TenantEdit() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
-            <input
-              type="text"
-              value={form.whatsappNumber}
-              onChange={e => setForm(f => ({ ...f, whatsappNumber: e.target.value }))}
-              className={inputClass}
-              placeholder="+919876543210"
-            />
+            {tenant.whatsapp_connected ? (
+              <>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={form.whatsappNumber}
+                    disabled
+                    className={`${inputClass} bg-gray-50 text-gray-500`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSyncNumber}
+                    disabled={syncingNumber}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap disabled:opacity-50"
+                  >
+                    {syncingNumber ? 'Syncing...' : 'Sync from Meta'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Synced from Meta. Not editable.</p>
+                {tenant.whatsapp_number_placeholder && (
+                  <p className="text-xs text-amber-700 mt-1">This number is a placeholder. Click Sync from Meta.</p>
+                )}
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={form.whatsappNumber}
+                  onChange={e => setForm(f => ({ ...f, whatsappNumber: e.target.value }))}
+                  className={inputClass}
+                  placeholder="+919876543210"
+                />
+                <p className="text-xs text-gray-400 mt-1">Placeholder until the clinic connects WhatsApp. Messages are matched by the connection, not by this number.</p>
+              </>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number ID</label>
@@ -563,6 +615,8 @@ export default function TenantEdit() {
           onConnected={(connected) => {
             setJustConnected(true);
             setForm(f => ({ ...f, whatsappPhoneNumberId: connected.phoneNumberId || f.whatsappPhoneNumberId }));
+            // Connect stores the number Meta shows and the tenant is now connected: reload the flags and the number
+            refreshTenantNumber().catch(() => {});
           }}
         />
       </Card>
