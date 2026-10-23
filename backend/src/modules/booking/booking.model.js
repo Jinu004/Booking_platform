@@ -1,4 +1,5 @@
 const tenantQuery = require('../../utils/tenantQuery');
+const { getBookingMode } = require('../industries/clinic/clinic.model');
 
 /**
  * Creates a new booking record
@@ -100,7 +101,15 @@ async function getBookings(pool, tenantId, filters = {}) {
   // Customer history and unfiltered requests keep the original newest-first order.
   let orderBy = `ORDER BY b.booking_date DESC, b.slot_time ASC NULLS LAST, b.token_number ASC`;
   if (!filters.customerId && (filters.upcoming || filters.date)) {
-    orderBy = `ORDER BY ${filters.upcoming ? 'b.booking_date ASC, ' : ''}
+    // Appointment-mode clinics: after the status group, order by the time of the booking (a malformed slot_time sorts last
+    // instead of failing the query), then doctor name. Token-mode clinics keep the order below exactly.
+    const appointmentMode = (await getBookingMode(pool, tenantId)) === 'appointment';
+    orderBy = appointmentMode
+      ? `ORDER BY ${filters.upcoming ? 'b.booking_date ASC, ' : ''}
+      CASE b.status WHEN 'cancelled' THEN 3 WHEN 'noshow' THEN 2 WHEN 'completed' THEN 1 ELSE 0 END,
+      CASE WHEN b.slot_time ~ '^([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$' THEN b.slot_time::time END ASC NULLS LAST,
+      cd.name ASC NULLS LAST, b.doctor_id, b.created_at ASC, b.id ASC`
+      : `ORDER BY ${filters.upcoming ? 'b.booking_date ASC, ' : ''}
       CASE b.status WHEN 'cancelled' THEN 3 WHEN 'noshow' THEN 2 WHEN 'completed' THEN 1 ELSE 0 END,
       cd.name ASC NULLS LAST, b.doctor_id, b.token_number ASC, b.created_at ASC, b.id ASC`;
   }
