@@ -1203,7 +1203,9 @@ export default function PatientProfile() {
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {b.booking_type === 'procedure'
                           ? `${b.slot_time || '—'} – ${b.end_time || '—'}`
-                          : b.session_start_time
+                          : (b.token_number == null && b.slot_time)
+                            ? `${fmtSessionTime(b.slot_time)}${b.end_time ? ` – ${fmtSessionTime(b.end_time)}` : ''}`
+                            : b.session_start_time
                             ? (() => { const [h, m] = b.session_start_time.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` })()
                             : '—'}
                       </td>

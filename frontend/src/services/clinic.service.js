@@ -61,6 +61,11 @@ export async function scheduleProcedureBooking(doctorId, data) {
   return api.post(`/clinic/doctors/${doctorId}/procedure-booking`, data);
 }
 
+// Appointment mode: body { patient_name, phone, date (YYYY-MM-DD), start_time (HH:MM), notes? }
+export async function scheduleAppointmentBooking(doctorId, data) {
+  return api.post(`/clinic/doctors/${doctorId}/appointment-booking`, data);
+}
+
 export async function cancelProcedureBooking(bookingId) {
   return api.delete(`/clinic/bookings/${bookingId}/procedure`);
 }

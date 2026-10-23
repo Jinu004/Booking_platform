@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   getBookings, getBookingStats, 
   completeBooking, cancelBooking, markNoShow, createBooking 
 } from '../services/booking.service';
-import { getDoctors, updateTokenStatus, getDoctorSchedule, getProcedures, getAvailableSlots, scheduleProcedureBooking } from '../services/clinic.service';
+import { getDoctors, updateTokenStatus, getDoctorSchedule, getProcedures, getAvailableSlots, scheduleProcedureBooking, scheduleAppointmentBooking } from '../services/clinic.service';
+import { getClinicSettings } from '../services/settings.service';
 import api from '../utils/api';
 import TokenReceipt from '../components/shared/TokenReceipt';
 import useStore from '../store/useStore';
@@ -67,6 +68,31 @@ const Bookings = () => {
   const [isOffline, setIsOffline] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Booking mode of the clinic ('token' unless the clinic switched to 'appointment'): the Quick booking button is for appointment mode only
+  const [bookingMode, setBookingMode] = useState('token');
+  useEffect(() => {
+    getClinicSettings()
+      .then(res => {
+        const d = res?.data || res;
+        if (d?.booking_mode === 'appointment') setBookingMode('appointment');
+      })
+      .catch(() => {});
+  }, []);
+
+  // Quick booking (appointment mode): phone, name, doctor, date, a free time of that doctor, notes
+  const [qbOpen, setQbOpen] = useState(false);
+  const [qb, setQb] = useState({ phone: '', name: '', doctorId: '', date: '', time: '', notes: '' });
+  const [qbDoctors, setQbDoctors] = useState([]);
+  const [qbPatients, setQbPatients] = useState([]);
+  const [qbSlots, setQbSlots] = useState([]);
+  const [qbSlotsLoading, setQbSlotsLoading] = useState(false);
+  const [qbSlotsError, setQbSlotsError] = useState(false);
+  const [qbReload, setQbReload] = useState(0);
+  const [qbSubmitting, setQbSubmitting] = useState(false);
+  const [qbError, setQbError] = useState('');
+  const qbSubmitRef = useRef(false);
+  const qbPhoneRef = useRef('');
 
   useEffect(() => {
     fetchData();
@@ -162,6 +188,94 @@ const Bookings = () => {
       .finally(() => setProcedureSlotsLoading(false));
   }, [procedureForm.doctorId, procedureForm.procedureId, procedureForm.date]);
 
+  // Free times of the chosen doctor and date (the clinic is in appointment mode, so the duration is the doctor's visit length)
+  useEffect(() => {
+    if (!qbOpen || !qb.doctorId || !qb.date) { setQbSlots([]); setQbSlotsError(false); return undefined; }
+    let cancelled = false;
+    setQbSlotsLoading(true);
+    setQbSlotsError(false);
+    getAvailableSlots(qb.doctorId, qb.date)
+      .then(res => {
+        if (cancelled) return;
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setQbSlots(list);
+        setQb(q => (list.includes(q.time) ? q : { ...q, time: '' }));
+      })
+      .catch(() => { if (!cancelled) { setQbSlots([]); setQbSlotsError(true); } })
+      .finally(() => { if (!cancelled) setQbSlotsLoading(false); });
+    return () => { cancelled = true; };
+  }, [qbOpen, qb.doctorId, qb.date, qbReload]);
+
+  const todayISTString = () => {
+    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const clockText = t => { const [h, m] = t.toString().split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; };
+
+  const openQuickBooking = async () => {
+    let list = [];
+    try { const res = await getDoctors(); list = res?.data || []; } catch {}
+    if (staff?.role === 'doctor' && staff.doctor_id) list = list.filter(d => d.id === staff.doctor_id);
+    setQbDoctors(list);
+    // With one doctor the choice is automatic and the field is hidden
+    setQb({ phone: '', name: '', doctorId: list.length === 1 ? list[0].id : '', date: todayISTString(), time: '', notes: '' });
+    setQbPatients([]);
+    setQbSlots([]);
+    setQbError('');
+    qbPhoneRef.current = '';
+    setQbOpen(true);
+  };
+
+  const handleQbPhone = async (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 10);
+    qbPhoneRef.current = digits;
+    setQb(q => ({ ...q, phone: digits }));
+    setQbPatients([]);
+    if (digits.length !== 10) return;
+    try {
+      const res = await api.get(`/bookings/lookup?phone=${digits}`);
+      if (qbPhoneRef.current !== digits) return; // the number changed while the lookup ran
+      const customer = res?.data?.customer || null;
+      const patients = res?.data?.patients || [];
+      setQbPatients(patients);
+      if (patients.length === 1) setQb(q => (q.name.trim() ? q : { ...q, name: patients[0].name }));
+      else if (patients.length === 0 && customer?.name) setQb(q => (q.name.trim() ? q : { ...q, name: customer.name }));
+    } catch { /* no lookup result: staff types the name */ }
+  };
+
+  const submitQuickBooking = async () => {
+    if (qbSubmitRef.current) return;
+    setQbError('');
+    if (qb.phone.length !== 10) { setQbError('Enter the 10-digit phone number.'); return; }
+    if (!qb.name.trim()) { setQbError('Enter the patient name.'); return; }
+    if (!qb.doctorId) { setQbError('Choose a doctor.'); return; }
+    if (!qb.time) { setQbError('Choose a free time.'); return; }
+    qbSubmitRef.current = true;
+    setQbSubmitting(true);
+    try {
+      await scheduleAppointmentBooking(qb.doctorId, {
+        patient_name: qb.name.trim(),
+        phone: `+91${qb.phone}`,
+        date: qb.date,
+        start_time: qb.time,
+        notes: qb.notes.trim()
+      });
+      setQbOpen(false);
+      addToast('Appointment booked', 'success');
+      fetchData();
+    } catch (err) {
+      // The api helper rejects with the server's response body, so the message is err.error
+      const message = err?.error;
+      const usable = typeof message === 'string' && message && message !== 'Internal Server Error' && message !== 'Cannot connect to server';
+      setQbError(usable ? message : 'Could not save, please try again.');
+      // The time may have been taken meanwhile: show the current free times again
+      setQbReload(n => n + 1);
+    } finally {
+      qbSubmitRef.current = false;
+      setQbSubmitting(false);
+    }
+  };
+
   const toSessionMins = t => { if (!t) return null; const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
   const fmtSessionLabel = (s, e) => { const fmt = t => { const [h, m] = t.toString().split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; }; return `${fmt(s)} - ${fmt(e)}`; };
 
@@ -191,6 +305,11 @@ const Bookings = () => {
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Procedure</span>
             <span className="text-xs text-ink/65 font-medium">{b.procedure_name || 'Procedure'}</span>
             <span className="text-xs text-ink/40">{b.slot_time || '—'} — {b.end_time}</span>
+          </div>
+        ) : (b.token_number == null && b.slot_time) ? (
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-ink/[0.05] text-ink/55 font-mono">Time</span>
+            <span className="text-xs font-semibold text-ink">{clockText(b.slot_time)}{b.end_time ? ` – ${clockText(b.end_time)}` : ''}</span>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-0.5">
@@ -371,6 +490,14 @@ const Bookings = () => {
         >
           + Procedure
         </button>
+        {bookingMode === 'appointment' && (
+          <button
+            onClick={openQuickBooking}
+            className="bg-white text-brand border border-brand px-5 py-2.5 rounded-lg font-medium hover:bg-brand-soft transition flex-1 md:flex-none"
+          >
+            + Quick booking
+          </button>
+        )}
         <button
           onClick={() => {
             loadFormDependencies();
@@ -486,6 +613,11 @@ const Bookings = () => {
                                 <span className="text-xs text-ink/65 font-medium">{b.procedure_name || 'Procedure'}</span>
                                 <span className="text-xs text-ink/40">{b.slot_time || '—'} – {b.end_time}</span>
                               </div>
+                            ) : (b.token_number == null && b.slot_time) ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-ink/[0.05] text-ink/55 font-mono">Time</span>
+                                <span className="text-xs font-semibold text-ink">{clockText(b.slot_time)}{b.end_time ? ` – ${clockText(b.end_time)}` : ''}</span>
+                              </div>
                             ) : (
                               <div className="flex flex-col items-center gap-0.5">
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-ink/[0.05] text-ink/55 font-mono">Token</span>
@@ -583,6 +715,11 @@ const Bookings = () => {
                 <div className="flex-shrink-0 text-center">
                   {b.booking_type === 'procedure' ? (
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Proc</span>
+                  ) : (b.token_number == null && b.slot_time) ? (
+                    <div className="flex flex-col items-center">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-ink/[0.05] text-ink/55 font-mono">Time</span>
+                      <span className="text-xs font-semibold text-ink">{clockText(b.slot_time)}{b.end_time ? ` – ${clockText(b.end_time)}` : ''}</span>
+                    </div>
                   ) : (
                     <div className="flex flex-col items-center">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-ink/[0.05] text-ink/55 font-mono">Token</span>
@@ -635,6 +772,103 @@ const Bookings = () => {
           ))
         )}
       </div>
+
+      {qbOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-xl font-bold text-ink">Quick booking</h2>
+              <button onClick={() => setQbOpen(false)} disabled={qbSubmitting} className="text-ink/40 hover:text-ink/65 text-2xl font-bold disabled:opacity-50">×</button>
+            </div>
+            <div className="space-y-4">
+              {qbError && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{qbError}</div>}
+              <div>
+                <label className="block text-sm font-medium text-ink/80 mb-1">Patient Phone</label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-ink/[0.12] bg-ink/[0.02] text-ink/55 text-sm">+91</span>
+                  <input type="tel" maxLength={10} value={qb.phone} disabled={qbSubmitting}
+                    onChange={e => handleQbPhone(e.target.value)}
+                    className="flex-1 border border-ink/[0.12] rounded-r-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                    placeholder="9876543210" />
+                </div>
+              </div>
+              {qbPatients.length > 1 && (
+                <div>
+                  <label className="block text-sm font-medium text-ink/80 mb-1">Patients with this number</label>
+                  <select defaultValue="" disabled={qbSubmitting}
+                    onChange={e => setQb(q => ({ ...q, name: e.target.value === '__new__' ? '' : e.target.value }))}
+                    className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
+                    <option value="" disabled>Choose a patient</option>
+                    {qbPatients.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                    <option value="__new__">New patient (type the name below)</option>
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-ink/80 mb-1">Patient Name</label>
+                <input type="text" value={qb.name} disabled={qbSubmitting}
+                  onChange={e => setQb(q => ({ ...q, name: e.target.value }))}
+                  className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                  placeholder="Patient name" />
+              </div>
+              {qbDoctors.length > 1 && (
+                <div>
+                  <label className="block text-sm font-medium text-ink/80 mb-1">Doctor</label>
+                  <select value={qb.doctorId} disabled={qbSubmitting}
+                    onChange={e => setQb(q => ({ ...q, doctorId: e.target.value, time: '' }))}
+                    className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
+                    <option value="">Select doctor</option>
+                    {qbDoctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-ink/80 mb-1">Date</label>
+                <input type="date" value={qb.date} min={todayISTString()} disabled={qbSubmitting}
+                  onChange={e => setQb(q => ({ ...q, date: e.target.value, time: '' }))}
+                  className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+              </div>
+              {qb.doctorId && (() => {
+                const doctor = qbDoctors.find(d => d.id === qb.doctorId);
+                const minutes = parseInt(doctor?.avg_consultation_minutes, 10) > 0 ? parseInt(doctor.avg_consultation_minutes, 10) : 15;
+                return <p className="text-xs text-ink/55">Visit length: {minutes} min (set per doctor on the Doctors page)</p>;
+              })()}
+              {qb.doctorId && qb.date && (
+                <div>
+                  <label className="block text-sm font-medium text-ink/80 mb-1">Time</label>
+                  {qbSlotsLoading ? (
+                    <p className="text-sm text-ink/40">Loading free times...</p>
+                  ) : qbSlotsError ? (
+                    <p className="text-sm text-red-500">Could not load the free times. Close and try again.</p>
+                  ) : qbSlots.length === 0 ? (
+                    <p className="text-sm text-red-500">No free times for this doctor on this date.</p>
+                  ) : (
+                    <select value={qb.time} disabled={qbSubmitting}
+                      onChange={e => setQb(q => ({ ...q, time: e.target.value }))}
+                      className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
+                      <option value="">Select time</option>
+                      {qbSlots.map(s => <option key={s} value={s}>{clockText(s)}</option>)}
+                    </select>
+                  )}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-ink/80 mb-1">Notes (optional)</label>
+                <textarea rows={2} value={qb.notes} disabled={qbSubmitting}
+                  onChange={e => setQb(q => ({ ...q, notes: e.target.value }))}
+                  className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none" />
+              </div>
+              <button
+                onClick={submitQuickBooking}
+                disabled={qbSubmitting || qb.phone.length !== 10 || !qb.name.trim() || !qb.doctorId || !qb.time}
+                className="w-full bg-brand text-white py-2.5 rounded-lg font-bold hover:bg-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {qbSubmitting ? 'Saving...' : 'Book appointment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isProcedureModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
