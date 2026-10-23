@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   getEHRPatient,
   upsertProfile,
+  editPatientDetails,
   addCondition,
   deleteCondition,
   addVisitNote,
@@ -72,6 +73,7 @@ const BLOOD_COLORS = {
 };
 
 const BLOOD_GROUPS = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+const EDIT_GENDERS = ['Male', 'Female', 'Other'];
 
 function Field({ label, value }) {
   return (
@@ -318,6 +320,16 @@ export default function PatientProfile() {
   const [emergencyForm, setEmergencyForm] = useState({});
   const [savingProfile, setSavingProfile] = useState(false);
 
+  // "Edit details" form (PATCH /ehr/patients/:id): admin, manager and receptionist only
+  const canEditDetails = ['admin', 'manager', 'receptionist'].includes(staff?.role);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editSharedCount, setEditSharedCount] = useState(null); // set when the number is shared by several patients
+  const [editPayload, setEditPayload] = useState(null);         // the payload to send again with apply_to_all
+  const editSavingRef = useRef(false);
+
   // Condition state
   const [savingCondition, setSavingCondition] = useState(false);
 
@@ -415,6 +427,102 @@ export default function PatientProfile() {
       addToast('Failed to update profile', 'error');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  // ── Edit details handlers ──────────────────────────────────────────────────
+
+  // The values as loaded from the server, in the shape of the form
+  const loadedDetails = () => ({
+    name: customer?.name || '',
+    phone: customer?.phone || '',
+    age: profile?.age ?? null,
+    gender: EDIT_GENDERS.find(g => g.toLowerCase() === String(profile?.gender || '').toLowerCase()) || '',
+    blood_group: profile?.blood_group || '',
+    emergency_contact_name: profile?.emergency_contact_name || '',
+    emergency_contact_phone: profile?.emergency_contact_phone || '',
+    emergency_contact_relationship: profile?.emergency_contact_relationship || '',
+  });
+
+  const openEditDetails = () => {
+    const loaded = loadedDetails();
+    setEditForm({ ...loaded, age: loaded.age === null ? '' : String(loaded.age) });
+    setEditError('');
+    setEditSharedCount(null);
+    setEditPayload(null);
+    setEditOpen(true);
+  };
+
+  // Only the fields that changed. Returns { payload } or { error }.
+  const buildEditPayload = () => {
+    const loaded = loadedDetails();
+    const f = editForm;
+    const payload = {};
+    const name = (f.name || '').trim();
+    if (!name) return { error: 'Name is required' };
+    if (name.length > 100) return { error: 'Name must be 100 characters or fewer' };
+    if (name !== loaded.name) payload.name = name;
+    const phone = (f.phone || '').trim();
+    if (!phone) return { error: 'Phone number is required' };
+    if (phone !== loaded.phone) payload.phone = phone;
+    const ageText = String(f.age ?? '').trim();
+    let age = null;
+    if (ageText !== '') {
+      age = Number(ageText);
+      if (!Number.isInteger(age) || age < 0 || age > 120) return { error: 'Age must be a whole number from 0 to 120' };
+    }
+    if (age !== (loaded.age ?? null)) payload.age = age;
+    if ((f.gender || '') !== loaded.gender) payload.gender = f.gender || null;
+    if ((f.blood_group || '') !== loaded.blood_group) payload.blood_group = f.blood_group || null;
+    for (const key of ['emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship']) {
+      const value = (f[key] || '').trim();
+      if (value !== loaded[key]) payload[key] = value || null;
+    }
+    return { payload };
+  };
+
+  // The server's message for a 400 or 409; a generic text for anything that is not a clear message
+  const editErrorText = (err) => {
+    const message = err?.error;
+    if (typeof message !== 'string' || !message || message === 'Cannot connect to server' || message === 'Internal Server Error') {
+      return 'Could not save, please try again.';
+    }
+    if (message.startsWith('Forbidden') || message.startsWith('EHR is a Pro')) return 'You do not have permission to edit patient details.';
+    return message;
+  };
+
+  const submitEditDetails = async (applyToAll = false) => {
+    if (editSavingRef.current) return;
+    let payload = editPayload;
+    if (!applyToAll) {
+      const built = buildEditPayload();
+      if (built.error) { setEditError(built.error); return; }
+      if (Object.keys(built.payload).length === 0) { setEditOpen(false); return; }
+      payload = built.payload;
+    }
+    editSavingRef.current = true;
+    setEditSaving(true);
+    setEditError('');
+    try {
+      await editPatientDetails(customer.id, applyToAll ? { ...payload, apply_to_all: true } : payload);
+      setEditOpen(false);
+      setEditSharedCount(null);
+      setEditPayload(null);
+      await loadData();
+      addToast('Patient details updated', 'success');
+    } catch (err) {
+      const sharedCount = err?.data?.patient_count;
+      if (!applyToAll && Number.isInteger(sharedCount)) {
+        // The number is shared: ask before changing it for all of them
+        setEditPayload(payload);
+        setEditSharedCount(sharedCount);
+      } else {
+        setEditSharedCount(null);
+        setEditError(editErrorText(err));
+      }
+    } finally {
+      editSavingRef.current = false;
+      setEditSaving(false);
     }
   };
 
@@ -681,6 +789,14 @@ export default function PatientProfile() {
               }`}>
                 {isNew ? 'New' : 'Returning'}
               </span>
+              {canEditDetails && (
+                <button
+                  onClick={openEditDetails}
+                  className="px-3 py-1 text-xs font-semibold border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Edit details
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-500 flex-wrap">
               {age && <span>{age}y</span>}
@@ -1123,6 +1239,145 @@ export default function PatientProfile() {
             </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Edit details modal */}
+      {editOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Edit details</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input
+                  type="text"
+                  maxLength={100}
+                  value={editForm.name || ''}
+                  onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={editForm.phone || ''}
+                  onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                {(editForm.phone || '').trim() !== (customer?.phone || '') && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+                    Changing the number moves this patient's chat history, reminders and recall to the new number, and clears their marketing consent. Only change it if the number was entered wrongly or the patient has a new number.
+                  </p>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Age</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="120"
+                    value={editForm.age ?? ''}
+                    onChange={e => setEditForm(f => ({ ...f, age: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                  <select
+                    value={editForm.gender || ''}
+                    onChange={e => setEditForm(f => ({ ...f, gender: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">-</option>
+                    {EDIT_GENDERS.map(g => <option key={g}>{g}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Blood group</label>
+                  <select
+                    value={editForm.blood_group || ''}
+                    onChange={e => setEditForm(f => ({ ...f, blood_group: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">-</option>
+                    {BLOOD_GROUPS.map(g => <option key={g}>{g}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Emergency contact name</label>
+                <input
+                  type="text"
+                  maxLength={255}
+                  value={editForm.emergency_contact_name || ''}
+                  onChange={e => setEditForm(f => ({ ...f, emergency_contact_name: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Emergency contact phone</label>
+                <input
+                  type="tel"
+                  maxLength={20}
+                  value={editForm.emergency_contact_phone || ''}
+                  onChange={e => setEditForm(f => ({ ...f, emergency_contact_phone: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Relationship</label>
+                <input
+                  type="text"
+                  maxLength={100}
+                  value={editForm.emergency_contact_relationship || ''}
+                  onChange={e => setEditForm(f => ({ ...f, emergency_contact_relationship: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+            {editError && <p className="text-sm text-red-500 mt-3">{editError}</p>}
+            {editSharedCount !== null ? (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                <p className="text-sm text-amber-800">This number is shared by {editSharedCount} patients. Change it for all of them?</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setEditSharedCount(null)}
+                    disabled={editSaving}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => submitEditDetails(true)}
+                    disabled={editSaving}
+                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition"
+                  >
+                    {editSaving ? 'Saving...' : 'Change for all'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={() => setEditOpen(false)}
+                  disabled={editSaving}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => submitEditDetails(false)}
+                  disabled={editSaving}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition"
+                >
+                  {editSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
