@@ -19,9 +19,13 @@ const ALLOWED_SETTINGS_KEYS = new Set([
   'booking_same_day', 'token_prefix', 'token_format',
   'weekly_off', 'avg_consultation_minutes', 'reset_time', 'max_tokens_per_day',
   'opening_time', 'closing_time',
+  'booking_mode',
   // Notifications
   'notification_reminder_hours', 'reminder_enabled', 'notification_channel',
 ])
+
+// How the clinic books: one token per patient per session, or a time-based appointment (the tenant_configs key booking_mode)
+const BOOKING_MODES = ['token', 'appointment']
 
 /**
  * GET /settings
@@ -87,6 +91,10 @@ async function updateSettings(req, res, next) {
       return errorResponse(res, `Invalid settings keys: ${rejectedKeys.join(', ')}`, 400)
     }
 
+    if (Object.prototype.hasOwnProperty.call(updates, 'booking_mode') && !BOOKING_MODES.includes(updates.booking_mode)) {
+      return errorResponse(res, `booking_mode must be one of: ${BOOKING_MODES.join(', ')}`, 400)
+    }
+
     for (const [key, value] of Object.entries(updates)) {
       if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
         await TenantService.setConfig(req.tenantId, key, value.toString())
@@ -115,6 +123,8 @@ async function getClinicSettings(req, res, next) {
         clinicProfile[key.replace('clinic_', '')] = value
       }
     }
+    // The booking mode ('token' when it is not set)
+    clinicProfile.booking_mode = configs.booking_mode === 'appointment' ? 'appointment' : 'token'
 
     return successResponse(res, clinicProfile)
   } catch (err) {

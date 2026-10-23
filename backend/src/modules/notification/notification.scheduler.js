@@ -35,9 +35,13 @@ cron.schedule('0 8 * * *', async () => {
 
       for (const booking of bookings.rows) {
         try {
-          const appointmentTime = booking.slot_time
-            ? `${booking.slot_time} session, Token #${booking.token_number}`
-            : `Token #${booking.token_number}`
+          // A time-based booking has no token number: say the time instead of "Token #null"
+          const clockText = (t) => { const [h, m] = String(t).split(':'); const hr = parseInt(h, 10); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` }
+          const appointmentTime = booking.token_number == null
+            ? (booking.slot_time ? `at ${clockText(booking.slot_time)}` : 'today')
+            : (booking.slot_time
+              ? `${booking.slot_time} session, Token #${booking.token_number}`
+              : `Token #${booking.token_number}`)
           await runAsTenant(booking.tenant_id, () => sendTemplateMessage(booking.phone, 'appointment_reminder_v2_', 'en', [
             {
               type: 'body',

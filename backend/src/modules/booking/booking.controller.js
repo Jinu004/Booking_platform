@@ -362,7 +362,8 @@ async function createManualBooking(req, res, next) {
     );
     if (dupCheck.rows.length) {
       await client.query('ROLLBACK');
-      return errorResponse(res, `This patient already has Token #${dupCheck.rows[0].token_number} with this doctor today`, 409);
+      const existingToken = dupCheck.rows[0].token_number
+      return errorResponse(res, `This patient already has ${existingToken == null ? 'a booking' : `Token #${existingToken}`} with this doctor today`, 409);
     }
 
     // Find or create customer

@@ -3,6 +3,7 @@ const pool = require('../../../config/database');
 const { successResponse, errorResponse } = require('../../../utils/response');
 const { sendTemplateMessage } = require('../../channel/whatsapp/whatsapp.adapter');
 const { runAsTenant } = require('../../channel/whatsapp/senderContext');
+const { normalizeCustomerPhone } = require('../../../utils/phone');
 
 // Sentinel value used to soft-delete doctors from token queues
 // clinic.model.js getDoctors filters out records where leave_days equals this value
@@ -337,9 +338,62 @@ async function getAvailableSlots(req, res, next) {
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const { date, duration } = req.query;
     if (!date || !isISODate(date)) return errorResponse(res, 'Valid date (YYYY-MM-DD) is required', 400);
-    if (!duration || isNaN(parseInt(duration))) return errorResponse(res, 'duration (minutes) is required', 400);
-    const slots = await ClinicModel.getAvailableSlots(pool, tenantId, id, date, parseInt(duration));
+    let durationMinutes = parseInt(duration);
+    if (!duration || isNaN(durationMinutes)) {
+      // Only an appointment-mode clinic may leave the duration out: the doctor's visit length is used. Token mode is unchanged.
+      if ((await ClinicModel.getBookingMode(pool, tenantId)) !== 'appointment') return errorResponse(res, 'duration (minutes) is required', 400);
+      const doctor = await ClinicModel.getDoctorById(pool, tenantId, id);
+      if (!doctor) return errorResponse(res, 'Not found', 404);
+      durationMinutes = ClinicModel.getVisitLengthMinutes(doctor.avg_consultation_minutes);
+    }
+    const slots = await ClinicModel.getAvailableSlots(pool, tenantId, id, date, durationMinutes);
     return successResponse(res, slots);
+  } catch (err) { next(err); }
+}
+
+/**
+ * POST /clinic/doctors/:id/appointment-booking
+ * Staff books a time-based appointment (appointment mode only). Body: patient_name, phone, date, start_time (HH:MM), notes?, marketing_consent?
+ * The visit length is the doctor's average consultation time (15 minutes when not set). 409 when the time overlaps another time-based booking.
+ */
+async function createAppointmentBooking(req, res, next) {
+  try {
+    const tenantId = req.tenantId || req.tenant?.id;
+    const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
+    const { patient_name, phone, date, start_time, notes, marketing_consent } = req.body;
+
+    const patientName = String(patient_name || '').trim().replace(/<[^>]*>/g, '').slice(0, 255);
+    if (!patientName) return errorResponse(res, 'patient_name is required', 400);
+    const normalizedPhone = normalizeCustomerPhone(phone);
+    if (!normalizedPhone) return errorResponse(res, 'Please enter a valid phone number: +91 and 10 digits for India, or + and the country code for other countries.', 400);
+    if (!date || !isISODate(date)) return errorResponse(res, 'Valid date (YYYY-MM-DD) is required', 400);
+    const timeMatch = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(start_time || '').trim());
+    if (!timeMatch) return errorResponse(res, 'Invalid start_time. Use HH:MM', 400);
+    const startTime = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+
+    const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const todayStr = `${todayIST.getFullYear()}-${String(todayIST.getMonth() + 1).padStart(2, '0')}-${String(todayIST.getDate()).padStart(2, '0')}`;
+    if (date < todayStr) return errorResponse(res, 'Cannot book an appointment in the past', 400);
+    if (date === todayStr && (parseInt(timeMatch[1], 10) * 60 + parseInt(timeMatch[2], 10)) <= todayIST.getHours() * 60 + todayIST.getMinutes()) {
+      return errorResponse(res, 'Cannot book an appointment at a time that has already passed', 400);
+    }
+
+    // The doctor must belong to this clinic (an id from another clinic answers the same 404 as an unknown id)
+    if (!(await doctorInTenant(tenantId, id))) return errorResponse(res, 'Not found', 404);
+    if ((await ClinicModel.getBookingMode(pool, tenantId)) !== 'appointment') {
+      return errorResponse(res, 'Appointment booking is not turned on for this clinic', 409);
+    }
+
+    const booking = await ClinicModel.createAppointmentBooking(pool, tenantId, id, {
+      patientName,
+      phone: normalizedPhone,
+      notes: String(notes || '').trim().replace(/<[^>]*>/g, '').slice(0, 2000),
+      date,
+      startTime,
+      marketingConsent: marketing_consent
+    });
+    return successResponse(res, booking, 201);
   } catch (err) { next(err); }
 }
 
@@ -449,5 +503,6 @@ module.exports = {
   deleteProcedure,
   getAvailableSlots,
   createProcedureBooking,
+  createAppointmentBooking,
   cancelProcedureBooking
 };

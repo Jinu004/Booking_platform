@@ -9,6 +9,23 @@ class BookingError extends Error {
   }
 }
 
+const minutesOf = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
+const timeOf = (mins) => `${Math.floor(mins / 60).toString().padStart(2, '0')}:${(mins % 60).toString().padStart(2, '0')}`;
+
+// The length of one time-based visit (appointment, or a booking without an end time): the doctor's average
+// consultation time when it is set and greater than zero, otherwise 15 minutes. The one place this default lives.
+const DEFAULT_VISIT_MINUTES = 15;
+function getVisitLengthMinutes(avgConsultationMinutes) {
+  const minutes = parseInt(avgConsultationMinutes, 10);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_VISIT_MINUTES;
+}
+
+// The clinic's booking mode, from the tenant_configs key booking_mode. Anything but 'appointment' (or no value) is 'token'.
+async function getBookingMode(pool, tenantId) {
+  const res = await pool.query(`SELECT value FROM tenant_configs WHERE tenant_id = $1 AND key = 'booking_mode'`, [tenantId]);
+  return res.rows[0]?.value === 'appointment' ? 'appointment' : 'token';
+}
+
 /**
  * Gets all doctors for a tenant
  * @param {object} pool
@@ -226,14 +243,18 @@ async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes
   }
   if (sessions.length === 0) return [];
 
-  const bookingsRes = await pool.query(`SELECT b.slot_time, b.end_time, b.booking_type, cd.avg_consultation_minutes FROM bookings b JOIN clinic_doctors cd ON cd.id = b.doctor_id WHERE b.tenant_id = $1 AND b.doctor_id = $2 AND b.booking_date = $3 AND b.status NOT IN ('cancelled', 'noshow') ORDER BY b.slot_time ASC`, [tenantId, doctorId, date]);
+  // Appointment mode: only time-based bookings (procedures and appointments) take time. Token mode is unchanged.
+  const appointmentMode = (await getBookingMode(pool, tenantId)) === 'appointment';
+  const bookingsRes = await pool.query(`SELECT b.slot_time, b.end_time, b.booking_type, cd.avg_consultation_minutes FROM bookings b JOIN clinic_doctors cd ON cd.id = b.doctor_id WHERE b.tenant_id = $1 AND b.doctor_id = $2 AND b.booking_date = $3 AND b.status NOT IN ('cancelled', 'noshow')${appointmentMode ? " AND b.booking_type IN ('procedure', 'appointment')" : ''} ORDER BY b.slot_time ASC`, [tenantId, doctorId, date]);
   const bookedSlots = bookingsRes.rows;
 
   const availableSlots = [];
   for (const session of sessions) {
     let cursor = toMinutes(session.start_time);
     const sessionEnd = toMinutes(session.end_time);
-    const avgMins = bookedSlots.length > 0 ? (parseInt(bookedSlots[0].avg_consultation_minutes) || 20) : 20;
+    const avgMins = appointmentMode
+      ? getVisitLengthMinutes(bookedSlots[0]?.avg_consultation_minutes)
+      : (bookedSlots.length > 0 ? (parseInt(bookedSlots[0].avg_consultation_minutes) || 20) : 20);
     const bookedInSession = bookedSlots
       .filter(b => b.slot_time && toMinutes(b.slot_time) >= cursor && toMinutes(b.slot_time) < sessionEnd)
       .map(b => ({ start: toMinutes(b.slot_time), end: b.end_time ? toMinutes(b.end_time) : toMinutes(b.slot_time) + avgMins }))
@@ -267,39 +288,47 @@ async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes
   return availableSlots;
 }
 
+// Locks the doctor row (the same first step as the normal booking flow: createManualBooking and the AI booking tools), so
+// bookings for the same doctor are handled one after the other, and returns the doctor row. 404 when the doctor is not in this clinic.
+async function lockDoctor(client, tenantId, doctorId) {
+  const doctorLock = await client.query(
+    'SELECT id, name, avg_consultation_minutes FROM clinic_doctors WHERE id = $1 AND tenant_id = $2 FOR UPDATE',
+    [doctorId, tenantId]
+  );
+  if (!doctorLock.rows.length) {
+    throw new BookingError('Not found', 404);
+  }
+  return doctorLock.rows[0];
+}
+
+// Throws 409 when [startTime, endTime) overlaps a booking of this doctor. Cancelled and no-show bookings are ignored, as in
+// getAvailableSlots, so a slot the screen offers as free is never refused here. Time-based bookings (procedure, appointment)
+// conflict when their time windows overlap. With includeTokenBookings, a normal booking whose slot_time falls inside the window
+// conflicts too (the procedure rule); an appointment only competes with other time-based bookings.
+async function assertNoOverlap(client, tenantId, doctorId, date, startTime, endTime, includeTokenBookings) {
+  const conflictRes = await client.query(
+    `SELECT id FROM bookings
+     WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
+     AND status NOT IN ('cancelled', 'noshow')
+     AND slot_time IS NOT NULL
+     AND (
+       ${includeTokenBookings ? "((booking_type IS NULL OR booking_type NOT IN ('procedure', 'appointment')) AND slot_time::time >= $4::time AND slot_time::time < $5::time) OR" : ''}
+       (booking_type IN ('procedure', 'appointment') AND end_time IS NOT NULL AND slot_time::time < $5::time AND end_time::time > $4::time)
+     )
+     LIMIT 1`,
+    [tenantId, doctorId, date, startTime, endTime]
+  );
+  if (conflictRes.rows.length > 0) {
+    throw new BookingError('That time is already booked for this doctor', 409);
+  }
+}
+
 async function createProcedureBooking(pool, tenantId, doctorId, procedureId, customerId, patientId, patientName, date, startTime, endTime) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Lock the doctor row first, the same first step as the normal booking flow (createManualBooking and the AI booking tools),
-    // so two procedure bookings, or a procedure and a normal booking, for the same doctor are handled one after the other.
-    const doctorLock = await client.query(
-      'SELECT id FROM clinic_doctors WHERE id = $1 AND tenant_id = $2 FOR UPDATE',
-      [doctorId, tenantId]
-    );
-    if (!doctorLock.rows.length) {
-      throw new BookingError('Not found', 404);
-    }
-
-    // Overlap with normal bookings (their slot_time falls inside the procedure window) or with another procedure of this
-    // doctor (the two time windows overlap). Cancelled and no-show bookings are ignored, as in getAvailableSlots,
-    // so a slot the screen offers as free is never refused here.
-    const conflictRes = await client.query(
-      `SELECT id FROM bookings
-       WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
-       AND status NOT IN ('cancelled', 'noshow')
-       AND slot_time IS NOT NULL
-       AND (
-         ((booking_type IS NULL OR booking_type != 'procedure') AND slot_time::time >= $4::time AND slot_time::time < $5::time)
-         OR
-         (booking_type = 'procedure' AND end_time IS NOT NULL AND slot_time::time < $5::time AND end_time::time > $4::time)
-       )
-       LIMIT 1`,
-      [tenantId, doctorId, date, startTime, endTime]
-    );
-    if (conflictRes.rows.length > 0) {
-      throw new BookingError('That time is already booked for this doctor', 409);
-    }
+    await lockDoctor(client, tenantId, doctorId);
+    await assertNoOverlap(client, tenantId, doctorId, date, startTime, endTime, true);
     const bookingRes = await client.query(
       `INSERT INTO bookings (tenant_id, doctor_id, customer_id, patient_id, patient_name, booking_date, slot_time, end_time, booking_type, procedure_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'procedure', $9, 'confirmed') RETURNING *`,
       [tenantId, doctorId, customerId, patientId || null, patientName, date, startTime, endTime, procedureId]
@@ -339,6 +368,93 @@ async function createProcedureBooking(pool, tenantId, doctorId, procedureId, cus
     );
 
     await client.query('COMMIT');
+    return booking;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Creates a time-based appointment for a doctor (appointment mode): no token, no schedule_overrides cut.
+ * The visit lasts getVisitLengthMinutes(doctor) from startTime. The customer and patient are found or created
+ * as in the manual booking path. All writes are one transaction under the doctor row lock.
+ * @param {{ patientName: string, phone: string, notes?: string, date: string, startTime: string (HH:MM), marketingConsent?: string }} input
+ */
+async function createAppointmentBooking(pool, tenantId, doctorId, input) {
+  const { patientName, phone, notes, date, startTime, marketingConsent } = input;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const doctor = await lockDoctor(client, tenantId, doctorId);
+
+    const startMins = minutesOf(startTime);
+    const endMins = startMins + getVisitLengthMinutes(doctor.avg_consultation_minutes);
+    if (endMins > 24 * 60) throw new BookingError('That appointment would run past midnight', 400);
+    const endTime = timeOf(endMins);
+
+    // The visit must fit inside one session of that day (when the doctor has sessions on it, as in the manual booking path)
+    const overrideRes = await client.query(`SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`, [tenantId, doctorId, date]);
+    let sessions;
+    if (overrideRes.rows.length > 0) {
+      sessions = overrideRes.rows[0].sessions;
+    } else {
+      const dow = new Date(date).getDay();
+      const schedRes = await client.query(`SELECT start_time, end_time FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true`, [tenantId, doctorId, dow]);
+      sessions = schedRes.rows;
+    }
+    if (sessions.length > 0 && !sessions.some(s => startMins >= minutesOf(s.start_time) && endMins <= minutesOf(s.end_time))) {
+      throw new BookingError('That time is outside the doctor\'s session hours', 409);
+    }
+
+    await assertNoOverlap(client, tenantId, doctorId, date, startTime, endTime, false);
+
+    // Find or create the customer and the patient, as the manual booking path does
+    const cusRes = await client.query('SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1', [tenantId, phone]);
+    let customerId;
+    if (cusRes.rows.length > 0) {
+      customerId = cusRes.rows[0].id;
+    } else {
+      const insertCus = await client.query('INSERT INTO customers (tenant_id, phone, name) VALUES ($1, $2, $3) RETURNING id', [tenantId, phone, patientName]);
+      customerId = insertCus.rows[0].id;
+    }
+    if (['all', 'checkups', 'none'].includes(marketingConsent)) {
+      await client.query(
+        `UPDATE customers SET marketing_consent = $1, consent_at = NOW(), consent_source = 'staff' WHERE id = $2 AND tenant_id = $3`,
+        [marketingConsent, customerId, tenantId]
+      );
+    }
+    const existingPatient = await client.query(
+      `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
+      [tenantId, customerId, patientName]
+    );
+    let patientId;
+    if (existingPatient.rows.length > 0) {
+      patientId = existingPatient.rows[0].id;
+    } else {
+      const newPatient = await client.query(
+        `INSERT INTO patients (tenant_id, customer_id, name, phone)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
+        [tenantId, customerId, patientName, phone]
+      );
+      patientId = newPatient.rows[0]?.id || null;
+    }
+
+    const bookingRes = await client.query(
+      `INSERT INTO bookings (tenant_id, customer_id, doctor_id, source, status, booking_date, notes, patient_name, patient_id, slot_time, end_time, booking_type)
+       VALUES ($1, $2, $3, 'dashboard', 'confirmed', $4, $5, $6, $7, $8, $9, 'appointment')
+       RETURNING *`,
+      [tenantId, customerId, doctorId, date, notes || '', patientName, patientId, startTime, endTime]
+    );
+
+    await client.query('COMMIT');
+    const booking = bookingRes.rows[0];
+    booking.patient_phone = phone;
+    booking.doctor_name = doctor.name;
     return booking;
   } catch (err) {
     await client.query('ROLLBACK');
@@ -435,6 +551,9 @@ module.exports = {
   deleteProcedure,
   getAvailableSlots,
   createProcedureBooking,
+  createAppointmentBooking,
+  getBookingMode,
+  getVisitLengthMinutes,
   cancelProcedureBooking,
   rebuildScheduleOverridesAfterCancel
 };
