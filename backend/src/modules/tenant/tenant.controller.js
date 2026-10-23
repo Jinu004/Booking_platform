@@ -92,6 +92,7 @@ const RESERVED_CONFIG_KEYS = new Set([
   'proactive_templates_enabled',
   'code_booking_flow',
   'ai_appointment_booking',
+  'media_auto_reply',
   'plan_override',
   'quota_override'
 ]);

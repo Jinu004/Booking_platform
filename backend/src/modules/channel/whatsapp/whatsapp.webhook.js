@@ -301,6 +301,13 @@ router.post('/', async (req, res) => {
       // Replies to this message use the clinic's own Meta token when it has one (the shared token otherwise)
       if (source === 'meta') await senderContext.setTenantAccessToken(tenant.id)
 
+      // Non-text messages (voice notes, images, documents, ...): stored as a placeholder and answered once in media.inbound.js.
+      // Handled completely here, before the consent, human-mode, appointment, code-flow and AI steps below.
+      if (message.kind === 'media') {
+        await require('./media.inbound').handleInboundMedia({ tenant, message, source })
+        return
+      }
+
       const ConversationService = require('../../conversation/conversation.service')
       const context = await ConversationService.handleIncomingMessage(tenant, message)
       logger.info(`Conversation ${context.conversation.id} updated`)

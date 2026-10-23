@@ -181,7 +181,26 @@ function parseIncomingMessage(payload) {
     const message = value?.messages?.[0]
 
     if (!message) return null
-    if (message.type !== 'text' && message.type !== 'interactive' && message.type !== 'button') return null
+    if (message.type !== 'text' && message.type !== 'interactive' && message.type !== 'button') {
+      // Voice notes, images, videos, documents, stickers, locations, contacts, reactions and anything else: a light result with no
+      // text and no media id. It is handled completely by media.inbound.js (message.id is the message id, kept only for the dedupe).
+      if (!message.id || !message.from) return null
+      const knownMedia = ['audio', 'image', 'video', 'document', 'sticker', 'location', 'contacts', 'reaction']
+      const mediaType = knownMedia.includes(message.type) ? message.type : 'other'
+      return {
+        kind: 'media',
+        mediaType,
+        id: message.id,
+        messageId: message.id,
+        from: `+${message.from}`,
+        to: `+${value?.metadata?.display_phone_number}`,
+        timestamp: message.timestamp,
+        type: mediaType,
+        message: '',
+        customerName: value?.contacts?.[0]?.profile?.name || '',
+        provider: 'meta'
+      }
+    }
 
     let messageText = ''
     let interactiveId = null

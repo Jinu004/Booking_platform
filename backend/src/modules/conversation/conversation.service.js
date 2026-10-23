@@ -86,6 +86,47 @@ async function handleIncomingMessage(tenant, message) {
 }
 
 /**
+ * Finds or creates the customer and the open conversation for a non-text message (voice note, image, ...).
+ * Unlike handleIncomingMessage it does not touch the Redis session, so a booking flow in progress keeps its state.
+ * last_inbound_at is updated (the 24-hour window) unless updateWindow is false (reactions).
+ *
+ * @returns {Promise<{ conversation: object, customer: object }>}
+ */
+async function handleIncomingMediaMessage(tenant, message, { updateWindow = true } = {}) {
+  const CRMService = require('../crm/crm.service');
+
+  let customer = { id: null };
+  try {
+    customer = await CRMService.findOrCreateCustomer(tenant.id, message.from, message.customerName || '');
+  } catch (err) {
+    logger.warn('Failed to find/create customer for a media message, proceeding with null ID:', err.message);
+  }
+
+  let conversation = null;
+  if (customer.id) {
+    conversation = await ConversationModel.getActiveConversation(pool, tenant.id, customer.id);
+  }
+  if (!conversation) {
+    conversation = await ConversationModel.createConversation(pool, tenant.id, customer.id, message.provider);
+    broadcastToTenant(tenant.id, 'new_conversation', {
+      conversationId: conversation.id,
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    await ConversationModel.touchConversation(pool, tenant.id, conversation.id);
+  }
+
+  if (updateWindow) {
+    pool.query(
+      'UPDATE conversations SET last_inbound_at = NOW() WHERE id = $1 AND tenant_id = $2',
+      [conversation.id, tenant.id]
+    ).catch(err => logger.warn(`LAST_INBOUND_UPDATE_FAILED ${String(err?.message || 'error').slice(0, 120)}`));
+  }
+
+  return { conversation, customer };
+}
+
+/**
  * Saves outbound message from AI or staff
  *
  * @param {string} conversationId
@@ -143,6 +184,7 @@ async function escalateToHuman(tenantId, conversationId, staffId) {
 
 module.exports = {
   handleIncomingMessage,
+  handleIncomingMediaMessage,
   saveOutboundMessage,
   saveInboundMessage,
   resolveConversation,

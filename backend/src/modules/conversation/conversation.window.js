@@ -32,7 +32,7 @@ async function isWindowOpen(tenantId, { conversationId, phone } = {}) {
       `SELECT COALESCE(
                 GREATEST(
                   c.last_inbound_at,
-                  (SELECT MAX(m.created_at) AT TIME ZONE 'UTC' FROM messages m WHERE m.conversation_id = c.id AND m.role = 'user')
+                  (SELECT MAX(m.created_at) AT TIME ZONE 'UTC' FROM messages m WHERE m.conversation_id = c.id AND m.role = 'user' AND COALESCE(m.type, 'text') <> 'reaction')
                 ) > NOW() - INTERVAL '23 hours 55 minutes', false) AS open
        FROM conversations c
        WHERE c.id = $2 AND c.tenant_id = $1`,
@@ -47,7 +47,7 @@ async function isWindowOpen(tenantId, { conversationId, phone } = {}) {
       `SELECT COALESCE(
                 MAX(GREATEST(
                   c.last_inbound_at,
-                  (SELECT MAX(m.created_at) AT TIME ZONE 'UTC' FROM messages m WHERE m.conversation_id = c.id AND m.role = 'user')
+                  (SELECT MAX(m.created_at) AT TIME ZONE 'UTC' FROM messages m WHERE m.conversation_id = c.id AND m.role = 'user' AND COALESCE(m.type, 'text') <> 'reaction')
                 )) > NOW() - INTERVAL '23 hours 55 minutes', false) AS open
        FROM customers cu
        JOIN conversations c ON c.customer_id = cu.id AND c.tenant_id = cu.tenant_id
