@@ -381,10 +381,15 @@ async function createProcedureBooking(pool, tenantId, doctorId, procedureId, cus
  * Creates a time-based appointment for a doctor (appointment mode): no token, no schedule_overrides cut.
  * The visit lasts getVisitLengthMinutes(doctor) from startTime. The customer and patient are found or created
  * as in the manual booking path. All writes are one transaction under the doctor row lock.
- * @param {{ patientName: string, phone: string, notes?: string, date: string, startTime: string (HH:MM), marketingConsent?: string }} input
+ * Optional inputs: source ('dashboard' or 'whatsapp', anything else is 'dashboard') and patientId (an existing patient of the
+ * customer with this phone: used instead of looking up or creating a patient by name; 404 if it is not a patient of this clinic,
+ * 400 if it belongs to another phone number).
+ * Returns the booking row plus patient_phone, doctor_name and a confirmation object (booking_id, doctor_name, date, start_time, end_time).
+ * @param {{ patientName: string, phone: string, notes?: string, date: string, startTime: string (HH:MM), marketingConsent?: string, source?: string, patientId?: string }} input
  */
 async function createAppointmentBooking(pool, tenantId, doctorId, input) {
-  const { patientName, phone, notes, date, startTime, marketingConsent } = input;
+  const { patientName, phone, notes, date, startTime, marketingConsent, patientId: patientIdInput } = input;
+  const bookingSource = input.source === 'whatsapp' ? 'whatsapp' : 'dashboard';
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -417,6 +422,8 @@ async function createAppointmentBooking(pool, tenantId, doctorId, input) {
     if (cusRes.rows.length > 0) {
       customerId = cusRes.rows[0].id;
     } else {
+      // A given patient must already belong to this phone number's customer: there is none yet
+      if (patientIdInput) throw new BookingError('That patient does not belong to this phone number', 400);
       const insertCus = await client.query('INSERT INTO customers (tenant_id, phone, name) VALUES ($1, $2, $3) RETURNING id', [tenantId, phone, patientName]);
       customerId = insertCus.rows[0].id;
     }
@@ -426,35 +433,47 @@ async function createAppointmentBooking(pool, tenantId, doctorId, input) {
         [marketingConsent, customerId, tenantId]
       );
     }
-    const existingPatient = await client.query(
-      `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
-      [tenantId, customerId, patientName]
-    );
     let patientId;
-    if (existingPatient.rows.length > 0) {
-      patientId = existingPatient.rows[0].id;
+    let bookedName = patientName;
+    if (patientIdInput) {
+      // Use this exact patient (looked up by id and clinic), and the name stored for it
+      const givenPatient = await client.query('SELECT id, name, customer_id FROM patients WHERE id = $1 AND tenant_id = $2', [patientIdInput, tenantId]);
+      if (!givenPatient.rows.length) throw new BookingError('Patient not found', 404);
+      if (givenPatient.rows[0].customer_id !== customerId) throw new BookingError('That patient does not belong to this phone number', 400);
+      patientId = givenPatient.rows[0].id;
+      bookedName = givenPatient.rows[0].name;
     } else {
-      const newPatient = await client.query(
-        `INSERT INTO patients (tenant_id, customer_id, name, phone)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
-         RETURNING id`,
-        [tenantId, customerId, patientName, phone]
+      const existingPatient = await client.query(
+        `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
+        [tenantId, customerId, patientName]
       );
-      patientId = newPatient.rows[0]?.id || null;
+      if (existingPatient.rows.length > 0) {
+        patientId = existingPatient.rows[0].id;
+      } else {
+        const newPatient = await client.query(
+          `INSERT INTO patients (tenant_id, customer_id, name, phone)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
+           RETURNING id`,
+          [tenantId, customerId, patientName, phone]
+        );
+        patientId = newPatient.rows[0]?.id || null;
+      }
     }
 
     const bookingRes = await client.query(
       `INSERT INTO bookings (tenant_id, customer_id, doctor_id, source, status, booking_date, notes, patient_name, patient_id, slot_time, end_time, booking_type)
-       VALUES ($1, $2, $3, 'dashboard', 'confirmed', $4, $5, $6, $7, $8, $9, 'appointment')
+       VALUES ($1, $2, $3, $10, 'confirmed', $4, $5, $6, $7, $8, $9, 'appointment')
        RETURNING *`,
-      [tenantId, customerId, doctorId, date, notes || '', patientName, patientId, startTime, endTime]
+      [tenantId, customerId, doctorId, date, notes || '', bookedName, patientId, startTime, endTime, bookingSource]
     );
 
     await client.query('COMMIT');
     const booking = bookingRes.rows[0];
     booking.patient_phone = phone;
     booking.doctor_name = doctor.name;
+    // What a confirmation message needs (date as plain YYYY-MM-DD text)
+    booking.confirmation = { booking_id: booking.id, doctor_name: doctor.name, date, start_time: startTime, end_time: endTime };
     return booking;
   } catch (err) {
     await client.query('ROLLBACK');

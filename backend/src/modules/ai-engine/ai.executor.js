@@ -2,6 +2,24 @@ const pool = require('../../config/database')
 const logger = require('../../utils/logger')
 
 // Escape special LIKE pattern characters to prevent unexpected query behavior
+// "Sat 25 Oct, 5:00 PM" for a booking date (a Date from the database or YYYY-MM-DD text) and an optional HH:MM time
+function formatBookingWhen(bookingDate, slotTime) {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  let y, m, d
+  if (bookingDate instanceof Date) {
+    y = bookingDate.getFullYear(); m = bookingDate.getMonth() + 1; d = bookingDate.getDate()
+  } else {
+    ;[y, m, d] = String(bookingDate || '').slice(0, 10).split('-').map(Number)
+  }
+  const dt = new Date(y, (m || 1) - 1, d || 1)
+  const dayText = isNaN(dt.getTime()) ? String(bookingDate) : `${days[dt.getDay()]} ${dt.getDate()} ${months[dt.getMonth()]}`
+  if (!slotTime) return dayText
+  const [h, min] = String(slotTime).split(':').map(Number)
+  if (!Number.isFinite(h) || !Number.isFinite(min)) return dayText
+  return `${dayText}, ${h % 12 || 12}:${String(min).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+}
+
 function escapeLike(str) {
   return str.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
@@ -1658,13 +1676,15 @@ For queries, contact us: ${contactPhoneFB}`
       case 'cancel_booking': {
         const { booking_id } = args
         const bookingCheck = await pool.query(
-          `SELECT booking_type, token_number FROM bookings WHERE id = $1 AND tenant_id = $2 AND customer_id = $3`,
+          `SELECT b.booking_type, b.token_number, b.booking_date, b.slot_time, cd.name AS doctor_name
+           FROM bookings b LEFT JOIN clinic_doctors cd ON cd.id = b.doctor_id
+           WHERE b.id = $1 AND b.tenant_id = $2 AND b.customer_id = $3`,
           [booking_id, tenant.id, customer?.id || null]
         )
         if (!bookingCheck.rows.length) {
           return { success: false, message: 'Booking not found or already cancelled.' }
         }
-        const { booking_type, token_number } = bookingCheck.rows[0]
+        const { booking_type, token_number, booking_date: cancelDate, slot_time: cancelTime, doctor_name: cancelDoctor } = bookingCheck.rows[0]
         if (booking_type === 'procedure') {
           const ClinicModel = require('../industries/clinic/clinic.model')
           await ClinicModel.cancelProcedureBooking(pool, tenant.id, booking_id)
@@ -1685,7 +1705,10 @@ For queries, contact us: ${contactPhoneFB}`
         }
         return {
           success: true,
-          message: `Token #${token_number} has been cancelled successfully.`
+          // A booking without a token number (appointment, procedure) is described by its date, time and doctor
+          message: token_number != null
+            ? `Token #${token_number} has been cancelled successfully.`
+            : `Your booking on ${formatBookingWhen(cancelDate, cancelTime)}${cancelDoctor ? ` with ${cancelDoctor}` : ''} has been cancelled successfully.`
         }
       }
 
@@ -1721,6 +1744,10 @@ For queries, contact us: ${contactPhoneFB}`
           }
           const fmtTime = (t) => { if (!t) return ''; const [h, m] = t.toString().split(':').map(Number); return ` at ${h > 12 ? h - 12 : h || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`; };
           const session = fmtTime(b.slot_time);
+          if (b.token_number == null) {
+            // No token number: show the date, time and doctor instead of "Token #null"
+            return `• Booking${patientLabel} with ${b.doctor_name} on ${formatBookingWhen(b.booking_date, b.slot_time)} (${b.status})`;
+          }
           return `• Token #${b.token_number}${patientLabel} with ${b.doctor_name} on ${date}${session} (${b.status})`;
         })
         return {
