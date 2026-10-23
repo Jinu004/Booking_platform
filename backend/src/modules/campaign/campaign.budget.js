@@ -14,21 +14,42 @@ function isSendWindowOpen() {
 }
 
 /**
- * The ONE definition of "first campaign" (preview, confirm and sender all get it through getBudgetSnapshot below).
- * A campaign is the first one only if no OTHER campaign of the clinic has sent anything (a recipient with sent_at set),
- * whatever that campaign's status is: completed, cancelled or paused all count once they sent. The campaign's own sent rows
- * do not count, so it stays "first" (and capped) until it ends.
+ * The ONE definition of the first-campaign cap (preview, confirm and sender all get it through getBudgetSnapshot below).
+ * The cap is cumulative: a clinic's campaigns are capped until the clinic has sent FIRST_CAMPAIGN_LIMIT campaign messages in total.
+ * "Sent" means a recipient with sent_at set, in any campaign and any status (failed unknown-state sends count too).
+ *
+ * For one campaign: the messages the clinic's OTHER campaigns sent decide whether this campaign is capped (fewer than the limit),
+ * and this campaign may then put out at most limit - (others' sends) messages in total. Its own sends are not used to lift the cap,
+ * so a campaign that started under the cap stays capped until it ends (never looser than the old "first campaign" rule).
+ * @returns {Promise<{ capped: boolean, remaining: number|null }>} remaining is null when the campaign is not capped
  */
-async function isFirstCampaign(tenantId, campaignId) {
+async function getFirstCampaignCap(tenantId, campaignId) {
   const res = await pool.query(
-    `SELECT NOT EXISTS (
-       SELECT 1 FROM campaigns cp
-       WHERE cp.tenant_id = $1 AND cp.id <> $2
-         AND EXISTS (SELECT 1 FROM campaign_recipients r WHERE r.campaign_id = cp.id AND r.sent_at IS NOT NULL)
-     ) AS is_first`,
+    `SELECT
+       (SELECT COUNT(*)::int FROM campaign_recipients WHERE tenant_id = $1 AND campaign_id <> $2 AND sent_at IS NOT NULL) AS sent_other,
+       (SELECT COUNT(*)::int FROM campaign_recipients WHERE tenant_id = $1 AND campaign_id = $2 AND sent_at IS NOT NULL) AS sent_this`,
     [tenantId, campaignId]
   )
-  return res.rows[0].is_first === true
+  const { sent_other: sentOther, sent_this: sentThis } = res.rows[0]
+  if (sentOther >= C.FIRST_CAMPAIGN_LIMIT) return { capped: false, remaining: null }
+  return { capped: true, remaining: Math.max(0, C.FIRST_CAMPAIGN_LIMIT - sentOther - sentThis) }
+}
+
+/**
+ * Messages still allowed under the cumulative cap for the whole clinic: the limit minus every campaign message it has sent
+ * (all campaigns, sent_at set), never below 0. 0 means the cap no longer applies to new campaigns.
+ */
+async function getFirstCampaignRemaining(tenantId) {
+  const res = await pool.query(
+    `SELECT COUNT(*)::int AS sent FROM campaign_recipients WHERE tenant_id = $1 AND sent_at IS NOT NULL`,
+    [tenantId]
+  )
+  return Math.max(0, C.FIRST_CAMPAIGN_LIMIT - res.rows[0].sent)
+}
+
+/** True while this campaign is under the first-campaign cap (kept for callers that need a boolean) */
+async function isFirstCampaign(tenantId, campaignId) {
+  return (await getFirstCampaignCap(tenantId, campaignId)).capped
 }
 
 /**
@@ -67,16 +88,17 @@ async function getDailyAllowance(tenantId, readinessDetails) {
 async function getBudgetSnapshot(tenantId, campaignId, readinessDetails) {
   const { limit, budget, used, remaining } = await getDailyAllowance(tenantId, readinessDetails)
 
-  // First campaign of the clinic: capped in total
-  const isFirst = await isFirstCampaign(tenantId, campaignId)
+  // Cumulative first-campaign cap: capped until the clinic has sent FIRST_CAMPAIGN_LIMIT campaign messages in total
+  const cap = await getFirstCampaignCap(tenantId, campaignId)
+  const isFirst = cap.capped
+  const clinicRemaining = await getFirstCampaignRemaining(tenantId)
   const firstRes = await pool.query(
-    `SELECT (SELECT COUNT(*)::int FROM campaign_recipients WHERE campaign_id = $2 AND sent_at IS NOT NULL) AS sent_total,
-            (SELECT COUNT(*)::int FROM campaign_recipients WHERE campaign_id = $2 AND sent_at > now() - interval '24 hours') AS sent_24h,
+    `SELECT (SELECT COUNT(*)::int FROM campaign_recipients WHERE campaign_id = $2 AND sent_at > now() - interval '24 hours') AS sent_24h,
             (SELECT daily_cap FROM campaigns WHERE id = $2 AND tenant_id = $1) AS daily_cap`,
     [tenantId, campaignId]
   )
-  const { sent_total: sentTotal, sent_24h: sent24h, daily_cap: dailyCap } = firstRes.rows[0]
-  const firstCampaignRemaining = isFirst ? C.FIRST_CAMPAIGN_LIMIT - sentTotal : null
+  const { sent_24h: sent24h, daily_cap: dailyCap } = firstRes.rows[0]
+  const firstCampaignRemaining = isFirst ? cap.remaining : null
   const dailyCapRemaining = dailyCap && dailyCap > 0 ? dailyCap - sent24h : null
 
   const canSendNow =
@@ -92,6 +114,7 @@ async function getBudgetSnapshot(tenantId, campaignId, readinessDetails) {
     isFirstCampaign: isFirst,
     firstCampaignLimit: C.FIRST_CAMPAIGN_LIMIT,
     firstCampaignRemaining,
+    first_campaign_remaining: clinicRemaining, // the clinic-wide count under the cumulative cap (additive)
     dailyCap: dailyCap || null,
     dailyCapRemaining,
     canSendNow
@@ -110,4 +133,4 @@ function willSendNow(snapshot, pending) {
   return Math.max(0, count)
 }
 
-module.exports = { getBudgetSnapshot, getDailyAllowance, isFirstCampaign, willSendNow, isSendWindowOpen, DEFAULT_DAILY_LIMIT }
+module.exports = { getBudgetSnapshot, getDailyAllowance, isFirstCampaign, getFirstCampaignRemaining, willSendNow, isSendWindowOpen, DEFAULT_DAILY_LIMIT }
