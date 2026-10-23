@@ -11,6 +11,14 @@ const {
 } = require('../tenant/tenant.service');
 const { omitTenantSecrets } = require('../../utils/secretBox');
 const { fetchWabaInfo } = require('../waba/waba.info.service');
+const tenantModel = require('../tenant/tenant.model');
+const { logAction } = require('../../utils/audit');
+
+// The clinic's booking mode and its AI appointment switch, read from the two tenant_configs rows (additive fields on the tenant screens)
+function withBookingModeFields(row) {
+  const { booking_mode_raw: modeRaw, ai_appointment_booking_raw: aiRaw, ...rest } = row;
+  return { ...rest, booking_mode: modeRaw === 'appointment' ? 'appointment' : 'token', ai_appointment_booking: aiRaw === 'true' };
+}
 const { TemplateError } = require('../waba/waba.templates.service');
 
 // Connection flags for the tenant screens (the phone number id itself is not added to the response)
@@ -36,12 +44,14 @@ async function getAllTenants(req, res) {
              (SELECT COUNT(*) FROM customers cu WHERE cu.tenant_id = t.id) AS customer_count,
              (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'proactive_templates_enabled') AS proactive_templates_enabled,
              (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'recall_enabled') AS recall_enabled,
+             (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'booking_mode') AS booking_mode_raw,
+             (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'ai_appointment_booking') AS ai_appointment_booking_raw,
              (SELECT email FROM staff s WHERE s.tenant_id = t.id AND s.role = 'admin' LIMIT 1) AS email
       FROM tenants t
       ORDER BY t.created_at DESC
     `;
     const result = await pool.query(sql);
-    return successResponse(res, result.rows.map(withWhatsappFlags));
+    return successResponse(res, result.rows.map((row) => withBookingModeFields(withWhatsappFlags(row))));
   } catch (err) {
     logger.error('Error fetching all tenants:', err.message);
     return errorResponse(res, 'Failed to fetch tenants', 500);
@@ -62,7 +72,16 @@ async function getTenantDetails(req, res) {
       return errorResponse(res, 'Tenant not found', 404);
     }
 
-    return successResponse(res, withWhatsappFlags(omitTenantSecrets(result.rows[0])));
+    const modeRows = await pool.query(
+      `SELECT key, value FROM tenant_configs WHERE tenant_id = $1 AND key IN ('booking_mode', 'ai_appointment_booking')`,
+      [id]
+    );
+    const modeConfig = Object.fromEntries(modeRows.rows.map((r) => [r.key, r.value]));
+    return successResponse(res, withBookingModeFields({
+      ...withWhatsappFlags(omitTenantSecrets(result.rows[0])),
+      booking_mode_raw: modeConfig.booking_mode,
+      ai_appointment_booking_raw: modeConfig.ai_appointment_booking
+    }));
   } catch (err) {
     logger.error('Error fetching tenant details:', err.message);
     return errorResponse(res, 'Failed to fetch tenant', 500);
@@ -302,6 +321,63 @@ async function updateTenant(req, res) {
 }
 
 /**
+ * POST /superadmin/tenants/:id/booking-mode
+ * Body: { mode: 'token' | 'appointment' }
+ * Sets booking_mode and ai_appointment_booking together, in one transaction: 'appointment' turns both on, 'token' turns the AI switch off.
+ */
+async function setBookingMode(req, res) {
+  try {
+    const { id } = req.params;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id))) {
+      return errorResponse(res, 'Invalid tenant id', 400);
+    }
+    const exists = await pool.query('SELECT 1 FROM tenants WHERE id = $1', [id]);
+    if (exists.rows.length === 0) {
+      return errorResponse(res, 'Tenant not found', 404);
+    }
+    const mode = req.body && req.body.mode;
+    if (mode !== 'token' && mode !== 'appointment') {
+      return errorResponse(res, "mode must be 'token' or 'appointment'", 400);
+    }
+
+    const aiValue = mode === 'appointment' ? 'true' : 'false';
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await tenantModel.setTenantConfig(client, id, 'booking_mode', mode);
+      await tenantModel.setTenantConfig(client, id, 'ai_appointment_booking', aiValue);
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
+
+    // The configs are cached for 60 seconds: drop the copy so both values apply at once
+    try {
+      await require('../../config/redis').del(`tenant_configs:${id}`);
+    } catch (cacheErr) {
+      logger.warn('Config cache clear failed after booking mode change:', cacheErr.message);
+    }
+
+    await logAction({
+      tenantId: id,
+      staffId: req.staff?.id,
+      action: 'booking_mode_changed',
+      entityType: 'tenant',
+      entityId: id,
+      metadata: { mode },
+      ipAddress: req.ip
+    });
+    return successResponse(res, { mode, ai_appointment_booking: mode === 'appointment' });
+  } catch (err) {
+    logger.error('Error changing booking mode:', err.message);
+    return errorResponse(res, 'Failed to change the booking mode', 500);
+  }
+}
+
+/**
  * POST /superadmin/tenants/:id/sync-whatsapp-number
  * Copies the display number that Meta shows for the clinic's phone number id into tenants.whatsapp_number
  */
@@ -451,6 +527,7 @@ module.exports = {
   updateTenantStatus,
   updateTenant,
   syncWhatsappNumber,
+  setBookingMode,
   createTenant,
   getPlatformStats,
   clearTenantConversations,

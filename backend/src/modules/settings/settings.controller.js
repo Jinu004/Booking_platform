@@ -24,9 +24,6 @@ const ALLOWED_SETTINGS_KEYS = new Set([
   'notification_reminder_hours', 'reminder_enabled', 'notification_channel',
 ])
 
-// How the clinic books: one token per patient per session, or a time-based appointment (the tenant_configs key booking_mode)
-const BOOKING_MODES = ['token', 'appointment']
-
 /**
  * GET /settings
  * Gets all tenant configuration settings and groups them
@@ -91,8 +88,9 @@ async function updateSettings(req, res, next) {
       return errorResponse(res, `Invalid settings keys: ${rejectedKeys.join(', ')}`, 400)
     }
 
-    if (Object.prototype.hasOwnProperty.call(updates, 'booking_mode') && !BOOKING_MODES.includes(updates.booking_mode)) {
-      return errorResponse(res, `booking_mode must be one of: ${BOOKING_MODES.join(', ')}`, 400)
+    // The booking mode is changed by a super admin only (POST /superadmin/tenants/:id/booking-mode): nothing in this request is saved
+    if (Object.prototype.hasOwnProperty.call(updates, 'booking_mode')) {
+      return errorResponse(res, 'Booking mode is changed by ReceptionAI support.', 403)
     }
 
     for (const [key, value] of Object.entries(updates)) {
