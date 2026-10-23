@@ -3,7 +3,7 @@ const CRMModel = require('./crm.model');
 const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
-const { normalizeCustomerPhone } = require('../../utils/phone');
+const { normalizeCustomerPhone, validatePhoneInput } = require('../../utils/phone');
 const { logAction } = require('../../utils/audit');
 
 // UUID v4 format validation helper
@@ -51,7 +51,10 @@ async function getCustomerById(req, res, next) {
 async function createCustomer(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const customer = await CRMModel.upsertCustomer(pool, tenantId, req.body);
+    // The phone is checked and normalised here (the HTTP route only; the model is also used by the WhatsApp path)
+    const phoneCheck = validatePhoneInput(req.body && req.body.phone);
+    if (!phoneCheck.ok) return errorResponse(res, phoneCheck.error, 400);
+    const customer = await CRMModel.upsertCustomer(pool, tenantId, { ...req.body, phone: phoneCheck.phone });
     return successResponse(res, customer, 201);
   } catch (error) {
     next(error);

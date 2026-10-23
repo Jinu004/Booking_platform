@@ -1,6 +1,7 @@
 const pool = require('../../config/database')
 const { successResponse, errorResponse } = require('../../utils/response')
 const logger = require('../../utils/logger')
+const { validatePhoneInput } = require('../../utils/phone')
 
 async function listLeads(req, res, next) {
   try {
@@ -21,9 +22,13 @@ async function createLead(req, res, next) {
     if (!customer_phone) {
       return errorResponse(res, 'customer_phone is required', 400)
     }
+    const phoneCheck = validatePhoneInput(customer_phone)
+    if (!phoneCheck.ok) {
+      return errorResponse(res, phoneCheck.error, 400)
+    }
     const result = await pool.query(
       'INSERT INTO leads (tenant_id, customer_phone, customer_name, product_id, product_name, quantity, delivery_address, alt_phone, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [req.tenantId, customer_phone, customer_name || '', product_id || '', product_name || '', quantity || 1, delivery_address || '', alt_phone || '', notes || '']
+      [req.tenantId, phoneCheck.phone, customer_name || '', product_id || '', product_name || '', quantity || 1, delivery_address || '', alt_phone || '', notes || '']
     )
     return successResponse(res, result.rows[0], 201)
   } catch (err) {

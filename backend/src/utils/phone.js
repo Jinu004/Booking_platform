@@ -32,6 +32,25 @@ function normalizeCustomerPhone(input) {
   return null;
 }
 
+const PHONE_INPUT_ERROR = 'Enter a valid phone number: 10 digits for India, or + and the country code for other countries.';
+
+/**
+ * The one check for a phone number typed into a form or sent to an API (booking, patient, customer, lead).
+ * Spaces, dashes, dots and brackets are ignored. Whatever normalizeCustomerPhone accepts keeps exactly its result
+ * (10 digits, 0 + 10 digits, 91 + 10 digits, +91 + 10 digits, + and a country code). Only when that refuses the number, a leading "00"
+ * is read as "+" (so "0091 98765 43210" and "00447911123456" work). A number with no "+" that is not an Indian form is refused.
+ * @param {string|number} raw
+ * @returns {{ ok: true, phone: string } | { ok: false, error: string }}
+ */
+function validatePhoneInput(raw) {
+  if (typeof raw !== 'string' && typeof raw !== 'number') return { ok: false, error: PHONE_INPUT_ERROR };
+  const text = String(raw).trim().replace(/[\s\-.()]/g, '');
+  if (!text) return { ok: false, error: PHONE_INPUT_ERROR };
+  let phone = normalizeCustomerPhone(text);
+  if (!phone && text.startsWith('00')) phone = normalizeCustomerPhone(`+${text.slice(2)}`);
+  return phone ? { ok: true, phone } : { ok: false, error: PHONE_INPUT_ERROR };
+}
+
 /**
  * A phone number made safe for logs: the country code, stars, then only the last 4 digits, for example +91******3210.
  * Use it for every phone number that goes into a log line. Empty values give '[no phone]'.
@@ -48,4 +67,4 @@ function maskPhone(value) {
   return `${code ? `+${code}` : ''}******${last4}`;
 }
 
-module.exports = { normalizeCustomerPhone, maskPhone };
+module.exports = { normalizeCustomerPhone, validatePhoneInput, PHONE_INPUT_ERROR, maskPhone };

@@ -1,7 +1,7 @@
 const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
-const { normalizeCustomerPhone } = require('../../utils/phone');
+const { normalizeCustomerPhone, validatePhoneInput } = require('../../utils/phone');
 const { logAction } = require('../../utils/audit');
 
 // HTML tag stripper — prevents stored XSS in free-text fields
@@ -176,21 +176,18 @@ async function createPatient(req, res) {
   const tenantId = req.tenantId;
   const { name, phone, age, gender, blood_group } = req.body;
 
-  // Normalize phone to +91XXXXXXXXXX format
-  const normalizedPhone = (() => {
-    const digits = (phone || '').replace(/\D/g, '');
-    if (digits.length === 10) return `+91${digits}`;
-    if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
-    if (digits.length === 13 && digits.startsWith('91')) return `+${digits.slice(1)}`;
-    return `+${digits}`;
-  })();
-
   if (!name || !name.trim()) {
     return res.status(400).json({ success: false, error: 'Patient name is required' });
   }
-  if (!phone || !phone.trim()) {
+  if (!phone || !String(phone).trim()) {
     return res.status(400).json({ success: false, error: 'Phone number is required' });
   }
+  // One shared check and normalisation (utils/phone.js)
+  const phoneCheck = validatePhoneInput(phone);
+  if (!phoneCheck.ok) {
+    return res.status(400).json({ success: false, error: phoneCheck.error });
+  }
+  const normalizedPhone = phoneCheck.phone;
 
   try {
     // Find or create customer record

@@ -8,8 +8,7 @@ const logger = require('../../utils/logger');
 const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter');
 const { logAction } = require('../../utils/audit');
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-// Phone: 7–15 digits optionally prefixed with +
-const isPhone = (str) => /^\+?\d{7,15}$/.test(str);
+const { validatePhoneInput } = require('../../utils/phone');
 
 /**
  * GET /bookings
@@ -21,8 +20,10 @@ async function patientLookup(req, res, next) {
     const tenantId = req.tenant.id;
     const { phone } = req.query;
     if (!phone) return errorResponse(res, 'Phone is required', 400);
-    const digits = phone.replace(/\D/g, '');
-    const normalizedPhone = digits.length === 10 ? `+91${digits}` : `+${digits}`;
+    // The same normalisation as the routes that store a phone; a number that is not valid (yet) simply matches nobody
+    const phoneCheck = validatePhoneInput(phone);
+    if (!phoneCheck.ok) return successResponse(res, { customer: null, patients: [] });
+    const normalizedPhone = phoneCheck.phone;
     const customerRes = await pool.query(
       `SELECT id, name, phone FROM customers WHERE phone = $1 AND tenant_id = $2 LIMIT 1`,
       [normalizedPhone, tenantId]
@@ -279,24 +280,18 @@ async function createManualBooking(req, res, next) {
     ? req.staff.doctor_id
     : req.body.doctorId
 
-  // Normalize phone to +91XXXXXXXXXX format
-  const normalizedPhone = (() => {
-    const digits = (patientPhone || '').replace(/\D/g, '');
-    if (digits.length === 10) return `+91${digits}`;
-    if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
-    if (digits.length === 13 && digits.startsWith('91')) return `+${digits.slice(1)}`;
-    return `+${digits}`;
-  })();
-
   const cleanPatientName = (patientName || '').trim().replace(/<[^>]*>/g, '').slice(0, 255) || 'Unknown Patient';
   const cleanNotes = (notes || '').trim().replace(/<[^>]*>/g, '').slice(0, 2000);
 
   if (!patientPhone || !doctorId) {
     return errorResponse(res, 'Patient phone and doctor ID are required', 400);
   }
-  if (!isPhone(normalizedPhone)) {
-    return errorResponse(res, 'Invalid phone number format', 400);
+  // One shared check and normalisation (utils/phone.js): +91 and 10 digits for India, + and the country code otherwise
+  const phoneCheck = validatePhoneInput(patientPhone);
+  if (!phoneCheck.ok) {
+    return errorResponse(res, phoneCheck.error, 400);
   }
+  const normalizedPhone = phoneCheck.phone;
   if (!isUUID(doctorId)) {
     return errorResponse(res, 'Invalid doctor ID', 400);
   }
