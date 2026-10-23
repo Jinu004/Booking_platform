@@ -91,12 +91,6 @@ export default function Settings() {
   const [savingKB, setSavingKB] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
-  // Booking mode ('token' or 'appointment'): admin and manager change it, every other role only reads it
-  const canEditBookingMode = ['admin', 'manager'].includes(staff?.role);
-  const [bookingMode, setBookingMode] = useState('token');
-  const [bookingModeDraft, setBookingModeDraft] = useState('token');
-  const [savingBookingMode, setSavingBookingMode] = useState(false);
-
   const [businessProfile, setBusinessProfile] = useState({
     business_address: '',
     business_phone: '',
@@ -160,12 +154,9 @@ export default function Settings() {
       .then(res => {
         const d = res?.data || res;
         if (d) {
-          // booking_mode is kept apart from the clinic profile: "Save Profile" sends the profile object back to PUT /settings/clinic
-          const { booking_mode: loadedMode, ...profileFields } = d;
+          // booking_mode is left out of the clinic profile: "Save Profile" sends the profile object back to PUT /settings/clinic
+          const { booking_mode: _bookingMode, ...profileFields } = d;
           setClinic(prev => ({ ...prev, ...profileFields }));
-          const mode = loadedMode === 'appointment' ? 'appointment' : 'token';
-          setBookingMode(mode);
-          setBookingModeDraft(mode);
         }
       })
       .catch(() => { })
@@ -209,21 +200,6 @@ export default function Settings() {
       addToast('Failed to save', 'error');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleSaveBookingMode = async () => {
-    if (bookingModeDraft === bookingMode) return;
-    if (bookingModeDraft === 'appointment' && !window.confirm('Switch this clinic to Appointment mode? Staff will book by time slot. WhatsApp bookings made by the AI still use tokens.')) return;
-    try {
-      setSavingBookingMode(true);
-      await updateSettings({ booking_mode: bookingModeDraft });
-      setBookingMode(bookingModeDraft);
-      addToast('Booking mode saved', 'success');
-    } catch (err) {
-      addToast(err?.error || 'Failed to save', 'error');
-    } finally {
-      setSavingBookingMode(false);
     }
   };
 
@@ -644,33 +620,6 @@ export default function Settings() {
                   </button>
                 </div>
                 <p className="text-xs text-gray-400 mt-1">Times are in 24-hour format — e.g. 09:00 for 9 AM, 18:00 for 6 PM</p>
-              </div>
-
-              <div className="border-t border-gray-100 pt-5">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Booking mode</label>
-                {canEditBookingMode ? (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <select
-                      value={bookingModeDraft}
-                      onChange={e => setBookingModeDraft(e.target.value)}
-                      disabled={savingBookingMode}
-                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                    >
-                      <option value="token">Token (queue by session)</option>
-                      <option value="appointment">Appointment (time slots)</option>
-                    </select>
-                    <button
-                      onClick={handleSaveBookingMode}
-                      disabled={savingBookingMode || bookingModeDraft === bookingMode}
-                      className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                    >
-                      {savingBookingMode ? 'Saving...' : 'Save Booking Mode'}
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-800">{bookingMode === 'appointment' ? 'Appointment (time slots)' : 'Token (queue by session)'}</p>
-                )}
-                <p className="text-xs text-gray-400 mt-2">Appointment mode is for clinics that book by time. WhatsApp bookings made by the AI still use tokens until the AI booking update, so only switch test clinics for now.</p>
               </div>
             </>
           )}

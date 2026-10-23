@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { getAllTenants, updateTenant } from '../../services/superadmin.service';
+import { getAllTenants, updateTenant, setTenantBookingMode } from '../../services/superadmin.service';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
 import CoexistenceConnect from '../../components/shared/CoexistenceConnect';
@@ -306,6 +306,9 @@ export default function TenantEdit() {
   const [error, setError] = useState('');
   const [justConnected, setJustConnected] = useState(false);
   const [syncingNumber, setSyncingNumber] = useState(false);
+  const [bookingModeDraft, setBookingModeDraft] = useState('token');
+  const [savingBookingMode, setSavingBookingMode] = useState(false);
+  const savingBookingModeRef = useRef(false);
 
   // The backend has no list-free way to get everything this page needs (recall and template flags, admin email,
   // connection flags), so the tenants list is loaded and this tenant is picked from it by id.
@@ -331,6 +334,7 @@ export default function TenantEdit() {
         }
         setTenant(row);
         setForm(formFromTenant(row));
+        setBookingModeDraft(row.booking_mode === 'appointment' ? 'appointment' : 'token');
       })
       .catch(err => {
         if (!cancelled) setLoadError(err?.error || 'Failed to load the tenant');
@@ -361,6 +365,29 @@ export default function TenantEdit() {
       addToast(err?.error || err?.response?.data?.error || 'Failed to sync the number from Meta', 'error');
     } finally {
       setSyncingNumber(false);
+    }
+  };
+
+  // Saves the booking mode (and with it the WhatsApp appointment booking switch), then reloads this tenant's row
+  const handleSaveBookingMode = async () => {
+    const current = tenant.booking_mode === 'appointment' ? 'appointment' : 'token';
+    if (savingBookingModeRef.current || bookingModeDraft === current) return;
+    if (!window.confirm(`Change the booking mode of ${tenant.name} to ${bookingModeDraft === 'appointment' ? 'Appointment' : 'Token'}?`)) return;
+    savingBookingModeRef.current = true;
+    setSavingBookingMode(true);
+    try {
+      await setTenantBookingMode(tenant.id, bookingModeDraft);
+      addToast('Booking mode saved', 'success');
+      const row = await fetchTenantRow();
+      if (row) {
+        setTenant(row);
+        setBookingModeDraft(row.booking_mode === 'appointment' ? 'appointment' : 'token');
+      }
+    } catch (err) {
+      addToast(err?.error || err?.response?.data?.error || 'Failed to save the booking mode', 'error');
+    } finally {
+      savingBookingModeRef.current = false;
+      setSavingBookingMode(false);
     }
   };
 
@@ -604,6 +631,31 @@ export default function TenantEdit() {
             </button>
           </div>
         )}
+      </Card>
+
+      {/* Booking mode: set by a super admin only */}
+      <Card title="Booking mode">
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={bookingModeDraft}
+            onChange={e => setBookingModeDraft(e.target.value)}
+            disabled={savingBookingMode}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+          >
+            <option value="token">Token</option>
+            <option value="appointment">Appointment</option>
+          </select>
+          <button
+            type="button"
+            onClick={handleSaveBookingMode}
+            disabled={savingBookingMode || bookingModeDraft === (tenant.booking_mode === 'appointment' ? 'appointment' : 'token')}
+            className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {savingBookingMode ? 'Saving...' : 'Save Booking Mode'}
+          </button>
+        </div>
+        <p className="text-sm text-gray-700 mt-3">WhatsApp appointment booking: <strong>{tenant.ai_appointment_booking ? 'On' : 'Off'}</strong></p>
+        <p className="text-xs text-gray-400 mt-2">Token: patients get a queue number for a session. Appointment: patients and staff book a specific time. Switching to Appointment also turns on WhatsApp appointment booking for this clinic and turns off token booking by the AI. Set each doctor's visit length (average consultation minutes) on the Doctors page first.</p>
       </Card>
 
       {/* WhatsApp connection (Coexistence) */}
