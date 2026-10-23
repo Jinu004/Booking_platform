@@ -158,7 +158,8 @@ async function updateCustomer(pool, tenantId, customerId, data) {
         -- A different phone number starts with no consent (the right-hand sides below see the old row)
         marketing_consent = CASE WHEN $3::text IS NOT NULL AND $3::text IS DISTINCT FROM phone THEN NULL ELSE marketing_consent END,
         consent_source = CASE WHEN $3::text IS NOT NULL AND $3::text IS DISTINCT FROM phone THEN NULL ELSE consent_source END,
-        consent_at = CASE WHEN $3::text IS NOT NULL AND $3::text IS DISTINCT FROM phone THEN NULL ELSE consent_at END
+        consent_at = CASE WHEN $3::text IS NOT NULL AND $3::text IS DISTINCT FROM phone THEN NULL ELSE consent_at END,
+        consent_asked_at = CASE WHEN $3::text IS NOT NULL AND $3::text IS DISTINCT FROM phone THEN NULL ELSE consent_asked_at END
     WHERE tenant_id = $1 AND id = $7
     RETURNING *
   `;

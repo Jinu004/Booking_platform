@@ -6,6 +6,7 @@ const {
   getPatient,
   createPatient,
   upsertProfile,
+  updatePatient,
   addCondition,
   deleteCondition,
   addVisitNote,
@@ -20,6 +21,7 @@ router.get('/patients', getPatients);
 router.get('/patients/consent-summary', getConsentSummary); // before /patients/:patientId so "consent-summary" is not read as an id
 router.post('/patients', requireAuth, createPatient);
 router.get('/patients/:patientId', getPatient);
+router.patch('/patients/:patientId', requireRole('admin', 'manager', 'receptionist'), updatePatient);
 router.put('/patients/:patientId/profile', requireRole('admin', 'manager', 'receptionist'), upsertProfile);
 router.post('/patients/:patientId/conditions', requireRole('admin', 'manager', 'doctor'), addCondition);
 router.delete('/patients/:patientId/conditions/:id', requireRole('admin', 'manager', 'doctor'), deleteCondition);
