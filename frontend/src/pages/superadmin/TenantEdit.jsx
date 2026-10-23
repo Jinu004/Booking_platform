@@ -7,8 +7,10 @@ import CoexistenceConnect from '../../components/shared/CoexistenceConnect';
 import WhatsappTemplatesPanel from '../../components/shared/WhatsappTemplatesPanel';
 import SendFailuresPanel from '../../components/shared/SendFailuresPanel';
 import MetaInfoPanel from '../../components/shared/MetaInfoPanel';
+import ReferralPanel from '../../components/superadmin/ReferralPanel';
+import PaymentsPanel from '../../components/superadmin/PaymentsPanel';
+import { usePlanIds } from '../../hooks/usePlans';
 
-const PLANS = ['starter', 'growth', 'pro'];
 
 const statusBadge = (status) => {
   const map = {
@@ -294,6 +296,7 @@ function SendReadinessPanel({ tenantId }) {
 }
 
 export default function TenantEdit() {
+  const PLANS = usePlanIds();
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToast } = useStore();
@@ -619,6 +622,16 @@ export default function TenantEdit() {
             refreshTenantNumber().catch(() => {});
           }}
         />
+      </Card>
+
+      {/* Billing: payments received from this clinic (also creates promoter commission) */}
+      <Card>
+        <PaymentsPanel tenantId={tenant.id} tenantPlan={tenant.plan} />
+      </Card>
+
+      {/* Promoter referral of this clinic */}
+      <Card>
+        <ReferralPanel tenantId={tenant.id} />
       </Card>
 
       {/* WhatsApp templates: only for a connection that is saved */}

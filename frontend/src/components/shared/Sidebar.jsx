@@ -6,6 +6,11 @@ import { getStoredStaff, logout } from '../../services/auth.service';
 import { useIndustry } from '../../hooks/useIndustry';
 
 const icons = {
+  PromoterProgram: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
   Dashboard: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -107,7 +112,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   ];
 
   const allEnquirySecondaryLinks = staff?.role === 'super_admin'
-    ? [...enquirySecondaryLinks, { name: 'Super Admin', path: '/superadmin' }, { name: 'Pricing Calculator', path: '/superadmin/pricing-calculator' }]
+    ? [...enquirySecondaryLinks, { name: 'Super Admin', path: '/superadmin' }, { name: 'Promoter Program', path: '/superadmin/promoters' }, { name: 'Pricing Calculator', path: '/superadmin/pricing-calculator' }]
     : enquirySecondaryLinks;
 
   const mainLinks = [
@@ -142,11 +147,13 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   };
 
   const allClinicLinks = staff?.role === 'super_admin'
-    ? [...clinicLinks, { name: 'Super Admin', path: '/superadmin' }, { name: 'Pricing Calculator', path: '/superadmin/pricing-calculator' }]
+    ? [...clinicLinks, { name: 'Super Admin', path: '/superadmin' }, { name: 'Promoter Program', path: '/superadmin/promoters' }, { name: 'Pricing Calculator', path: '/superadmin/pricing-calculator' }]
     : clinicLinks;
 
   const renderLink = (link) => {
-    const isActive = location.pathname.startsWith(link.path);
+    const isActive = link.path === '/superadmin'
+      ? (location.pathname === '/superadmin' || location.pathname.startsWith('/superadmin/tenants'))
+      : location.pathname.startsWith(link.path);
     const iconKey = link.name.replace(' ', '');
     return (
       <Link

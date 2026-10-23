@@ -8,6 +8,7 @@ import { useIndustry } from '../hooks/useIndustry';
 import api from '../utils/api';
 import PosterImage from '../components/shared/PosterImage';
 import { plural, hourLabel } from '../utils/plural';
+import BillingHistory from '../components/shared/BillingHistory';
 
 const DAYS = [
   { key: 'mon', label: 'Monday' },
@@ -1228,6 +1229,7 @@ export default function Settings() {
           <div className="pt-2 border-t border-gray-100">
             <p className="text-sm text-gray-500">To upgrade your plan or make billing changes, contact <a href="mailto:support@receptionai.in" className="text-indigo-600 hover:underline">support@receptionai.in</a></p>
           </div>
+          <BillingHistory />
         </div>
       )}
     </div>

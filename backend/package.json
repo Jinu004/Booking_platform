@@ -6,7 +6,9 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "migrate": "node src/database/migrate.js",
-    "seed": "node src/database/seed.js"
+    "seed": "node src/database/seed.js",
+    "test": "node --test test/money.test.js",
+    "test:integration": "node --test --test-concurrency=1 test/promoter.integration.test.js"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.2.0",

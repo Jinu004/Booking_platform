@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../utils/api';
+import { captureReferralFromUrl } from '../utils/referral';
 
 /* ─────────────────────────────────────────────
    CSS
@@ -965,7 +967,7 @@ function Footer() {
           </div>
           <div className="rai-footer-col">
             <h4>Company</h4>
-            <ul><li><a href="#">About</a></li><li><a href="#">Contact</a></li></ul>
+            <ul><li><a href="#">About</a></li><li><a href="#">Contact</a></li><li><a href="/partner/apply">Become a partner</a></li></ul>
           </div>
           <div className="rai-footer-col">
             <h4>Legal</h4>
@@ -994,6 +996,13 @@ const Landing = () => {
       style.textContent = LANDING_CSS;
       document.head.appendChild(style);
     }
+  }, []);
+  // A promoter link (?ref=CODE) to the home page: remember the code for the sign-up form
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).get('ref')) return;
+    api.get('/partner/config')
+      .then(res => { if (res?.data?.program_enabled) captureReferralFromUrl(res.data.ref_memory_days); })
+      .catch(() => {});
   }, []);
   return (
     <div className="rai-landing">

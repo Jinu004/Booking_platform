@@ -5,8 +5,8 @@ import useStore from '../store/useStore';
 import api from '../utils/api';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/shared/Skeleton';
 import PosterImage from '../components/shared/PosterImage';
+import { usePlanIds } from '../hooks/usePlans';
 
-const PLANS = ['starter', 'growth', 'pro'];
 
 const statusBadge = (status) => {
   const map = {
@@ -38,6 +38,7 @@ const industryBadge = (industry) => {
 };
 
 export default function SuperAdmin() {
+  const PLANS = usePlanIds();
   const { staff, addToast } = useStore();
   const navigate = useNavigate();
 

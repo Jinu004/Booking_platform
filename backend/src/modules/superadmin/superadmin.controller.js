@@ -12,6 +12,9 @@ const {
 const { omitTenantSecrets } = require('../../utils/secretBox');
 const { fetchWabaInfo } = require('../waba/waba.info.service');
 const { TemplateError } = require('../waba/waba.templates.service');
+const billingService = require('../billing/billing.service');
+const referralService = require('../promoter/referral.service');
+const { staffActor } = require('../promoter/promoter.audit');
 
 // Connection flags for the tenant screens (the phone number id itself is not added to the response)
 function withWhatsappFlags(row) {
@@ -124,17 +127,12 @@ async function getPlatformStats(req, res) {
         (SELECT COUNT(*) FROM conversations WHERE DATE(started_at) = CURRENT_DATE) as total_conversations_today
     `);
 
-    // Basic revenue logic counting based on active plan counts just as an approximation
-    const revenueStats = await pool.query(`
-      SELECT SUM(
-        CASE plan
-          WHEN 'starter' THEN 2999
-          WHEN 'growth' THEN 5999
-          WHEN 'pro' THEN 9999
-          ELSE 0
-        END
-      ) as total_revenue_this_month
-      FROM tenants WHERE status = 'active'
+    // Revenue actually collected this month (IST), net of tax and refunds, from recorded payments
+    const revenuePaise = await billingService.revenueThisMonth();
+    // Expected monthly revenue if every active clinic pays its plan price (from the plans table)
+    const expected = await pool.query(`
+      SELECT COALESCE(SUM(p.monthly_price_paise), 0)::bigint AS paise
+      FROM tenants t JOIN plans p ON p.id = t.plan WHERE t.status = 'active'
     `);
 
     const stats = {
@@ -142,7 +140,8 @@ async function getPlatformStats(req, res) {
       active_tenants: parseInt(tenantStats.rows[0].active_tenants, 10) || 0,
       total_bookings_today: parseInt(activityStats.rows[0].total_bookings_today, 10) || 0,
       total_conversations_today: parseInt(activityStats.rows[0].total_conversations_today, 10) || 0,
-      total_revenue_this_month: parseInt(revenueStats.rows[0].total_revenue_this_month, 10) || 0
+      total_revenue_this_month: Math.round(revenuePaise / 100),
+      expected_monthly_revenue: Math.round(Number(expected.rows[0].paise) / 100)
     };
 
     return successResponse(res, stats);
@@ -160,13 +159,13 @@ async function getPlatformStats(req, res) {
 async function createTenant(req, res) {
   const client = await pool.connect();
   try {
-    const { clinicName, email, password, plan, industry } = req.body;
+    const { clinicName, email, password, plan, industry, promoterId } = req.body;
 
     if (!clinicName || !email || !password || !plan) {
       return errorResponse(res, 'All fields required', 400);
     }
 
-    if (!['starter', 'growth', 'pro'].includes(plan)) {
+    if (!(await billingService.planExists(pool, plan))) {
       return errorResponse(res, 'Invalid plan', 400);
     }
 
@@ -202,7 +201,17 @@ async function createTenant(req, res) {
     );
 
     await client.query('COMMIT');
-    return successResponse(res, omitTenantSecrets(tenant), 201);
+
+    // Optional promoter for a clinic created by the super admin
+    let referralWarning = null;
+    if (promoterId) {
+      try {
+        await referralService.adminAssign(tenant.id, { promoter_id: promoterId, reason: 'Assigned when the clinic was created by super admin' }, staffActor(req));
+      } catch (refErr) {
+        referralWarning = `Clinic created, but the promoter could not be assigned: ${refErr.message}`;
+      }
+    }
+    return successResponse(res, { ...omitTenantSecrets(tenant), referral_warning: referralWarning }, 201);
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === '23505') {
@@ -224,6 +233,9 @@ async function updateTenant(req, res) {
   try {
     const { id } = req.params;
     const { clinicName, plan, whatsappNumber, industry, aiModel, email, whatsappPhoneNumberId } = req.body;
+    if (plan && !(await billingService.planExists(pool, plan))) {
+      return errorResponse(res, 'Invalid plan', 400);
+    }
     const VALID_AI_MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
     if (aiModel && !VALID_AI_MODELS.includes(aiModel)) {
       return errorResponse(res, 'Invalid AI model. Must be one of: ' + VALID_AI_MODELS.join(', '), 400)
@@ -367,6 +379,14 @@ async function deleteTenant(req, res) {
     const tenant = await pool.query('SELECT * FROM tenants WHERE id = $1', [id]);
     if (!tenant.rows.length) return errorResponse(res, 'Clinic not found', 404);
     if (tenant.rows[0].status !== 'suspended') return errorResponse(res, 'Clinic must be suspended before deletion', 400);
+    // Promoter commission records survive deletion (they keep the clinic name), but unpaid commission
+    // for this clinic must be confirmed so it is not deleted by accident.
+    const unpaid = await pool.query(
+      `SELECT COUNT(*)::int AS n, COALESCE(SUM(amount_paise), 0)::bigint AS paise FROM promoter_commissions
+       WHERE tenant_id = $1 AND status IN ('pending', 'available')`, [id]);
+    if (unpaid.rows[0].n > 0 && req.query.confirm_commissions !== '1') {
+      return errorResponse(res, `This clinic has ${unpaid.rows[0].n} unpaid promoter commission entries (₹${(Number(unpaid.rows[0].paise) / 100).toFixed(2)}). They will stay in the promoter ledger. Confirm to delete anyway.`, 409);
+    }
     await pool.query('DELETE FROM tenants WHERE id = $1', [id]);
     return successResponse(res, { message: 'Clinic deleted permanently' });
   } catch (err) {

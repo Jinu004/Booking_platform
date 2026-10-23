@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Input from '../components/shared/Input';
 import Select from '../components/shared/Select';
@@ -6,6 +6,7 @@ import useStore from '../store/useStore';
 import api from '../utils/api';
 import { storeAuthData } from '../services/auth.service';
 import { PLANS } from '../constants';
+import { captureReferralFromUrl, getStoredReferral, clearStoredReferral } from '../utils/referral';
 
 
 
@@ -18,7 +19,7 @@ const STEPS = [
   { id: 4, label: 'Password', icon: '🔒' },
 ];
 
-const plans = Object.values(PLANS).map(p => ({ ...p, price: `₹${p.priceDisplay}` }));
+const basePlans = Object.values(PLANS).map(p => ({ ...p, price: `₹${p.priceDisplay}` }));
 
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'None'];
 
@@ -32,6 +33,9 @@ export default function Onboarding() {
   const [checkingWhatsapp, setCheckingWhatsapp] = useState(false);
   const [whatsappAvailable, setWhatsappAvailable] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [plans, setPlans] = useState(basePlans);
+  // Promoter referral: code from a ?ref= link (remembered in the browser) or typed by the clinic
+  const [referral, setReferral] = useState({ enabled: false, editable: true, fromLink: null, check: null });
 
   const [formData, setFormData] = useState({
     clinicName: '', ownerName: '', email: '', phone: '',
@@ -39,7 +43,42 @@ export default function Onboarding() {
     openingTime: '09:00', closingTime: '17:00',
     weeklyOff: 'Sunday', avgConsultationMinutes: 10,
     password: '', confirmPassword: '',
+    referralCode: '',
   });
+
+  useEffect(() => {
+    // Live prices from the server (the super admin can change them); the built-in list is only a fallback
+    api.get('/onboarding/plans').then(res => {
+      const live = res?.data || {};
+      setPlans(basePlans
+        .filter(p => live[p.id])
+        .map(p => ({ ...p, name: live[p.id].name || p.name, price: `₹${Number(live[p.id].price).toLocaleString('en-IN')}` })));
+    }).catch(() => {});
+
+    api.get('/partner/config').then(res => {
+      const cfg = res?.data || {};
+      if (!cfg.program_enabled) return;
+      captureReferralFromUrl(cfg.ref_memory_days);
+      const code = getStoredReferral();
+      setReferral(r => ({ ...r, enabled: true, editable: cfg.code_editable !== false || !code, fromLink: code }));
+      if (code) {
+        setFormData(f => ({ ...f, referralCode: code }));
+        checkReferral(code);
+      }
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const checkReferral = async (code) => {
+    const c = String(code || '').trim();
+    if (!c) { setReferral(r => ({ ...r, check: null })); return; }
+    try {
+      const res = await api.get(`/partner/code/${encodeURIComponent(c)}`);
+      setReferral(r => ({ ...r, check: res.data.valid ? { ok: true, name: res.data.promoterName } : { ok: false } }));
+    } catch {
+      setReferral(r => ({ ...r, check: null }));
+    }
+  };
 
   const handleChange = (e) => {
     let { name, value } = e.target;
@@ -94,8 +133,14 @@ export default function Onboarding() {
     if (!validate(4)) return;
     setLoading(true); setError(null);
     try {
-      const response = await api.post('/onboarding/clinic', { ...formData });
+      const code = formData.referralCode.trim().toUpperCase();
+      const response = await api.post('/onboarding/clinic', {
+        ...formData,
+        referralCode: code || undefined,
+        referralSource: code && code === referral.fromLink ? 'link' : 'manual'
+      });
       if (response.success && response.data.token) {
+        clearStoredReferral();
         storeAuthData(response.data.token, response.data.staff);
         setStep(5);
         setTimeout(() => {
@@ -314,6 +359,24 @@ export default function Onboarding() {
                     })}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {step === 3 && referral.enabled && (
+              <div style={{ maxWidth: 320, marginTop: 24 }}>
+                <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--muted)', letterSpacing: '0.02em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                  Referral code <span style={{ textTransform: 'none', fontWeight: 400 }}>(optional)</span>
+                </label>
+                <input
+                  name="referralCode" value={formData.referralCode}
+                  readOnly={!referral.editable}
+                  onChange={e => { const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16); setFormData(p => ({ ...p, referralCode: v })); setReferral(r => ({ ...r, check: null })); }}
+                  onBlur={() => checkReferral(formData.referralCode)}
+                  placeholder="e.g. AB12CD34"
+                  style={{ width: '100%', background: referral.editable ? 'var(--input-bg)' : 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: 15, fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.06em', outline: 'none' }}
+                />
+                {referral.check?.ok && <p style={{ fontSize: 12, color: 'var(--green)', marginTop: 4 }}>Referred by {referral.check.name}</p>}
+                {referral.check && !referral.check.ok && <p style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>This code was not found. You can still continue; it will be ignored.</p>}
               </div>
             )}
 

@@ -29,6 +29,18 @@ const Leads               = React.lazy(() => import('./pages/enquiry/Leads'));
 const Landing        = React.lazy(() => import('./pages/Landing'));
 const PendingApproval = React.lazy(() => import('./pages/PendingApproval'));
 const PatientProfile = React.lazy(() => import('./pages/PatientProfile'));
+const PromoterProgram = React.lazy(() => import('./pages/superadmin/PromoterProgram'));
+const PromoterDetail  = React.lazy(() => import('./pages/superadmin/PromoterDetail'));
+// Partner (promoter) portal: separate login and layout, outside the staff app
+const PartnerLogin  = React.lazy(() => import('./partner/PartnerAuthPages').then(m => ({ default: m.PartnerLogin })));
+const PartnerApply  = React.lazy(() => import('./partner/PartnerAuthPages').then(m => ({ default: m.PartnerApply })));
+const PartnerReset  = React.lazy(() => import('./partner/PartnerAuthPages').then(m => ({ default: m.PartnerResetPassword })));
+const PartnerRoute  = React.lazy(() => import('./partner/PartnerLayout').then(m => ({ default: m.PartnerRoute })));
+const PartnerOverview = React.lazy(() => import('./partner/PartnerPages').then(m => ({ default: m.PartnerOverview })));
+const PartnerClinics  = React.lazy(() => import('./partner/PartnerPages').then(m => ({ default: m.PartnerClinics })));
+const PartnerEarnings = React.lazy(() => import('./partner/PartnerPages').then(m => ({ default: m.PartnerEarnings })));
+const PartnerPayouts  = React.lazy(() => import('./partner/PartnerPages').then(m => ({ default: m.PartnerPayouts })));
+const PartnerProfile  = React.lazy(() => import('./partner/PartnerPages').then(m => ({ default: m.PartnerProfile })));
 
 const PageLoader = (
   <div className="flex items-center justify-center h-screen">
@@ -54,6 +66,17 @@ const App = () => {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/" element={<Landing />} />
 
+          <Route path="/partner/login" element={<PartnerLogin />} />
+          <Route path="/partner/apply" element={<PartnerApply />} />
+          <Route path="/partner/reset-password" element={<PartnerReset />} />
+          <Route path="/partner" element={<PartnerRoute />}>
+            <Route index element={<PartnerOverview />} />
+            <Route path="clinics" element={<PartnerClinics />} />
+            <Route path="earnings" element={<PartnerEarnings />} />
+            <Route path="payouts" element={<PartnerPayouts />} />
+            <Route path="profile" element={<PartnerProfile />} />
+          </Route>
+
           <Route element={<PrivateRoute />}>
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<DashboardWrapper />} />
@@ -72,6 +95,8 @@ const App = () => {
                 <Route path="/superadmin" element={<SuperAdmin />} />
                 <Route path="/superadmin/tenants/:id" element={<TenantEdit />} />
                 <Route path="/superadmin/pricing-calculator" element={<PricingCalculator />} />
+                <Route path="/superadmin/promoters" element={<PromoterProgram />} />
+                <Route path="/superadmin/promoters/:id" element={<PromoterDetail />} />
               </Route>
             </Route>
           </Route>

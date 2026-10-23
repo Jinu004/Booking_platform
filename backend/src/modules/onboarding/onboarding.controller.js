@@ -5,6 +5,8 @@ const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 const bcrypt = require('bcryptjs');
 const { generateToken } = require('../../config/auth');
+const referralService = require('../promoter/referral.service');
+const billingService = require('../billing/billing.service');
 
 /**
  * POST /onboarding/clinic
@@ -20,7 +22,9 @@ async function onboardClinic(req, res) {
     openingTime, closingTime, weeklyOff,
     avgConsultationMinutes,
     maxTokens,
-    password
+    password,
+    referralCode,
+    referralSource
   } = req.body;
 
   if (!clinicName || !ownerName || !email || !whatsappNumber) {
@@ -30,7 +34,12 @@ async function onboardClinic(req, res) {
     return errorResponse(res, 'Password must be at least 8 characters', 400);
   }
 
+  if (plan && !(await billingService.planExists(pool, plan))) {
+    return errorResponse(res, 'Invalid plan', 400);
+  }
+
   const password_hash = await bcrypt.hash(password, 12);
+  let referralNotify = null;
 
   const client = await pool.connect();
   try {
@@ -128,7 +137,26 @@ async function onboardClinic(req, res) {
       [newStaff.id, newStaff.tenant_id, tokenHash]
     );
 
+    // 7. Promoter referral (never fails the sign-up: an unknown code is ignored)
+    if (referralCode) {
+      await client.query('SAVEPOINT referral');
+      try {
+        const attached = await referralService.attachAtSignup(client, {
+          tenant,
+          owner: { email, phone, whatsapp: normalizedWA },
+          code: referralCode,
+          source: referralSource === 'link' ? 'signup_link' : 'signup_manual_code'
+        }, req.ip);
+        referralNotify = attached?.notify || null;
+        await client.query('RELEASE SAVEPOINT referral');
+      } catch (refErr) {
+        await client.query('ROLLBACK TO SAVEPOINT referral');
+        logger.error(`Referral attach failed for new clinic ${tenant.id}: ${refErr.message}`);
+      }
+    }
+
     await client.query('COMMIT');
+    if (referralNotify) referralNotify();
 
     return successResponse(res, {
       token,
@@ -194,45 +222,51 @@ async function checkWhatsappAvailable(req, res) {
  * GET /onboarding/plans
  * Returns available plans and pricing
  */
+// Feature lists shown on the plan cards. Prices come from the plans table (editable by super admin).
+const PLAN_FEATURES = {
+  starter: [
+    'Up to 50 tokens per day',
+    'AI WhatsApp responses',
+    '1 doctor',
+    'Basic analytics',
+    'Email support'
+  ],
+  growth: [
+    'Up to 150 tokens per day',
+    'AI WhatsApp responses',
+    'Up to 5 doctors',
+    'Advanced analytics',
+    'Priority support',
+    'Custom AI responses'
+  ],
+  pro: [
+    'Unlimited tokens',
+    'AI WhatsApp responses',
+    'Unlimited doctors',
+    'Full analytics',
+    '24/7 support',
+    'Custom branding',
+    'API access'
+  ]
+};
+
 async function getPlans(req, res) {
-  return successResponse(res, {
-    starter: {
-      name: 'Starter',
-      price: 2999,
-      features: [
-        'Up to 50 tokens per day',
-        'AI WhatsApp responses',
-        '1 doctor',
-        'Basic analytics',
-        'Email support'
-      ]
-    },
-    growth: {
-      name: 'Growth',
-      price: 5999,
-      features: [
-        'Up to 150 tokens per day',
-        'AI WhatsApp responses',
-        'Up to 5 doctors',
-        'Advanced analytics',
-        'Priority support',
-        'Custom AI responses'
-      ]
-    },
-    pro: {
-      name: 'Pro',
-      price: 9999,
-      features: [
-        'Unlimited tokens',
-        'AI WhatsApp responses',
-        'Unlimited doctors',
-        'Full analytics',
-        '24/7 support',
-        'Custom branding',
-        'API access'
-      ]
+  try {
+    const plans = await billingService.listPlans({ activeOnly: true });
+    const out = {};
+    for (const p of plans) {
+      out[p.id] = {
+        name: p.name,
+        price: p.monthly_price_paise / 100,
+        price_paise: p.monthly_price_paise,
+        features: PLAN_FEATURES[p.id] || []
+      };
     }
-  });
+    return successResponse(res, out);
+  } catch (err) {
+    logger.error('Error loading plans:', err.message);
+    return errorResponse(res, 'Failed to load plans', 500);
+  }
 }
 
 module.exports = {

@@ -62,6 +62,12 @@ async function requireAuth(req, res, next) {
         'Invalid or expired token', 401)
     }
 
+    // Partner (promoter) tokens are never valid for staff APIs
+    if (decoded && decoded.typ === 'promoter') {
+      return errorResponse(res,
+        'Invalid token', 401)
+    }
+
     // Check session exists in database
     const sessionResult = await pool.query(
       `SELECT s.*, t.name AS tenant_name,

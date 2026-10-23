@@ -92,9 +92,23 @@ app.use('/api/v1/tenants', tenantRoutes);
 const campaignRoutes = require('./modules/campaign/campaign.routes');
 app.use('/api/v1/tenants', campaignRoutes);
 
+// Billing and promoter program (super admin). Mounted before the general super admin router so
+// these paths are handled here without running the general router's middleware.
+const billingRoutes = require('./modules/billing/billing.routes');
+app.use('/api/v1/superadmin/billing', billingRoutes.adminRouter);
+const promoterAdminRoutes = require('./modules/promoter/promoter.admin.routes');
+app.use('/api/v1/superadmin/promoter-program', promoterAdminRoutes);
+
 // Super Admin Routes
 const superAdminRoutes = require('./modules/superadmin/superadmin.routes');
 app.use('/api/v1/superadmin', superAdminRoutes);
+
+// Clinic's own billing history
+app.use('/api/v1/billing', billingRoutes.clinicRouter);
+
+// Partner (promoter) portal
+const partnerRoutes = require('./modules/promoter/promoter.routes');
+app.use('/api/v1/partner', partnerRoutes);
 
 // Onboarding Routes
 const onboardingRoutes = require('./modules/onboarding/onboarding.routes');
@@ -183,6 +197,7 @@ const { startRecallCron } = require('./cron/recall.cron');
 const { startRetryCron }  = require('./cron/retry.cron');
 const { startSendFailuresCleanupCron } = require('./cron/sendFailures.cron');
 const { startCampaignCron } = require('./cron/campaign.cron');
+const { startPromoterCron } = require('./cron/promoter.cron');
 const { broadcastToTenant } = require('./modules/hitl/hitl.service');
 
 setTimeout(() => {
@@ -197,6 +212,7 @@ setTimeout(() => {
   startRetryCron();
   startSendFailuresCleanupCron();
   startCampaignCron();
+  startPromoterCron();
 }, 5000);
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
