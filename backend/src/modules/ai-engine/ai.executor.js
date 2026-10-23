@@ -70,6 +70,16 @@ async function executeFunction(name, args, ctx) {
   try {
     switch (name) {
 
+      case 'start_appointment_booking': {
+        // Only offered to clinics with booking_mode 'appointment' AND ai_appointment_booking (see ai.functions.js); checked again here
+        const TenantServiceApt = require('../tenant/tenant.service')
+        const { isAppointmentBookingOn } = require('../../utils/appointmentFlag')
+        let aptOn = false
+        try { aptOn = isAppointmentBookingOn(await TenantServiceApt.getAllConfigs(tenant.id)) } catch { aptOn = false }
+        if (!aptOn) return { success: false, message: 'Appointment booking by time is not available.' }
+        return require('../channel/whatsapp/appointment.flow').startFromTool(ctx, args)
+      }
+
       case 'get_clinic_info': {
         const result = await pool.query(
           `SELECT cp.clinic_name as name, cp.address, cp.working_hours,

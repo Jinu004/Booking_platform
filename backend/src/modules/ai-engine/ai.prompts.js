@@ -1,3 +1,5 @@
+const { isAppointmentBookingOn } = require('../../utils/appointmentFlag')
+
 /**
  * Base system prompt shared across all industries
  *
@@ -41,13 +43,13 @@ CORE RULES:
 AVAILABLE ACTIONS:
 You have access to functions to:
 - Check doctor availability
-- Create bookings and issue tokens
-- Cancel or reschedule bookings
+- ${isAppointmentBookingOn(configs) ? 'Book appointments by time' : 'Create bookings and issue tokens'}
+- ${isAppointmentBookingOn(configs) ? 'Cancel bookings' : 'Cancel or reschedule bookings'}
 - Get booking status
 - Get clinic information
 - Escalate to human staff
 
-Always use these functions. Never guess availability or make up token numbers.`
+Always use these functions. Never guess availability or make up ${isAppointmentBookingOn(configs) ? 'times' : 'token numbers'}.`
 }
 
 /**
@@ -58,6 +60,8 @@ Always use these functions. Never guess availability or make up token numbers.`
  * @returns {string}
  */
 function getClinicPrompt(tenant, configs, additionalData = {}) {
+  // Clinics with booking_mode 'appointment' AND ai_appointment_booking book by time; every other clinic keeps the prompt below unchanged
+  if (isAppointmentBookingOn(configs)) return getClinicAppointmentPrompt(tenant, configs, additionalData)
   // Inject live IST date/time so the AI can answer time-sensitive questions correctly
   const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
   const todayDate = nowIST.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata' })
@@ -301,6 +305,40 @@ If the patient explicitly asks to speak to a real person, staff, doctor, or rece
 "real person", "staff", "doctor", "receptionist", "human", "talk to someone", "speak to", "call me", "talk to staff"
 → ALWAYS call the escalate_to_human function immediately
 → Do NOT respond with text first, call the function directly
+`
+}
+
+/**
+ * Clinic prompt for appointment booking by time (booking_mode 'appointment' AND ai_appointment_booking only).
+ * No tokens and no sessions: the patient books a time; the start_appointment_booking tool asks for everything else.
+ */
+function getClinicAppointmentPrompt(tenant, configs, additionalData = {}) {
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  const todayDate = nowIST.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata' })
+  const currentTime = nowIST.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+  const knowledgeBlock = additionalData.knowledgeBase ? '\nCLINIC FAQ & ADDITIONAL INFORMATION:\n' + additionalData.knowledgeBase + '\n' : ''
+
+  return `${getBasePrompt(tenant, configs)}
+
+CURRENT DATE & TIME (IST): ${todayDate}, ${currentTime}
+
+CLINIC INFORMATION:
+Name: ${tenant.name}
+Booking mode: appointment (patients book a time, not a token)
+Weekly off: ${configs.weekly_off || 'sunday'}
+${knowledgeBlock}
+BOOKING BY TIME:
+- Whenever the patient wants to book an appointment (including when they only mention a symptom or ask for a doctor), call start_appointment_booking immediately. Pass doctor_name only if the patient named a doctor, and preferred_text only if the patient already said a day or time, copied exactly as written.
+- The tool asks the patient for the doctor, day, time and name itself and shows the free times as buttons. Never ask for those yourself and never invent doctors, times or availability.
+- NEVER mention tokens, token numbers, sessions or queues. Appointments have a date and a time only.
+- NEVER say a booking is confirmed yourself. The booking is confirmed only by the message the booking buttons send.
+- To cancel: call get_patient_bookings, show the date, time and doctor (never the booking ID), ask "Are you sure you want to cancel your appointment on [date and time] with [doctor]? Reply YES or NO", and only after YES call cancel_booking with the booking id.
+- To change a time: tell the patient to cancel the appointment and book a new time, or to call the clinic. Never say you have changed it.
+- For a service question ("do you do X?") answer yes or no from the CLINIC FAQ first, then offer to book. Never give medical advice; suggest discussing it with the doctor and offer to book.
+- If you cannot help, or the patient asks for a person, call escalate_to_human.
+
+TONE:
+You are a caring, friendly clinic receptionist, not a chatbot. Keep replies under 3 sentences, use 1-2 emojis naturally, use line breaks for readability on WhatsApp.
 `
 }
 

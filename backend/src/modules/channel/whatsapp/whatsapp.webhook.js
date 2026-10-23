@@ -373,6 +373,10 @@ router.post('/', async (req, res) => {
         return codeFlowOnCache
       }
 
+      // Appointment booking by clock time: only clinics with booking_mode 'appointment' AND ai_appointment_booking (appointment.flow.js).
+      // It sits after the tenant-active and human-mode checks above, so neither can reach it; every other clinic falls straight through.
+      if (await require('./appointment.flow').handleIncoming({ tenant, context, message, source })) return
+
       // ---- Code flow: typed new-patient name helpers (used by the text branch and the two button handlers) ----
       const logName = (result, extra = '', confidence = null) => logger.info(`CODE_BOOKING_FLOW step=new_name${confidence ? ` confidence=${confidence}` : ''} result=${result}${extra} tenant=${tenant.id} conversation=${context.conversation.id}`)
       const saveNameInbound = async () => {

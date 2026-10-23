@@ -5,7 +5,53 @@
  * @param {string} industry
  * @returns {Array} Gemini function declarations
  */
-function getFunctionDefinitions(industry) {
+function getFunctionDefinitions(industry, options = {}) {
+  // Clinics with booking_mode 'appointment' AND ai_appointment_booking: booking by clock time. No token booking or token availability tools.
+  if (options.appointmentBooking && industry !== 'enquiry') {
+    return [
+      {
+        name: 'get_clinic_info',
+        description: 'Get clinic information including working hours and available doctors',
+        parameters: { type: 'OBJECT', properties: {}, required: [] }
+      },
+      {
+        name: 'start_appointment_booking',
+        description: 'Starts booking an appointment by time. Call this whenever the patient wants to book, even when they only mention a symptom. Pass doctor_name only if the patient named a doctor, and preferred_text only if the patient already said a day or time (for example "Saturday 5 pm"), copied exactly as they wrote it. The tool asks the patient everything else itself.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            doctor_name: { type: 'STRING', description: 'Name of the doctor, only if the patient named one' },
+            preferred_text: { type: 'STRING', description: 'The day and time the patient wrote, exactly as written, only if they gave one' }
+          },
+          required: []
+        }
+      },
+      {
+        name: 'cancel_booking',
+        description: 'Cancel an existing booking for the patient',
+        parameters: {
+          type: 'OBJECT',
+          properties: { booking_id: { type: 'STRING', description: 'ID of the booking to cancel' } },
+          required: ['booking_id']
+        }
+      },
+      {
+        name: 'get_patient_bookings',
+        description: 'Get all upcoming bookings for the current patient',
+        parameters: { type: 'OBJECT', properties: {}, required: [] }
+      },
+      {
+        name: 'escalate_to_human',
+        description: 'Escalate to human staff when you cannot help the patient',
+        parameters: {
+          type: 'OBJECT',
+          properties: { reason: { type: 'STRING', description: 'Reason for escalation' } },
+          required: ['reason']
+        }
+      }
+    ]
+  }
+
   const commonFunctions = [
     {
       name: 'get_clinic_info',

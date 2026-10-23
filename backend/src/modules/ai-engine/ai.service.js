@@ -1,6 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai')
 const { getSystemPrompt } = require('./ai.prompts')
 const { getFunctionDefinitions } = require('./ai.functions')
+const { isAppointmentBookingOn } = require('../../utils/appointmentFlag')
 const { executeFunction } = require('./ai.executor')
 const logger = require('../../utils/logger')
 const { maskPhone } = require('../../utils/phone')
@@ -166,7 +167,8 @@ async function processMessage(context) {
     }
 
     const systemPrompt = getSystemPrompt(tenant, configs, additionalData)
-    const functionDeclarations = getFunctionDefinitions(tenant.industry)
+    // Appointment-by-time clinics (both switches on) get a different tool set; every other clinic gets exactly the list it always had
+    const functionDeclarations = getFunctionDefinitions(tenant.industry, { appointmentBooking: isAppointmentBookingOn(configs) })
 
     const FALLBACK_MODEL = 'gemini-2.5-flash-lite';
     const MAX_ATTEMPTS = 3;
