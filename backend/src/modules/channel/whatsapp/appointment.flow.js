@@ -18,7 +18,6 @@ const MAX_DAYS_AHEAD = 14;
 const MIN_LEAD_MINUTES = 30;
 const APT_ID_RE = /^(aptdoc|aptday|apt|aptpat)\|/;
 const GREETINGS = ['hi', 'hello', 'hey', 'hii', 'helo', 'hai', 'hiya', 'start', 'menu'];
-const EXAMPLE = 'Saturday 5 pm';
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -74,6 +73,47 @@ function buildConfirmationText({ patientName, doctorName, dateText, timeText }) 
     'Please arrive 10 minutes early. To cancel or change, reply CANCEL.'
   ].join('\n');
 }
+
+/** "Sat, 25 Oct" for a YYYY-MM-DD date */
+function formatShortDate(dateStr) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${days[dt.getUTCDay()]}, ${dt.getUTCDate()} ${months[dt.getUTCMonth()]}`;
+}
+
+/** The full weekday name ("Saturday") for a YYYY-MM-DD date */
+function weekdayName(dateStr) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return names[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] || '';
+}
+
+// The patient-facing wording of the flow, in one place. A missing value gives the plain sentence without it (never "null" or "undefined").
+// Not here: the booking confirmation (buildConfirmationText), button titles and the clinic's own handoff and out-of-hours texts.
+const MESSAGES = {
+  greeting: (clinicName) => {
+    const name = String(clinicName || '').trim();
+    return name ? `Hello! 👋 Welcome to ${name}. How can we help you today?` : 'Hello! 👋 How can we help you today?';
+  },
+  whichDoctor: () => 'Sure, happy to help. Which doctor would you like to see?',
+  askDayTime: () => 'Sure! When would be convenient for you? You can type something like “today evening” or “Saturday 5 pm”.',
+  offerTimes: (doctorLabel, dateText) => (doctorLabel && dateText ? `Here are the nearest times for ${doctorLabel} on ${dateText}:` : 'Here are the nearest times:'),
+  onlyDay: (weekday) => (weekday ? `Got it, ${weekday}. What time suits you? For example “5 pm”.` : 'What time suits you? For example “5 pm”.'),
+  onlyTime: (timeText) => (timeText ? `${timeText} works. Which day would you like, today or tomorrow?` : 'Which day would you like, today or tomorrow?'),
+  choosePatient: () => 'Who is the appointment for?',
+  askName: () => 'May I have the patient\'s full name, please?',
+  slotTaken: () => 'Sorry, that time was just taken. Here are the nearest times still free:',
+  noFreeThatDay: (doctorLabel, weekday) => (doctorLabel && weekday
+    ? `I'm sorry, ${doctorLabel} has no free times on ${weekday}. These days have openings:`
+    : 'I\'m sorry, there are no free times on that day. These days have openings:'),
+  didntCatch: () => 'Sorry, I didn\'t catch that. You can type something like “tomorrow 5 pm” or choose a day below.',
+  alreadyBooked: (doctorLabel, weekday) => (doctorLabel && weekday
+    ? `You already have an appointment with ${doctorLabel} on ${weekday}. To change it, reply CANCEL and I'll help you book a new time.`
+    : 'You already have an appointment that day. To change it, reply CANCEL and I\'ll help you book a new time.'),
+  genericFailure: () => 'Sorry, something went wrong on our side. Please try again, or call the clinic and we\'ll sort it out.'
+};
 
 function addDaysStr(dateStr, n) {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -198,13 +238,15 @@ function createFlow(deps) {
     return bookableSlots(slots.map(toMinutes).filter(Number.isFinite), dateStr, nowIst());
   };
 
-  const askDayTime = (doctor) => text(`Which day and time would suit you with ${doctor.name}? For example: ${EXAMPLE}.`);
+  const askDayTime = () => text(MESSAGES.askDayTime());
 
   // The patient told us a day only, or a time only, or nothing usable
   const askForDay = async (ctx, doctor, pendingMinutes) => {
     const now = nowIst();
     await save(ctx, 'apt_time', { doctorId: doctor.id, doctorName: doctor.name, pending: pendingMinutes.map(hhmm).join(',') });
-    return [buttons('Which day would you like?', buildDayButtons(doctor.id, [now.dateStr, addDaysStr(now.dateStr, 1)], now))];
+    // One candidate time ("5 pm") is named in the question; two candidates (a bare "5") are not
+    const timeText = pendingMinutes.length === 1 ? formatTimeLabel(pendingMinutes[0]) : '';
+    return [buttons(MESSAGES.onlyTime(timeText), buildDayButtons(doctor.id, [now.dateStr, addDaysStr(now.dateStr, 1)], now))];
   };
 
   // Up to 3 days (next 14) with free times, nearest to the wanted date
@@ -227,22 +269,23 @@ function createFlow(deps) {
       return [text(`Sorry, ${doctor.name} has no free times in the next two weeks. Please call the clinic and our team will help you.`)];
     }
     await save(ctx, 'apt_time', { doctorId: doctor.id, doctorName: doctor.name });
-    return [buttons(`${doctor.name} has no free time on ${formatDateLabel(dateStr)}. These days have free times:`, buildDayButtons(doctor.id, days, nowIst()))];
+    return [buttons(MESSAGES.noFreeThatDay(buildDoctorLabel(doctor.name), weekdayName(dateStr)), buildDayButtons(doctor.id, days, nowIst()))];
   };
 
   // Offers the 3 free times nearest to the candidates on a date
-  const showNearest = async (ctx, doctor, dateStr, candidates, prefix = '') => {
+  const showNearest = async (ctx, doctor, dateStr, candidates, taken = false) => {
     const free = await freeMinutes(ctx, doctor, dateStr);
     if (free.length === 0) return noTimeThatDay(ctx, doctor, dateStr);
     const target = resolveTarget(candidates, free);
     const picks = pickNearestSlots(free, target, 3);
     await save(ctx, 'apt_pick', { doctorId: doctor.id, doctorName: doctor.name, date: dateStr });
-    return [buttons(`${prefix}${doctor.name}, ${formatDateLabel(dateStr)}. These are the closest free times. Tap one to book:`, buildTimeButtons(doctor.id, dateStr, picks))];
+    const body = taken ? MESSAGES.slotTaken() : MESSAGES.offerTimes(buildDoctorLabel(doctor.name), formatShortDate(dateStr));
+    return [buttons(body, buildTimeButtons(doctor.id, dateStr, picks))];
   };
 
   const askName = async (ctx, doctor, dateStr, timeMinutes, attempts = 0) => {
     await save(ctx, 'apt_name', { doctorId: doctor.id, doctorName: doctor.name, date: dateStr, pending: hhmm(timeMinutes), attempts });
-    return [text('Please reply with the patient\'s full name.')];
+    return [text(MESSAGES.askName())];
   };
 
   // Time text while the flow waits for a day and time
@@ -262,7 +305,7 @@ function createFlow(deps) {
         return [{ type: 'escalate' }];
       }
       await save(ctx, 'apt_time', { doctorId: doctor.id, doctorName: doctor.name, attempts });
-      return [buttons(`Sorry, I did not catch that. Please tell me a day and time, for example: ${EXAMPLE}. Or pick a day:`, buildDayButtons(doctor.id, [nowIst().dateStr, addDaysStr(nowIst().dateStr, 1)], nowIst()))];
+      return [buttons(MESSAGES.didntCatch(), buildDayButtons(doctor.id, [nowIst().dateStr, addDaysStr(nowIst().dateStr, 1)], nowIst()))];
     }
     if (!date) return askForDay(ctx, doctor, times);
     if (date > addDaysStr(nowIst().dateStr, MAX_DAYS_AHEAD)) {
@@ -270,7 +313,7 @@ function createFlow(deps) {
     }
     if (times.length === 0) {
       await save(ctx, 'apt_time', { doctorId: doctor.id, doctorName: doctor.name, date });
-      return [text(`What time on ${formatDateLabel(date)}? For example: 5 pm.`)];
+      return [text(MESSAGES.onlyDay(weekdayName(date)))];
     }
     return showNearest(ctx, doctor, date, times);
   };
@@ -288,7 +331,7 @@ function createFlow(deps) {
       await save(ctx, 'apt_doctor');
       return [{
         type: 'list',
-        body: 'Which doctor would you like to see?',
+        body: MESSAGES.whichDoctor(),
         buttonText: 'Select Doctor',
         items: doctors.slice(0, 10).map((d) => ({ id: `aptdoc|${d.id}`, title: clip(d.name, 24), description: clip(d.specialization || 'Doctor', 72) }))
       }];
@@ -307,11 +350,11 @@ function createFlow(deps) {
   const bookNow = async (ctx, doctor, dateStr, timeMinutes, who) => {
     const free = await freeMinutes(ctx, doctor, dateStr);
     if (!free.includes(timeMinutes)) {
-      return showNearest(ctx, doctor, dateStr, [timeMinutes], 'That time was just taken. ');
+      return showNearest(ctx, doctor, dateStr, [timeMinutes], true);
     }
     if (who.patientId && await deps.db.hasSameDayBooking(ctx.tenant.id, doctor.id, dateStr, who.patientId)) {
       await deps.state.clear(ctx.tenant.id, ctx.phone);
-      return [text(`${who.patientName || 'This patient'} already has an appointment with ${doctor.name} on ${formatDateLabel(dateStr)}. Reply CANCEL to cancel it, or call the clinic to change it.`)];
+      return [text(MESSAGES.alreadyBooked(buildDoctorLabel(doctor.name), weekdayName(dateStr)))];
     }
     try {
       const booking = await deps.clinic.createAppointment(ctx.tenant.id, doctor.id, {
@@ -332,25 +375,25 @@ function createFlow(deps) {
       }), { afterBooking: true })];
     } catch (err) {
       if (err && err.statusCode === 409) {
-        return showNearest(ctx, doctor, dateStr, [timeMinutes], 'That time was just taken. ');
+        return showNearest(ctx, doctor, dateStr, [timeMinutes], true);
       }
       deps.log.warn(`APT_FLOW booking_failed class=${(err && (err.name || err.code)) || 'Error'} tenant=${ctx.tenant.id}`);
       await deps.state.clear(ctx.tenant.id, ctx.phone);
-      return [text('Sorry, I could not complete your booking. Please try again, or call the clinic and our team will help you.')];
+      return [text(MESSAGES.genericFailure())];
     }
   };
 
   // A tapped time: choose or ask for the patient, then book
   const onTime = async (ctx, doctor, dateStr, timeMinutes) => {
     const free = await freeMinutes(ctx, doctor, dateStr);
-    if (!free.includes(timeMinutes)) return showNearest(ctx, doctor, dateStr, [timeMinutes], 'That time was just taken. ');
+    if (!free.includes(timeMinutes)) return showNearest(ctx, doctor, dateStr, [timeMinutes], true);
     const patients = ctx.customer?.id ? await deps.db.listPatients(ctx.tenant.id, ctx.customer.id) : [];
     if (patients.length === 0) return askName(ctx, doctor, dateStr, timeMinutes);
     if (patients.length === 1) return bookNow(ctx, doctor, dateStr, timeMinutes, { patientId: patients[0].id, patientName: patients[0].name });
     await save(ctx, 'apt_patient', { doctorId: doctor.id, doctorName: doctor.name, date: dateStr, pending: hhmm(timeMinutes) });
     return [{
       type: 'list',
-      body: 'Who is this appointment for?',
+      body: MESSAGES.choosePatient(),
       buttonText: 'Select Patient',
       items: [
         ...patients.slice(0, 9).map((p) => ({ id: `aptpat|${p.id}`, title: clip(p.name, 24), description: 'Existing profile' })),
@@ -377,7 +420,7 @@ function createFlow(deps) {
       const pending = live && live.data.sessionStart && live.data.doctorId === doctor.id ? live.data.sessionStart.split(',').filter(Boolean).map(toMinutes) : [];
       if (pending.length > 0) return showNearest(ctx, doctor, dateStr, pending);
       await save(ctx, 'apt_time', { doctorId: doctor.id, doctorName: doctor.name, date: dateStr });
-      return [text(`What time on ${formatDateLabel(dateStr)}? For example: 5 pm.`)];
+      return [text(MESSAGES.onlyDay(weekdayName(dateStr)))];
     }
     if (kind === 'apt') {
       const doctor = await findDoctor(ctx, parts[1]);
@@ -421,7 +464,7 @@ function createFlow(deps) {
 
   const greeting = async (ctx) => {
     await deps.state.clear(ctx.tenant.id, ctx.phone);
-    return [buttons(`Hello! Welcome to ${ctx.tenant.name} 👋\nHow can I help you today?`, buildMenuButtons())];
+    return [buttons(MESSAGES.greeting(ctx.tenant.name), buildMenuButtons())];
   };
 
   /**
@@ -605,7 +648,7 @@ async function handleIncoming({ tenant, context, message, source }) {
     logger.error(`APT_FLOW error class=${(err && (err.name || err.code)) || 'Error'} tenant=${tenant.id}`);
     try {
       await require('../../conversation/conversation.flow').clearFlow(tenant.id, message.from);
-      await adapter.sendMessage(message.from, 'Sorry, something went wrong. Please try again, or call the clinic and our team will help you.');
+      await adapter.sendMessage(message.from, MESSAGES.genericFailure());
     } catch (sendErr) { /* nothing more to do */ }
     return true;
   }
@@ -636,13 +679,13 @@ async function startFromTool(ctx, args = {}) {
     return `DIRECT:${spec.body}`;
   } catch (err) {
     logger.error(`APT_FLOW tool_error class=${(err && (err.name || err.code)) || 'Error'}`);
-    return 'DIRECT:Sorry, I could not start the booking. Please try again, or call the clinic and our team will help you.';
+    return `DIRECT:${MESSAGES.genericFailure()}`;
   }
 }
 
 module.exports = {
   // pure helpers
-  buildConfirmationText, buildDoctorLabel, formatConfirmDate,
+  buildConfirmationText, buildDoctorLabel, formatConfirmDate, formatShortDate, weekdayName, MESSAGES,
   pickNearestSlots, resolveTarget, formatTimeLabel, formatDateLabel, bookableSlots, buildTimeButtons, buildDayButtons, buildMenuButtons,
   cleanPatientName, istNowParts, addDaysStr, toMinutes,
   // the state machine (injectable) and the real wiring
