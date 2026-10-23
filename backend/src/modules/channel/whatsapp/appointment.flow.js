@@ -44,6 +44,37 @@ function formatDateLabel(dateStr) {
   return `${days[dt.getUTCDay()]} ${dt.getUTCDate()} ${months[dt.getUTCMonth()]}`;
 }
 
+/** "Dr " in front of the doctor's name unless it already starts with "Dr" (with or without a full stop): "Dr. Ajesh", "Dr Lena Thomas" */
+function buildDoctorLabel(name) {
+  const clean = String(name || '').trim();
+  if (!clean) return '';
+  return /^dr\b\.?/i.test(clean) ? clean : `Dr ${clean}`;
+}
+
+/** "Sat, 25 Oct 2026" for a YYYY-MM-DD date */
+function formatConfirmDate(dateStr) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${days[dt.getUTCDay()]}, ${dt.getUTCDate()} ${months[dt.getUTCMonth()]} ${dt.getUTCFullYear()}`;
+}
+
+/** The text sent after a successful booking. The Patient line is left out when there is no patient name. */
+function buildConfirmationText({ patientName, doctorName, dateText, timeText }) {
+  const patient = String(patientName || '').trim();
+  return [
+    '✅ Appointment confirmed',
+    '',
+    ...(patient ? [`Patient: ${patient}`] : []),
+    `Doctor: ${buildDoctorLabel(doctorName)}`,
+    `Date: ${dateText}`,
+    `Time: ${timeText}`,
+    '',
+    'Please arrive 10 minutes early. To cancel or change, reply CANCEL.'
+  ].join('\n');
+}
+
 function addDaysStr(dateStr, n) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d + n));
@@ -292,9 +323,13 @@ function createFlow(deps) {
         source: 'whatsapp'
       });
       const c = booking.confirmation;
-      const length = toMinutes(c.end_time) - toMinutes(c.start_time);
       await deps.state.clear(ctx.tenant.id, ctx.phone);
-      return [text(`Your appointment with ${c.doctor_name} is booked for ${formatDateLabel(c.date)}, ${formatTimeLabel(toMinutes(c.start_time))} (about ${length} minutes). Reply CANCEL to cancel.`, { afterBooking: true })];
+      return [text(buildConfirmationText({
+        patientName: who.patientName,
+        doctorName: c.doctor_name,
+        dateText: formatConfirmDate(c.date),
+        timeText: formatTimeLabel(toMinutes(c.start_time))
+      }), { afterBooking: true })];
     } catch (err) {
       if (err && err.statusCode === 409) {
         return showNearest(ctx, doctor, dateStr, [timeMinutes], 'That time was just taken. ');
@@ -607,6 +642,7 @@ async function startFromTool(ctx, args = {}) {
 
 module.exports = {
   // pure helpers
+  buildConfirmationText, buildDoctorLabel, formatConfirmDate,
   pickNearestSlots, resolveTarget, formatTimeLabel, formatDateLabel, bookableSlots, buildTimeButtons, buildDayButtons, buildMenuButtons,
   cleanPatientName, istNowParts, addDaysStr, toMinutes,
   // the state machine (injectable) and the real wiring
