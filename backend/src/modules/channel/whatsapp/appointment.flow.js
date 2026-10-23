@@ -112,6 +112,7 @@ const MESSAGES = {
   alreadyBooked: (doctorLabel, weekday) => (doctorLabel && weekday
     ? `You already have an appointment with ${doctorLabel} on ${weekday}. To change it, reply CANCEL and I'll help you book a new time.`
     : 'You already have an appointment that day. To change it, reply CANCEL and I\'ll help you book a new time.'),
+  handoff: () => 'No problem, I\'ll ask our team to help you. They\'ll reply shortly.',
   genericFailure: () => 'Sorry, something went wrong on our side. Please try again, or call the clinic and we\'ll sort it out.'
 };
 
@@ -608,6 +609,13 @@ async function handleIncoming({ tenant, context, message, source }) {
     escalate: async (c) => {
       const settings = await HITLModel.getTenantSettings(c.tenant.id);
       if (settings && HITLService.isWithinWorkingHours(settings.working_hours)) {
+        // One plain sentence first (inside working hours only); a failure here never stops the handoff
+        try {
+          await adapter.sendMessage(c.phone, MESSAGES.handoff());
+          await ConversationService.saveOutboundMessage(c.conversation.id, MESSAGES.handoff(), 'assistant');
+        } catch (sentenceErr) {
+          logger.warn(`APT_FLOW handoff_sentence_failed class=${(sentenceErr && (sentenceErr.name || sentenceErr.code)) || 'Error'}`);
+        }
         await HITLService.handleAIHandoffRequest(c.tenant, { ...c.conversation, customer_phone: c.customer?.phone || c.phone }, null);
       } else {
         const body = (settings && settings.out_of_hours_message) || 'Our clinic is closed right now. Our team will get back to you during working hours.';

@@ -85,15 +85,22 @@ async function requireAuth(req, res, next) {
 
     const staffData = sessionResult.rows[0]
 
-    // Check tenant is active
-    if (staffData.tenant_status === 'suspended') {
-      return errorResponse(res,
-        'Account suspended', 403)
-    }
+    // Only an active clinic can use the dashboard; a super admin is never refused
+    if (staffData.role !== 'super_admin') {
+      if (staffData.tenant_status === 'suspended') {
+        return errorResponse(res,
+          'Account suspended', 403)
+      }
 
-if (staffData.tenant_status === 'pending') {
-      return errorResponse(res,
-        'Account pending approval', 403)
+      if (staffData.tenant_status === 'pending') {
+        return errorResponse(res,
+          'Account pending approval', 403)
+      }
+
+      if (staffData.tenant_status !== 'active') {
+        return errorResponse(res,
+          'Account inactive', 403)
+      }
     }
 
     // Set req.staff and req.tenant

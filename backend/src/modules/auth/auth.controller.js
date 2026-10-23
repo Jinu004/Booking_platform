@@ -41,10 +41,16 @@ async function login(req, res) {
 
     const staff = result.rows[0]
 
-    // Check if tenant is active
-    if (staff.tenant_status === 'suspended') {
-      return errorResponse(res,
-        'Your clinic account has been suspended. Please contact support.', 403)
+    // Check if tenant is active (a pending clinic may log in to see the approval screen; a super admin is never refused)
+    if (staff.role !== 'super_admin') {
+      if (staff.tenant_status === 'suspended') {
+        return errorResponse(res,
+          'Your clinic account has been suspended. Please contact support.', 403)
+      }
+      if (staff.tenant_status !== 'active' && staff.tenant_status !== 'pending') {
+        return errorResponse(res,
+          'Account inactive', 403)
+      }
     }
 
     // Verify password

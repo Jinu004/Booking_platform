@@ -244,12 +244,17 @@ router.post('/', async (req, res) => {
 
       const redisClient = require('../../../config/redis')
       if (message.messageId && redisClient) {
-        const isDuplicate = await redisClient.get(`msg_dedup:${message.messageId}`)
-        if (isDuplicate) {
-          logger.warn(`Duplicate message detected and skipped: ${message.messageId}`)
-          return
+        try {
+          const isDuplicate = await redisClient.get(`msg_dedup:${message.messageId}`)
+          if (isDuplicate) {
+            logger.warn(`Duplicate message detected and skipped: ${message.messageId}`)
+            return
+          }
+          await redisClient.set(`msg_dedup:${message.messageId}`, '1', { EX: 300 })
+        } catch (dedupeErr) {
+          // Redis problem: the message is still processed (dropping it would lose it and Meta does not retry); only the error class is logged
+          logger.warn(`WEBHOOK_DEDUPE_REDIS_ERROR class=${String((dedupeErr && (dedupeErr.name || dedupeErr.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)}`)
         }
-        await redisClient.set(`msg_dedup:${message.messageId}`, '1', { EX: 300 })
       }
 
       logger.info(`Incoming ${source} message from ${maskPhone(message.from)}`)

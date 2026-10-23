@@ -241,6 +241,11 @@ function cleanCaption(caption) {
 
 const round2 = (value) => Math.round(value * 100) / 100
 
+// The note under the preview while the clinic is under the cumulative first-campaign cap
+function firstCampaignNote(limit, remaining) {
+  return `Until your clinic has sent ${limit} campaign message${limit === 1 ? '' : 's'} in total, campaigns are limited. This one can send up to ${remaining} more; the rest are skipped.`
+}
+
 async function loadCampaignRow(tenantId, campaignId) {
   assertUuid(tenantId, 'Clinic id')
   if (!UUID_RE.test(String(campaignId))) throw new CampaignError('Campaign not found', 404)
@@ -270,8 +275,9 @@ async function buildPreview(tenantId, campaign, readiness) {
     is_first_campaign: snap.isFirstCampaign,
     first_campaign_limit: snap.firstCampaignLimit,
     left_over_after_cap: pending - willSend,
+    first_campaign_remaining: snap.firstCampaignRemaining, // how many more this campaign may send under the cumulative cap (null: no cap)
     left_over_note: snap.isFirstCampaign
-      ? `A first campaign is limited to ${snap.firstCampaignLimit} patients; the rest are skipped.`
+      ? firstCampaignNote(snap.firstCampaignLimit, snap.firstCampaignRemaining)
       : "The rest wait for the next day's budget.",
     daily: { limit: snap.limit, budget: snap.budget, used: snap.used, remaining: snap.remaining },
     cost: { per_message_inr: perMessage, subtotal_inr: subtotal, gst_inr: gst, total_inr: round2(subtotal + gst), estimate: true },
@@ -350,5 +356,6 @@ module.exports = {
   cancelCampaign,
   previewCampaign,
   confirmCampaign,
+  firstCampaignNote,
   ELIGIBILITY_SQL
 }
