@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { getTokenQueue, updateTokenStatus } from '../services/clinic.service';
 import { getStoredStaff } from '../services/auth.service';
 import { plural } from '../utils/plural';
+import { getErrorMessage } from '../utils/errorMessage';
+import LoadError from '../components/LoadError';
 
 const getStatusPill = (status) => {
   switch (status) {
@@ -29,6 +31,8 @@ const TokenQueue = () => {
   const [doctorFilter, setDoctorFilter] = useState('all');
   const [collapsedSessions, setCollapsedSessions] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [loadError, setLoadError] = useState('');   // the last load failed
+  const [hasLoaded, setHasLoaded] = useState(false); // a load has worked at least once, so there is good data to keep on screen
 
   const staff = getStoredStaff();
   const isDoctor = staff?.role === 'doctor';
@@ -39,7 +43,12 @@ const TokenQueue = () => {
       const res = await getTokenQueue();
       const tokens = res?.data || [];
       setTokenQueue(isDoctor ? tokens.filter(t => t.doctor_id === staffDoctorId) : tokens);
-    } catch {}
+      setLoadError('');
+      setHasLoaded(true);
+    } catch (err) {
+      // The last good data stays on screen; it is replaced by an error only while there is none
+      setLoadError(getErrorMessage(err, 'Could not load the token queue. Try again.'));
+    }
     finally { setLoading(false); }
   };
 
@@ -113,8 +122,13 @@ const TokenQueue = () => {
           ))}
         </div>
 
+        {loadError && hasLoaded && (
+          <p className="px-4 py-2 text-xs text-amber-700 bg-amber-50 border-b border-amber-100">Could not refresh. Retrying…</p>
+        )}
         {loading ? (
           <div className="p-12 text-center text-sm text-ink/40">Loading queue...</div>
+        ) : loadError && !hasLoaded ? (
+          <div className="p-6"><LoadError message={loadError} onRetry={fetchQueue} /></div>
         ) : filteredTokens.length === 0 ? (
           <div className="p-12 text-center text-sm text-ink/40">No tokens in this queue</div>
         ) : (

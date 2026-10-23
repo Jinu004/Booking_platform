@@ -13,6 +13,20 @@ import { getStoredStaff } from '../services/auth.service';
 import { TableRowSkeleton, StatCardSkeleton } from '../components/shared/Skeleton';
 import { saveToCache, loadFromCache } from '../utils/offlineCache';
 import { plural } from '../utils/plural';
+import { getErrorMessage } from '../utils/errorMessage';
+
+// Phone fields take digits, spaces and a leading "+" (the backend checks and normalises the number)
+const PHONE_HELP = '10 digits for India, or + and the country code for other countries';
+const cleanPhoneInput = (value) => {
+  const text = String(value).replace(/[^\d+\s]/g, '');
+  return ((text.startsWith('+') ? '+' : '') + text.replace(/\+/g, '')).slice(0, 16);
+};
+// The patient lookup starts when the number looks complete: 10 or more digits, or "+" and 8 or more digits (spaces ignored)
+const phoneReadyForLookup = (value) => {
+  const text = String(value).trim();
+  const digits = text.replace(/\D/g, '').length;
+  return text.startsWith('+') ? digits >= 8 : digits >= 10;
+};
 
 const Bookings = () => {
   const { addToast } = useStore();
@@ -227,14 +241,14 @@ const Bookings = () => {
   };
 
   const handleQbPhone = async (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 10);
-    qbPhoneRef.current = digits;
-    setQb(q => ({ ...q, phone: digits }));
+    const typed = cleanPhoneInput(value);
+    qbPhoneRef.current = typed;
+    setQb(q => ({ ...q, phone: typed }));
     setQbPatients([]);
-    if (digits.length !== 10) return;
+    if (!phoneReadyForLookup(typed)) return;
     try {
-      const res = await api.get(`/bookings/lookup?phone=${digits}`);
-      if (qbPhoneRef.current !== digits) return; // the number changed while the lookup ran
+      const res = await api.get(`/bookings/lookup?phone=${encodeURIComponent(typed.trim())}`);
+      if (qbPhoneRef.current !== typed) return; // the number changed while the lookup ran
       const customer = res?.data?.customer || null;
       const patients = res?.data?.patients || [];
       setQbPatients(patients);
@@ -246,7 +260,7 @@ const Bookings = () => {
   const submitQuickBooking = async () => {
     if (qbSubmitRef.current) return;
     setQbError('');
-    if (qb.phone.length !== 10) { setQbError('Enter the 10-digit phone number.'); return; }
+    if (!phoneReadyForLookup(qb.phone)) { setQbError('Enter a valid phone number: 10 digits for India, or + and the country code for other countries.'); return; }
     if (!qb.name.trim()) { setQbError('Enter the patient name.'); return; }
     if (!qb.doctorId) { setQbError('Choose a doctor.'); return; }
     if (!qb.time) { setQbError('Choose a free time.'); return; }
@@ -255,7 +269,7 @@ const Bookings = () => {
     try {
       await scheduleAppointmentBooking(qb.doctorId, {
         patient_name: qb.name.trim(),
-        phone: `+91${qb.phone}`,
+        phone: qb.phone.trim(), // as typed: the backend normalises it
         date: qb.date,
         start_time: qb.time,
         notes: qb.notes.trim()
@@ -396,7 +410,7 @@ const Bookings = () => {
       setNewBooking({ patientName: '', patientPhone: '', doctorId: '', notes: '', isPresent: true, sendWhatsapp: true, marketing_consent: '' });
       fetchData();
     } catch (err) {
-      alert(err?.error || err?.message || 'Failed to create booking');
+      alert(getErrorMessage(err, 'Failed to create booking'));
     } finally {
       setIsSubmitting(false);
     }
@@ -784,13 +798,11 @@ const Bookings = () => {
               {qbError && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{qbError}</div>}
               <div>
                 <label className="block text-sm font-medium text-ink/80 mb-1">Patient Phone</label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-ink/[0.12] bg-ink/[0.02] text-ink/55 text-sm">+91</span>
-                  <input type="tel" maxLength={10} value={qb.phone} disabled={qbSubmitting}
-                    onChange={e => handleQbPhone(e.target.value)}
-                    className="flex-1 border border-ink/[0.12] rounded-r-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-                    placeholder="9876543210" />
-                </div>
+                <input type="tel" maxLength={16} value={qb.phone} disabled={qbSubmitting}
+                  onChange={e => handleQbPhone(e.target.value)}
+                  className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                  placeholder="9876543210 or +971501234567" />
+                <p className="text-xs text-ink/50 mt-1">{PHONE_HELP}</p>
               </div>
               {qbPatients.length > 1 && (
                 <div>
@@ -860,7 +872,7 @@ const Bookings = () => {
               </div>
               <button
                 onClick={submitQuickBooking}
-                disabled={qbSubmitting || qb.phone.length !== 10 || !qb.name.trim() || !qb.doctorId || !qb.time}
+                disabled={qbSubmitting || !phoneReadyForLookup(qb.phone) || !qb.name.trim() || !qb.doctorId || !qb.time}
                 className="w-full bg-brand text-white py-2.5 rounded-lg font-bold hover:bg-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {qbSubmitting ? 'Saving...' : 'Book appointment'}
@@ -1023,23 +1035,23 @@ const Bookings = () => {
               <div>
                 <label className="block text-sm font-bold text-ink/80 mb-1">Patient Phone <span className="text-red-500">*</span></label>
                 <div className="flex relative">
-                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-ink/[0.12] bg-ink/[0.02] text-ink/55 text-sm font-bold">+91</span>
-                  <input type="tel" required value={scheduleBooking.patientPhone}
+                  <input type="tel" required maxLength={16} value={scheduleBooking.patientPhone}
                     onChange={async e => {
-                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      setScheduleBooking({...scheduleBooking, patientPhone: digits});
-                      if (digits.length === 10) {
+                      const typed = cleanPhoneInput(e.target.value);
+                      setScheduleBooking({...scheduleBooking, patientPhone: typed});
+                      if (phoneReadyForLookup(typed)) {
                         try {
-                          const res = await api.get(`/bookings/lookup?phone=${digits}`);
+                          const res = await api.get(`/bookings/lookup?phone=${encodeURIComponent(typed.trim())}`);
                           const found = res?.data?.patients || [];
                           if (found.length > 0) { setPhoneSuggestions(found); setShowSuggestions(true); setActiveSuggestionModal('schedule'); }
                           else { setShowSuggestions(false); }
                         } catch { setShowSuggestions(false); }
                       } else { setShowSuggestions(false); }
                     }}
-                    className="flex-1 rounded-none rounded-r-md border border-ink/[0.12] p-2 font-bold focus:ring-ink/20 focus:border-ink/40"
-                    placeholder="9876543210" />
+                    className="flex-1 rounded-md border border-ink/[0.12] p-2 font-bold focus:ring-ink/20 focus:border-ink/40"
+                    placeholder="9876543210 or +971501234567" />
                 </div>
+                <p className="text-xs text-ink/50 mt-1">{PHONE_HELP}</p>
                 {showSuggestions && activeSuggestionModal === 'schedule' && (
                   <div className="mt-1 w-full bg-white border border-ink/[0.08] rounded-lg shadow-sm">
                     {phoneSuggestions.map(p => (
@@ -1142,7 +1154,7 @@ const Bookings = () => {
                 onClick={async () => {
                   setIsScheduleSubmitting(true);
                   try {
-                    const phone = '+91' + scheduleBooking.patientPhone;
+                    const phone = scheduleBooking.patientPhone.trim(); // as typed: the backend normalises it
                     await api.post('/bookings/manual', {
                       patientPhone: phone,
                       patientName: scheduleBooking.patientName,
@@ -1159,7 +1171,7 @@ const Bookings = () => {
                     setNoSessions(false);
                     fetchData();
                   } catch (err) {
-                    alert(err?.error || 'Failed to schedule booking');
+                    alert(getErrorMessage(err, 'Failed to schedule booking'));
                   } finally {
                     setIsScheduleSubmitting(false);
                   }
@@ -1179,26 +1191,26 @@ const Bookings = () => {
               <div className="relative">
                 <label className="block text-sm font-bold text-ink/80 mb-1">Patient Phone <span className="text-red-500">*</span></label>
                 <div className="flex">
-                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-ink/[0.12] bg-ink/[0.02] text-ink/55 text-sm font-bold">+91</span>
                   <input
-                    type="tel" required
+                    type="tel" required maxLength={16}
                     value={newBooking.patientPhone}
                     onChange={async e => {
-                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      setNewBooking({...newBooking, patientPhone: digits});
-                      if (digits.length === 10) {
+                      const typed = cleanPhoneInput(e.target.value);
+                      setNewBooking({...newBooking, patientPhone: typed});
+                      if (phoneReadyForLookup(typed)) {
                         try {
-                          const res = await api.get(`/bookings/lookup?phone=${digits}`);
+                          const res = await api.get(`/bookings/lookup?phone=${encodeURIComponent(typed.trim())}`);
                           const found = res?.data?.patients || [];
                           if (found.length > 0) { setPhoneSuggestions(found); setShowSuggestions(true); setActiveSuggestionModal('new'); }
                           else { setShowSuggestions(false); }
                         } catch { setShowSuggestions(false); }
                       } else { setShowSuggestions(false); }
                     }}
-                    className="flex-1 rounded-none rounded-r-md border border-ink/[0.12] p-2 font-bold focus:ring-ink/20 focus:border-ink/40"
-                    placeholder="9876543210"
+                    className="flex-1 rounded-md border border-ink/[0.12] p-2 font-bold focus:ring-ink/20 focus:border-ink/40"
+                    placeholder="9876543210 or +971501234567"
                   />
                 </div>
+                <p className="text-xs text-ink/50 mt-1">{PHONE_HELP}</p>
                 {showSuggestions && activeSuggestionModal === 'new' && (
                   <div className="absolute z-50 mt-1 w-full bg-white border border-ink/[0.08] rounded-lg shadow-lg">
                     {phoneSuggestions.map(p => (

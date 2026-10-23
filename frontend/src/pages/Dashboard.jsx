@@ -8,6 +8,7 @@ import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
 import { saveToCache, loadFromCache } from '../utils/offlineCache';
 import { plural } from '../utils/plural';
+import LoadError from '../components/LoadError';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({ bookingsToday: 0, activeConversations: 0, availableDoctors: 0, pendingTokens: 0 });
@@ -17,6 +18,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const { tenant, addToast } = useStore();
   const [hasDoctors, setHasDoctors] = useState(true);
+  const [statsFailed, setStatsFailed] = useState(false);     // the stats call failed: the number is unknown, not zero
+  const [doctorsFailed, setDoctorsFailed] = useState(false); // the doctors call failed: "no doctors yet" must not be shown
   const [doctors, setDoctors] = useState([]);
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -42,11 +45,13 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
+      let statsDidFail = false;
+      let doctorsDidFail = false;
       const [statsRes, convRes, docsRes, allDocsRes, tokensRes, bookingsRes] = await Promise.all([
-        getBookingStats().catch(() => ({ data: { total: 0 } })),
+        getBookingStats().catch(() => { statsDidFail = true; return { data: { total: 0 } }; }),
         isDoctor ? Promise.resolve({ data: [] }) : getHITLConversations({ since: '24h' }).catch(() => ({ data: { conversations: [] } })),
-        getDoctors(true).catch(() => ({ data: [] })),
-        getDoctors().catch(() => ({ data: [] })),
+        getDoctors(true).catch(() => { doctorsDidFail = true; return { data: [] }; }),
+        getDoctors().catch(() => { doctorsDidFail = true; return { data: [] }; }),
         getTokenQueue().catch(() => ({ data: [] })),
         getBookings({ limit: 5 }).catch(() => ({ data: { bookings: [] } }))
       ]);
@@ -87,6 +92,8 @@ const Dashboard = () => {
       setDoctors(dashboardData.doctors);
       setAvailableDoctors(dashboardData.availableDoctors);
       setHasDoctors(dashboardData.hasDoctors);
+      setStatsFailed(statsDidFail);
+      setDoctorsFailed(doctorsDidFail);
       setIsOffline(false);
     } catch (err) {
       const cached = await loadFromCache('dashboard');
@@ -169,8 +176,15 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* The doctors could not be loaded: say so instead of showing the "add your first doctor" prompt */}
+      {doctorsFailed && (
+        <div className="mx-6 mt-4">
+          <LoadError message="Could not load your doctors. Try again." onRetry={fetchDashboardData} />
+        </div>
+      )}
+
       {/* Setup Banner */}
-      {!hasDoctors && (
+      {!hasDoctors && !doctorsFailed && (
         <div className="mx-6 mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
           <h3 className="font-semibold text-blue-900 mb-3">👋 Complete your setup</h3>
           <div className="space-y-2">
@@ -222,7 +236,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 py-5">
         <div className={`${cardBase} p-5`}>
           <p className={`${monoLabel} text-ink/50`}>Today's Tokens</p>
-          <p className="mt-3 text-[40px] font-semibold tracking-[-0.04em] leading-none">{stats.bookingsToday}</p>
+          <p className="mt-3 text-[40px] font-semibold tracking-[-0.04em] leading-none">{statsFailed && !isDoctor ? '—' : stats.bookingsToday}</p>
         </div>
         <div className="bg-accent-soft text-accent rounded-2xl border border-accent/15 shadow-card p-5">
           <p className={`${monoLabel} text-accent/70`}>Waiting Now</p>

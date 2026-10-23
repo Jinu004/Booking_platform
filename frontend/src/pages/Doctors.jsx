@@ -3,6 +3,8 @@ import { getDoctors, createDoctor, updateDoctor, deleteDoctor, updateAvailabilit
 import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
 import { CardSkeleton } from '../components/shared/Skeleton';
+import { getErrorMessage } from '../utils/errorMessage';
+import LoadError from '../components/LoadError';
 
 const AVATAR_COLORS = [
   'bg-indigo-100 text-indigo-700',
@@ -119,6 +121,7 @@ const Doctors = () => {
   const [doctors, setDoctors] = useState([]);
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [doctorsLoadError, setDoctorsLoadError] = useState('');
 
   const [scheduleModalDoc, setScheduleModalDoc] = useState(null);
   const [doctorSchedule, setDoctorSchedule] = useState([]);
@@ -226,10 +229,12 @@ const Doctors = () => {
 
   const fetchDoctors = async () => {
     try {
+      setDoctorsLoadError('');
       const result = await getDoctors();
       setDoctors(result?.data || []);
     } catch (err) {
-      console.error(err);
+      // Shown in place of the list only while there is no list yet
+      setDoctorsLoadError(getErrorMessage(err, 'Could not load the doctors. Try again.'));
     }
   };
 
@@ -302,7 +307,7 @@ const Doctors = () => {
       addToast('Schedule saved successfully', 'success');
       fetchDoctors();
     } catch (err) {
-      addToast('Failed to save schedule', 'error');
+      addToast(getErrorMessage(err, 'Failed to save schedule'), 'error');
     } finally {
       setSavingSchedule(false);
     }
@@ -364,7 +369,7 @@ const Doctors = () => {
       setIsManageModalOpen(false);
       fetchDoctors();
     } catch (err) {
-      addToast(`Failed to ${manageMode} doctor`, 'error');
+      addToast(getErrorMessage(err, `Failed to ${manageMode} doctor`), 'error');
     }
   };
 
@@ -407,7 +412,7 @@ const Doctors = () => {
       setLeaveModalDoc(null);
       fetchDoctors();
     } catch (err) {
-      addToast('Failed to register leave', 'error');
+      addToast(getErrorMessage(err, 'Failed to register leave'), 'error');
     }
   };
 
@@ -468,6 +473,8 @@ const Doctors = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <CardSkeleton /><CardSkeleton /><CardSkeleton />
           </div>
+        ) : doctorsLoadError && doctors.length === 0 ? (
+          <LoadError message={doctorsLoadError} onRetry={fetchDoctors} />
         ) : doctors.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
             <p className="text-gray-400 text-sm">No doctors added yet.</p>

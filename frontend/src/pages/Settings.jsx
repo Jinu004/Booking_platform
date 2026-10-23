@@ -8,6 +8,8 @@ import { useIndustry } from '../hooks/useIndustry';
 import api from '../utils/api';
 import PosterImage from '../components/shared/PosterImage';
 import { plural, hourLabel } from '../utils/plural';
+import { getErrorMessage } from '../utils/errorMessage';
+import LoadError from '../components/LoadError';
 
 const DAYS = [
   { key: 'mon', label: 'Monday' },
@@ -118,6 +120,9 @@ export default function Settings() {
 
   const [clinicLoading, setClinicLoading] = useState(true);
   const [hitlLoading, setHITLLoading] = useState(true);
+  // A failed load is shown as an error with Retry: the defaults above are never shown (or saved) as if they were the clinic's real data
+  const [clinicLoadError, setClinicLoadError] = useState('');
+  const [hitlLoadError, setHitlLoadError] = useState('');
 
   const kbUnlocked = plan === 'growth' || plan === 'pro';
   const kbLimit = plan === 'pro' ? 3500 : 1000;
@@ -149,8 +154,10 @@ export default function Settings() {
     };
   }, [activeTab, canUsePosters]);
 
-  useEffect(() => {
-    getClinicSettings()
+  const loadClinic = () => {
+    setClinicLoading(true);
+    setClinicLoadError('');
+    return getClinicSettings()
       .then(res => {
         const d = res?.data || res;
         if (d) {
@@ -159,10 +166,14 @@ export default function Settings() {
           setClinic(prev => ({ ...prev, ...profileFields }));
         }
       })
-      .catch(() => { })
+      .catch(err => setClinicLoadError(getErrorMessage(err, 'Could not load the clinic profile. Try again.')))
       .finally(() => setClinicLoading(false));
+  };
 
-    Promise.all([getHITLSettings(), getSettings()])
+  const loadHitl = () => {
+    setHITLLoading(true);
+    setHitlLoadError('');
+    return Promise.all([getHITLSettings(), getSettings()])
       .then(([hitlRes, settingsRes]) => {
         const hitlData = hitlRes?.data || hitlRes;
         const lang = settingsRes?.data?.language || settingsRes?.language;
@@ -184,8 +195,13 @@ export default function Settings() {
           payment_phone:    hitlData?.payment_phone    || '',
         });
       })
-      .catch(() => { })
+      .catch(err => setHitlLoadError(getErrorMessage(err, 'Could not load the working hours and AI settings. Try again.')))
       .finally(() => setHITLLoading(false));
+  };
+
+  useEffect(() => {
+    loadClinic();
+    loadHitl();
   }, []);
 
   const handleSaveClinic = async () => {
@@ -196,8 +212,8 @@ export default function Settings() {
       setSaving(true);
       await updateClinicSettings(clinic);
       addToast('Clinic profile saved', 'success');
-    } catch {
-      addToast('Failed to save', 'error');
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Failed to save'), 'error');
     } finally {
       setSaving(false);
     }
@@ -214,8 +230,8 @@ export default function Settings() {
         updateSettings({ language: hitl.language || 'english' }),
       ]);
       addToast('AI settings saved', 'success');
-    } catch {
-      addToast('Failed to save AI settings', 'error');
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Failed to save AI settings'), 'error');
     } finally {
       setSavingAI(false);
     }
@@ -226,8 +242,8 @@ export default function Settings() {
       setSavingHours(true);
       await updateHITLSettings({ working_hours: hitl.working_hours });
       addToast('Working hours saved', 'success');
-    } catch {
-      addToast('Failed to save working hours', 'error');
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Failed to save working hours'), 'error');
     } finally {
       setSavingHours(false);
     }
@@ -244,8 +260,8 @@ export default function Settings() {
         payment_phone:    businessProfile.payment_phone,
       });
       addToast('Business profile saved', 'success');
-    } catch {
-      addToast('Failed to save business profile', 'error');
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Failed to save business profile'), 'error');
     } finally {
       setSavingProfile(false);
     }
@@ -281,13 +297,17 @@ export default function Settings() {
   const [posterRequests, setPosterRequests] = useState([]);
   const [posterLoading, setPosterLoading] = useState(false);
   const posterInputRef = useRef(null);
+  const [posterLoadError, setPosterLoadError] = useState('');
+  const [campaignsLoadError, setCampaignsLoadError] = useState('');
 
   const fetchPosterRequests = async () => {
     try {
       setPosterLoading(true);
+      setPosterLoadError('');
       const res = await api.get(`/tenants/${staff?.tenantId}/poster-requests`);
       setPosterRequests(res.data || []);
-    } catch {
+    } catch (err) {
+      setPosterLoadError(getErrorMessage(err, 'Could not load your poster requests. Try again.'));
     } finally {
       setPosterLoading(false);
     }
@@ -351,8 +371,11 @@ export default function Settings() {
       const list = res.data || [];
       setCampaigns(list);
       setCampaignsLoaded(true);
+      setCampaignsLoadError('');
       return list;
-    } catch {
+    } catch (err) {
+      // Shown only while there is no list yet; a failed refresh keeps the list on screen
+      setCampaignsLoadError(getErrorMessage(err, 'Could not load your campaigns. Try again.'));
       return null;
     } finally {
       setCampaignsLoading(false);
@@ -514,6 +537,12 @@ export default function Settings() {
           <h2 className="text-lg font-semibold text-gray-900">Clinic Profile</h2>
           {clinicLoading || hitlLoading ? (
             <p className="text-sm text-gray-400">Loading...</p>
+          ) : (clinicLoadError || hitlLoadError) ? (
+            // The form is not shown (and so cannot be saved) until both loads have worked
+            <div className="space-y-3">
+              {clinicLoadError && <LoadError message={clinicLoadError} onRetry={loadClinic} />}
+              {hitlLoadError && <LoadError message={hitlLoadError} onRetry={loadHitl} />}
+            </div>
           ) : (
             <>
               <div>
@@ -633,6 +662,8 @@ export default function Settings() {
             <h2 className="text-lg font-semibold text-gray-900">AI & Staff Handoff Settings</h2>
             {hitlLoading ? (
               <p className="text-sm text-gray-400">Loading...</p>
+            ) : hitlLoadError ? (
+              <LoadError message={hitlLoadError} onRetry={loadHitl} />
             ) : (
               <>
                 <div>
@@ -690,6 +721,8 @@ export default function Settings() {
               </div>
               {hitlLoading ? (
                 <p className="text-sm text-gray-400">Loading...</p>
+              ) : hitlLoadError ? (
+                <LoadError message={hitlLoadError} onRetry={loadHitl} />
               ) : (
                 <>
                   <div>
@@ -804,7 +837,7 @@ export default function Settings() {
                   </span>
                   <button
                     onClick={handleSaveKnowledgeBase}
-                    disabled={savingKB || kbOverLimit}
+                    disabled={savingKB || kbOverLimit || hitlLoading || !!hitlLoadError}
                     className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                   >
                     {savingKB ? 'Saving...' : 'Save Knowledge Base'}
@@ -964,6 +997,8 @@ export default function Settings() {
             </div>
             {posterLoading ? (
               <p className="text-sm text-gray-400">Loading...</p>
+            ) : posterLoadError && posterRequests.length === 0 ? (
+              <LoadError message={posterLoadError} onRetry={fetchPosterRequests} />
             ) : posterRequests.length === 0 ? (
               <p className="text-sm text-gray-400">No poster requests yet. Upload one above to get started.</p>
             ) : (
@@ -1011,6 +1046,8 @@ export default function Settings() {
               {sendNote && <p className="text-sm text-green-600 mb-3">{sendNote}</p>}
               {campaignsLoading && !campaignsLoaded ? (
                 <p className="text-sm text-gray-400">Loading...</p>
+              ) : campaignsLoadError && !campaignsLoaded ? (
+                <LoadError message={campaignsLoadError} onRetry={fetchCampaigns} />
               ) : campaigns.length === 0 ? (
                 <p className="text-sm text-gray-400">No campaigns yet.</p>
               ) : (
@@ -1082,7 +1119,7 @@ export default function Settings() {
                               {preview.left_over_after_cap > 0 && (
                                 <p className="text-sm text-gray-700">
                                   {preview.is_first_campaign
-                                    ? `As this is your first campaign, it is limited to ${plural(preview.first_campaign_limit, 'patient')}. ${plural(preview.left_over_after_cap, 'patient')} will not be sent this time.`
+                                    ? `Until your clinic has sent ${preview.first_campaign_limit} campaign messages in total, campaigns are limited. This one can send up to ${preview.first_campaign_remaining ?? preview.first_campaign_limit} more; ${plural(preview.left_over_after_cap, 'patient')} will not be sent this time.`
                                     : `${plural(preview.left_over_after_cap, 'patient')} will be sent later, as your daily allowance frees up.`}
                                 </p>
                               )}

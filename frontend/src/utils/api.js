@@ -50,7 +50,9 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     } else if (status === 403) {
-      useStore.getState().addToast('You do not have permission', 'error');
+      // "Account inactive / suspended / pending approval" explain themselves; every other 403 keeps the generic text
+      const serverText = error.response.data?.error;
+      useStore.getState().addToast(typeof serverText === 'string' && serverText.startsWith('Account') ? serverText : 'You do not have permission', 'error');
     } else if (status === 500) {
       if (!error.config?.silent) {
         useStore.getState().addToast('Something went wrong. Try again.', 'error');

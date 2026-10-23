@@ -16,11 +16,13 @@ import {
 } from 'recharts';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
+import LoadError from '../components/LoadError';
 
 const Analytics = () => {
   const { addToast } = useStore();
   const { industry } = useIndustry();
   const [period, setPeriod] = useState('month');
+  const [someFailed, setSomeFailed] = useState(false); // at least one of the page's calls failed (its numbers are defaults, not real zeros)
 
   // ── Clinic state ─────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
@@ -60,12 +62,14 @@ const Analytics = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      let failed = false;
       const [oRes, dRes, docRes, cRes] = await Promise.all([
-        getOverview(period).catch(() => ({ data: overview })),
-        getDailyBookings(period).catch(() => ({ data: [] })),
-        getDoctorStats().catch(() => ({ data: [] })),
-        getConversationStats(period).catch(() => ({ data: convData }))
+        getOverview(period).catch(() => { failed = true; return { data: overview }; }),
+        getDailyBookings(period).catch(() => { failed = true; return { data: [] }; }),
+        getDoctorStats().catch(() => { failed = true; return { data: [] }; }),
+        getConversationStats(period).catch(() => { failed = true; return { data: convData }; })
       ]);
+      setSomeFailed(failed);
 
       setOverview(oRes.data || overview);
       if (period === 'month') {
@@ -94,11 +98,13 @@ const Analytics = () => {
       aiStats: { resolutionRate: 0 }
     };
     try {
+      let failed = false;
       const [ovRes, dailyRes, prodRes] = await Promise.all([
-        getEnquiryOverview(period).catch(() => ovFallback),
-        getEnquiryDailyLeads(period).catch(() => ({ daily: [] })),
-        getTopProducts(period).catch(() => ({ products: [] })),
+        getEnquiryOverview(period).catch(() => { failed = true; return ovFallback; }),
+        getEnquiryDailyLeads(period).catch(() => { failed = true; return { daily: [] }; }),
+        getTopProducts(period).catch(() => { failed = true; return { products: [] }; }),
       ]);
+      setSomeFailed(failed);
       setEnquiryOverview(ovRes || ovFallback);
       setEnquiryDaily(dailyRes || { daily: [] });
       setEnquiryProducts(prodRes || { products: [] });
@@ -153,6 +159,10 @@ const Analytics = () => {
               ))}
             </div>
           </div>
+
+          {!loading && someFailed && (
+            <LoadError message="Some data could not be loaded." onRetry={fetchData} />
+          )}
 
           {loading ? (
             <>
@@ -371,6 +381,10 @@ const Analytics = () => {
               ))}
             </div>
           </div>
+
+          {!enquiryLoading && someFailed && (
+            <LoadError message="Some data could not be loaded." onRetry={fetchEnquiryData} />
+          )}
 
           {enquiryLoading ? (
             <>

@@ -7,6 +7,7 @@ import CoexistenceConnect from '../../components/shared/CoexistenceConnect';
 import WhatsappTemplatesPanel from '../../components/shared/WhatsappTemplatesPanel';
 import SendFailuresPanel from '../../components/shared/SendFailuresPanel';
 import MetaInfoPanel from '../../components/shared/MetaInfoPanel';
+import PosterImage from '../../components/shared/PosterImage';
 
 const PLANS = ['starter', 'growth', 'pro'];
 
@@ -72,7 +73,6 @@ function PosterTemplatePanel({ tenantId, connected }) {
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [brokenThumbs, setBrokenThumbs] = useState({});
 
   const loadData = async () => {
     setLoadError('');
@@ -156,16 +156,11 @@ function PosterTemplatePanel({ tenantId, connected }) {
               <div className="space-y-2">
                 {posters.map(pr => (
                   <div key={pr.id} className="flex items-center gap-3 text-xs">
-                    {brokenThumbs[pr.id] ? (
-                      <span className="w-12 h-12 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-400 text-lg flex-shrink-0">📄</span>
-                    ) : (
-                      <img
-                        src={pr.image_url}
-                        alt="Poster"
-                        onError={() => setBrokenThumbs(b => ({ ...b, [pr.id]: true }))}
-                        className="w-12 h-12 object-cover rounded-lg border border-gray-200 flex-shrink-0"
-                      />
-                    )}
+                    {/* The poster bucket is private: the thumbnail is loaded through the authenticated endpoint (click to enlarge) */}
+                    <PosterImage
+                      path={`/superadmin/poster-requests/${pr.id}/image`}
+                      className="w-12 h-12 object-cover rounded-lg border border-gray-200"
+                    />
                     <div className="min-w-0">
                       <p className="text-gray-700 truncate">{pr.caption || <span className="text-gray-400">No caption</span>}</p>
                       <p className="text-gray-400">Submitted {new Date(pr.created_at).toLocaleDateString('en-IN')}</p>

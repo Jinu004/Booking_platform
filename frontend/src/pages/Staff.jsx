@@ -3,11 +3,14 @@ import { getStaff, inviteStaff, updateStaff, deleteStaff, activateStaff, deleteS
 import useStore from '../store/useStore';
 import { CardSkeleton } from '../components/shared/Skeleton';
 import { plural } from '../utils/plural';
+import { getErrorMessage } from '../utils/errorMessage';
+import LoadError from '../components/LoadError';
 
 const Staff = () => {
   const { addToast } = useStore();
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   // Modals
   const [isInviteModalOpen, setInviteModalOpen] = useState(false);
@@ -42,10 +45,11 @@ const Staff = () => {
   const fetchStaff = async () => {
     try {
       setLoading(true);
+      setLoadError('');
       const res = await getStaff();
       setStaffList(res.data?.staff || res.staff || []);
     } catch (err) {
-      console.error(err);
+      setLoadError(getErrorMessage(err, 'Could not load the staff list. Try again.'));
     } finally {
       setLoading(false);
     }
@@ -224,6 +228,8 @@ const Staff = () => {
       {/* Staff Table */}
       {loading ? (
         <CardSkeleton />
+      ) : loadError ? (
+        <LoadError message={loadError} onRetry={fetchStaff} />
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {filteredStaff.length === 0 ? (

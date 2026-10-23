@@ -15,6 +15,7 @@ import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import api from '../utils/api';
 import { CardSkeleton } from '../components/shared/Skeleton';
+import { getErrorMessage } from '../utils/errorMessage';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -423,8 +424,8 @@ export default function PatientProfile() {
       setProfile(prev => ({ ...prev, ...basicForm }));
       setEditingBasic(false);
       addToast('Profile updated', 'success');
-    } catch {
-      addToast('Failed to update profile', 'error');
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Failed to update profile'), 'error');
     } finally {
       setSavingProfile(false);
     }
@@ -558,8 +559,8 @@ export default function PatientProfile() {
       const newItem = res?.data || { id: Date.now().toString(), type, name };
       setConditions(prev => [...prev, newItem]);
       addToast('Added successfully', 'success');
-    } catch {
-      addToast('Failed to add', 'error');
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Failed to add'), 'error');
     } finally {
       setSavingCondition(false);
     }
@@ -664,8 +665,8 @@ export default function PatientProfile() {
       setShowNoteForm(false);
       setEditingNote(null);
       await loadData();
-    } catch {
-      addToast('Failed to save visit note', 'error');
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Failed to save visit note'), 'error');
     } finally {
       setSavingNote(false);
     }

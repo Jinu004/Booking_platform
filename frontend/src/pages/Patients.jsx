@@ -5,6 +5,7 @@ import useStore from '../store/useStore';
 import { TableRowSkeleton } from '../components/shared/Skeleton';
 import api from '../utils/api';
 import { plural } from '../utils/plural';
+import { getErrorMessage } from '../utils/errorMessage';
 
 const AVATAR_COLORS = [
   'bg-indigo-100 text-indigo-700',
@@ -175,7 +176,7 @@ export default function Patients() {
       setAddPatientForm({ name: '', age: '', gender: '', blood_group: '', marketing_consent: '' });
       fetchPatients();
     } catch (err) {
-      addToast('Failed to add patient', 'error');
+      addToast(getErrorMessage(err, 'Failed to add patient'), 'error');
     } finally {
       setAddPatientSaving(false);
     }
