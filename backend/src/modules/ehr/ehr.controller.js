@@ -1,7 +1,7 @@
 const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
-const { normalizeCustomerPhone, validatePhoneInput } = require('../../utils/phone');
+const { validatePhoneInput } = require('../../utils/phone');
 const { logAction } = require('../../utils/audit');
 
 // HTML tag stripper — prevents stored XSS in free-text fields
@@ -325,9 +325,9 @@ function validatePatientPatch(body) {
     }
   }
   if (has('phone')) {
-    const phone = normalizeCustomerPhone(body.phone);
-    if (!phone) return { error: 'Please enter a valid phone number: +91 and 10 digits for India, or + and the country code for other countries.' };
-    values.phone = phone;
+    const phoneCheck = validatePhoneInput(body.phone);
+    if (!phoneCheck.ok) return { error: phoneCheck.error };
+    values.phone = phoneCheck.phone;
   }
   return { values };
 }

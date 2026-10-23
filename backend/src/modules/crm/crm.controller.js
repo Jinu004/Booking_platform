@@ -3,7 +3,7 @@ const CRMModel = require('./crm.model');
 const pool = require('../../config/database');
 const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
-const { normalizeCustomerPhone, validatePhoneInput } = require('../../utils/phone');
+const { validatePhoneInput } = require('../../utils/phone');
 const { logAction } = require('../../utils/audit');
 
 // UUID v4 format validation helper
@@ -74,10 +74,11 @@ async function updateCustomer(req, res, next) {
     const data = { ...req.body };
     let phoneChanged = false;
     if (data.phone !== undefined && data.phone !== null && String(data.phone).trim() !== '') {
-      const normalized = normalizeCustomerPhone(data.phone);
-      if (!normalized) {
-        return errorResponse(res, 'Please enter a valid phone number: +91 and 10 digits for India, or + and the country code for other countries.', 400);
+      const phoneCheck = validatePhoneInput(data.phone);
+      if (!phoneCheck.ok) {
+        return errorResponse(res, phoneCheck.error, 400);
       }
+      const normalized = phoneCheck.phone;
       const existing = await CRMModel.getCustomerById(pool, tenantId, id);
       if (!existing) return errorResponse(res, 'Customer not found', 404);
       phoneChanged = existing.phone !== normalized;

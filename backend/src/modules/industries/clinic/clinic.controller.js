@@ -3,7 +3,7 @@ const pool = require('../../../config/database');
 const { successResponse, errorResponse } = require('../../../utils/response');
 const { sendTemplateMessage } = require('../../channel/whatsapp/whatsapp.adapter');
 const { runAsTenant } = require('../../channel/whatsapp/senderContext');
-const { normalizeCustomerPhone } = require('../../../utils/phone');
+const { validatePhoneInput } = require('../../../utils/phone');
 
 // Sentinel value used to soft-delete doctors from token queues
 // clinic.model.js getDoctors filters out records where leave_days equals this value
@@ -365,8 +365,9 @@ async function createAppointmentBooking(req, res, next) {
 
     const patientName = String(patient_name || '').trim().replace(/<[^>]*>/g, '').slice(0, 255);
     if (!patientName) return errorResponse(res, 'patient_name is required', 400);
-    const normalizedPhone = normalizeCustomerPhone(phone);
-    if (!normalizedPhone) return errorResponse(res, 'Please enter a valid phone number: +91 and 10 digits for India, or + and the country code for other countries.', 400);
+    const phoneCheck = validatePhoneInput(phone);
+    if (!phoneCheck.ok) return errorResponse(res, phoneCheck.error, 400);
+    const normalizedPhone = phoneCheck.phone;
     if (!date || !isISODate(date)) return errorResponse(res, 'Valid date (YYYY-MM-DD) is required', 400);
     const timeMatch = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(start_time || '').trim());
     if (!timeMatch) return errorResponse(res, 'Invalid start_time. Use HH:MM', 400);
