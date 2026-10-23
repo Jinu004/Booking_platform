@@ -185,6 +185,8 @@ function parseIncomingMessage(payload) {
       // Voice notes, images, videos, documents, stickers, locations, contacts, reactions and anything else: a light result with no
       // text and no media id. It is handled completely by media.inbound.js (message.id is the message id, kept only for the dedupe).
       if (!message.id || !message.from) return null
+      // Meta "system" events (for example a patient changing their number) are not patient messages: ignored as before
+      if (message.type === 'system') return null
       const knownMedia = ['audio', 'image', 'video', 'document', 'sticker', 'location', 'contacts', 'reaction']
       const mediaType = knownMedia.includes(message.type) ? message.type : 'other'
       return {
