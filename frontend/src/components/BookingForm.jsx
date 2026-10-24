@@ -295,13 +295,19 @@ export default function BookingForm({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+      <div className={`bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto ${modeReady ? '' : 'min-h-[min(420px,80vh)]'}`}>
         <div className="flex justify-between items-center mb-5">
           <h2 className="text-xl font-bold text-ink">New booking</h2>
           <button onClick={onClose} disabled={submitting} className="text-ink/40 hover:text-ink/65 text-2xl font-bold disabled:opacity-50">×</button>
         </div>
 
-        {modeStatus === 'loading' && <p className="text-sm text-ink/40">Loading...</p>}
+        {/* Same width and a steady minimum height while the first data loads, so the card does not jump when the form appears */}
+        {modeStatus === 'loading' && (
+          <div className="flex flex-col items-center justify-center gap-3 py-24" role="status">
+            <div className="h-8 w-8 rounded-full border-2 border-ink/15 border-t-brand animate-spin" />
+            <p className="text-sm text-ink/40">Loading...</p>
+          </div>
+        )}
         {modeStatus === 'error' && (
           <LoadError message="Could not load the clinic settings. Try again." onRetry={onRetryMode} />
         )}
