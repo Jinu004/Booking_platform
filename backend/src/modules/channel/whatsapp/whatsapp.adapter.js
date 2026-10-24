@@ -1,5 +1,6 @@
 const waha = require('./whatsapp.waha')
 const meta = require('./whatsapp.meta')
+const senderContext = require('./senderContext')
 const { randomDelay } = require('../../../utils/delay')
 const logger = require('../../../utils/logger')
 const { maskPhone } = require('../../../utils/phone')
@@ -27,15 +28,17 @@ function getProvider() {
  * @returns {Promise<object>} Provider response
  */
 async function sendMessage(to, message) {
+  const sendStart = Date.now()
   await randomDelay(800, 1500)
 
   const provider = getProvider()
   logger.info(`Sending via ${provider} to ${maskPhone(to)}`)
 
-  if (provider === 'meta') {
-    return meta.sendTextMessage(to, message)
-  }
-  return waha.sendTextMessage(to, message)
+  const result = provider === 'meta'
+    ? await meta.sendTextMessage(to, message)
+    : await waha.sendTextMessage(to, message)
+  senderContext.noteReplySent('text', Date.now() - sendStart) // only counts inside a webhook message (reply timing log)
+  return result
 }
 
 /**
@@ -66,7 +69,10 @@ async function sendButtons(to, bodyText, buttons) {
   const provider = getProvider()
 
   if (provider === 'meta') {
-    return meta.sendInteractiveButtons(to, bodyText, buttons)
+    const sendStart = Date.now()
+    const result = await meta.sendInteractiveButtons(to, bodyText, buttons)
+    senderContext.noteReplySent('button', Date.now() - sendStart)
+    return result
   }
 
   // WAHA fallback — plain text with numbered options
@@ -87,12 +93,15 @@ async function sendDoctorList(to, bodyText, items, buttonText = 'Select Doctor')
   const provider = getProvider()
 
   if (provider === 'meta') {
-    return meta.sendListMessage(
+    const sendStart = Date.now()
+    const result = await meta.sendListMessage(
       to,
       bodyText,
       buttonText,
       items
     )
+    senderContext.noteReplySent('list', Date.now() - sendStart)
+    return result
   }
 
   // WAHA fallback — plain text list

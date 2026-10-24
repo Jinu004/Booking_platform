@@ -522,8 +522,57 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en', compon
   }
 }
 
+// Marks an inbound message as read and shows the "typing..." indicator to the patient (it lasts until the reply or about 25 seconds).
+// Same Graph call pattern as the sends above: the clinic's phone number id, the token from getToken, a short timeout. It never throws,
+// never retries, and a failure is NOT recorded in send_failures: it only logs a warning (Meta error code only) once a minute per clinic.
+// A clinic without a token to use (no own token and no platform flag) simply gets no indicator, silently: this does not go through
+// getToken's "blocked" logging, so it cannot use up the once-a-minute slot of a real blocked send.
+const TYPING_TIMEOUT_MS = 3000
+const typingWarned = new Map()
+async function markReadWithTyping(messageId) {
+  try {
+    if (!messageId || !senderContext.hasContext()) return
+    if (!senderContext.getPhoneNumberId()) return
+    const mayUsePlatformToken = senderContext.getPlatformTokenAllowed() && String(META_TOKEN).trim()
+    if (!senderContext.getAccessToken() && !mayUsePlatformToken) return
+
+    await axios.post(
+      `${META_API_URL}/${getPhoneId()}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: messageId,
+        typing_indicator: { type: 'text' }
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${getToken()}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: TYPING_TIMEOUT_MS
+      }
+    )
+  } catch (err) {
+    try {
+      const tenantId = senderContext.hasContext() ? senderContext.getTenantId() : null
+      const key = tenantId || 'unknown'
+      const now = Date.now()
+      if (now - (typingWarned.get(key) || 0) >= 60 * 1000) {
+        if (typingWarned.size > 300) {
+          for (const [k, t] of typingWarned) if (now - t >= 60 * 1000) typingWarned.delete(k)
+        }
+        typingWarned.set(key, now)
+        const metaCode = err?.response?.data?.error?.code
+        const code = Number.isInteger(metaCode) ? metaCode : String(err?.code || err?.response?.status || 'none').replace(/[^A-Za-z0-9_]/g, '').slice(0, 30)
+        logger.warn(`TYPING_INDICATOR_FAILED tenant=${tenantId || 'unknown'} code=${code}`)
+      }
+    } catch (_) { /* a logging problem must never matter here */ }
+  }
+}
+
 module.exports = {
   extractWamid,
+  markReadWithTyping,
   recordDelivery,
   sendTextMessage,
   sendInteractiveButtons,

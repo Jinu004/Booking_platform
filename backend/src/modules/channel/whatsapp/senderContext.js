@@ -40,8 +40,31 @@ function run(phoneNumberId, fn, accessToken = null, tenantId = null, auth = NO_A
     accessToken: accessToken || null,
     tenantId: tenantId || null,
     platformTokenAllowed: auth.platformTokenAllowed === true,
-    tokenState: auth.state || 'no_tenant'
+    tokenState: auth.state || 'no_tenant',
+    timing: null
   }, fn)
+}
+
+// Reply timing for ONE inbound WhatsApp message (only the webhook starts it; every other context has none and the calls below do nothing).
+// startReplyTiming() when processing begins, addAiTime(ms) around the AI call, noteReplySent(kind, sendMs) when a reply has gone out
+// (the first one counts), getReplyTiming() when processing is over. Nothing here holds a phone number or message text.
+function startReplyTiming() {
+  const store = storage.getStore()
+  if (store) store.timing = { start: Date.now(), aiMs: 0, reply: null }
+}
+
+function addAiTime(ms) {
+  const timing = storage.getStore()?.timing
+  if (timing && Number.isFinite(ms)) timing.aiMs += ms
+}
+
+function noteReplySent(kind, sendMs) {
+  const timing = storage.getStore()?.timing
+  if (timing && !timing.reply) timing.reply = { kind, totalMs: Date.now() - timing.start, sendMs }
+}
+
+function getReplyTiming() {
+  return storage.getStore()?.timing || null
 }
 
 function getTenantId() {
@@ -158,6 +181,10 @@ module.exports = {
   getTokenState,
   setTenantAccessToken,
   clearTenantTokenCache,
+  startReplyTiming,
+  addAiTime,
+  noteReplySent,
+  getReplyTiming,
   runAsTenant,
   hasContext
 }

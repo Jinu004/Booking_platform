@@ -354,7 +354,8 @@ async function processMessage(context) {
           if (escalated) break;
 
           // Feed function results back to Gemini
-          response = await chat.sendMessage(functionResponses)
+          // Same style of timeout as the first call (20 s here): an abort is a "timeout" error and goes through the existing retry loop
+          response = await chat.sendMessage(functionResponses, { signal: AbortSignal.timeout(20000) })
           result = response.response
           logGeminiUsage(tenant, conversation, currentModel, result)
         }

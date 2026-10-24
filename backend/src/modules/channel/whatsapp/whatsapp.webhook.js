@@ -46,6 +46,18 @@ function isConfidentName(typed) {
 // future (now + this many minutes - 1 minute); the cron then leaves it alone until this long after the last echo.
 const ECHO_HUMAN_MODE_MINUTES = 10
 
+// One REPLY_TIMING line per inbound message that was answered: when the first reply had gone out (total_ms), how long the AI call took
+// (ai_ms, 0 without AI) and how long that first send took (send_ms, including the pre-send pause). Tenant id only: no phone, no text.
+// A logging problem is swallowed: it can never affect the reply.
+function logReplyTiming(senderContext) {
+  try {
+    const timing = senderContext.getReplyTiming()
+    if (!timing || !timing.reply) return
+    const path = timing.reply.kind === 'text' ? (timing.aiMs > 0 ? 'ai-text' : 'coded-text') : timing.reply.kind
+    logger.info(`REPLY_TIMING tenant=${senderContext.getTenantId() || 'unknown'} path=${path} total_ms=${timing.reply.totalMs} ai_ms=${timing.aiMs} send_ms=${timing.reply.sendMs}`)
+  } catch (_) { /* never affects the reply */ }
+}
+
 // A staff reply sent from the WhatsApp Business app (smb_message_echoes): store it as a staff message and keep the AI paused.
 // Never runs the AI, never writes the Redis session, and never creates a message from the patient.
 async function handleStaffEcho(event) {
@@ -194,6 +206,7 @@ router.post('/', async (req, res) => {
       ? req.body?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id
       : null
     await senderContext.run(incomingPhoneId, async () => {
+    senderContext.startReplyTiming() // reply timing log: processing of this inbound message begins (after the 200 acknowledgement)
     try {
       const body = req.body
 
@@ -1256,6 +1269,14 @@ router.post('/', async (req, res) => {
       let isEscalated = false
       let isInteractiveSent = false
       let isBlockedConfirmation = false
+
+      // Read receipt with the "typing..." indicator while the AI works: typed text messages only (not taps, coded flows, media,
+      // consent keywords or human mode: those returned above). Fire and forget: it never waits, retries or touches the reply.
+      if (source === 'meta' && message.type === 'text' && !message.interactiveId && message.messageId) {
+        require('./whatsapp.meta').markReadWithTyping(message.messageId).catch(() => {})
+      }
+
+      const aiStartedAt = Date.now()
       try {
         aiResponse = await AIService.processMessage({
           tenant,
@@ -1267,6 +1288,7 @@ router.post('/', async (req, res) => {
           additionalData,
           interactiveId: message.interactiveId || null
         })
+        senderContext.addAiTime(Date.now() - aiStartedAt)
 
 
         isAIError = typeof aiResponse === 'object' && aiResponse.error
@@ -1288,6 +1310,7 @@ router.post('/', async (req, res) => {
           aiResponse = aiResponse.text
         }
       } catch (err) {
+       senderContext.addAiTime(Date.now() - aiStartedAt)
        logger.error(`AI processing crashed for [redacted]: ${err?.message} ${err?.stack}`)
         const clinicPhone = configs?.business_phone ? ` or call us at ${configs.business_phone}` : ''
         aiResponse = `Sorry, I could not process that. Please say Hi to try again${clinicPhone}.`
@@ -1384,6 +1407,8 @@ if (isBlockedConfirmation) {
           await sendMessage(fallbackFrom, fallbackMessage)
         } catch (e) {}
       }
+    } finally {
+      logReplyTiming(senderContext)
     }
     })
   })
