@@ -11,6 +11,7 @@ import { Badge, Button, Input, Spinner, PageHeader } from '../components/shared'
 import { CardSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
 import api from '../utils/api';
+import { subscribeLiveEvents } from '../utils/liveEvents';
 
 // Short reasons shown under an outbound message that WhatsApp did not deliver, keyed by the Meta error code
 const DELIVERY_FAILURE_REASONS = {
@@ -142,13 +143,12 @@ export default function Conversations() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    if (!token) return;
-    const eventSource = new EventSource(`/api/v1/hitl/events?token=${token}`, { withCredentials: true });
+    // The handlers below are collected and subscribed to the one shared live connection (utils/liveEvents.js):
+    // the token travels in a header, never in the URL
+    const handlers = {};
+    const live = { addEventListener: (name, handler) => { handlers[name] = handler; } };
 
-    eventSource.onmessage = (e) => { };
-
-    eventSource.addEventListener('new_message', (e) => {
+    live.addEventListener('new_message', (e) => {
       try {
         const data = JSON.parse(e.data);
         setConversations(prev => {
@@ -180,7 +180,7 @@ export default function Conversations() {
       }
     });
 
-    eventSource.addEventListener('mode_changed', (e) => {
+    live.addEventListener('mode_changed', (e) => {
       try {
         const data = JSON.parse(e.data);
         if (data.conversationId) {
@@ -193,7 +193,7 @@ export default function Conversations() {
         }
       } catch {}
     });
-    eventSource.addEventListener('new_conversation', (e) => {
+    live.addEventListener('new_conversation', (e) => {
       fetchConversations();
     });
 
@@ -203,7 +203,7 @@ export default function Conversations() {
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    eventSource.addEventListener('handoff_requested', (e) => {
+    live.addEventListener('handoff_requested', (e) => {
       try {
         const data = JSON.parse(e.data);
         setConversations(prev => {
@@ -230,8 +230,10 @@ export default function Conversations() {
       }
     });
 
+    const unsubscribe = subscribeLiveEvents(handlers);
+
     return () => {
-      eventSource.close();
+      unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);

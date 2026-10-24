@@ -5,6 +5,7 @@ import { useIndustry } from '../../hooks/useIndustry';
 import { globalSearch } from '../../services/patient.service';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
+import { subscribeLiveEvents } from '../../utils/liveEvents';
 import { STORAGE_KEYS } from '../../constants';
 
 const Layout = () => {
@@ -96,24 +97,23 @@ const Layout = () => {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    if (!token) return;
-    const eventSource = new EventSource(`/api/v1/hitl/events?token=${token}`, { withCredentials: true });
-    eventSource.addEventListener('handoff_requested', () => {
-      useStore.getState().incrementHandoffs();
+    // One shared live connection (utils/liveEvents.js): the token travels in a header, never in the URL
+    return subscribeLiveEvents({
+      handoff_requested: () => {
+        useStore.getState().incrementHandoffs();
+      },
+      session_refresh: async () => {
+        try {
+          const res = await api.get('/auth/me');
+          if (res.data?.staff && res.data?.tenant) {
+            const current = JSON.parse(localStorage.getItem(STORAGE_KEYS.STAFF_DATA) || '{}');
+            const updated = { ...current, tenantPlan: res.data.tenant?.plan };
+            localStorage.setItem(STORAGE_KEYS.STAFF_DATA, JSON.stringify(updated));
+            useStore.getState().setTenant(res.data.tenant);
+          }
+        } catch {}
+      }
     });
-    eventSource.addEventListener('session_refresh', async () => {
-      try {
-        const res = await api.get('/auth/me');
-        if (res.data?.staff && res.data?.tenant) {
-          const current = JSON.parse(localStorage.getItem(STORAGE_KEYS.STAFF_DATA) || '{}');
-          const updated = { ...current, tenantPlan: res.data.tenant?.plan };
-          localStorage.setItem(STORAGE_KEYS.STAFF_DATA, JSON.stringify(updated));
-          useStore.getState().setTenant(res.data.tenant);
-        }
-      } catch {}
-    });
-    return () => eventSource.close();
   }, []);
 
   return (

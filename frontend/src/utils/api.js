@@ -26,6 +26,20 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// A rejected login token: clear the stored login and go to the login page (also used by the live events client)
+export function logoutUnauthorized() {
+  const isAuthRoute = window.location.pathname === '/login' ||
+                      window.location.pathname === '/reset-password';
+  if (!isAuthRoute) {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('staff_data');
+    if (useStore.getState().clearAuth) {
+      useStore.getState().clearAuth();
+    }
+    window.location.href = '/login';
+  }
+}
+
 api.interceptors.response.use(
   (response) => {
     return response.data;
@@ -39,16 +53,7 @@ api.interceptors.response.use(
     const { status } = error.response;
 
     if (status === 401) {
-      const isAuthRoute = window.location.pathname === '/login' ||
-                          window.location.pathname === '/reset-password';
-      if (!isAuthRoute) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('staff_data');
-        if (useStore.getState().clearAuth) {
-          useStore.getState().clearAuth();
-        }
-        window.location.href = '/login';
-      }
+      logoutUnauthorized();
     } else if (status === 403) {
       // "Account inactive / suspended / pending approval" explain themselves; every other 403 keeps the generic text
       const serverText = error.response.data?.error;
