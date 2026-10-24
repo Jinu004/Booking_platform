@@ -372,6 +372,10 @@ async function createAppointmentBooking(req, res, next) {
     const tenantId = req.tenantId || req.tenant?.id;
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
+    // A doctor books for their own schedule only (the same rule as the manual token booking)
+    if (req.staff?.role === 'doctor' && req.staff?.doctor_id && req.staff.doctor_id !== id) {
+      return errorResponse(res, 'You can only book for your own schedule.', 403);
+    }
     const { patient_name, phone, date, start_time, notes, marketing_consent, send_whatsapp } = req.body;
 
     const patientName = String(patient_name || '').trim().replace(/<[^>]*>/g, '').slice(0, 255);
@@ -436,9 +440,15 @@ async function createProcedureBooking(req, res, next) {
     const tenantId = req.tenantId || req.tenant?.id;
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
+    // A doctor books for their own schedule only (the same rule as the manual token booking)
+    if (req.staff?.role === 'doctor' && req.staff?.doctor_id && req.staff.doctor_id !== id) {
+      return errorResponse(res, 'You can only book for your own schedule.', 403);
+    }
     const { procedure_id, customer_id, patient_id, date, start_time, end_time, phone, name, send_whatsapp } = req.body;
-    // "name" is accepted as an alternative to patient_name
-    const patient_name = req.body.patient_name || name;
+    // "name" is accepted as an alternative to patient_name. Cleaned like the appointment handler: text only, HTML tags removed,
+    // at most 255 characters. A missing or non-text name stays '' so the required-field check below still answers 400.
+    const rawPatientName = req.body.patient_name || name;
+    const patient_name = typeof rawPatientName === 'string' ? rawPatientName.trim().replace(/<[^>]*>/g, '').slice(0, 255).trim() : '';
     if (!procedure_id || !patient_name || !date || !start_time || !end_time) {
       return errorResponse(res, 'procedure_id, patient_name, date, start_time and end_time are required', 400);
     }

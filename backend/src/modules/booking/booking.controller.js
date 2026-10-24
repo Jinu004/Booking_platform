@@ -9,6 +9,11 @@ const { sendMessage } = require('../channel/whatsapp/whatsapp.adapter');
 const { logAction } = require('../../utils/audit');
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 const { validatePhoneInput } = require('../../utils/phone');
+const ClinicModel = require('../industries/clinic/clinic.model');
+
+// A real calendar date written YYYY-MM-DD (2026-02-31 is refused)
+const isISODate = (str) => typeof str === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(str) && !isNaN(Date.parse(str))
+  && new Date(`${str}T00:00:00Z`).toISOString().slice(0, 10) === str;
 
 /**
  * GET /bookings
@@ -294,6 +299,14 @@ async function createManualBooking(req, res, next) {
   const normalizedPhone = phoneCheck.phone;
   if (!isUUID(doctorId)) {
     return errorResponse(res, 'Invalid doctor ID', 400);
+  }
+  // bookingDate is optional (today when absent); when given it must be a real YYYY-MM-DD date. Past dates are not refused here.
+  if (bookingDate !== undefined && bookingDate !== null && bookingDate !== '' && !isISODate(bookingDate)) {
+    return errorResponse(res, 'Enter a valid date', 400);
+  }
+  // Token bookings are for token clinics; an appointment-mode clinic books by time (New booking form)
+  if ((await ClinicModel.getBookingMode(pool, tenantId)) === 'appointment') {
+    return errorResponse(res, 'This clinic books by appointment time. Use New booking.', 400);
   }
 
   const client = await pool.connect();
