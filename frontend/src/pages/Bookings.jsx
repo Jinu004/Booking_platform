@@ -6,8 +6,7 @@ import {
 } from '../services/booking.service';
 import { getDoctors, updateTokenStatus, getDoctorSchedule } from '../services/clinic.service';
 import { getClinicSettings } from '../services/settings.service';
-import TokenReceipt from '../components/shared/TokenReceipt';
-import BookingForm from '../components/BookingForm';
+import NewBookingModal from '../components/NewBookingModal';
 import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
 import { TableRowSkeleton, StatCardSkeleton } from '../components/shared/Skeleton';
@@ -53,26 +52,18 @@ const Bookings = () => {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [doctors, setDoctors] = useState([]);
 
-  const [receiptBooking, setReceiptBooking] = useState(null);
-
   const [isOffline, setIsOffline] = useState(false);
 
-  // Booking mode of the clinic: 'token' or 'appointment'. It stays 'token' for the stat card label until it has loaded;
-  // the booking form waits for modeStatus 'ready' and shows a retry when it could not be loaded (no silent fallback to token).
+  // Booking mode of the clinic, only for the "Booked" / "In Consult" stat card label ('token' until it has loaded).
+  // The New booking form loads its own mode and doctors (components/NewBookingModal.jsx).
   const [bookingMode, setBookingMode] = useState('token');
-  const [modeStatus, setModeStatus] = useState('loading');
-  const loadBookingMode = () => {
-    setModeStatus('loading');
+  useEffect(() => {
     getClinicSettings()
       .then(res => {
         const d = res?.data || res;
-        setBookingMode(d?.booking_mode === 'appointment' ? 'appointment' : 'token');
-        setModeStatus('ready');
+        if (d?.booking_mode === 'appointment') setBookingMode('appointment');
       })
-      .catch(() => setModeStatus('error'));
-  };
-  useEffect(() => {
-    loadBookingMode();
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -256,27 +247,7 @@ const Bookings = () => {
     }
   };
 
-  // Opens the one booking form with a fresh doctor list (the list also says who is available right now)
-  const openBookingForm = async () => {
-    try { const res = await getDoctors(); if (res?.data) setDoctors(res.data); } catch {}
-    setBookingOpen(true);
-  };
-
-  // After a save: close the form, refresh the list, then the token receipt or a short message
-  const handleBooked = (result) => {
-    setBookingOpen(false);
-    fetchData();
-    if (result?.kind === 'token_now') {
-      if (result.booking) setReceiptBooking(result.booking);
-      else addToast('Token issued', 'success');
-    } else if (result?.kind === 'appointment') {
-      addToast('Appointment booked', 'success');
-    } else if (result?.kind === 'procedure') {
-      addToast('Procedure scheduled', 'success');
-    } else {
-      addToast('Booking scheduled', 'success');
-    }
-  };
+  const openBookingForm = () => setBookingOpen(true);
 
   const statusColors = {
     pending: 'bg-yellow-100 text-yellow-800',
@@ -612,21 +583,11 @@ const Bookings = () => {
         )}
       </div>
 
-      <BookingForm
+      <NewBookingModal
         open={bookingOpen}
         onClose={() => setBookingOpen(false)}
-        onBooked={handleBooked}
-        bookingMode={bookingMode}
-        modeStatus={modeStatus}
-        onRetryMode={loadBookingMode}
-        doctors={doctors}
-        staffRole={staff?.role}
-        ownDoctorId={staff?.doctor_id}
+        onSaved={fetchData}
       />
-
-      {receiptBooking && (
-         <TokenReceipt booking={receiptBooking} onClose={() => setReceiptBooking(null)} />
-      )}
     </div>
   );
 };

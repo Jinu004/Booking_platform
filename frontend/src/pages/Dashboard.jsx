@@ -9,6 +9,7 @@ import { getStoredStaff } from '../services/auth.service';
 import { saveToCache, loadFromCache } from '../utils/offlineCache';
 import { plural } from '../utils/plural';
 import LoadError from '../components/LoadError';
+import NewBookingModal from '../components/NewBookingModal';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({ bookingsToday: 0, activeConversations: 0, availableDoctors: 0, pendingTokens: 0 });
@@ -25,6 +26,7 @@ const Dashboard = () => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [isOffline, setIsOffline] = useState(false);
   const [loadingToken, setLoadingToken] = useState(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
   const staff = getStoredStaff();
   const isDoctor = staff?.role === 'doctor';
   const staffDoctorId = isDoctor ? staff?.doctor_id : null;
@@ -223,12 +225,13 @@ const Dashboard = () => {
           </h1>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          <Link
-            to="/bookings"
+          <button
+            type="button"
+            onClick={() => setBookingOpen(true)}
             className="px-4 py-2 text-sm font-medium bg-brand text-white rounded-lg hover:bg-brand-hover transition"
           >
-            + New Token
-          </Link>
+            + New booking
+          </button>
         </div>
       </div>
 
@@ -464,6 +467,11 @@ const Dashboard = () => {
         </div>
       )}
 
+      <NewBookingModal
+        open={bookingOpen}
+        onClose={() => setBookingOpen(false)}
+        onSaved={fetchDashboardData}
+      />
     </div>
   );
 };
