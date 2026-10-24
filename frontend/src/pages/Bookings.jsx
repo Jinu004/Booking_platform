@@ -13,6 +13,25 @@ import { getStoredStaff } from '../services/auth.service';
 import { TableRowSkeleton, StatCardSkeleton } from '../components/shared/Skeleton';
 import { saveToCache, loadFromCache } from '../utils/offlineCache';
 
+// The note of a booking under the patient name: one truncated line, a click shows the full text (and a second click folds it back).
+// Nothing is shown for an empty note or the automatic "Booked via WhatsApp ..." note (the Source label already says it).
+const BookingNote = ({ note }) => {
+  const [expanded, setExpanded] = useState(false);
+  const text = typeof note === 'string' ? note.trim() : '';
+  if (!text || text.startsWith('Booked via WhatsApp')) return null;
+  return (
+    <button
+      type="button"
+      title={text}
+      aria-expanded={expanded}
+      onClick={(e) => { e.stopPropagation(); setExpanded(v => !v); }}
+      className={`block max-w-[16rem] text-left text-xs text-ink/55 hover:text-ink/80 mt-0.5 ${expanded ? 'whitespace-pre-wrap break-words' : 'truncate'}`}
+    >
+      {text}
+    </button>
+  );
+};
+
 const Bookings = () => {
   const { addToast } = useStore();
   const staff = getStoredStaff();
@@ -184,6 +203,7 @@ const Bookings = () => {
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="text-sm font-bold text-ink">{b.patient_name || 'Unknown'}</div>
         <div className="text-sm text-ink/55 font-medium">{b.patient_phone}</div>
+        <BookingNote note={b.notes} />
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-ink/80">
         {b.doctor_name || 'Unassigned'}
@@ -445,6 +465,7 @@ const Bookings = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-bold text-ink">{b.patient_name || 'Unknown'}</div>
                             <div className="text-sm text-ink/55 font-medium">{b.patient_phone}</div>
+                            <BookingNote note={b.notes} />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-ink/80">
                             {b.doctor_name || 'Unassigned'}
@@ -552,6 +573,7 @@ const Bookings = () => {
                     </span>
                   </div>
                   <div className="text-xs text-ink/55 mt-0.5">{b.patient_phone}</div>
+                  <BookingNote note={b.notes} />
                   <div className="mt-0.5 text-xs text-ink/40 truncate">{b.doctor_name}</div>
                   <div className="flex items-center gap-2 mt-0.5 text-xs text-ink/40">
                     <span className="whitespace-nowrap">
