@@ -14,20 +14,12 @@ import useStore from '../store/useStore';
 // clinic and user, see utils/bookingFormCache.js, so a remount reuses them and another login never sees them). When the form opens
 // with data already loaded it shows the full form at once and refreshes the doctors (and the mode) quietly in the background;
 // "loading" only shows when there is no data yet, and the retry only when the first load failed or timed out (15 seconds).
+// A first load that answers after the timeout is still accepted when it is the newest request of the same login.
 // A failed or timed-out background refresh keeps the data already shown.
 // bookingMode is 'appointment' only when booking_mode === 'appointment' once loaded: a failed load never turns into token mode.
 // After a save it closes, shows the token receipt or a short toast, then calls onSaved(result).
 // Keep it mounted all the time: the receipt must stay on screen after the form has closed.
 const REQUEST_TIMEOUT_MS = 15000;
-
-// The request, or a rejection after 15 seconds. A response that arrives after the timeout is ignored (the race has already settled).
-function withTimeout(promise) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('timeout')), REQUEST_TIMEOUT_MS);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
 
 export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
   const { addToast } = useStore();
@@ -42,12 +34,31 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
   const modeRequest = useRef(0);    // only the newest settings request may set the state
   const doctorsRequest = useRef(0); // same for the doctors request
   const firstOpenEffect = useRef(true);
+  const timers = useRef(new Set()); // the 15-second failure timers, cleared when the wrapper unmounts
+
+  // The timeout only MARKS the load as failed (the error with Retry while there is no data). The request itself keeps going: if its
+  // answer still arrives and it is the newest request of the same login, it is accepted and the error goes away. An older request
+  // or an answer for another login is ignored; a failure after data exists changes nothing on screen.
+  const startTimer = (id, requestRef, onTimeout) => {
+    const timer = setTimeout(() => {
+      timers.current.delete(timer);
+      if (id === requestRef.current) onTimeout();
+    }, REQUEST_TIMEOUT_MS);
+    timers.current.add(timer);
+    return timer;
+  };
+  const stopTimer = (timer) => {
+    clearTimeout(timer);
+    timers.current.delete(timer);
+  };
 
   const loadMode = () => {
     const id = ++modeRequest.current;
     const key = getBookingFormCacheKey();
-    withTimeout(getClinicSettings())
+    const timer = startTimer(id, modeRequest, () => setModeFailed(true));
+    getClinicSettings()
       .then(res => {
+        stopTimer(timer);
         if (id !== modeRequest.current || getBookingFormCacheKey() !== key) return;
         const d = res?.data || res;
         const mode = d?.booking_mode === 'appointment' ? 'appointment' : 'token';
@@ -56,6 +67,7 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
         setModeFailed(false);
       })
       .catch(() => {
+        stopTimer(timer);
         if (id !== modeRequest.current) return;
         setModeFailed(true); // a failed refresh keeps the mode already loaded (the status below stays 'ready')
       });
@@ -64,8 +76,10 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
   const loadDoctors = () => {
     const id = ++doctorsRequest.current;
     const key = getBookingFormCacheKey();
-    withTimeout(getDoctors())
+    const timer = startTimer(id, doctorsRequest, () => setDoctorsFailed(true));
+    getDoctors()
       .then(res => {
+        stopTimer(timer);
         if (id !== doctorsRequest.current || getBookingFormCacheKey() !== key) return;
         if (Array.isArray(res?.data)) {
           writeBookingFormCache(key, { doctors: res.data });
@@ -77,15 +91,18 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
         }
       })
       .catch(() => {
+        stopTimer(timer);
         if (id !== doctorsRequest.current) return;
         setDoctorsFailed(true); // a failed refresh keeps the list already shown
       });
   };
 
-  // Once, when the wrapper mounts
+  // Once, when the wrapper mounts (and the timers are cleared when it unmounts)
   useEffect(() => {
     loadMode();
     loadDoctors();
+    const pending = timers.current;
+    return () => { pending.forEach(clearTimeout); pending.clear(); };
   }, []);
 
   // Every time the form opens: refresh quietly (the first run is the mount, which has just loaded everything)

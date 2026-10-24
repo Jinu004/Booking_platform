@@ -35,6 +35,14 @@ const clockText = (t) => {
   return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`;
 };
 
+// The controls Tab can reach inside the dialog, in order. The two focus guards are never part of the list.
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const getRealFocusables = (dialog) => Array.from(dialog.querySelectorAll(FOCUSABLE))
+  .filter(el => !el.hasAttribute('data-focus-guard') && el.getClientRects().length > 0);
+
+// Zero-size but tabbable: they sit at both ends of the dialog so Tab can never leave it (see the guards in the markup)
+const GUARD_STYLE = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, outline: 'none', pointerEvents: 'none' };
+
 const INPUT = 'w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand';
 const LABEL = 'block text-sm font-medium text-ink/80 mb-1';
 
@@ -97,15 +105,51 @@ export default function BookingForm({
     };
   }, [open]);
 
-  // Escape closes the dialog, but not while a booking is being saved
+  // Keys: Escape closes the dialog, but not while a booking is being saved and not from a dropdown or the notes box (there it closes
+  // the dropdown or is part of editing). Tab and Shift+Tab stay inside the dialog: from the last element they wrap to the first and back.
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (e) => {
-      if (e.key === 'Escape' && !submitRef.current) onClose();
+      if (e.key === 'Escape') {
+        const tag = e.target && e.target.tagName;
+        if (tag === 'SELECT' || tag === 'TEXTAREA') return;
+        if (!submitRef.current) onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const items = getRealFocusables(dialog);
+      if (items.length === 0) {
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      const inside = dialog.contains(active);
+      if (e.shiftKey) {
+        if (!inside || active === dialog || active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (!inside || active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
+
+  // The page behind does not scroll while the dialog is open; the previous value is restored on close and on unmount
+  useEffect(() => {
+    if (!open) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previous; };
+  }, [open]);
 
   const modeReady = modeStatus === 'ready' && (bookingMode === 'token' || bookingMode === 'appointment');
 
@@ -316,6 +360,19 @@ export default function BookingForm({
 
   const fmtSession = (t) => (t ? clockText(t) : '');
 
+  // The focus guards: the browser lands on one of them when Tab or Shift+Tab leaves the first or last control. Coming from a real
+  // control of the dialog, focus wraps to the opposite end; coming from anywhere else (the dialog itself right after it opens, or the
+  // browser's own UI) it goes to the natural edge of that guard. With no real control the dialog itself takes the focus.
+  const onGuardFocus = (which) => (e) => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const items = getRealFocusables(dialog);
+    if (items.length === 0) { dialog.focus(); return; }
+    const fromControl = items.includes(e.relatedTarget);
+    if (which === 'start') (fromControl ? items[items.length - 1] : items[0]).focus();
+    else (fromControl ? items[0] : items[items.length - 1]).focus();
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
       <div
@@ -326,6 +383,7 @@ export default function BookingForm({
         tabIndex={-1}
         className={`bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto focus:outline-none ${modeReady ? '' : 'min-h-[min(420px,80vh)]'}`}
       >
+        <span tabIndex={0} data-focus-guard="start" onFocus={onGuardFocus('start')} style={GUARD_STYLE} />
         <div className="flex justify-between items-center mb-5">
           <h2 id="new-booking-title" className="text-xl font-bold text-ink">New booking</h2>
           <button onClick={onClose} disabled={submitting} aria-label="Close" className="text-ink/40 hover:text-ink/65 text-2xl font-bold disabled:opacity-50">×</button>
@@ -560,6 +618,7 @@ export default function BookingForm({
             </button>
           </div>
         )}
+        <span tabIndex={0} data-focus-guard="end" onFocus={onGuardFocus('end')} style={GUARD_STYLE} />
       </div>
     </div>
   );
