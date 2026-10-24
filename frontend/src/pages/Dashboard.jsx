@@ -10,6 +10,7 @@ import { saveToCache, loadFromCache } from '../utils/offlineCache';
 import { plural } from '../utils/plural';
 import LoadError from '../components/LoadError';
 import NewBookingModal from '../components/NewBookingModal';
+import usePollWhileVisible from '../hooks/usePollWhileVisible';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({ bookingsToday: 0, activeConversations: 0, availableDoctors: 0, pendingTokens: 0 });
@@ -32,34 +33,25 @@ const Dashboard = () => {
   const staffDoctorId = isDoctor ? staff?.doctor_id : null;
   useEffect(() => {
     fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 30000);
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') fetchDashboardData();
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
   }, []);
 
   const fetchDashboardData = async () => {
     try {
       let statsDidFail = false;
       let doctorsDidFail = false;
-      const [statsRes, convRes, docsRes, allDocsRes, tokensRes, bookingsRes] = await Promise.all([
+      const [statsRes, convRes, allDocsRes, tokensRes, bookingsRes] = await Promise.all([
         getBookingStats().catch(() => { statsDidFail = true; return { data: { total: 0 } }; }),
         isDoctor ? Promise.resolve({ data: [] }) : getHITLConversations({ since: '24h' }).catch(() => ({ data: { conversations: [] } })),
-        getDoctors(true).catch(() => { doctorsDidFail = true; return { data: [] }; }),
         getDoctors().catch(() => { doctorsDidFail = true; return { data: [] }; }),
         getTokenQueue().catch(() => ({ data: [] })),
-        getBookings({ limit: 5 }).catch(() => ({ data: { bookings: [] } }))
+        // page AND limit: the server only limits the list when both are sent (response shape is the same: { bookings, total, page, limit })
+        getBookings({ page: 1, limit: 5 }).catch(() => ({ data: { bookings: [] } }))
       ]);
 
       const docsArray = allDocsRes?.data || [];
-      const availableDocsArray = docsRes?.data || [];
+      // One doctors call: the "available" list is the full list filtered by the two fields the server's available=true filter used
+      // (available_today, and being inside a session right now = available_now)
+      const availableDocsArray = docsArray.filter(d => d.available_today && d.available_now);
       const tokensArray = tokensRes?.data || [];
 
       let activeConvs = Array.isArray(convRes?.data) ? convRes.data : (convRes?.data?.conversations || []);
@@ -115,6 +107,10 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
+
+  // Refreshes every 30 s while the tab is visible; paused when hidden, refreshed once when it is shown again (replaces the old
+  // separate visibility listener, so there is exactly one refresh on showing the tab). Called here, below fetchDashboardData's definition.
+  usePollWhileVisible(fetchDashboardData, 30000);
 
   const filteredTokens = activeFilter === 'all' ? tokenQueue
     : activeFilter === 'arrived' ? tokenQueue.filter(t => t.status === 'arrived')

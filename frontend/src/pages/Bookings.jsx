@@ -7,6 +7,7 @@ import {
 import { getDoctors, updateTokenStatus, getDoctorSchedule } from '../services/clinic.service';
 import { getClinicSettings } from '../services/settings.service';
 import NewBookingModal from '../components/NewBookingModal';
+import usePollWhileVisible from '../hooks/usePollWhileVisible';
 import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
 import { TableRowSkeleton, StatCardSkeleton } from '../components/shared/Skeleton';
@@ -68,8 +69,6 @@ const Bookings = () => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000); // 30s poll
-    return () => clearInterval(interval);
   }, [date, statusFilter, viewMode]);
 
   const fetchData = async () => {
@@ -136,6 +135,9 @@ const Bookings = () => {
       setLoading(false);
     }
   };
+
+  // 30 s refresh while the tab is visible (always with the current date and filters); paused when hidden, refreshed once when shown again
+  usePollWhileVisible(fetchData, 30000);
 
   useEffect(() => {
     if (!selectedDoctor) { setDoctorScheduleSessions([]); return; }

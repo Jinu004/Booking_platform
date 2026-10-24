@@ -5,6 +5,7 @@ import { getStoredStaff } from '../services/auth.service';
 import { plural } from '../utils/plural';
 import { getErrorMessage } from '../utils/errorMessage';
 import LoadError from '../components/LoadError';
+import usePollWhileVisible from '../hooks/usePollWhileVisible';
 
 const getStatusPill = (status) => {
   switch (status) {
@@ -54,9 +55,9 @@ const TokenQueue = () => {
 
   useEffect(() => {
     fetchQueue();
-    const interval = setInterval(fetchQueue, 15000);
-    return () => clearInterval(interval);
   }, []);
+  // Refreshes every 15 s while the tab is visible; paused when hidden, refreshed once when it is shown again
+  usePollWhileVisible(fetchQueue, 15000);
 
   const doctors = [...new Set(tokenQueue.map(t => t.doctor_name))].filter(Boolean);
 

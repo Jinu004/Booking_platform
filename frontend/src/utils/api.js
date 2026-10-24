@@ -2,6 +2,10 @@ import axios from 'axios';
 import useStore from '../store/useStore';
 import { clearBookingFormCache } from './bookingFormCache';
 
+const GET_TIMEOUT_MS = 20000;
+const LONG_GET_PATTERN = /\/superadmin\/tenants\/[^/]+\/(waba-info|send-readiness|templates)/;
+const TIMEOUT_MESSAGE = 'The server took too long to respond. Check your connection and try again.';
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1',
   headers: {
@@ -21,7 +25,15 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
-    
+
+    // GET requests give up after 20 s (a hung request must not wait forever). Never for POST, PUT, PATCH or DELETE, and not for the
+    // few GETs that can legitimately take long: file/image downloads (blob) and the super admin panels that call Meta one after another.
+    if (String(config.method || 'get').toLowerCase() === 'get' && !config.timeout
+        && config.responseType !== 'blob'
+        && !LONG_GET_PATTERN.test(String(config.url || ''))) {
+      config.timeout = GET_TIMEOUT_MS;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -47,6 +59,12 @@ api.interceptors.response.use(
     return response.data;
   },
   (error) => {
+    if (!error.response && (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') && /timeout/i.test(String(error.message || ''))) {
+      // A GET that timed out: a readable message for the page's error state (getErrorMessage / LoadError); never a logout
+      useStore.getState().addToast(TIMEOUT_MESSAGE, 'error');
+      return Promise.reject({ success: false, data: null, error: TIMEOUT_MESSAGE });
+    }
+
     if (!error.response) {
       useStore.getState().addToast('Cannot connect to server', 'error');
       return Promise.reject({ success: false, data: null, error: 'Cannot connect to server' });

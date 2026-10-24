@@ -6,6 +6,7 @@ import { globalSearch } from '../../services/patient.service';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
 import { subscribeLiveEvents } from '../../utils/liveEvents';
+import usePollWhileVisible from '../../hooks/usePollWhileVisible';
 import { STORAGE_KEYS } from '../../constants';
 
 const Layout = () => {
@@ -19,22 +20,22 @@ const Layout = () => {
   const { tenant, addToast } = useStore();
   const [updateAvailable, setUpdateAvailable] = useState(false)
 
+  const checkVersion = async () => {
+    try {
+      const res = await fetch(`/version.json?t=${Date.now()}`)
+      const data = await res.json()
+      const serverVersion = data.version
+      const acceptedVersion = localStorage.getItem('acceptedVersion')
+      if (serverVersion !== acceptedVersion) {
+        setUpdateAvailable(true)
+      }
+    } catch (err) {}
+  }
   useEffect(() => {
-    const checkVersion = async () => {
-      try {
-        const res = await fetch(`/version.json?t=${Date.now()}`)
-        const data = await res.json()
-        const serverVersion = data.version
-        const acceptedVersion = localStorage.getItem('acceptedVersion')
-        if (serverVersion !== acceptedVersion) {
-          setUpdateAvailable(true)
-        }
-      } catch (err) {}
-    }
     checkVersion()
-    const interval = setInterval(checkVersion, 5 * 60 * 1000)
-    return () => clearInterval(interval)
   }, [])
+  // Checked every 5 minutes while the tab is visible; paused when hidden, checked once when it is shown again
+  usePollWhileVisible(checkVersion, 5 * 60 * 1000)
   const { industry } = useIndustry();
   const isEnquiry = industry === 'enquiry';
   const staff = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.STAFF_DATA) || '{}'); } catch { return {}; } })();

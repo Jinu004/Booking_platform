@@ -91,6 +91,7 @@ export default function BookingForm({
   const [error, setError] = useState('');
   const submitRef = useRef(false);
   const phoneRef = useRef('');
+  const lookupTimerRef = useRef(null); // the pending (debounced) patient lookup
   const dialogRef = useRef(null);
   const returnFocusRef = useRef(null);
 
@@ -180,7 +181,11 @@ export default function BookingForm({
     setSubmitting(false);
     submitRef.current = false;
     phoneRef.current = '';
+    clearTimeout(lookupTimerRef.current); // a lookup still pending from the last time the form was open
   }, [open]);
+
+  // A pending lookup never outlives the form
+  useEffect(() => () => clearTimeout(lookupTimerRef.current), []);
 
   // One doctor: chosen automatically (the field is hidden). A chosen doctor that is no longer offered is cleared.
   useEffect(() => {
@@ -259,21 +264,26 @@ export default function BookingForm({
     return () => { cancelled = true; };
   }, [open, slotKind, f.doctorId, f.date, f.procedureId, reload]);
 
-  const handlePhone = async (value) => {
+  // The patient lookup waits 300 ms after the last keystroke. Every change of the number cancels a pending lookup and clears the
+  // previous result at once; an answer for an older number is ignored (phoneRef guard).
+  const handlePhone = (value) => {
     const typed = cleanPhoneInput(value);
     phoneRef.current = typed;
     set({ phone: typed });
     setPatients([]);
+    clearTimeout(lookupTimerRef.current);
     if (!phoneReadyForLookup(typed)) return;
-    try {
-      const res = await api.get(`/bookings/lookup?phone=${encodeURIComponent(typed.trim())}`);
-      if (phoneRef.current !== typed) return; // the number changed while the lookup ran
-      const customer = res?.data?.customer || null;
-      const found = res?.data?.patients || [];
-      setPatients(found);
-      if (found.length === 1) setF(prev => (prev.name.trim() ? prev : { ...prev, name: found[0].name }));
-      else if (found.length === 0 && customer?.name) setF(prev => (prev.name.trim() ? prev : { ...prev, name: customer.name }));
-    } catch { /* no lookup result: staff types the name */ }
+    lookupTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await api.get(`/bookings/lookup?phone=${encodeURIComponent(typed.trim())}`);
+        if (phoneRef.current !== typed) return; // the number changed while the lookup ran
+        const customer = res?.data?.customer || null;
+        const found = res?.data?.patients || [];
+        setPatients(found);
+        if (found.length === 1) setF(prev => (prev.name.trim() ? prev : { ...prev, name: found[0].name }));
+        else if (found.length === 0 && customer?.name) setF(prev => (prev.name.trim() ? prev : { ...prev, name: customer.name }));
+      } catch { /* no lookup result: staff types the name */ }
+    }, 300);
   };
 
   const slotModeNeedsReload = path === 'appointment' || path === 'procedure';

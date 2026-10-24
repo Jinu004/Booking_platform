@@ -33,7 +33,6 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
   const [receiptBooking, setReceiptBooking] = useState(null);
   const modeRequest = useRef(0);    // only the newest settings request may set the state
   const doctorsRequest = useRef(0); // same for the doctors request
-  const firstOpenEffect = useRef(true);
   const timers = useRef(new Set()); // the 15-second failure timers, cleared when the wrapper unmounts
 
   // The timeout only MARKS the load as failed (the error with Retry while there is no data). The request itself keeps going: if its
@@ -97,19 +96,40 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
       });
   };
 
-  // Once, when the wrapper mounts (and the timers are cleared when it unmounts)
-  useEffect(() => {
+  // The silent first load (settings + doctors) waits until the browser is idle after the page's own first load (at most 2 s, or 1.5 s
+  // where requestIdleCallback does not exist). If the form is opened before that, the load starts at once (see the effect below), so the
+  // loading, error and Retry behaviour the user sees does not change. The timers are cleared when the wrapper unmounts.
+  const initialLoadStarted = useRef(false);
+  const startInitialLoad = () => {
+    if (initialLoadStarted.current) return;
+    initialLoadStarted.current = true;
     loadMode();
     loadDoctors();
+  };
+  useEffect(() => {
+    let idleHandle = null;
+    let timeoutHandle = null;
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      idleHandle = window.requestIdleCallback(startInitialLoad, { timeout: 2000 });
+    } else {
+      timeoutHandle = setTimeout(startInitialLoad, 1500);
+    }
     const pending = timers.current;
-    return () => { pending.forEach(clearTimeout); pending.clear(); };
+    return () => {
+      if (idleHandle !== null && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleHandle);
+      if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+      pending.forEach(clearTimeout);
+      pending.clear();
+    };
   }, []);
 
-  // Every time the form opens: refresh quietly (the first run is the mount, which has just loaded everything)
+  // Every time the form opens: if the silent first load has not run yet it starts now (and is the refresh); otherwise refresh quietly
   useEffect(() => {
-    const isFirstRun = firstOpenEffect.current;
-    firstOpenEffect.current = false;
-    if (!open || isFirstRun) return;
+    if (!open) return;
+    if (!initialLoadStarted.current) {
+      startInitialLoad();
+      return;
+    }
     loadDoctors();
     loadMode();
   }, [open]);
