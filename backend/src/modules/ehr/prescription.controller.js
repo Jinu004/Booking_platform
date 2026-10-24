@@ -340,6 +340,9 @@ async function sendPrescriptionToWhatsApp(req, res, next) {
     await runAsTenant(req.tenantId, () => sendDocument(data.patient_phone, pdfBuffer, filename, caption));
     return successResponse(res, { message: 'Prescription sent to patient WhatsApp' });
   } catch (err) {
+    if (err && err.code === 'NO_TENANT_TOKEN') {
+      return errorResponse(res, "This clinic's WhatsApp is not connected, so the message could not be sent.", 409);
+    }
     logger.error('Prescription WhatsApp send failed:', err.message);
     next(err);
   }

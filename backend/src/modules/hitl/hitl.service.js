@@ -69,8 +69,14 @@ async function handleAIHandoffRequest(tenant, conversation, staffId = null) {
   // Send holding message to patient
   const customerPhone = conversation.customer_phone;
   if (customerPhone) {
-    await sendMessage(customerPhone, settings.handoff_message);
-    await ConversationService.saveOutboundMessage(conversation.id, settings.handoff_message, 'assistant');
+    // A failed holding message (for example a clinic without a WhatsApp token) must not stop staff from being alerted below
+    try {
+      await sendMessage(customerPhone, settings.handoff_message);
+      await ConversationService.saveOutboundMessage(conversation.id, settings.handoff_message, 'assistant');
+    } catch (holdingErr) {
+      const errorClass = String((holdingErr && (holdingErr.name || holdingErr.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40);
+      logger.warn(`HANDOFF_HOLDING_MESSAGE_FAILED tenant=${tenant.id} class=${errorClass}`);
+    }
   }
 
   await pool.query(

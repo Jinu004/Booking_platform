@@ -104,6 +104,13 @@ async function resolveTenantAuth(tenantId) {
   }
 }
 
+// Forgets the cached token and platform-token flag of one clinic (or of every clinic when no id is given), so a changed flag, a new
+// connection or a removed token applies at once instead of after up to a minute. The cache stores the same things as before.
+function clearTenantTokenCache(tenantId) {
+  if (tenantId) tokenCache.delete(tenantId)
+  else tokenCache.clear()
+}
+
 // Adds the tenant's token to the context that is already active (used by the webhook, where the tenant is found after run())
 async function setTenantAccessToken(tenantId) {
   const store = storage.getStore()
@@ -150,6 +157,7 @@ module.exports = {
   getPlatformTokenAllowed,
   getTokenState,
   setTenantAccessToken,
+  clearTenantTokenCache,
   runAsTenant,
   hasContext
 }

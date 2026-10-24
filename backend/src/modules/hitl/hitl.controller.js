@@ -136,6 +136,9 @@ async function sendTemplate(req, res) {
 
     return res.json({ success: true })
   } catch (err) {
+    if (err && err.code === 'NO_TENANT_TOKEN') {
+      return res.status(409).json({ error: "This clinic's WhatsApp is not connected, so the message could not be sent." })
+    }
     logger.error('sendTemplate failed:', err?.response?.data || err?.message)
     return res.status(500).json({ error: 'Failed to send template' })
   }

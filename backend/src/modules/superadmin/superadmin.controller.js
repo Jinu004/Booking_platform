@@ -109,6 +109,9 @@ async function updateTenantStatus(req, res) {
       return errorResponse(res, 'Tenant not found', 404);
     }
 
+    // The sender's cached token and platform-token flag of this clinic are dropped too
+    require('../channel/whatsapp/senderContext').clearTenantTokenCache(id);
+
     // The webhook caches the tenant by number for 5 minutes: drop it so the new status takes effect at once
     try {
       const redisClient = require('../../config/redis');

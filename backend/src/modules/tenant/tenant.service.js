@@ -226,6 +226,10 @@ const setConfig = async (tenantId, key, value) => {
   } catch (err) {
     logger.warn('Redis cache invalidation failed after setConfig:', err.message);
   }
+  // The sender keeps this flag with the clinic's token for up to a minute: forget it so the change applies at once
+  if (key === 'platform_token_allowed') {
+    require('../channel/whatsapp/senderContext').clearTenantTokenCache(tenantId);
+  }
   return result;
 };
 

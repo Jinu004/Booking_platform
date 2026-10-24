@@ -30,18 +30,42 @@ const getPhoneId = () => {
 // This is called inside the try of each send function, so the failure is recorded by recordSendFailure below.
 const getToken = () => {
   const inContext = senderContext.hasContext()
+  let reason = 'no_context'
   if (inContext) {
     const tenantToken = senderContext.getAccessToken()
     if (tenantToken) return tenantToken
-    if (senderContext.getPlatformTokenAllowed()) return META_TOKEN
+    if (senderContext.getPlatformTokenAllowed()) {
+      // A flagged clinic may use the platform token, but an empty one would only be rejected by Meta: block it with a clear reason
+      if (String(META_TOKEN).trim()) return META_TOKEN
+      reason = 'platform_token_missing'
+    } else {
+      reason = senderContext.getTokenState()
+    }
   }
   const tenantId = inContext ? senderContext.getTenantId() : null
-  const reason = inContext ? senderContext.getTokenState() : 'no_context'
-  logger.warn(`NO_TENANT_TOKEN tenant=${tenantId || 'unknown'} reason=${reason} result=blocked`)
+  const quiet = !blockedNoiseAllowed(tenantId)
+  if (!quiet) logger.warn(`NO_TENANT_TOKEN tenant=${tenantId || 'unknown'} reason=${reason} result=blocked`)
   const err = new Error('No WhatsApp token for this clinic - message not sent')
   err.name = 'NO_TENANT_TOKEN'
   err.code = 'NO_TENANT_TOKEN'
+  err.quiet = quiet // recordSendFailure skips the log line and the send_failures row for a repeat within the minute
   throw err
+}
+
+// The send still fails every time, but the log lines and the send_failures row for a blocked clinic are written at most once per
+// minute per clinic (an in-memory map; old entries are dropped when it grows, so it cannot grow without bound)
+const BLOCKED_NOISE_MS = 60 * 1000
+const blockedNoise = new Map()
+function blockedNoiseAllowed(tenantId) {
+  const key = tenantId || 'unknown'
+  const now = Date.now()
+  const last = blockedNoise.get(key)
+  if (last && now - last < BLOCKED_NOISE_MS) return false
+  if (blockedNoise.size > 300) {
+    for (const [k, t] of blockedNoise) if (now - t >= BLOCKED_NOISE_MS) blockedNoise.delete(k)
+  }
+  blockedNoise.set(key, now)
+  return true
 }
 
 // Safe summary of a failed send: HTTP status, Meta error code/subcode, a trimmed message and the fbtrace id.
@@ -66,6 +90,8 @@ function summariseSendError(err) {
 // Logs one line for a failed send (part of the message text, so it is always printed) and records a send_failures row.
 // Never throws and never waits for the database, so it cannot break or delay a send.
 function recordSendFailure(ctx, templateName, err) {
+  // A repeat of "this clinic has no WhatsApp token" within the minute: already logged and recorded, nothing more is written
+  if (err && err.code === 'NO_TENANT_TOKEN' && err.quiet) return
   try {
     const s = summariseSendError(err)
     const tenantId = senderContext.hasContext() ? senderContext.getTenantId() : null

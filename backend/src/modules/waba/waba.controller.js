@@ -166,6 +166,8 @@ async function connectClinicNumber(req, res) {
         return errorResponse(res, 'Failed to store the connection', 500);
       }
       connectedAtMs = Date.now();
+      // The sender caches a clinic's token for up to a minute: forget it so the new connection is used at once
+      require('../channel/whatsapp/senderContext').clearTenantTokenCache(tenantId);
       await clearTenantCache([tenantRow.whatsapp_number]);
     }
     const authHeaders = { Authorization: `Bearer ${businessToken}` };
