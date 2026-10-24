@@ -1,32 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  getBookings, getBookingStats, 
-  completeBooking, cancelBooking, markNoShow, createBooking 
+import {
+  getBookings, getBookingStats,
+  completeBooking, cancelBooking
 } from '../services/booking.service';
-import { getDoctors, updateTokenStatus, getDoctorSchedule, getProcedures, getAvailableSlots, scheduleProcedureBooking, scheduleAppointmentBooking } from '../services/clinic.service';
+import { getDoctors, updateTokenStatus, getDoctorSchedule } from '../services/clinic.service';
 import { getClinicSettings } from '../services/settings.service';
-import api from '../utils/api';
 import TokenReceipt from '../components/shared/TokenReceipt';
+import BookingForm from '../components/BookingForm';
 import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
 import { TableRowSkeleton, StatCardSkeleton } from '../components/shared/Skeleton';
 import { saveToCache, loadFromCache } from '../utils/offlineCache';
-import { plural } from '../utils/plural';
-import { getErrorMessage } from '../utils/errorMessage';
-
-// Phone fields take digits, spaces and a leading "+" (the backend checks and normalises the number)
-const PHONE_HELP = '10 digits for India, or + and the country code for other countries';
-const cleanPhoneInput = (value) => {
-  const text = String(value).replace(/[^\d+\s]/g, '');
-  return ((text.startsWith('+') ? '+' : '') + text.replace(/\+/g, '')).slice(0, 16);
-};
-// The patient lookup starts when the number looks complete: 10 or more digits, or "+" and 8 or more digits (spaces ignored)
-const phoneReadyForLookup = (value) => {
-  const text = String(value).trim();
-  const digits = text.replace(/\D/g, '').length;
-  return text.startsWith('+') ? digits >= 8 : digits >= 10;
-};
 
 const Bookings = () => {
   const { addToast } = useStore();
@@ -46,67 +31,30 @@ const Bookings = () => {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [doctorScheduleSessions, setDoctorScheduleSessions] = useState([]);
   
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [isProcedureModalOpen, setIsProcedureModalOpen] = useState(false);
-  const [procedureForm, setProcedureForm] = useState({ patientPhone: '', patientName: '', doctorId: '', date: '', procedureId: '', slot: '' });
-  const [procedureDoctors, setProcedureDoctors] = useState([]);
-  const [procedureList, setProcedureList] = useState([]);
-  const [procedureSlots, setProcedureSlots] = useState([]);
-  const [procedureSlotsLoading, setProcedureSlotsLoading] = useState(false);
-  const [procedureSubmitting, setProcedureSubmitting] = useState(false);
-  const [procedureError, setProcedureError] = useState('');
-  const [scheduleBooking, setScheduleBooking] = useState({ patientName: '', patientPhone: '', doctorId: '', bookingDate: '', sessionTime: '', notes: '', sendWhatsapp: true });
-  const [doctorSessions, setDoctorSessions] = useState([]);
-  const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [noSessions, setNoSessions] = useState(false);
-  const [isScheduleSubmitting, setIsScheduleSubmitting] = useState(false);
-  const [phoneSuggestions, setPhoneSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [activeSuggestionModal, setActiveSuggestionModal] = useState(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
   const [doctors, setDoctors] = useState([]);
-  const [modalDoctors, setModalDoctors] = useState([]);
-  
-  const [newBooking, setNewBooking] = useState({
-    patientName: '',
-    patientPhone: '',
-    doctorId: '',
-    notes: '',
-    isPresent: true,
-    sendWhatsapp: true,
-    marketing_consent: '' // '' = not asked: the field is not sent
-  });
 
   const [receiptBooking, setReceiptBooking] = useState(null);
 
   const [isOffline, setIsOffline] = useState(false);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Booking mode of the clinic ('token' unless the clinic switched to 'appointment'): the Quick booking button is for appointment mode only
+  // Booking mode of the clinic: 'token' or 'appointment'. It stays 'token' for the stat card label until it has loaded;
+  // the booking form waits for modeStatus 'ready' and shows a retry when it could not be loaded (no silent fallback to token).
   const [bookingMode, setBookingMode] = useState('token');
-  useEffect(() => {
+  const [modeStatus, setModeStatus] = useState('loading');
+  const loadBookingMode = () => {
+    setModeStatus('loading');
     getClinicSettings()
       .then(res => {
         const d = res?.data || res;
-        if (d?.booking_mode === 'appointment') setBookingMode('appointment');
+        setBookingMode(d?.booking_mode === 'appointment' ? 'appointment' : 'token');
+        setModeStatus('ready');
       })
-      .catch(() => {});
+      .catch(() => setModeStatus('error'));
+  };
+  useEffect(() => {
+    loadBookingMode();
   }, []);
-
-  // Quick booking (appointment mode): phone, name, doctor, date, a free time of that doctor, notes
-  const [qbOpen, setQbOpen] = useState(false);
-  const [qb, setQb] = useState({ phone: '', name: '', doctorId: '', date: '', time: '', notes: '' });
-  const [qbDoctors, setQbDoctors] = useState([]);
-  const [qbPatients, setQbPatients] = useState([]);
-  const [qbSlots, setQbSlots] = useState([]);
-  const [qbSlotsLoading, setQbSlotsLoading] = useState(false);
-  const [qbSlotsError, setQbSlotsError] = useState(false);
-  const [qbReload, setQbReload] = useState(0);
-  const [qbSubmitting, setQbSubmitting] = useState(false);
-  const [qbError, setQbError] = useState('');
-  const qbSubmitRef = useRef(false);
-  const qbPhoneRef = useRef('');
 
   useEffect(() => {
     fetchData();
@@ -189,106 +137,7 @@ const Bookings = () => {
     }).catch(() => setDoctorScheduleSessions([]));
   }, [selectedDoctor, date]);
 
-  useEffect(() => {
-    if (!procedureForm.doctorId || !procedureForm.procedureId || !procedureForm.date) return;
-    const proc = procedureList.find(p => p.id === procedureForm.procedureId);
-    if (!proc) return;
-    setProcedureSlotsLoading(true);
-    setProcedureSlots([]);
-    setProcedureForm(f => ({ ...f, slot: '' }));
-    getAvailableSlots(procedureForm.doctorId, procedureForm.date, proc.duration_minutes)
-      .then(res => setProcedureSlots(res.data || []))
-      .catch(() => setProcedureSlots([]))
-      .finally(() => setProcedureSlotsLoading(false));
-  }, [procedureForm.doctorId, procedureForm.procedureId, procedureForm.date]);
-
-  // Free times of the chosen doctor and date (the clinic is in appointment mode, so the duration is the doctor's visit length)
-  useEffect(() => {
-    if (!qbOpen || !qb.doctorId || !qb.date) { setQbSlots([]); setQbSlotsError(false); return undefined; }
-    let cancelled = false;
-    setQbSlotsLoading(true);
-    setQbSlotsError(false);
-    getAvailableSlots(qb.doctorId, qb.date)
-      .then(res => {
-        if (cancelled) return;
-        const list = Array.isArray(res?.data) ? res.data : [];
-        setQbSlots(list);
-        setQb(q => (list.includes(q.time) ? q : { ...q, time: '' }));
-      })
-      .catch(() => { if (!cancelled) { setQbSlots([]); setQbSlotsError(true); } })
-      .finally(() => { if (!cancelled) setQbSlotsLoading(false); });
-    return () => { cancelled = true; };
-  }, [qbOpen, qb.doctorId, qb.date, qbReload]);
-
-  const todayISTString = () => {
-    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
   const clockText = t => { const [h, m] = t.toString().split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; };
-
-  const openQuickBooking = async () => {
-    let list = [];
-    try { const res = await getDoctors(); list = res?.data || []; } catch {}
-    if (staff?.role === 'doctor' && staff.doctor_id) list = list.filter(d => d.id === staff.doctor_id);
-    setQbDoctors(list);
-    // With one doctor the choice is automatic and the field is hidden
-    setQb({ phone: '', name: '', doctorId: list.length === 1 ? list[0].id : '', date: todayISTString(), time: '', notes: '' });
-    setQbPatients([]);
-    setQbSlots([]);
-    setQbError('');
-    qbPhoneRef.current = '';
-    setQbOpen(true);
-  };
-
-  const handleQbPhone = async (value) => {
-    const typed = cleanPhoneInput(value);
-    qbPhoneRef.current = typed;
-    setQb(q => ({ ...q, phone: typed }));
-    setQbPatients([]);
-    if (!phoneReadyForLookup(typed)) return;
-    try {
-      const res = await api.get(`/bookings/lookup?phone=${encodeURIComponent(typed.trim())}`);
-      if (qbPhoneRef.current !== typed) return; // the number changed while the lookup ran
-      const customer = res?.data?.customer || null;
-      const patients = res?.data?.patients || [];
-      setQbPatients(patients);
-      if (patients.length === 1) setQb(q => (q.name.trim() ? q : { ...q, name: patients[0].name }));
-      else if (patients.length === 0 && customer?.name) setQb(q => (q.name.trim() ? q : { ...q, name: customer.name }));
-    } catch { /* no lookup result: staff types the name */ }
-  };
-
-  const submitQuickBooking = async () => {
-    if (qbSubmitRef.current) return;
-    setQbError('');
-    if (!phoneReadyForLookup(qb.phone)) { setQbError('Enter a valid phone number: 10 digits for India, or + and the country code for other countries.'); return; }
-    if (!qb.name.trim()) { setQbError('Enter the patient name.'); return; }
-    if (!qb.doctorId) { setQbError('Choose a doctor.'); return; }
-    if (!qb.time) { setQbError('Choose a free time.'); return; }
-    qbSubmitRef.current = true;
-    setQbSubmitting(true);
-    try {
-      await scheduleAppointmentBooking(qb.doctorId, {
-        patient_name: qb.name.trim(),
-        phone: qb.phone.trim(), // as typed: the backend normalises it
-        date: qb.date,
-        start_time: qb.time,
-        notes: qb.notes.trim()
-      });
-      setQbOpen(false);
-      addToast('Appointment booked', 'success');
-      fetchData();
-    } catch (err) {
-      // The api helper rejects with the server's response body, so the message is err.error
-      const message = err?.error;
-      const usable = typeof message === 'string' && message && message !== 'Internal Server Error' && message !== 'Cannot connect to server';
-      setQbError(usable ? message : 'Could not save, please try again.');
-      // The time may have been taken meanwhile: show the current free times again
-      setQbReload(n => n + 1);
-    } finally {
-      qbSubmitRef.current = false;
-      setQbSubmitting(false);
-    }
-  };
 
   const toSessionMins = t => { if (!t) return null; const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
   const fmtSessionLabel = (s, e) => { const fmt = t => { const [h, m] = t.toString().split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; }; return `${fmt(s)} - ${fmt(e)}`; };
@@ -376,15 +225,6 @@ const Bookings = () => {
     </tr>
   );
 
-  const loadFormDependencies = async () => {
-    try {
-      const docRes = await getDoctors(true).catch(() => ({ data: [] }));
-      setModalDoctors(docRes.data || []);
-    } catch(err) {
-      addToast('Failed to load form data', 'error');
-    }
-  };
-
   const handleAction = async (id, actionFn) => {
     if (actionFn === completeBooking && !window.confirm('Are you sure you want to complete this token?')) return;
     if (actionFn === cancelBooking && !window.confirm('Are you sure you want to cancel this token?')) return;
@@ -396,23 +236,25 @@ const Bookings = () => {
     }
   };
 
-  const handleCreateSubmit = async (e) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      // The consent choice is only sent when staff picked one (the patient agreed at reception)
-      const { marketing_consent: pickedConsent, ...bookingBody } = newBooking;
-      if (pickedConsent) bookingBody.marketing_consent = pickedConsent;
-      const { data } = await api.post('/bookings/manual', bookingBody);
-      setReceiptBooking(data.data);
-      setIsModalOpen(false);
-      setNewBooking({ patientName: '', patientPhone: '', doctorId: '', notes: '', isPresent: true, sendWhatsapp: true, marketing_consent: '' });
-      fetchData();
-    } catch (err) {
-      alert(getErrorMessage(err, 'Failed to create booking'));
-    } finally {
-      setIsSubmitting(false);
+  // Opens the one booking form with a fresh doctor list (the list also says who is available right now)
+  const openBookingForm = async () => {
+    try { const res = await getDoctors(); if (res?.data) setDoctors(res.data); } catch {}
+    setBookingOpen(true);
+  };
+
+  // After a save: close the form, refresh the list, then the token receipt or a short message
+  const handleBooked = (result) => {
+    setBookingOpen(false);
+    fetchData();
+    if (result?.kind === 'token_now') {
+      if (result.booking) setReceiptBooking(result.booking);
+      else addToast('Token issued', 'success');
+    } else if (result?.kind === 'appointment') {
+      addToast('Appointment booked', 'success');
+    } else if (result?.kind === 'procedure') {
+      addToast('Procedure scheduled', 'success');
+    } else {
+      addToast('Booking scheduled', 'success');
     }
   };
 
@@ -480,46 +322,10 @@ const Bookings = () => {
         </div>
         <div className="flex gap-2 w-full md:w-auto flex-wrap">
         <button
-          onClick={async () => {
-            setScheduleBooking({ patientName: '', patientPhone: '', doctorId: '', bookingDate: '', sessionTime: '', notes: '', sendWhatsapp: true });
-            setDoctorSessions([]);
-            setNoSessions(false);
-            try { const res = await getDoctors(); if (res?.data) setDoctors(res.data); } catch {}
-            setIsScheduleModalOpen(true);
-          }}
-          className="bg-white text-brand border border-brand px-5 py-2.5 rounded-lg font-medium hover:bg-brand-soft transition flex-1 md:flex-none"
-        >
-          + Schedule Booking
-        </button>
-        <button
-          onClick={async () => {
-            setProcedureForm({ patientPhone: '', patientName: '', doctorId: '', date: '', procedureId: '', slot: '' });
-            setProcedureList([]);
-            setProcedureSlots([]);
-            setProcedureError('');
-            try { const res = await getDoctors(); if (res?.data) setProcedureDoctors(res.data); } catch {}
-            setIsProcedureModalOpen(true);
-          }}
-          className="bg-purple-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-purple-700 transition flex-1 md:flex-none"
-        >
-          + Procedure
-        </button>
-        {bookingMode === 'appointment' && (
-          <button
-            onClick={openQuickBooking}
-            className="bg-white text-brand border border-brand px-5 py-2.5 rounded-lg font-medium hover:bg-brand-soft transition flex-1 md:flex-none"
-          >
-            + Quick booking
-          </button>
-        )}
-        <button
-          onClick={() => {
-            loadFormDependencies();
-            setIsModalOpen(true);
-          }}
+          onClick={openBookingForm}
           className="bg-brand text-white px-5 py-2.5 rounded-lg font-medium hover:bg-brand-hover transition flex-1 md:flex-none"
         >
-          + New Booking
+          + New booking
         </button>
         </div>
       </div>
@@ -590,14 +396,11 @@ const Bookings = () => {
                   <div className="flex flex-col items-center justify-center space-y-3">
                     <svg className="w-12 h-12 text-ink/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                     <p className="text-ink/55 font-medium text-lg">No bookings yet today</p>
-                    <button 
-                      onClick={() => {
-                        loadFormDependencies();
-                        setIsModalOpen(true);
-                      }}
+                    <button
+                      onClick={openBookingForm}
                       className="mt-2 text-ink font-semibold hover:text-ink/70"
                     >
-                      + New Booking
+                      + New booking
                     </button>
                   </div>
                 </td>
@@ -787,515 +590,17 @@ const Bookings = () => {
         )}
       </div>
 
-      {qbOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-xl font-bold text-ink">Quick booking</h2>
-              <button onClick={() => setQbOpen(false)} disabled={qbSubmitting} className="text-ink/40 hover:text-ink/65 text-2xl font-bold disabled:opacity-50">×</button>
-            </div>
-            <div className="space-y-4">
-              {qbError && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{qbError}</div>}
-              <div>
-                <label className="block text-sm font-medium text-ink/80 mb-1">Patient Phone</label>
-                <input type="tel" maxLength={16} value={qb.phone} disabled={qbSubmitting}
-                  onChange={e => handleQbPhone(e.target.value)}
-                  className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-                  placeholder="9876543210 or +971501234567" />
-                <p className="text-xs text-ink/50 mt-1">{PHONE_HELP}</p>
-              </div>
-              {qbPatients.length > 1 && (
-                <div>
-                  <label className="block text-sm font-medium text-ink/80 mb-1">Patients with this number</label>
-                  <select defaultValue="" disabled={qbSubmitting}
-                    onChange={e => setQb(q => ({ ...q, name: e.target.value === '__new__' ? '' : e.target.value }))}
-                    className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
-                    <option value="" disabled>Choose a patient</option>
-                    {qbPatients.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-                    <option value="__new__">New patient (type the name below)</option>
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-ink/80 mb-1">Patient Name</label>
-                <input type="text" value={qb.name} disabled={qbSubmitting}
-                  onChange={e => setQb(q => ({ ...q, name: e.target.value }))}
-                  className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-                  placeholder="Patient name" />
-              </div>
-              {qbDoctors.length > 1 && (
-                <div>
-                  <label className="block text-sm font-medium text-ink/80 mb-1">Doctor</label>
-                  <select value={qb.doctorId} disabled={qbSubmitting}
-                    onChange={e => setQb(q => ({ ...q, doctorId: e.target.value, time: '' }))}
-                    className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
-                    <option value="">Select doctor</option>
-                    {qbDoctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-ink/80 mb-1">Date</label>
-                <input type="date" value={qb.date} min={todayISTString()} disabled={qbSubmitting}
-                  onChange={e => setQb(q => ({ ...q, date: e.target.value, time: '' }))}
-                  className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
-              </div>
-              {qb.doctorId && (() => {
-                const doctor = qbDoctors.find(d => d.id === qb.doctorId);
-                const minutes = parseInt(doctor?.avg_consultation_minutes, 10) > 0 ? parseInt(doctor.avg_consultation_minutes, 10) : 15;
-                return <p className="text-xs text-ink/55">Visit length: {minutes} min (set per doctor on the Doctors page)</p>;
-              })()}
-              {qb.doctorId && qb.date && (
-                <div>
-                  <label className="block text-sm font-medium text-ink/80 mb-1">Time</label>
-                  {qbSlotsLoading ? (
-                    <p className="text-sm text-ink/40">Loading free times...</p>
-                  ) : qbSlotsError ? (
-                    <p className="text-sm text-red-500">Could not load the free times. Close and try again.</p>
-                  ) : qbSlots.length === 0 ? (
-                    <p className="text-sm text-red-500">No free times for this doctor on this date.</p>
-                  ) : (
-                    <select value={qb.time} disabled={qbSubmitting}
-                      onChange={e => setQb(q => ({ ...q, time: e.target.value }))}
-                      className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
-                      <option value="">Select time</option>
-                      {qbSlots.map(s => <option key={s} value={s}>{clockText(s)}</option>)}
-                    </select>
-                  )}
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-ink/80 mb-1">Notes (optional)</label>
-                <textarea rows={2} value={qb.notes} disabled={qbSubmitting}
-                  onChange={e => setQb(q => ({ ...q, notes: e.target.value }))}
-                  className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none" />
-              </div>
-              <button
-                onClick={submitQuickBooking}
-                disabled={qbSubmitting || !phoneReadyForLookup(qb.phone) || !qb.name.trim() || !qb.doctorId || !qb.time}
-                className="w-full bg-brand text-white py-2.5 rounded-lg font-bold hover:bg-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {qbSubmitting ? 'Saving...' : 'Book appointment'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isProcedureModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-xl font-bold text-ink">Schedule Procedure</h2>
-              <button onClick={() => setIsProcedureModalOpen(false)} className="text-ink/40 hover:text-ink/65 text-2xl font-bold">×</button>
-            </div>
-            <div className="space-y-4">
-              {procedureError && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{procedureError}</div>}
-              <div className="relative">
-                <label className="block text-sm font-medium text-ink/80 mb-1">Patient Phone</label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-ink/[0.12] bg-ink/[0.02] text-ink/55 text-sm">+91</span>
-                  <input type="tel" maxLength={10} value={procedureForm.patientPhone}
-                    onChange={async e => {
-                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      setProcedureForm(f => ({ ...f, patientPhone: digits }));
-                      if (digits.length === 10) {
-                        try {
-                          const res = await api.get(`/bookings/lookup?phone=${digits}`);
-                          setPhoneSuggestions(res.data?.patients || res.data || []);
-                          setShowSuggestions(true);
-                          setActiveSuggestionModal('procedure');
-                        } catch { setShowSuggestions(false); }
-                      } else { setShowSuggestions(false); }
-                    }}
-                    className="flex-1 border border-ink/[0.12] rounded-r-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="9876543210" />
-                </div>
-                {showSuggestions && activeSuggestionModal === 'procedure' && phoneSuggestions.length > 0 && (
-                  <div className="absolute z-10 w-full bg-white border border-ink/[0.08] rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto">
-                    {phoneSuggestions.map(p => (
-                      <button key={p.id} type="button"
-                        onClick={() => { setProcedureForm(f => ({ ...f, patientName: p.name })); setShowSuggestions(false); }}
-                        className="w-full text-left px-4 py-2 hover:bg-ink/[0.03] text-sm">
-                        <span className="font-medium">{p.name}</span>
-                        <span className="text-ink/40 ml-2">{p.phone}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink/80 mb-1">Patient Name</label>
-                <input type="text" value={procedureForm.patientName}
-                  onChange={e => setProcedureForm(f => ({ ...f, patientName: e.target.value }))}
-                  className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="Patient name" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink/80 mb-1">Doctor</label>
-                <select value={procedureForm.doctorId}
-                  onChange={async e => {
-                    const doctorId = e.target.value;
-                    setProcedureForm(f => ({ ...f, doctorId, procedureId: '', slot: '' }));
-                    setProcedureSlots([]);
-                    if (doctorId) {
-                      try { const res = await getProcedures(doctorId); setProcedureList(res.data || []); } catch { setProcedureList([]); }
-                    } else { setProcedureList([]); }
-                  }}
-                  className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
-                  <option value="">Select doctor</option>
-                  {procedureDoctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-              </div>
-              {procedureList.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-ink/80 mb-1">Procedure</label>
-                  <select value={procedureForm.procedureId}
-                    onChange={e => setProcedureForm(f => ({ ...f, procedureId: e.target.value, slot: '' }))}
-                    className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
-                    <option value="">Select procedure</option>
-                    {procedureList.map(p => <option key={p.id} value={p.id}>{p.name} ({p.duration_minutes} min)</option>)}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-ink/80 mb-1">Date</label>
-                <input type="date" value={procedureForm.date}
-                  min={(() => { const _d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`; })()}
-                  onChange={e => setProcedureForm(f => ({ ...f, date: e.target.value, slot: '' }))}
-                  className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
-              </div>
-              {procedureSlotsLoading && <p className="text-sm text-ink/40">Loading available slots...</p>}
-              {procedureSlots.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-ink/80 mb-1">Available Slot</label>
-                  <select value={procedureForm.slot}
-                    onChange={e => setProcedureForm(f => ({ ...f, slot: e.target.value }))}
-                    className="w-full border border-ink/[0.12] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
-                    <option value="">Select slot</option>
-                    {procedureSlots.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              )}
-              {procedureForm.date && procedureForm.doctorId && procedureForm.procedureId && !procedureSlotsLoading && procedureSlots.length === 0 && (
-                <p className="text-sm text-red-500">No available slots for this date.</p>
-              )}
-              <button
-                onClick={async () => {
-                  setProcedureError('');
-                  if (!procedureForm.patientPhone || !procedureForm.doctorId || !procedureForm.procedureId || !procedureForm.date || !procedureForm.slot) {
-                    setProcedureError('Please fill in all required fields and select a slot.');
-                    return;
-                  }
-                  const proc = procedureList.find(p => p.id === procedureForm.procedureId);
-                  if (!proc) return;
-                  const [h, m] = procedureForm.slot.split(':').map(Number);
-                  const endMins = h * 60 + m + proc.duration_minutes;
-                  const endH = Math.floor(endMins / 60).toString().padStart(2, '0');
-                  const endM = (endMins % 60).toString().padStart(2, '0');
-                  setProcedureSubmitting(true);
-                  try {
-                    await scheduleProcedureBooking(procedureForm.doctorId, {
-                      procedure_id: procedureForm.procedureId,
-                      customer_id: null,
-                      patient_id: null,
-                      patient_name: procedureForm.patientName || procedureForm.patientPhone,
-                      date: procedureForm.date,
-                      start_time: procedureForm.slot,
-                      end_time: `${endH}:${endM}`
-                    });
-                    setIsProcedureModalOpen(false);
-                    fetchData();
-                  } catch (err) {
-                    // The api helper rejects with the server's response body, so the message is err.error
-                    const serverMessage = err?.error || err?.response?.data?.error;
-                    setProcedureError(serverMessage && serverMessage !== 'Internal Server Error' ? serverMessage : 'Failed to schedule procedure.');
-                  } finally {
-                    setProcedureSubmitting(false);
-                  }
-                }}
-                disabled={procedureSubmitting || !procedureForm.patientPhone || !procedureForm.doctorId || !procedureForm.procedureId || !procedureForm.date || !procedureForm.slot}
-                className="w-full bg-purple-600 text-white py-2.5 rounded-lg font-bold hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {procedureSubmitting ? 'Scheduling...' : 'Schedule Procedure'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isScheduleModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-xl font-bold text-ink">Schedule Booking</h2>
-              <button onClick={() => setIsScheduleModalOpen(false)} className="text-ink/40 hover:text-ink/65 text-2xl font-bold">×</button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-ink/80 mb-1">Patient Phone <span className="text-red-500">*</span></label>
-                <div className="flex relative">
-                  <input type="tel" required maxLength={16} value={scheduleBooking.patientPhone}
-                    onChange={async e => {
-                      const typed = cleanPhoneInput(e.target.value);
-                      setScheduleBooking({...scheduleBooking, patientPhone: typed});
-                      if (phoneReadyForLookup(typed)) {
-                        try {
-                          const res = await api.get(`/bookings/lookup?phone=${encodeURIComponent(typed.trim())}`);
-                          const found = res?.data?.patients || [];
-                          if (found.length > 0) { setPhoneSuggestions(found); setShowSuggestions(true); setActiveSuggestionModal('schedule'); }
-                          else { setShowSuggestions(false); }
-                        } catch { setShowSuggestions(false); }
-                      } else { setShowSuggestions(false); }
-                    }}
-                    className="flex-1 rounded-md border border-ink/[0.12] p-2 font-bold focus:ring-ink/20 focus:border-ink/40"
-                    placeholder="9876543210 or +971501234567" />
-                </div>
-                <p className="text-xs text-ink/50 mt-1">{PHONE_HELP}</p>
-                {showSuggestions && activeSuggestionModal === 'schedule' && (
-                  <div className="mt-1 w-full bg-white border border-ink/[0.08] rounded-lg shadow-sm">
-                    {phoneSuggestions.map(p => (
-                      <button key={p.id} type="button"
-                        onClick={() => { setScheduleBooking({...scheduleBooking, patientName: p.name}); setShowSuggestions(false); }}
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-ink/[0.04] transition rounded-lg">
-                        {p.name}{p.age ? ` (${p.age}${p.gender ? ', ' + p.gender : ''})` : ''} <span className="text-ink/40 text-xs">{p.phone}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-ink/80 mb-1">Patient Name</label>
-                <input type="text" value={scheduleBooking.patientName}
-                  onChange={e => setScheduleBooking({...scheduleBooking, patientName: e.target.value.replace(/\b\w/g, c => c.toUpperCase())})}
-                  className="block w-full rounded-md border border-ink/[0.12] p-2 bg-ink/[0.02]"
-                  placeholder="Patient Name (Optional)" />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-ink/80 mb-1">Doctor <span className="text-red-500">*</span></label>
-                <select required value={scheduleBooking.doctorId}
-                  onChange={async e => {
-                    const doctorId = e.target.value;
-                    setScheduleBooking({...scheduleBooking, doctorId, sessionTime: ''});
-                    setDoctorSessions([]);
-                    setNoSessions(false);
-                    if (doctorId && scheduleBooking.bookingDate) {
-                      setSessionsLoading(true);
-                      try {
-                        const res = await getDoctorSchedule(doctorId);
-                        const date = new Date(scheduleBooking.bookingDate + 'T00:00:00');
-                        const dow = date.getDay();
-                        const sessions = (res?.data || []).filter(s => s.day_of_week === dow && s.is_available);
-                        setDoctorSessions(sessions);
-                        setNoSessions(sessions.length === 0);
-                      } catch {} finally { setSessionsLoading(false); }
-                    }
-                  }}
-                  className="block w-full rounded-md border border-ink/[0.12] p-2 bg-ink/[0.02] font-bold">
-                  <option value="">Select doctor</option>
-                  {doctors.map(d => <option key={d.id} value={d.id}>{d.name} — {d.specialization || 'General'}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-ink/80 mb-1">Booking Date <span className="text-red-500">*</span></label>
-                <input type="date" required value={scheduleBooking.bookingDate}
-                  onChange={async e => {
-                    const bookingDate = e.target.value;
-                    setScheduleBooking({...scheduleBooking, bookingDate, sessionTime: ''});
-                    setDoctorSessions([]);
-                    setNoSessions(false);
-                    if (scheduleBooking.doctorId && bookingDate) {
-                      setSessionsLoading(true);
-                      try {
-                        const res = await getDoctorSchedule(scheduleBooking.doctorId);
-                        const date = new Date(bookingDate + 'T00:00:00');
-                        const dow = date.getDay();
-                        const sessions = (res?.data || []).filter(s => s.day_of_week === dow && s.is_available);
-                        setDoctorSessions(sessions);
-                        setNoSessions(sessions.length === 0);
-                      } catch {} finally { setSessionsLoading(false); }
-                    }
-                  }}
-                  className="block w-full rounded-md border border-ink/[0.12] p-2 bg-ink/[0.02] font-bold" />
-              </div>
-              {sessionsLoading && <p className="text-sm text-ink/40">Loading sessions...</p>}
-              {noSessions && <p className="text-sm text-red-500 font-medium">No sessions available on this date. Please select another date.</p>}
-              {doctorSessions.length > 0 && (
-                <div>
-                  <label className="block text-sm font-bold text-ink/80 mb-1">Session <span className="text-red-500">*</span></label>
-                  <select required value={scheduleBooking.sessionTime}
-                    onChange={e => setScheduleBooking({...scheduleBooking, sessionTime: e.target.value})}
-                    className="block w-full rounded-md border border-ink/[0.12] p-2 bg-ink/[0.02] font-bold">
-                    <option value="">Select session</option>
-                    {doctorSessions.map((s, i) => {
-                      const fmt = t => { if (!t) return ''; const [h, m] = t.split(':').map(Number); return `${h > 12 ? h - 12 : h || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`; };
-                      return <option key={i} value={s.start_time}>{fmt(s.start_time)} – {fmt(s.end_time)}</option>;
-                    })}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-bold text-ink/80 mb-1">Internal Notes</label>
-                <textarea value={scheduleBooking.notes}
-                  onChange={e => setScheduleBooking({...scheduleBooking, notes: e.target.value})}
-                  className="block w-full rounded-md border border-ink/[0.12] p-2 bg-ink/[0.02]" rows="2" />
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={scheduleBooking.sendWhatsapp}
-                  onChange={e => setScheduleBooking({...scheduleBooking, sendWhatsapp: e.target.checked})}
-                  className="w-4 h-4 rounded accent-accent" />
-                <span className="text-sm font-medium text-ink/80">Send WhatsApp confirmation</span>
-              </label>
-            </div>
-            <div className="flex justify-end space-x-3 pt-4 border-t border-ink/[0.06] mt-4">
-              <button type="button" onClick={() => setIsScheduleModalOpen(false)} className="px-5 py-2.5 rounded-lg text-ink/80 font-bold hover:bg-ink/[0.05] transition">Cancel</button>
-              <button
-                disabled={isScheduleSubmitting || !scheduleBooking.patientPhone || !scheduleBooking.doctorId || !scheduleBooking.bookingDate || (doctorSessions.length > 0 && !scheduleBooking.sessionTime) || noSessions}
-                onClick={async () => {
-                  setIsScheduleSubmitting(true);
-                  try {
-                    const phone = scheduleBooking.patientPhone.trim(); // as typed: the backend normalises it
-                    await api.post('/bookings/manual', {
-                      patientPhone: phone,
-                      patientName: scheduleBooking.patientName,
-                      doctorId: scheduleBooking.doctorId,
-                      bookingDate: scheduleBooking.bookingDate,
-                      slot_time: scheduleBooking.sessionTime || null,
-                      notes: scheduleBooking.notes,
-                      isPresent: false,
-                      sendWhatsapp: scheduleBooking.sendWhatsapp
-                    });
-                    setIsScheduleModalOpen(false);
-                    setScheduleBooking({ patientName: '', patientPhone: '', doctorId: '', bookingDate: '', sessionTime: '', notes: '', sendWhatsapp: true });
-                    setDoctorSessions([]);
-                    setNoSessions(false);
-                    fetchData();
-                  } catch (err) {
-                    alert(getErrorMessage(err, 'Failed to schedule booking'));
-                  } finally {
-                    setIsScheduleSubmitting(false);
-                  }
-                }}
-                className="px-6 py-2.5 bg-brand font-medium text-white rounded-lg hover:bg-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >{isScheduleSubmitting ? 'Scheduling...' : 'Schedule Booking'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-lg w-full transform transition-all duration-300">
-            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-ink mb-6">Issue New Token</h2>
-            <form onSubmit={handleCreateSubmit} className="space-y-5">
-              <div className="relative">
-                <label className="block text-sm font-bold text-ink/80 mb-1">Patient Phone <span className="text-red-500">*</span></label>
-                <div className="flex">
-                  <input
-                    type="tel" required maxLength={16}
-                    value={newBooking.patientPhone}
-                    onChange={async e => {
-                      const typed = cleanPhoneInput(e.target.value);
-                      setNewBooking({...newBooking, patientPhone: typed});
-                      if (phoneReadyForLookup(typed)) {
-                        try {
-                          const res = await api.get(`/bookings/lookup?phone=${encodeURIComponent(typed.trim())}`);
-                          const found = res?.data?.patients || [];
-                          if (found.length > 0) { setPhoneSuggestions(found); setShowSuggestions(true); setActiveSuggestionModal('new'); }
-                          else { setShowSuggestions(false); }
-                        } catch { setShowSuggestions(false); }
-                      } else { setShowSuggestions(false); }
-                    }}
-                    className="flex-1 rounded-md border border-ink/[0.12] p-2 font-bold focus:ring-ink/20 focus:border-ink/40"
-                    placeholder="9876543210 or +971501234567"
-                  />
-                </div>
-                <p className="text-xs text-ink/50 mt-1">{PHONE_HELP}</p>
-                {showSuggestions && activeSuggestionModal === 'new' && (
-                  <div className="absolute z-50 mt-1 w-full bg-white border border-ink/[0.08] rounded-lg shadow-lg">
-                    {phoneSuggestions.map(p => (
-                      <button key={p.id} type="button"
-                        onClick={() => { setNewBooking({...newBooking, patientName: p.name}); setShowSuggestions(false); }}
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-ink/[0.03] transition">
-                        {p.name}{p.age ? ` (${p.age}${p.gender ? ', ' + p.gender : ''})` : ''} <span className="text-ink/40 text-xs">{p.phone}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-ink/80 mb-1">Patient Name</label>
-                <input
-                  type="text"
-                  value={newBooking.patientName}
-                  onChange={e => setNewBooking({...newBooking, patientName: e.target.value.replace(/\b\w/g, c => c.toUpperCase())})}
-                  className="block w-full rounded-md border border-ink/[0.12] p-2 focus:ring-ink/20 focus:border-ink/40"
-                  placeholder="New Patient Name (Optional)"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-ink/80 mb-1">Assign Doctor <span className="text-red-500">*</span></label>
-                <select
-                  required
-                  value={staff?.role === 'doctor' ? staff.doctor_id : newBooking.doctorId}
-                  onChange={e => staff?.role !== 'doctor' && setNewBooking(b => ({ ...b, doctorId: e.target.value }))}
-                  disabled={staff?.role === 'doctor'}
-                  className="block w-full rounded-md border border-ink/[0.12] p-2 bg-ink/[0.02] font-medium"
-                >
-                  <option value="">Select Doctor...</option>
-                  {modalDoctors.map(d => (
-                    <option key={d.id} value={d.id}>{d.name} ({d.specialization}){d.max_tokens_daily > 0 ? ` - max ${plural(d.max_tokens_daily, 'token')}` : ''}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-ink/80 mb-1">Internal Notes</label>
-                <textarea 
-                  value={newBooking.notes}
-                  onChange={e => setNewBooking({...newBooking, notes: e.target.value})}
-                  className="block w-full rounded-md border border-ink/[0.12] p-2 bg-ink/[0.02]"
-                  rows="2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-ink/80 mb-1">WhatsApp updates</label>
-                <select
-                  value={newBooking.marketing_consent}
-                  onChange={e => setNewBooking({...newBooking, marketing_consent: e.target.value})}
-                  className="block w-full rounded-md border border-ink/[0.12] p-2 bg-ink/[0.02] font-medium"
-                >
-                  <option value="">Not asked</option>
-                  <option value="all">Checkups + offers</option>
-                  <option value="checkups">Checkups only</option>
-                  <option value="none">No updates</option>
-                </select>
-                <p className="text-xs text-ink/40 mt-1">Only choose if the patient agreed when asked at reception.</p>
-              </div>
-
-              <div className="flex flex-col gap-2 mb-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={newBooking.isPresent} onChange={e => setNewBooking({...newBooking, isPresent: e.target.checked})} className="w-4 h-4 rounded accent-accent" />
-                  <span className="text-sm font-medium text-ink/80">Patient is here now</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={newBooking.sendWhatsapp} onChange={e => setNewBooking({...newBooking, sendWhatsapp: e.target.checked})} className="w-4 h-4 rounded accent-accent" />
-                  <span className="text-sm font-medium text-ink/80">Send WhatsApp confirmation</span>
-                </label>
-              </div>
-              <div className="flex justify-end space-x-3 pt-4 border-t border-ink/[0.06]">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 rounded-lg text-ink/80 font-bold hover:bg-ink/[0.05] transition">Cancel</button>
-                <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-brand font-medium text-white rounded-lg hover:bg-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
-                  {isSubmitting ? 'Issuing...' : 'Issue Token'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <BookingForm
+        open={bookingOpen}
+        onClose={() => setBookingOpen(false)}
+        onBooked={handleBooked}
+        bookingMode={bookingMode}
+        modeStatus={modeStatus}
+        onRetryMode={loadBookingMode}
+        doctors={doctors}
+        staffRole={staff?.role}
+        ownDoctorId={staff?.doctor_id}
+      />
 
       {receiptBooking && (
          <TokenReceipt booking={receiptBooking} onClose={() => setReceiptBooking(null)} />
