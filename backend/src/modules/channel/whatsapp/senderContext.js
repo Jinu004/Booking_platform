@@ -6,20 +6,42 @@ const { decrypt } = require('../../../utils/secretBox')
 const storage = new AsyncLocalStorage()
 const PHONE_NUMBER_ID_PATTERN = /^\d{8,20}$/
 
-// The encrypted token is cached per tenant for a short time so a message does not add a database query each time
+// The clinic's encrypted token and its platform_token_allowed flag are read together and cached per tenant for a short time,
+// so a message does not add a database query each time (a changed flag applies within a minute)
 const TOKEN_CACHE_MS = 60 * 1000
 const tokenCache = new Map()
-let tokenLookupWarned = false
+const lastWarned = new Map() // one warning per tenant and kind per minute, so a database outage does not flood the log
 
-// Optional accessToken: a tenant's own Meta token; null means the shared env token is used
-// Optional tenantId: only used to label failed sends in logs and in the send_failures table
-function run(phoneNumberId, fn, accessToken = null, tenantId = null) {
+// Why a send has no own token: 'ok' (it has one), 'no_token' (the clinic has none), 'lookup_failed', 'decrypt_failed', or
+// 'no_tenant' (a context that does not belong to a clinic yet)
+const NO_AUTH = { token: null, platformTokenAllowed: false, state: 'no_tenant' }
+
+const errorClass = (err) => String((err && (err.name || err.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)
+
+function warnOnce(kind, tenantId, text) {
+  const key = `${kind}:${tenantId}`
+  const last = lastWarned.get(key)
+  if (last && Date.now() - last < TOKEN_CACHE_MS) return
+  lastWarned.set(key, Date.now())
+  logger.warn(text)
+}
+
+// Optional accessToken: a tenant's own Meta token; null means the clinic has none
+// Optional tenantId: used to label failed sends in logs and in the send_failures table
+// Optional auth: { platformTokenAllowed, state } - whether the clinic may fall back to the shared platform token, and why it has no own token
+function run(phoneNumberId, fn, accessToken = null, tenantId = null, auth = NO_AUTH) {
   const value = phoneNumberId == null ? '' : String(phoneNumberId)
   const validated = PHONE_NUMBER_ID_PATTERN.test(value) ? value : null
   if (value && !validated) {
     logger.warn(`[senderContext] run() received non-empty but invalid phoneNumberId: ${value}`)
   }
-  return storage.run({ phoneNumberId: validated, accessToken: accessToken || null, tenantId: tenantId || null }, fn)
+  return storage.run({
+    phoneNumberId: validated,
+    accessToken: accessToken || null,
+    tenantId: tenantId || null,
+    platformTokenAllowed: auth.platformTokenAllowed === true,
+    tokenState: auth.state || 'no_tenant'
+  }, fn)
 }
 
 function getTenantId() {
@@ -34,33 +56,51 @@ function getAccessToken() {
   return storage.getStore()?.accessToken || null
 }
 
-// Returns the tenant's decrypted Meta token, or null (no token, column not migrated yet, or decryption failed).
-// Nothing here logs the token or the ciphertext.
-async function resolveTenantToken(tenantId) {
-  if (!tenantId) return null
-  let enc = null
+// True only for a clinic whose tenant_configs value platform_token_allowed is exactly 'true' (set by a super admin)
+function getPlatformTokenAllowed() {
+  return storage.getStore()?.platformTokenAllowed === true
+}
+
+function getTokenState() {
+  return storage.getStore()?.tokenState || 'no_tenant'
+}
+
+// Turns what was read for a clinic into { token, platformTokenAllowed, state }. A decrypt failure is recorded, never silent.
+function openToken(tenantId, enc, allowedValue) {
+  const platformTokenAllowed = allowedValue === 'true'
+  if (!enc) return { token: null, platformTokenAllowed, state: 'no_token' }
+  try {
+    return { token: decrypt(enc), platformTokenAllowed, state: 'ok' }
+  } catch (err) {
+    warnOnce('decrypt', tenantId, `TENANT_TOKEN_DECRYPT_FAILED tenant=${tenantId} class=${errorClass(err)}`)
+    return { token: null, platformTokenAllowed, state: 'decrypt_failed' }
+  }
+}
+
+// The clinic's decrypted Meta token and its platform-token flag. Nothing here logs the token or the ciphertext.
+// A failed lookup is logged (tenant id and error class only); the last values read for the clinic are used if there are any,
+// otherwise the clinic has no token and no right to the platform token for this send.
+async function resolveTenantAuth(tenantId) {
+  if (!tenantId) return NO_AUTH
   const cached = tokenCache.get(tenantId)
   if (cached && Date.now() - cached.at < TOKEN_CACHE_MS) {
-    enc = cached.enc
-  } else {
-    try {
-      const result = await pool.query('SELECT whatsapp_access_token_enc FROM tenants WHERE id = $1', [tenantId])
-      enc = result.rows[0]?.whatsapp_access_token_enc || null
-      tokenCache.set(tenantId, { enc, at: Date.now() })
-    } catch (err) {
-      if (!tokenLookupWarned) {
-        tokenLookupWarned = true
-        logger.warn(`[senderContext] Tenant token lookup failed, using the shared token: ${err.message}`)
-      }
-      return null
-    }
+    return openToken(tenantId, cached.enc, cached.allowed)
   }
-  if (!enc) return null
   try {
-    return decrypt(enc)
+    const result = await pool.query(
+      `SELECT t.whatsapp_access_token_enc AS enc,
+              (SELECT c.value FROM tenant_configs c WHERE c.tenant_id = t.id AND c.key = 'platform_token_allowed') AS allowed
+       FROM tenants t WHERE t.id = $1`,
+      [tenantId]
+    )
+    const row = result.rows[0]
+    const entry = { enc: row?.enc || null, allowed: row?.allowed || null, at: Date.now() }
+    tokenCache.set(tenantId, entry)
+    return openToken(tenantId, entry.enc, entry.allowed)
   } catch (err) {
-    logger.warn(`[senderContext] Tenant ${tenantId} token could not be decrypted, using the shared token`)
-    return null
+    warnOnce('lookup', tenantId, `TENANT_TOKEN_LOOKUP_FAILED tenant=${tenantId} class=${errorClass(err)}`)
+    if (cached) return openToken(tenantId, cached.enc, cached.allowed)
+    return { token: null, platformTokenAllowed: false, state: 'lookup_failed' }
   }
 }
 
@@ -68,8 +108,11 @@ async function resolveTenantToken(tenantId) {
 async function setTenantAccessToken(tenantId) {
   const store = storage.getStore()
   if (!store) return
+  const auth = await resolveTenantAuth(tenantId)
   store.tenantId = tenantId || null
-  store.accessToken = await resolveTenantToken(tenantId)
+  store.accessToken = auth.token
+  store.platformTokenAllowed = auth.platformTokenAllowed
+  store.tokenState = auth.state
 }
 
 function hasContext() {
@@ -95,8 +138,8 @@ async function runAsTenant(tenantId, fn) {
     logger.error(`Phone number ID lookup failed for tenant ${tenantId}:`, err.message)
     phoneNumberId = null
   }
-  const tenantToken = await resolveTenantToken(tenantId)
-  return run(phoneNumberId, fn, tenantToken, tenantId)
+  const auth = await resolveTenantAuth(tenantId)
+  return run(phoneNumberId, fn, auth.token, tenantId, auth)
 }
 
 module.exports = {
@@ -104,6 +147,8 @@ module.exports = {
   getPhoneNumberId,
   getTenantId,
   getAccessToken,
+  getPlatformTokenAllowed,
+  getTokenState,
   setTenantAccessToken,
   runAsTenant,
   hasContext

@@ -94,6 +94,7 @@ const RESERVED_CONFIG_KEYS = new Set([
   'ai_appointment_booking',
   'booking_mode',
   'recall_enabled',
+  'platform_token_allowed',
   'media_auto_reply',
   'plan_override',
   'quota_override'

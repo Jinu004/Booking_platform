@@ -24,13 +24,24 @@ const getPhoneId = () => {
   return id
 }
 
-// The clinic's own Meta token when the sender context has one, otherwise the shared env token
+// The clinic's own Meta token when the sender context has one. The shared platform token (META_WHATSAPP_TOKEN) is used ONLY for a
+// clinic a super admin flagged with tenant_configs platform_token_allowed = 'true'. Every other send, and a send with no tenant
+// context, fails with NO_TENANT_TOKEN: the callers record it like any other send failure (send_failures) and never retry it in a loop.
+// This is called inside the try of each send function, so the failure is recorded by recordSendFailure below.
 const getToken = () => {
-  if (senderContext.hasContext()) {
+  const inContext = senderContext.hasContext()
+  if (inContext) {
     const tenantToken = senderContext.getAccessToken()
     if (tenantToken) return tenantToken
+    if (senderContext.getPlatformTokenAllowed()) return META_TOKEN
   }
-  return META_TOKEN
+  const tenantId = inContext ? senderContext.getTenantId() : null
+  const reason = inContext ? senderContext.getTokenState() : 'no_context'
+  logger.warn(`NO_TENANT_TOKEN tenant=${tenantId || 'unknown'} reason=${reason} result=blocked`)
+  const err = new Error('No WhatsApp token for this clinic - message not sent')
+  err.name = 'NO_TENANT_TOKEN'
+  err.code = 'NO_TENANT_TOKEN'
+  throw err
 }
 
 // Safe summary of a failed send: HTTP status, Meta error code/subcode, a trimmed message and the fbtrace id.
