@@ -41,16 +41,27 @@ function run(phoneNumberId, fn, accessToken = null, tenantId = null, auth = NO_A
     tenantId: tenantId || null,
     platformTokenAllowed: auth.platformTokenAllowed === true,
     tokenState: auth.state || 'no_tenant',
-    timing: null
+    timing: null,
+    replyFast: false // true only inside the webhook's processing of a patient's inbound message (see startReplyTiming)
   }, fn)
 }
 
 // Reply timing for ONE inbound WhatsApp message (only the webhook starts it; every other context has none and the calls below do nothing).
 // startReplyTiming() when processing begins, addAiTime(ms) around the AI call, noteReplySent(kind, sendMs) when a reply has gone out
 // (the first one counts), getReplyTiming() when processing is over. Nothing here holds a phone number or message text.
+// It also marks the context as "reply fast": text sent while the webhook processes a patient's message waits 0.3-0.7 s before sending
+// instead of 0.8-1.5 s (whatsapp.adapter.js). This is the ONLY place that sets the flag; the webhook is the only caller, and every other
+// context (crons, staff replies, the retry cron, confirmations) is created without it, so those keep the longer pause.
 function startReplyTiming() {
   const store = storage.getStore()
-  if (store) store.timing = { start: Date.now(), aiMs: 0, reply: null }
+  if (store) {
+    store.timing = { start: Date.now(), aiMs: 0, reply: null }
+    store.replyFast = true
+  }
+}
+
+function isReplyFast() {
+  return storage.getStore()?.replyFast === true
 }
 
 function addAiTime(ms) {
@@ -182,6 +193,7 @@ module.exports = {
   setTenantAccessToken,
   clearTenantTokenCache,
   startReplyTiming,
+  isReplyFast,
   addAiTime,
   noteReplySent,
   getReplyTiming,

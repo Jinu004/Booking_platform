@@ -29,7 +29,9 @@ function getProvider() {
  */
 async function sendMessage(to, message) {
   const sendStart = Date.now()
-  await randomDelay(800, 1500)
+  // A reply to a patient's message (inside the webhook) pauses 0.3-0.7 s; every other text keeps the 0.8-1.5 s pause
+  if (senderContext.isReplyFast()) await randomDelay(300, 700)
+  else await randomDelay(800, 1500)
 
   const provider = getProvider()
   logger.info(`Sending via ${provider} to ${maskPhone(to)}`)
