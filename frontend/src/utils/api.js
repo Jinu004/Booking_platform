@@ -1,5 +1,6 @@
 import axios from 'axios';
 import useStore from '../store/useStore';
+import { clearBookingFormCache } from './bookingFormCache';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1',
@@ -31,6 +32,7 @@ export function logoutUnauthorized() {
   const isAuthRoute = window.location.pathname === '/login' ||
                       window.location.pathname === '/reset-password';
   if (!isAuthRoute) {
+    clearBookingFormCache();
     localStorage.removeItem('auth_token');
     localStorage.removeItem('staff_data');
     if (useStore.getState().clearAuth) {

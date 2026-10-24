@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useStore from '../../store/useStore';
 import Badge from './Badge';
 import { getStoredStaff, logout } from '../../services/auth.service';
+import { clearBookingFormCache } from '../../utils/bookingFormCache';
 import { useIndustry } from '../../hooks/useIndustry';
 
 const icons = {
@@ -138,6 +139,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   const handleLogout = async () => {
     if (!window.confirm('Are you sure you want to log out?')) return;
     await logout();
+    clearBookingFormCache();
     navigate('/login');
   };
 

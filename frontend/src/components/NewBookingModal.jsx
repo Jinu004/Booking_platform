@@ -4,26 +4,40 @@ import TokenReceipt from './shared/TokenReceipt';
 import { getClinicSettings } from '../services/settings.service';
 import { getDoctors } from '../services/clinic.service';
 import { getStoredStaff } from '../services/auth.service';
+import { getBookingFormCacheKey, readBookingFormCache, writeBookingFormCache } from '../utils/bookingFormCache';
 import useStore from '../store/useStore';
 
 // The shared "New booking" modal. It owns what the form needs, so any page can use it:
 //   <NewBookingModal open={open} onClose={() => setOpen(false)} onSaved={refreshThePage} />
 // Optional prefill = { phone, name, customerId, patientId, doctorId } books for a known patient (see BookingForm).
-// The booking mode and the doctors are loaded when the wrapper mounts and kept (also in a small module-level cache, so a remount
-// reuses them). When the form opens with data already loaded it shows the full form at once and refreshes the doctors (and the
-// mode) quietly in the background; "loading" only shows when there is no data yet, and the retry only when the mode has never loaded.
+// The booking mode and the doctors are loaded when the wrapper mounts and kept (also in a small cache that belongs to the logged-in
+// clinic and user, see utils/bookingFormCache.js, so a remount reuses them and another login never sees them). When the form opens
+// with data already loaded it shows the full form at once and refreshes the doctors (and the mode) quietly in the background;
+// "loading" only shows when there is no data yet, and the retry only when the first load failed or timed out (15 seconds).
+// A failed or timed-out background refresh keeps the data already shown.
 // bookingMode is 'appointment' only when booking_mode === 'appointment' once loaded: a failed load never turns into token mode.
 // After a save it closes, shows the token receipt or a short toast, then calls onSaved(result).
 // Keep it mounted all the time: the receipt must stay on screen after the form has closed.
-const cache = { mode: null, doctors: null };
+const REQUEST_TIMEOUT_MS = 15000;
+
+// The request, or a rejection after 15 seconds. A response that arrives after the timeout is ignored (the race has already settled).
+function withTimeout(promise) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('timeout')), REQUEST_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
   const { addToast } = useStore();
   const staff = getStoredStaff();
-  const [bookingMode, setBookingMode] = useState(cache.mode);          // null until the first successful load
-  const [modeFailed, setModeFailed] = useState(false);                 // only matters while bookingMode is still null
-  const [doctors, setDoctors] = useState(cache.doctors || []);
-  const [doctorsSettled, setDoctorsSettled] = useState(cache.doctors !== null); // the doctors request has finished (or data exists)
+  const [initial] = useState(() => readBookingFormCache(getBookingFormCacheKey())); // empty unless it belongs to this login
+  const [bookingMode, setBookingMode] = useState(initial.mode);          // null until the first successful load
+  const [modeFailed, setModeFailed] = useState(false);                   // only matters while bookingMode is still null
+  const [doctors, setDoctors] = useState(initial.doctors || []);
+  const [doctorsLoaded, setDoctorsLoaded] = useState(initial.doctors !== null); // a doctor list (possibly empty) has been received
+  const [doctorsFailed, setDoctorsFailed] = useState(false);             // only matters while no list has been received
   const [receiptBooking, setReceiptBooking] = useState(null);
   const modeRequest = useRef(0);    // only the newest settings request may set the state
   const doctorsRequest = useRef(0); // same for the doctors request
@@ -31,12 +45,13 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
 
   const loadMode = () => {
     const id = ++modeRequest.current;
-    getClinicSettings()
+    const key = getBookingFormCacheKey();
+    withTimeout(getClinicSettings())
       .then(res => {
-        if (id !== modeRequest.current) return;
+        if (id !== modeRequest.current || getBookingFormCacheKey() !== key) return;
         const d = res?.data || res;
         const mode = d?.booking_mode === 'appointment' ? 'appointment' : 'token';
-        cache.mode = mode;
+        writeBookingFormCache(key, { mode });
         setBookingMode(mode);
         setModeFailed(false);
       })
@@ -48,18 +63,22 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
 
   const loadDoctors = () => {
     const id = ++doctorsRequest.current;
-    getDoctors()
+    const key = getBookingFormCacheKey();
+    withTimeout(getDoctors())
       .then(res => {
-        if (id !== doctorsRequest.current) return;
-        if (res?.data) {
-          cache.doctors = res.data;
+        if (id !== doctorsRequest.current || getBookingFormCacheKey() !== key) return;
+        if (Array.isArray(res?.data)) {
+          writeBookingFormCache(key, { doctors: res.data });
           setDoctors(res.data);
+          setDoctorsLoaded(true);
+          setDoctorsFailed(false);
+        } else {
+          setDoctorsFailed(true);
         }
-        setDoctorsSettled(true);
       })
       .catch(() => {
         if (id !== doctorsRequest.current) return;
-        setDoctorsSettled(true); // keep the list we have; the form says so when it is empty
+        setDoctorsFailed(true); // a failed refresh keeps the list already shown
       });
   };
 
@@ -78,16 +97,19 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
     loadMode();
   }, [open]);
 
-  const retryMode = () => {
+  const retry = () => {
     setModeFailed(false);
+    setDoctorsFailed(false);
     loadMode();
+    loadDoctors();
   };
 
-  // What the form sees: 'ready' as soon as the mode is known and the doctors request has finished; 'error' only when the mode
-  // has never loaded; 'loading' otherwise
-  const modeStatus = bookingMode
-    ? (doctorsSettled ? 'ready' : 'loading')
-    : (modeFailed ? 'error' : 'loading');
+  // What the form sees: 'ready' as soon as the mode is known and a doctor list has been received; 'error' only while a first
+  // load has failed or timed out; 'loading' otherwise
+  const hasMode = bookingMode === 'token' || bookingMode === 'appointment';
+  const modeStatus = hasMode && doctorsLoaded
+    ? 'ready'
+    : (((!hasMode && modeFailed) || (!doctorsLoaded && doctorsFailed)) ? 'error' : 'loading');
 
   // After a save: close the form, then the token receipt or a short message, then let the host page refresh itself
   const handleBooked = (result) => {
@@ -113,7 +135,7 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
         onBooked={handleBooked}
         bookingMode={bookingMode}
         modeStatus={modeStatus}
-        onRetryMode={retryMode}
+        onRetryMode={retry}
         doctors={doctors}
         staffRole={staff?.role}
         ownDoctorId={staff?.doctor_id}

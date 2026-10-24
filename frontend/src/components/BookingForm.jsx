@@ -83,6 +83,29 @@ export default function BookingForm({
   const [error, setError] = useState('');
   const submitRef = useRef(false);
   const phoneRef = useRef('');
+  const dialogRef = useRef(null);
+  const returnFocusRef = useRef(null);
+
+  // Dialog behaviour: focus moves into the dialog when it opens and goes back to the element that opened it when it closes
+  useEffect(() => {
+    if (!open) return undefined;
+    returnFocusRef.current = document.activeElement;
+    if (dialogRef.current) dialogRef.current.focus();
+    return () => {
+      const opener = returnFocusRef.current;
+      if (opener && typeof opener.focus === 'function' && document.contains(opener)) opener.focus();
+    };
+  }, [open]);
+
+  // Escape closes the dialog, but not while a booking is being saved
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && !submitRef.current) onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
 
   const modeReady = modeStatus === 'ready' && (bookingMode === 'token' || bookingMode === 'appointment');
 
@@ -295,10 +318,17 @@ export default function BookingForm({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto ${modeReady ? '' : 'min-h-[min(420px,80vh)]'}`}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-booking-title"
+        tabIndex={-1}
+        className={`bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto focus:outline-none ${modeReady ? '' : 'min-h-[min(420px,80vh)]'}`}
+      >
         <div className="flex justify-between items-center mb-5">
-          <h2 className="text-xl font-bold text-ink">New booking</h2>
-          <button onClick={onClose} disabled={submitting} className="text-ink/40 hover:text-ink/65 text-2xl font-bold disabled:opacity-50">×</button>
+          <h2 id="new-booking-title" className="text-xl font-bold text-ink">New booking</h2>
+          <button onClick={onClose} disabled={submitting} aria-label="Close" className="text-ink/40 hover:text-ink/65 text-2xl font-bold disabled:opacity-50">×</button>
         </div>
 
         {/* Same width and a steady minimum height while the first data loads, so the card does not jump when the form appears */}
