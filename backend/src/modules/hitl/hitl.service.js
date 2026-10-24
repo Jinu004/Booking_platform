@@ -63,6 +63,13 @@ async function handleAIHandoffRequest(tenant, conversation, staffId = null) {
         }
       }
     }
+    // Nobody is in: no live alert and no push, but the conversation is flagged so staff see it first thing (the flag is cleared
+    // when staff acknowledge the conversation). The flag alone changes nothing for the patient.
+    try {
+      await markNeedsAttention(tenant, conversation);
+    } catch (flagErr) {
+      logger.warn(`NEEDS_ATTENTION_FLAG_FAILED tenant=${tenant.id} class=${String((flagErr && (flagErr.name || flagErr.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)}`);
+    }
     return { switched: false, reason: 'outside_working_hours' };
   }
 
@@ -98,6 +105,42 @@ async function handleAIHandoffRequest(tenant, conversation, staffId = null) {
   });
 
   return { switched: true };
+}
+
+/**
+ * Flags a conversation for staff WITHOUT sending anything to the patient (handleAIHandoffRequest sends a holding message, this does not).
+ * With { alert: true } it also shows the live "needs attention" alert on the dashboards and sends the staff push, at most once per
+ * conversation per 10 minutes (a Redis lock; without Redis there is no alert, only the flag).
+ * @returns {Promise<{ flagged: boolean, alerted: boolean }>}
+ */
+async function markNeedsAttention(tenant, conversation, { alert = false } = {}) {
+  await pool.query(
+    `UPDATE conversations SET needs_attention = true WHERE id = $1 AND tenant_id = $2`,
+    [conversation.id, tenant.id]
+  );
+  if (!alert) return { flagged: true, alerted: false };
+
+  let allowed = false;
+  try {
+    const redis = require('../../config/redis');
+    allowed = !!redis && (await redis.set(`attn_alert:${conversation.id}`, '1', { NX: true, EX: 600 })) === 'OK';
+  } catch (_) {
+    allowed = false;
+  }
+  if (!allowed) return { flagged: true, alerted: false };
+
+  broadcastToTenant(tenant.id, 'handoff_requested', {
+    conversationId: conversation.id,
+    customerName: conversation.customer_name,
+    customerPhone: conversation.customer_phone,
+    timestamp: new Date().toISOString(),
+  });
+  sendPushToTenant(tenant.id, {
+    title: 'Patient needs attention',
+    body: `${conversation.customer_name || conversation.customer_phone} sent a message the assistant could not answer`,
+    data: { conversationId: conversation.id, type: 'handoff_requested' }
+  });
+  return { flagged: true, alerted: true };
 }
 
 /**
@@ -220,6 +263,7 @@ module.exports = {
   broadcastToTenant,
   broadcastIncomingPatientMessage,
   handleAIHandoffRequest,
+  markNeedsAttention,
   staffReply,
   toggleMode,
   isWithinWorkingHours,

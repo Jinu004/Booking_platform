@@ -374,8 +374,11 @@ router.post('/', async (req, res) => {
 
       // ---- Code flow: typed new-patient name helpers (used by the text branch and the two button handlers) ----
       const logName = (result, extra = '', confidence = null) => logger.info(`CODE_BOOKING_FLOW step=new_name${confidence ? ` confidence=${confidence}` : ''} result=${result}${extra} tenant=${tenant.id} conversation=${context.conversation.id}`)
+      // True once this inbound message has a row in messages (the AI path below saves it before the AI call, unless a step above did)
+      let inboundSaved = false
       const saveNameInbound = async () => {
         await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+        inboundSaved = true
         HITLService.broadcastToTenant(tenant.id, 'new_message', {
           conversationId: context.conversation.id,
           message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
@@ -1240,6 +1243,22 @@ router.post('/', async (req, res) => {
       let isInteractiveSent = false
       let isBlockedConfirmation = false
 
+      // The patient's message is saved BEFORE the AI call, so it is never lost if the AI fails, hands the chat to staff, or the process
+      // stops while the AI is working. A failed save is logged once (no text, no number) and the AI call goes ahead as before; the
+      // save is then tried again after the AI call, exactly as it used to be done.
+      if (!inboundSaved) {
+        try {
+          await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
+          inboundSaved = true
+          HITLService.broadcastToTenant(tenant.id, 'new_message', {
+            conversationId: context.conversation.id,
+            message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
+          })
+        } catch (inboundSaveErr) {
+          logger.warn(`INBOUND_SAVE_FAILED tenant=${tenant.id} conversation=${context.conversation.id} class=${String((inboundSaveErr && (inboundSaveErr.name || inboundSaveErr.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)}`)
+        }
+      }
+
       // Read receipt with the "typing..." indicator while the AI works: typed text messages only (not taps, coded flows, media,
       // consent keywords or human mode: those returned above). Fire and forget: it never waits, retries or touches the reply.
       if (source === 'meta' && message.type === 'text' && !message.interactiveId && message.messageId) {
@@ -1289,16 +1308,40 @@ router.post('/', async (req, res) => {
 
 
 let assistantRow = null
+if (isAIError) {
+  // A failed AI turn is visible to staff: the "brief hiccup" text that goes to the patient is stored as an assistant row, and the
+  // conversation is flagged and alerted (at most one alert per conversation per 10 minutes). Nothing extra is sent to the patient.
+  try {
+    if (aiResponse) {
+      assistantRow = await ConversationService.saveOutboundMessage(context.conversation.id, aiResponse, 'assistant')
+      HITLService.broadcastToTenant(tenant.id, 'new_message', {
+        conversationId: context.conversation.id,
+        message: { role: 'assistant', content: aiResponse, created_at: new Date().toISOString() }
+      })
+    }
+    await HITLService.markNeedsAttention(
+      tenant,
+      { ...context.conversation, customer_name: context.customer?.name, customer_phone: context.customer?.phone },
+      { alert: true }
+    )
+  } catch (aiErrRecordErr) {
+    logger.warn(`AI_ERROR_RECORD_FAILED tenant=${tenant.id} conversation=${context.conversation.id} class=${String((aiErrRecordErr && (aiErrRecordErr.name || aiErrRecordErr.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)}`)
+  }
+}
 if (!isAIError && !isEscalated) {
-  await ConversationService.saveInboundMessage(
-    context.conversation.id,
-    message.message,
-    message.type || 'text'
-  )
-  HITLService.broadcastToTenant(tenant.id, 'new_message', {
-    conversationId: context.conversation.id,
-    message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
-  })
+  if (!inboundSaved) {
+    // The early save failed: try again now, as this path always did
+    await ConversationService.saveInboundMessage(
+      context.conversation.id,
+      message.message,
+      message.type || 'text'
+    )
+    inboundSaved = true
+    HITLService.broadcastToTenant(tenant.id, 'new_message', {
+      conversationId: context.conversation.id,
+      message: { role: 'user', content: message.message, created_at: new Date().toISOString() }
+    })
+  }
   assistantRow = await ConversationService.saveOutboundMessage(
     context.conversation.id,
     aiResponse,
