@@ -1,5 +1,6 @@
 const pool = require('../../config/database')
 const logger = require('../../utils/logger')
+const { formatPatientName } = require('../../utils/patientName')
 
 // Escape special LIKE pattern characters to prevent unexpected query behavior
 // "Sat 25 Oct, 5:00 PM" for a booking date (a Date from the database or YYYY-MM-DD text) and an optional HH:MM time
@@ -818,11 +819,7 @@ Please reply with your name to confirm booking.`
     if (!ownedPatientCTB) return { success: false, message: 'Patient not found' }
     patient_name = ownedPatientCTB.name
   }
-  const formattedName = (patient_name || '')
-    .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')  // allow Latin, Malayalam, spaces, hyphens
-    .trim()
-    .slice(0, 100)
-    .replace(/\b\w/g, c => c.toUpperCase())
+  const formattedName = formatPatientName(patient_name) // letters of any script, spaces, hyphens, dots, apostrophes (utils/patientName.js)
   // Refuse before any lookup, capacity check or booking insert when there is no usable patient name
   if (!formattedName) {
     return { success: false, message: 'Please provide a valid patient name.' }
@@ -1169,11 +1166,7 @@ For queries, contact us: ${contactPhone}`
           if (!ownedPatientTMR) return { success: false, message: 'Patient not found' }
           patient_name = ownedPatientTMR.name
         }
-        const formattedName = (patient_name || '')
-          .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')  // allow Latin, Malayalam, spaces, hyphens
-          .trim()
-          .slice(0, 100)
-          .replace(/\b\w/g, c => c.toUpperCase())
+        const formattedName = formatPatientName(patient_name) // letters of any script, spaces, hyphens, dots, apostrophes (utils/patientName.js)
         // Refuse before any lookup or insert when there is no usable patient name
         if (!formattedName) {
           return { success: false, message: 'Please provide a valid patient name.' }
@@ -1478,7 +1471,7 @@ For queries, contact us: ${contactPhoneTmr}`
         return `DIRECT:That date is no longer available. Please choose another day.`
       }
       const targetDow = targetDate.getDay()
-      const formattedNameFB = patientNameFB.replace(/[^a-zA-Z\sഀ-ൿ-]/g, '').trim().slice(0, 100).replace(/\b\w/g, c => c.toUpperCase())
+      const formattedNameFB = formatPatientName(patientNameFB)
       if (!formattedNameFB) return `DIRECT:Please provide a valid name to confirm booking.`
 
       const fmtFB = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` }

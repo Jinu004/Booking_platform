@@ -7,39 +7,9 @@ const logger = require('../../../utils/logger')
 const { maskPhone } = require('../../../utils/phone')
 const crypto = require('crypto');
 
-// Typed-name validation for the code booking flow. The cleaning below is the same rule
-// create_token_booking applies to patient_name, so the validated name is what gets stored.
-const NAME_STOP_WORDS = new Set(['hi', 'hello', 'hey', 'menu', 'book', 'cancel', 'yes', 'no', 'ok', 'okay', 'thanks', 'thank you', 'tomorrow', 'today'])
-// Whole words that mark typed text as a question or request rather than a name
-const NAME_BLOCKED_WORDS = new Set(['what', 'when', 'where', 'how', 'why', 'who', 'which', 'time', 'timing', 'timings', 'open', 'close', 'closed', 'hours', 'doctor', 'appointment', 'book', 'booking', 'cancel', 'reschedule', 'fee', 'fees', 'price', 'address', 'location', 'available', 'availability', 'please', 'help', 'want', 'need', 'can', 'could', 'do', 'does', 'is', 'are', 'will', 'today', 'tomorrow', 'token', 'clinic', 'hospital'])
-function validatePatientName(text) {
-  const typed = (text || '').trim()
-  if (!typed || typed.includes('?')) return null
-  const words = typed.split(/\s+/)
-  if (words.length > 4) return null
-  if (words.some(w => NAME_BLOCKED_WORDS.has(w.toLowerCase().replace(/^[.'’-]+|[.'’-]+$/g, '')))) return null
-  // Letters (Latin, Malayalam U+0D00-U+0D7F), spaces, hyphens, dots, apostrophes only; digits are rejected
-  if (!/^[a-zA-Z\sഀ-ൿ.'’-]+$/.test(typed)) return null
-  if (NAME_STOP_WORDS.has(typed.toLowerCase().replace(/\s+/g, ' '))) return null
-  const cleaned = typed
-    .replace(/[^a-zA-Z\sഀ-ൿ-]/g, '')
-    .trim()
-    .slice(0, 100)
-    .replace(/\b\w/g, c => c.toUpperCase())
-  const letterCount = (cleaned.match(/[a-zA-Zഀ-ൿ]/g) || []).length
-  if (letterCount < 2 || cleaned.length < 2 || cleaned.length > 60) return null
-  return { typed, cleaned }
-}
-
-// Used only after validatePatientName accepted the text: true when the text is very likely a real name,
-// so it can be booked without asking for confirmation. Latin letters only, 2 or 3 words, one word of 3+ letters.
-function isConfidentName(typed) {
-  const t = (typed || '').trim()
-  if (!/^[a-zA-Z\s.'’-]+$/.test(t)) return false
-  const words = t.split(/\s+/)
-  if (words.length < 2 || words.length > 3) return false
-  return words.some(w => (w.match(/[a-zA-Z]/g) || []).length >= 3)
-}
+// Typed-name validation for the code booking flow (utils/patientName.js, shared with the appointment flow and the AI booking tools).
+// Its cleaning is the same rule create_token_booking applies to patient_name, so the validated name is what gets stored.
+const { validatePatientName, isConfidentName } = require('../../../utils/patientName')
 
 // Coexistence: how long a conversation stays in human mode after the clinic replies from the WhatsApp Business app.
 // hitl.cron.js resets a human conversation one minute after mode_changed_at, so an echo stores mode_changed_at in the

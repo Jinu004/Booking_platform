@@ -19,7 +19,7 @@ async function upsertCustomer(pool, tenantId, customerData) {
     VALUES ($1, $2, $3, $4, $5, $6, NOW())
     ON CONFLICT (tenant_id, phone) 
     DO UPDATE SET 
-      name = COALESCE(EXCLUDED.name, customers.name),
+      name = COALESCE(NULLIF(customers.name, ''), EXCLUDED.name),
       email = COALESCE(EXCLUDED.email, customers.email),
       date_of_birth = COALESCE(EXCLUDED.date_of_birth, customers.date_of_birth),
       notes = COALESCE(EXCLUDED.notes, customers.notes),

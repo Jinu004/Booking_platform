@@ -13,6 +13,7 @@
 
 const { parseDayAndTime } = require('../../../utils/dayTimeParse');
 const { isAppointmentBookingOn } = require('../../../utils/appointmentFlag');
+const { validatePatientName } = require('../../../utils/patientName');
 
 const MAX_DAYS_AHEAD = 14;
 const MIN_LEAD_MINUTES = 30;
@@ -199,11 +200,15 @@ function buildMenuButtons() {
   ];
 }
 
-/** A usable patient name: 2 to 100 characters, with a letter in it */
+/**
+ * A usable patient name, or null. The same rules as the coded token flow (utils/patientName.js): no question marks, request words,
+ * "yes/ok/hi", digits, emoji or line breaks, at most 4 words; letters of any script, apostrophes and dots are kept.
+ * HTML tags are removed first, as before.
+ */
 function cleanPatientName(text) {
-  const name = String(text || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-  if (name.length < 2 || name.length > 100 || !/\p{L}/u.test(name)) return null;
-  return name;
+  const withoutTags = String(text || '').replace(/<[^>]*>/g, ' ');
+  const checked = validatePatientName(withoutTags);
+  return checked ? checked.cleaned : null;
 }
 
 // ---------------------------------------------------------------------------

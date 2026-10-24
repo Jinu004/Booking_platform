@@ -11,6 +11,7 @@ const { getDailyAllowance, isSendWindowOpen } = require('../modules/campaign/cam
 const { classifyRecipient, FREQUENCY_CAP_DAYS } = require('../modules/campaign/campaign.service')
 const { acquireLockByKey, releaseLockByKey, randomGapMs, sleep, safeError } = require('../modules/campaign/campaign.sender')
 const C = require('../modules/campaign/campaign.config')
+const { greetingName } = require('../utils/patientName')
 
 const RECALL_LOCK_KEY = 'recall:run:lock'
 const CANDIDATE_BATCH = 300
@@ -141,7 +142,7 @@ async function recallClinic(clinic, totals) {
           {
             type: 'body',
             parameters: [
-              { type: 'text', text: row.patient_name },
+              { type: 'text', text: greetingName(row.patient_name) }, // letters of any script only, no emoji/line breaks, 30 characters, "there" if empty
               { type: 'text', text: String(row.months_since_visit) },
               { type: 'text', text: clinic.clinic_name }
             ]
