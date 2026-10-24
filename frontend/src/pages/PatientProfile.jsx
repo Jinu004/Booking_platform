@@ -10,7 +10,8 @@ import {
   updateVisitNote,
 } from '../services/ehr.service';
 import { getDoctors, getProcedures, getAvailableSlots, scheduleProcedureBooking } from '../services/clinic.service';
-import { createManualBooking, completeBooking, cancelBooking } from '../services/booking.service';
+import { completeBooking, cancelBooking } from '../services/booking.service';
+import NewBookingModal from '../components/NewBookingModal';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import api from '../utils/api';
@@ -277,10 +278,7 @@ export default function PatientProfile() {
   const { addToast } = useStore();
 
   const staff = getStoredStaff();
-  const [scheduleModal, setScheduleModal] = useState(false)
-  const [scheduleForm, setScheduleForm] = useState({ doctorId: '', bookingDate: '', notes: '' })
-  const [scheduleSaving, setScheduleSaving] = useState(false)
-  const [scheduleError, setScheduleError] = useState('')
+  const [bookingOpen, setBookingOpen] = useState(false)
   const [showProcedureModal, setShowProcedureModal] = useState(false);
   const [procedures, setProcedures] = useState([]);
   const [selectedProcedure, setSelectedProcedure] = useState(null);
@@ -379,9 +377,10 @@ export default function PatientProfile() {
     return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
   }
 
-  const loadData = async () => {
+  // silent: reload without the full-page loading screen (used after a booking so the token receipt stays on screen)
+  const loadData = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await getEHRPatient(customerId);
       const d = res?.data || res || {};
       setCustomer(d.customer || {});
@@ -576,40 +575,6 @@ export default function PatientProfile() {
   };
 
   // ── Visit note handlers ────────────────────────────────────────────────────
-
-  const openScheduleModal = () => {
-    const autoDoctor = staff?.role === 'doctor' ? staff.doctor_id : ''
-    setScheduleForm({ doctorId: autoDoctor, bookingDate: '', notes: '' })
-    setScheduleError('')
-    setScheduleModal(true)
-    if (!doctors.length) loadDoctors()
-  }
-
-  const handleScheduleNext = async () => {
-    if (!scheduleForm.doctorId || !scheduleForm.bookingDate) {
-      setScheduleError('Please select a doctor and date.')
-      return
-    }
-    setScheduleSaving(true)
-    setScheduleError('')
-    try {
-      await createManualBooking({
-        patientName: customer?.name || patient?.name,
-        patientPhone: customer?.phone,
-        doctorId: scheduleForm.doctorId,
-        bookingDate: scheduleForm.bookingDate,
-        notes: scheduleForm.notes,
-        sendWhatsapp: true
-      })
-      setScheduleModal(false)
-      await loadData()
-      addToast('Appointment scheduled and WhatsApp confirmation sent!', 'success')
-    } catch (err) {
-      setScheduleError(err?.error || err?.response?.data?.error || 'Failed to schedule appointment.')
-    } finally {
-      setScheduleSaving(false)
-    }
-  }
 
   const openAddNote = async () => {
     const storedStaff = getStoredStaff();
@@ -888,7 +853,7 @@ export default function PatientProfile() {
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider">Next Appointment</p>
             <button
-              onClick={openScheduleModal}
+              onClick={() => setBookingOpen(true)}
               className="text-xs text-indigo-600 font-semibold hover:text-indigo-700 transition"
             >
               + Schedule
@@ -1384,66 +1349,13 @@ export default function PatientProfile() {
         </div>
       )}
 
-      {/* Schedule Next Appointment Modal */}
-      {scheduleModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Schedule Next Appointment</h2>
-            {scheduleError && <p className="text-sm text-red-500 mb-3">{scheduleError}</p>}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Doctor</label>
-                <select
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  value={scheduleForm.doctorId}
-                  onChange={e => setScheduleForm(f => ({ ...f, doctorId: e.target.value }))}
-                  disabled={staff?.role === 'doctor'}
-                >
-                  <option value="">Select doctor</option>
-                  {doctors.map(d => (
-                    <option key={d.id} value={d.id}>{d.name} {d.specialization ? `(${d.specialization})` : ''}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Date</label>
-                <input
-                  type="date"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  value={scheduleForm.bookingDate}
-                  min={(() => { const _d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); return `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`; })()}
-                  onChange={e => setScheduleForm(f => ({ ...f, bookingDate: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-                <textarea
-                  rows={2}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                  placeholder="Follow-up instructions or reason for visit"
-                  value={scheduleForm.notes}
-                  onChange={e => setScheduleForm(f => ({ ...f, notes: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-5">
-              <button
-                onClick={() => setScheduleModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleScheduleNext}
-                disabled={scheduleSaving}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition"
-              >
-                {scheduleSaving ? 'Scheduling...' : 'Schedule & Notify'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* New booking for this patient (shared form, patient pre-filled and locked) */}
+      <NewBookingModal
+        open={bookingOpen}
+        onClose={() => setBookingOpen(false)}
+        onSaved={() => loadData({ silent: true })}
+        prefill={customer ? { phone: customer.phone, name: customer.name, customerId: customer.customer_id, patientId: customer.id } : undefined}
+      />
 
       {/* ── VISIT NOTE MODAL ── */}
       {showNoteForm && (

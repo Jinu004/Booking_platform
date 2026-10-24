@@ -8,10 +8,11 @@ import useStore from '../store/useStore';
 
 // The shared "New booking" modal. It owns what the form needs, so any page can use it:
 //   <NewBookingModal open={open} onClose={() => setOpen(false)} onSaved={refreshThePage} />
+// Optional prefill = { phone, name, customerId, patientId, doctorId } books for a known patient (see BookingForm).
 // Each time it opens it loads the clinic's booking mode (with a retry in the form when that fails: never a silent fallback
 // to token mode) and a fresh doctor list. After a save it closes, shows the token receipt or a short toast, then calls onSaved(result).
 // Keep it mounted all the time: the receipt must stay on screen after the form has closed.
-export default function NewBookingModal({ open, onClose, onSaved }) {
+export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
   const { addToast } = useStore();
   const staff = getStoredStaff();
   const [bookingMode, setBookingMode] = useState(null);
@@ -75,6 +76,7 @@ export default function NewBookingModal({ open, onClose, onSaved }) {
         doctors={doctors}
         staffRole={staff?.role}
         ownDoctorId={staff?.doctor_id}
+        prefill={prefill}
       />
       {receiptBooking && (
         <TokenReceipt booking={receiptBooking} onClose={() => setReceiptBooking(null)} />

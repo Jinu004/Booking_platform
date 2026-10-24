@@ -60,7 +60,10 @@ export default function BookingForm({
   onRetryMode,
   doctors = [],
   staffRole,
-  ownDoctorId
+  ownDoctorId,
+  // Optional: book for a known patient. { phone, name, customerId, patientId, doctorId } - the patient section is then read-only
+  // (no lookup, no patient picker, no consent change) and a procedure is booked with customer_id and patient_id instead of the phone.
+  prefill
 }) {
   const [f, setF] = useState(emptyForm);
   const set = (patch) => setF(prev => ({ ...prev, ...patch }));
@@ -102,7 +105,9 @@ export default function BookingForm({
   // A fresh form every time it opens
   useEffect(() => {
     if (!open) return;
-    setF(emptyForm());
+    setF(prefill
+      ? { ...emptyForm(), phone: prefill.phone || '', name: prefill.name || '', doctorId: prefill.doctorId || '' }
+      : emptyForm());
     setPatients([]);
     setError('');
     setSubmitting(false);
@@ -251,16 +256,22 @@ export default function BookingForm({
         const endMins = h * 60 + m + procedure.duration_minutes;
         const endH = Math.floor(endMins / 60).toString().padStart(2, '0');
         const endM = (endMins % 60).toString().padStart(2, '0');
-        // No customer_id or patient_id: the backend finds or creates them from the phone
-        await scheduleProcedureBooking(f.doctorId, {
+        // A known patient (prefill): their real ids, no phone. Otherwise no ids: the backend finds or creates them from the phone.
+        const body = {
           procedure_id: f.procedureId,
           patient_name: name,
-          phone,
           date: f.date,
           start_time: f.time,
           end_time: `${endH}:${endM}`,
           send_whatsapp: f.sendWhatsapp === true
-        });
+        };
+        if (prefill?.customerId) {
+          body.customer_id = prefill.customerId;
+          if (prefill.patientId) body.patient_id = prefill.patientId;
+        } else {
+          body.phone = phone;
+        }
+        await scheduleProcedureBooking(f.doctorId, body);
         result = { kind: 'procedure' };
       }
       onBooked(result);
@@ -300,15 +311,22 @@ export default function BookingForm({
             {error && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{error}</div>}
 
             {/* 1. Patient */}
-            <div>
-              <label className={LABEL}>Patient Phone</label>
-              <input type="tel" maxLength={16} value={f.phone} disabled={submitting}
-                onChange={e => handlePhone(e.target.value)}
-                className={INPUT}
-                placeholder="9876543210 or +971501234567" />
-              <p className="text-xs text-ink/50 mt-1">{PHONE_HELP}</p>
-            </div>
-            {patients.length > 1 && (
+            {prefill ? (
+              <div>
+                <label className={LABEL}>Patient</label>
+                <p className="text-sm text-ink"><span className="font-medium">{f.name}</span>{f.phone ? <span className="text-ink/55">, {f.phone}</span> : null}</p>
+              </div>
+            ) : (
+              <div>
+                <label className={LABEL}>Patient Phone</label>
+                <input type="tel" maxLength={16} value={f.phone} disabled={submitting}
+                  onChange={e => handlePhone(e.target.value)}
+                  className={INPUT}
+                  placeholder="9876543210 or +971501234567" />
+                <p className="text-xs text-ink/50 mt-1">{PHONE_HELP}</p>
+              </div>
+            )}
+            {!prefill && patients.length > 1 && (
               <div>
                 <label className={LABEL}>Patients with this number</label>
                 <select defaultValue="" disabled={submitting}
@@ -320,13 +338,15 @@ export default function BookingForm({
                 </select>
               </div>
             )}
-            <div>
-              <label className={LABEL}>Patient Name</label>
-              <input type="text" value={f.name} disabled={submitting}
-                onChange={e => set({ name: e.target.value })}
-                className={INPUT}
-                placeholder="Patient name" />
-            </div>
+            {!prefill && (
+              <div>
+                <label className={LABEL}>Patient Name</label>
+                <input type="text" value={f.name} disabled={submitting}
+                  onChange={e => set({ name: e.target.value })}
+                  className={INPUT}
+                  placeholder="Patient name" />
+              </div>
+            )}
 
             {/* 2. Doctor */}
             {doctorOptions.length > 1 && (
@@ -470,7 +490,7 @@ export default function BookingForm({
               </div>
             )}
 
-            {path !== 'procedure' && (
+            {path !== 'procedure' && !prefill && (
               <div>
                 <label className={LABEL}>WhatsApp updates</label>
                 <select value={f.consent} disabled={submitting}
