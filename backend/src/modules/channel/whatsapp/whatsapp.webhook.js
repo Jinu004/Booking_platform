@@ -1319,10 +1319,21 @@ if (isAIError) {
         message: { role: 'assistant', content: aiResponse, created_at: new Date().toISOString() }
       })
     }
+    // The flag is always set. The live alert and the push go out only while the clinic is inside its working hours (the same check the
+    // AI handoff uses). If the hours cannot be read or are not configured, the alert is sent (the safe side).
+    let insideWorkingHours = true
+    try {
+      const hoursSettings = await HITLModel.getTenantSettings(tenant.id)
+      if (hoursSettings && hoursSettings.working_hours) {
+        insideWorkingHours = HITLService.isWithinWorkingHours(hoursSettings.working_hours)
+      }
+    } catch (hoursErr) {
+      insideWorkingHours = true
+    }
     await HITLService.markNeedsAttention(
       tenant,
       { ...context.conversation, customer_name: context.customer?.name, customer_phone: context.customer?.phone },
-      { alert: true }
+      { alert: insideWorkingHours }
     )
   } catch (aiErrRecordErr) {
     logger.warn(`AI_ERROR_RECORD_FAILED tenant=${tenant.id} conversation=${context.conversation.id} class=${String((aiErrRecordErr && (aiErrRecordErr.name || aiErrRecordErr.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)}`)
