@@ -7,7 +7,6 @@ const {
   getBookings,
   getBookingStats,
   getBookingById,
-  createBooking,
   updateBookingStatus,
   cancelBooking,
   completeBooking,
@@ -17,7 +16,6 @@ const {
   createManualBooking
 } = require('./booking.controller');
 const {
-  validateCreateBooking,
   validateUpdateStatus
 } = require('./booking.validation');
 
@@ -40,7 +38,6 @@ router.get('/today', getTodayBookings);
 router.get('/export', requireRole('admin', 'manager'), exportBookings);
 router.get('/stats', getBookingStats);
 router.get('/:id', getBookingById);
-router.post('/', validateCreateBooking, validate, createBooking);
 router.post('/manual', createManualBooking);
 router.patch('/:id/status', validateUpdateStatus, validate, updateBookingStatus);
 router.post('/:id/cancel', cancelBooking);

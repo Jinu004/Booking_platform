@@ -102,26 +102,6 @@ async function getBookingById(req, res, next) {
 }
 
 /**
- * POST /bookings
- * Creates new booking (staff portal)
- */
-async function createBooking(req, res, next) {
-  try {
-    const tenantId = req.tenant.id;
-    const result = await BookingService.createBookingWithToken(tenantId, req.body);
-    return successResponse(res, result, 201);
-  } catch (error) {
-    if (error.statusCode === 429) {
-      return errorResponse(res, error.message, 429);
-    }
-    if (error.message.includes('not available') || error.message.includes('fully booked')) {
-      return errorResponse(res, error.message, 400);
-    }
-    next(error);
-  }
-}
-
-/**
  * PATCH /bookings/:id/status
  * Updates booking status
  */
@@ -280,6 +260,10 @@ async function exportBookings(req, res, next) {
  */
 async function createManualBooking(req, res, next) {
   const tenantId = req.tenant.id;
+  // A doctor account must be linked to a doctor: without that link there is no "own schedule" to book for
+  if (req.staff?.role === 'doctor' && !req.staff?.doctor_id) {
+    return errorResponse(res, 'Your account is not linked to a doctor. Ask your admin.', 403);
+  }
   const { patientName, patientPhone, notes, bookingDate, sendWhatsapp, isPresent, slot_time } = req.body
   const doctorId = req.staff?.role === 'doctor' && req.staff?.doctor_id
     ? req.staff.doctor_id
@@ -528,7 +512,6 @@ module.exports = {
   getBookings,
   getBookingStats,
   getBookingById,
-  createBooking,
   updateBookingStatus,
   cancelBooking,
   completeBooking,

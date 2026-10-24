@@ -18,7 +18,8 @@ const isISODate = (str) => /^\d{4}-\d{2}-\d{2}$/.test(str) && !isNaN(Date.parse(
 
 // The date ("13 Jul 2026") and time ("9:00 AM") texts of the procedure_scheduled template
 function templateDateText(date) {
-  return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  // The date arrives as YYYY-MM-DD (read as UTC midnight), so it is also written in UTC: the same text on a server in any time zone
+  return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 function templateTimeText(startTime) {
   const [h, m] = startTime.split(':');
@@ -177,6 +178,14 @@ async function updateTokenStatus(req, res, next) {
     const tenantId = req.tenant.id;
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid token ID', 400);
+    // A doctor changes tokens of their own schedule only (an unknown token still answers 404 below, as before)
+    if (req.staff?.role === 'doctor') {
+      if (!req.staff.doctor_id) return errorResponse(res, 'You can only change your own schedule.', 403);
+      const owner = await pool.query('SELECT doctor_id FROM clinic_tokens WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+      if (owner.rows.length && owner.rows[0].doctor_id !== req.staff.doctor_id) {
+        return errorResponse(res, 'You can only change your own schedule.', 403);
+      }
+    }
     const { status } = req.body;
 
     const token = await ClinicModel.updateTokenStatus(pool, tenantId, id, status);
@@ -373,12 +382,15 @@ async function createAppointmentBooking(req, res, next) {
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     // A doctor books for their own schedule only (the same rule as the manual token booking)
-    if (req.staff?.role === 'doctor' && req.staff?.doctor_id && req.staff.doctor_id !== id) {
+    if (req.staff?.role === 'doctor' && !req.staff?.doctor_id) {
+      return errorResponse(res, 'Your account is not linked to a doctor. Ask your admin.', 403);
+    }
+    if (req.staff?.role === 'doctor' && req.staff.doctor_id !== id) {
       return errorResponse(res, 'You can only book for your own schedule.', 403);
     }
     const { patient_name, phone, date, start_time, notes, marketing_consent, send_whatsapp } = req.body;
 
-    const patientName = String(patient_name || '').trim().replace(/<[^>]*>/g, '').slice(0, 255);
+    const patientName = Array.from(String(patient_name || '').trim().replace(/<[^>]*>/g, '')).slice(0, 255).join('');
     if (!patientName) return errorResponse(res, 'patient_name is required', 400);
     const phoneCheck = validatePhoneInput(phone);
     if (!phoneCheck.ok) return errorResponse(res, phoneCheck.error, 400);
@@ -441,14 +453,19 @@ async function createProcedureBooking(req, res, next) {
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     // A doctor books for their own schedule only (the same rule as the manual token booking)
-    if (req.staff?.role === 'doctor' && req.staff?.doctor_id && req.staff.doctor_id !== id) {
+    if (req.staff?.role === 'doctor' && !req.staff?.doctor_id) {
+      return errorResponse(res, 'Your account is not linked to a doctor. Ask your admin.', 403);
+    }
+    if (req.staff?.role === 'doctor' && req.staff.doctor_id !== id) {
       return errorResponse(res, 'You can only book for your own schedule.', 403);
     }
     const { procedure_id, customer_id, patient_id, date, start_time, end_time, phone, name, send_whatsapp } = req.body;
     // "name" is accepted as an alternative to patient_name. Cleaned like the appointment handler: text only, HTML tags removed,
     // at most 255 characters. A missing or non-text name stays '' so the required-field check below still answers 400.
     const rawPatientName = req.body.patient_name || name;
-    const patient_name = typeof rawPatientName === 'string' ? rawPatientName.trim().replace(/<[^>]*>/g, '').slice(0, 255).trim() : '';
+    const patient_name = typeof rawPatientName === 'string'
+      ? Array.from(rawPatientName.trim().replace(/<[^>]*>/g, '')).slice(0, 255).join('').trim()
+      : '';
     if (!procedure_id || !patient_name || !date || !start_time || !end_time) {
       return errorResponse(res, 'procedure_id, patient_name, date, start_time and end_time are required', 400);
     }
@@ -535,6 +552,17 @@ async function cancelProcedureBooking(req, res, next) {
     const tenantId = req.tenantId || req.tenant?.id;
     const { bookingId } = req.params;
     if (!isUUID(bookingId)) return errorResponse(res, 'Invalid booking ID', 400);
+    // A doctor cancels procedures of their own schedule only (an unknown booking is handled by the model as before)
+    if (req.staff?.role === 'doctor') {
+      if (!req.staff.doctor_id) return errorResponse(res, 'You can only change your own schedule.', 403);
+      const owner = await pool.query(
+        `SELECT doctor_id FROM bookings WHERE id = $1 AND tenant_id = $2 AND booking_type = 'procedure'`,
+        [bookingId, tenantId]
+      );
+      if (owner.rows.length && owner.rows[0].doctor_id !== req.staff.doctor_id) {
+        return errorResponse(res, 'You can only change your own schedule.', 403);
+      }
+    }
     const booking = await ClinicModel.cancelProcedureBooking(pool, tenantId, bookingId);
     return successResponse(res, booking);
   } catch (err) { next(err); }
