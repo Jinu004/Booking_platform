@@ -23,7 +23,8 @@ const pool = require('./config/database');
 require('./config/redis');
 
 const app = express();
-app.set('trust proxy', 1)
+// Cloudflare -> nginx -> Node: trust two hops so req.ip is the real visitor address
+app.set('trust proxy', 2)
 
 
 // 1. Middleware inside app
@@ -198,6 +199,6 @@ setTimeout(() => {
   startSendFailuresCleanupCron();
   startCampaignCron();
 }, 5000);
-app.listen(PORT, () => {
+app.listen(PORT, '127.0.0.1', () => {
   logger.info(`Server running on port ${PORT}`);
 });
