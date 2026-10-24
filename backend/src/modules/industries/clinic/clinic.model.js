@@ -323,12 +323,50 @@ async function assertNoOverlap(client, tenantId, doctorId, date, startTime, endT
   }
 }
 
-async function createProcedureBooking(pool, tenantId, doctorId, procedureId, customerId, patientId, patientName, date, startTime, endTime) {
+// Finds or creates the customer of a phone number and the patient of that name (the same steps as the appointment booking), inside
+// the caller's transaction. The phone is already validated and normalised. Returns { customerId, patientId }.
+async function findOrCreateCustomerAndPatient(client, tenantId, phone, patientName) {
+  const cusRes = await client.query('SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1', [tenantId, phone]);
+  let customerId;
+  if (cusRes.rows.length > 0) {
+    customerId = cusRes.rows[0].id;
+  } else {
+    const insertCus = await client.query('INSERT INTO customers (tenant_id, phone, name) VALUES ($1, $2, $3) RETURNING id', [tenantId, phone, patientName]);
+    customerId = insertCus.rows[0].id;
+  }
+  let patientId;
+  const existingPatient = await client.query(
+    `SELECT id FROM patients WHERE tenant_id = $1 AND customer_id = $2 AND LOWER(name) = LOWER($3)`,
+    [tenantId, customerId, patientName]
+  );
+  if (existingPatient.rows.length > 0) {
+    patientId = existingPatient.rows[0].id;
+  } else {
+    const newPatient = await client.query(
+      `INSERT INTO patients (tenant_id, customer_id, name, phone)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (tenant_id, customer_id, LOWER(name)) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id`,
+      [tenantId, customerId, patientName, phone]
+    );
+    patientId = newPatient.rows[0]?.id || null;
+  }
+  return { customerId, patientId };
+}
+
+// Optional last argument contact = { phone } (normalised): used only when customerId is missing. The customer and patient are then
+// found or created in the same transaction as the booking and linked to it.
+async function createProcedureBooking(pool, tenantId, doctorId, procedureId, customerId, patientId, patientName, date, startTime, endTime, contact) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await lockDoctor(client, tenantId, doctorId);
     await assertNoOverlap(client, tenantId, doctorId, date, startTime, endTime, true);
+    if (!customerId && contact && contact.phone) {
+      const resolved = await findOrCreateCustomerAndPatient(client, tenantId, contact.phone, patientName);
+      customerId = resolved.customerId;
+      patientId = resolved.patientId;
+    }
     const bookingRes = await client.query(
       `INSERT INTO bookings (tenant_id, doctor_id, customer_id, patient_id, patient_name, booking_date, slot_time, end_time, booking_type, procedure_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'procedure', $9, 'confirmed') RETURNING *`,
       [tenantId, doctorId, customerId, patientId || null, patientName, date, startTime, endTime, procedureId]

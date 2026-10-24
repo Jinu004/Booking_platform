@@ -4,6 +4,7 @@ const { successResponse, errorResponse } = require('../../../utils/response');
 const { sendTemplateMessage } = require('../../channel/whatsapp/whatsapp.adapter');
 const { runAsTenant } = require('../../channel/whatsapp/senderContext');
 const { validatePhoneInput } = require('../../../utils/phone');
+const logger = require('../../../utils/logger');
 
 // Sentinel value used to soft-delete doctors from token queues
 // clinic.model.js getDoctors filters out records where leave_days equals this value
@@ -14,6 +15,16 @@ const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 
 // ISO 8601 date (YYYY-MM-DD) validation helper
 const isISODate = (str) => /^\d{4}-\d{2}-\d{2}$/.test(str) && !isNaN(Date.parse(str));
+
+// The date ("13 Jul 2026") and time ("9:00 AM") texts of the procedure_scheduled template
+function templateDateText(date) {
+  return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function templateTimeText(startTime) {
+  const [h, m] = startTime.split(':');
+  const hr = parseInt(h);
+  return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`;
+}
 
 // True only when the doctor exists in this clinic (an id from another clinic is treated as unknown)
 async function doctorInTenant(tenantId, doctorId) {
@@ -361,7 +372,7 @@ async function createAppointmentBooking(req, res, next) {
     const tenantId = req.tenantId || req.tenant?.id;
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
-    const { patient_name, phone, date, start_time, notes, marketing_consent } = req.body;
+    const { patient_name, phone, date, start_time, notes, marketing_consent, send_whatsapp } = req.body;
 
     const patientName = String(patient_name || '').trim().replace(/<[^>]*>/g, '').slice(0, 255);
     if (!patientName) return errorResponse(res, 'patient_name is required', 400);
@@ -394,6 +405,28 @@ async function createAppointmentBooking(req, res, next) {
       startTime,
       marketingConsent: marketing_consent
     });
+
+    // Optional confirmation (off unless send_whatsapp is exactly true). Sent after the booking is saved; a failure never affects it.
+    if (send_whatsapp === true) {
+      setImmediate(async () => {
+        await runAsTenant(tenantId, async () => {
+          try {
+            const phoneRes = await pool.query('SELECT phone FROM customers WHERE id = $1 AND tenant_id = $2', [booking.customer_id, tenantId]);
+            const savedPhone = phoneRes.rows[0]?.phone;
+            if (!savedPhone) return;
+            await sendTemplateMessage(savedPhone, 'procedure_scheduled', 'en', [
+              { type: 'body', parameters: [
+                { type: 'text', text: 'consultation' },
+                { type: 'text', text: templateDateText(booking.confirmation.date) },
+                { type: 'text', text: templateTimeText(booking.confirmation.start_time) }
+              ]}
+            ]);
+          } catch (err) {
+            logger.warn(`Appointment WhatsApp confirmation failed: ${String(err && err.message).slice(0, 120)}`);
+          }
+        });
+      });
+    }
     return successResponse(res, booking, 201);
   } catch (err) { next(err); }
 }
@@ -403,7 +436,9 @@ async function createProcedureBooking(req, res, next) {
     const tenantId = req.tenantId || req.tenant?.id;
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
-    const { procedure_id, customer_id, patient_id, patient_name, date, start_time, end_time } = req.body;
+    const { procedure_id, customer_id, patient_id, date, start_time, end_time, phone, name, send_whatsapp } = req.body;
+    // "name" is accepted as an alternative to patient_name
+    const patient_name = req.body.patient_name || name;
     if (!procedure_id || !patient_name || !date || !start_time || !end_time) {
       return errorResponse(res, 'procedure_id, patient_name, date, start_time and end_time are required', 400);
     }
@@ -444,19 +479,27 @@ async function createProcedureBooking(req, res, next) {
       if (!patOwn.rows.length) return notFound();
     }
 
-    const booking = await ClinicModel.createProcedureBooking(pool, tenantId, id, procedure_id, customer_id, patient_id, patient_name, date, start_time, end_time);
+    // Without a customer_id a phone number can be given: the customer and patient are then found or created with the booking
+    let contact;
+    if (!customer_id && phone) {
+      const phoneCheck = validatePhoneInput(phone);
+      if (!phoneCheck.ok) return errorResponse(res, phoneCheck.error, 400);
+      contact = { phone: phoneCheck.phone };
+    }
 
-    // Send WhatsApp notification to patient
-    setImmediate(async () => {
+    const booking = await ClinicModel.createProcedureBooking(pool, tenantId, id, procedure_id, customer_id, patient_id, patient_name, date, start_time, end_time, contact);
+
+    // Send WhatsApp notification to patient (unless send_whatsapp is exactly false)
+    if (send_whatsapp !== false) setImmediate(async () => {
       await runAsTenant(tenantId, async () => {
       try {
-        const phoneRes = await pool.query(`SELECT phone FROM customers WHERE id = $1 AND tenant_id = $2`, [customer_id, tenantId]);
+        const phoneRes = await pool.query(`SELECT phone FROM customers WHERE id = $1 AND tenant_id = $2`, [booking.customer_id, tenantId]);
         const procRes = await pool.query(`SELECT name FROM procedures WHERE id = $1 AND tenant_id = $2`, [procedure_id, tenantId]);
         if (phoneRes.rows.length && procRes.rows.length) {
           const phone = phoneRes.rows[0].phone;
           const procedureName = procRes.rows[0].name;
-          const formattedDate = new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-          const formattedTime = (() => { const [h, m] = start_time.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; })();
+          const formattedDate = templateDateText(date);
+          const formattedTime = templateTimeText(start_time);
           // Only the approved template is sent: this confirmation is usually outside the 24-hour window.
           // A failed send is logged and recorded by the send helper (META_SEND_FAILED and send_failures).
           await sendTemplateMessage(phone, 'procedure_scheduled', 'en', [
