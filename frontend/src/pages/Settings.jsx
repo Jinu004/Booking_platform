@@ -179,7 +179,8 @@ export default function Settings() {
     return Promise.all([getHITLSettings(), getSettings()])
       .then(([hitlRes, settingsRes]) => {
         const hitlData = hitlRes?.data || hitlRes;
-        const lang = settingsRes?.data?.language || settingsRes?.language;
+        // getSettings() returns the inner object { general, booking, ai, notifications, connection }; the language is grouped under "ai"
+        const lang = settingsRes?.ai?.language;
         // getSettings() returns the inner object (general, booking, ai, notifications, connection), so connection is read directly
         setWaState(settingsRes?.connection?.wa_connection_state || null);
         setHITL(prev => ({
@@ -275,10 +276,12 @@ export default function Settings() {
   const handleSaveKnowledgeBase = async () => {
     try {
       setSavingKB(true);
-      await updateHITLSettings({ ai_knowledge_base: knowledgeBase });
+      const saved = await updateHITLSettings({ ai_knowledge_base: knowledgeBase });
+      // Show what was really stored (after the plan limit and the filter), when the server says so
+      if (saved && typeof saved.ai_knowledge_base_saved === 'string') setKnowledgeBase(saved.ai_knowledge_base_saved);
       addToast('Knowledge base saved', 'success');
-    } catch {
-      addToast('Failed to save knowledge base', 'error');
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Failed to save knowledge base'), 'error');
     } finally {
       setSavingKB(false);
     }
@@ -682,6 +685,10 @@ export default function Settings() {
                     <option value="english">English</option>
                     <option value="malayalam">Malayalam</option>
                     <option value="hindi">Hindi</option>
+                    {/* A stored value the list does not offer (for example "both") is kept and saved back unchanged */}
+                    {hitl.language && !['english', 'malayalam', 'hindi'].includes(hitl.language) && (
+                      <option value={hitl.language}>{hitl.language} (current)</option>
+                    )}
                   </select>
                 </div>
                 <div>
@@ -848,6 +855,9 @@ export default function Settings() {
                     {savingKB ? 'Saving...' : 'Save Knowledge Base'}
                   </button>
                 </div>
+                {hitlLoadError && (
+                  <p className="text-xs text-gray-400">Settings could not be loaded. Use Retry above, then save.</p>
+                )}
               </>
             )}
           </div>
