@@ -244,6 +244,12 @@ async function updateTokenStatus(pool, tenantId, tokenId, status) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // A finished or cancelled token cannot be stepped back: its booking is already completed or no-show and would be left inconsistent
+    const current = await client.query('SELECT status FROM clinic_tokens WHERE tenant_id = $1 AND id = $2 FOR UPDATE', [tenantId, tokenId]);
+    if (!current.rows.length) { await client.query('ROLLBACK'); return null; }
+    if (['completed', 'done', 'cancelled'].includes(current.rows[0].status) && ['waiting', 'arrived', 'in_progress'].includes(status)) {
+      throw Object.assign(new Error('This patient is already finished.'), { code: 'TOKEN_CLOSED' });
+    }
     const tokenRes = await client.query(
       `UPDATE clinic_tokens SET status = $1 WHERE tenant_id = $2 AND id = $3 RETURNING *`,
       [status, tenantId, tokenId]

@@ -194,7 +194,7 @@ async function getQueue(req, res, next) {
 /**
  * PATCH /clinic/tokens/:id/status
  * Updates token status
- * Body: { status: waiting|in_progress|done|cancelled }
+ * Body: { status: waiting|arrived|in_progress|completed }
  */
 async function updateTokenStatus(req, res, next) {
   try {
@@ -210,6 +210,10 @@ async function updateTokenStatus(req, res, next) {
       }
     }
     const { status } = req.body;
+    // The values the dashboard sends today (arrived, in_progress, completed) plus waiting and arrived for stepping back
+    if (!['waiting', 'arrived', 'in_progress', 'completed'].includes(status)) {
+      return errorResponse(res, 'Invalid status', 400);
+    }
 
     const token = await ClinicModel.updateTokenStatus(pool, tenantId, id, status);
     if (!token) {
@@ -219,6 +223,9 @@ async function updateTokenStatus(req, res, next) {
   } catch (error) {
     if (error.code === 'DOCTOR_BUSY') {
       return errorResponse(res, error.message, 409);
+    }
+    if (error.code === 'TOKEN_CLOSED') {
+      return errorResponse(res, error.message, 400);
     }
     next(error);
   }

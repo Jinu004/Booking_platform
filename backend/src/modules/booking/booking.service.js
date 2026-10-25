@@ -249,8 +249,10 @@ async function completeBooking(tenantId, bookingId) {
 
 /**
  * Live queue actions for an APPOINTMENT booking (tokens use PATCH /clinic/tokens/:id/status):
- *   'arrived'    sets arrived_at (once)
+ *   'waiting'    clears arrived_at and consult_started_at (undo)
+ *   'arrived'    sets arrived_at (once); from in consult it clears consult_started_at and keeps arrived_at (undo)
  *   'in_consult' sets consult_started_at (once) and arrived_at when it is still empty
+ * A move to the state the booking is already in changes nothing and returns the current state.
  * Only for today's (IST) appointments of this clinic that are still confirmed or pending. A doctor may act on their own bookings only.
  * One patient in consult per doctor: refused (409) while that doctor has an appointment in consult today, or a token in progress today.
  * The booking row and then the doctor row are locked inside one transaction, so two simultaneous calls for the same doctor cannot both succeed.
@@ -295,17 +297,33 @@ async function setAppointmentQueueStatus(tenantId, bookingId, status, staff) {
       if (busy.rows.length) throw fail('This doctor already has a patient in consult.', 409);
     }
 
-    const upd = await client.query(
-      status === 'in_consult'
-        ? `UPDATE bookings SET consult_started_at = COALESCE(consult_started_at, NOW()), arrived_at = COALESCE(arrived_at, NOW()), updated_at = NOW()
-           WHERE id = $1 AND tenant_id = $2 RETURNING id, arrived_at, consult_started_at`
-        : `UPDATE bookings SET arrived_at = COALESCE(arrived_at, NOW()), updated_at = NOW()
-           WHERE id = $1 AND tenant_id = $2 RETURNING id, arrived_at, consult_started_at`,
-      [bookingId, tenantId]
-    );
+    // Transitions (current state is derived from the two columns: consult_started_at set = in consult, else arrived_at set = arrived, else waiting):
+    //   to 'waiting':    clears arrived_at and consult_started_at (no-op when already waiting)
+    //   to 'arrived':    from waiting sets arrived_at; from in consult clears consult_started_at and keeps arrived_at; no-op when already arrived
+    //   to 'in_consult': sets consult_started_at (and arrived_at when empty); no-op when already in consult
+    let updateSql = null;
+    if (status === 'waiting') {
+      if (booking.arrived_at || booking.consult_started_at) {
+        updateSql = `UPDATE bookings SET arrived_at = NULL, consult_started_at = NULL, updated_at = NOW()
+                     WHERE id = $1 AND tenant_id = $2 RETURNING id, arrived_at, consult_started_at`;
+      }
+    } else if (status === 'arrived') {
+      if (booking.consult_started_at) {
+        updateSql = `UPDATE bookings SET consult_started_at = NULL, arrived_at = COALESCE(arrived_at, NOW()), updated_at = NOW()
+                     WHERE id = $1 AND tenant_id = $2 RETURNING id, arrived_at, consult_started_at`;
+      } else if (!booking.arrived_at) {
+        updateSql = `UPDATE bookings SET arrived_at = NOW(), updated_at = NOW()
+                     WHERE id = $1 AND tenant_id = $2 RETURNING id, arrived_at, consult_started_at`;
+      }
+    } else if (!booking.consult_started_at) {
+      updateSql = `UPDATE bookings SET consult_started_at = NOW(), arrived_at = COALESCE(arrived_at, NOW()), updated_at = NOW()
+                   WHERE id = $1 AND tenant_id = $2 RETURNING id, arrived_at, consult_started_at`;
+    }
+    const row = updateSql
+      ? (await client.query(updateSql, [bookingId, tenantId])).rows[0]
+      : { id: booking.id, arrived_at: booking.arrived_at, consult_started_at: booking.consult_started_at };
     await client.query('COMMIT');
-    const row = upd.rows[0];
-    return { ...row, queue_status: row.consult_started_at ? 'in_consult' : 'arrived' };
+    return { ...row, queue_status: row.consult_started_at ? 'in_consult' : (row.arrived_at ? 'arrived' : 'waiting') };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

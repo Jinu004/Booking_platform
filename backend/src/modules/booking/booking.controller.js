@@ -124,7 +124,7 @@ async function updateBookingStatus(req, res, next) {
 
 /**
  * PATCH /bookings/:id/queue-status
- * Body: { status: 'arrived' | 'in_consult' } - appointment bookings only (tokens use PATCH /clinic/tokens/:id/status).
+ * Body: { status: 'waiting' | 'arrived' | 'in_consult' } (waiting and arrived also undo a later step) - appointment bookings only (tokens use PATCH /clinic/tokens/:id/status).
  * Finish, no-show and cancel keep using POST /bookings/:id/complete, /noshow and /cancel.
  */
 async function updateAppointmentQueueStatus(req, res, next) {
