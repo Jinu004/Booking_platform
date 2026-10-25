@@ -23,12 +23,14 @@ async function sendPushToTenant(tenantId, payload) {
       'SELECT subscription FROM push_subscriptions WHERE tenant_id = $1',
       [tenantId]
     );
+    let sent = 0;
     for (const row of result.rows) {
       try {
         await webpush.sendNotification(
           JSON.parse(row.subscription),
           JSON.stringify(payload)
         );
+        sent++;
       } catch (err) {
         logger.warn('Push notification failed:', err.message);
         if (err.statusCode === 410) {
@@ -40,8 +42,10 @@ async function sendPushToTenant(tenantId, payload) {
         }
       }
     }
+    return { total: result.rows.length, sent };
   } catch (err) {
     logger.error('sendPushToTenant failed:', err.message);
+    return { total: 0, sent: 0, error: true };
   }
 }
 

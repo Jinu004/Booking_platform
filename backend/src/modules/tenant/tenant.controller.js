@@ -102,7 +102,9 @@ const RESERVED_CONFIG_KEYS = new Set([
   'wa_disconnect_reason',
   'wa_disconnect_initiated_by',
   'wa_state_changed_at',
-  'wa_last_alert_event'
+  'wa_last_alert_event',
+  'wa_app_reminder_last',
+  'wa_app_reminder_enabled'
 ]);
 
 const setConfig = async (req, res) => {

@@ -184,6 +184,7 @@ const { startRecallCron } = require('./cron/recall.cron');
 const { startRetryCron }  = require('./cron/retry.cron');
 const { startSendFailuresCleanupCron } = require('./cron/sendFailures.cron');
 const { startCampaignCron } = require('./cron/campaign.cron');
+const { startWaAppReminderCron } = require('./cron/waAppReminder.cron');
 const { broadcastToTenant } = require('./modules/hitl/hitl.service');
 
 setTimeout(() => {
@@ -198,6 +199,7 @@ setTimeout(() => {
   startRetryCron();
   startSendFailuresCleanupCron();
   startCampaignCron();
+  startWaAppReminderCron();
 }, 5000);
 app.listen(PORT, '127.0.0.1', () => {
   logger.info(`Server running on port ${PORT}`);
