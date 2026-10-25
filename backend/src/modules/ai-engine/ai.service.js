@@ -261,6 +261,8 @@ async function processMessage(context) {
             if (msg.role === 'assistant') {
               const content = msg.content?.toLowerCase() || '';
               if (errorPhrases.some(phrase => content.includes(phrase))) return false;
+              // Output-filter artefacts ("[number]", "[ref]") in an earlier reply make the model copy them
+              if (msg.content && (msg.content.includes('[number]') || msg.content.includes('[ref]'))) return false;
             }
             return true;
           })
