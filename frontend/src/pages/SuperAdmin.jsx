@@ -5,6 +5,7 @@ import useStore from '../store/useStore';
 import api from '../utils/api';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/shared/Skeleton';
 import PosterImage from '../components/shared/PosterImage';
+import WhatsappStateBadge from '../components/shared/WhatsappStateBadge';
 
 const PLANS = ['starter', 'growth', 'pro'];
 
@@ -424,6 +425,7 @@ export default function SuperAdmin() {
                     {t.whatsapp_connected === false && (
                       <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-500">Not connected</span>
                     )}
+                    <WhatsappStateBadge state={t.wa_connection_state} reason={t.wa_disconnect_reason} />
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.booking_count}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{t.conversation_count}</td>

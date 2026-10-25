@@ -76,7 +76,10 @@ export default function Settings() {
   }
   const whatsappNumber = staff?.tenantWhatsapp || null;
   // A placeholder number (+9100000000...) is not a real clinic number: the card shows the connected state without it
-  const whatsappNumberIsPlaceholder = !!whatsappNumber && String(whatsappNumber).startsWith('+9100000000');
+  // wa_connection_state from GET /settings (data.connection): 'disconnected' replaces "Connected" below; null until known
+  const [waState, setWaState] = useState(null);
+  const waDisconnected = !!whatsappNumber && waState === 'disconnected';
+  const whatsappNumberIsPlaceholder =!!whatsappNumber && String(whatsappNumber).startsWith('+9100000000');
   const { addToast } = useStore();
   const { industry } = useIndustry();
 
@@ -177,6 +180,7 @@ export default function Settings() {
       .then(([hitlRes, settingsRes]) => {
         const hitlData = hitlRes?.data || hitlRes;
         const lang = settingsRes?.data?.language || settingsRes?.language;
+        setWaState(settingsRes?.data?.connection?.wa_connection_state || null);
         setHITL(prev => ({
           working_hours: hitlData?.working_hours || prev.working_hours,
           handoff_message: hitlData?.handoff_message || prev.handoff_message,
@@ -853,18 +857,18 @@ export default function Settings() {
       {activeTab === 'whatsapp' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
           <h2 className="text-lg font-semibold text-gray-900">WhatsApp</h2>
-          <div className={`flex items-center gap-4 p-5 rounded-xl border-2 ${whatsappNumber ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+          <div className={`flex items-center gap-4 p-5 rounded-xl border-2 ${waDisconnected ? 'border-red-200 bg-red-50' : whatsappNumber ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
             <div className="relative">
               <div className={`w-14 h-14 rounded-full flex items-center justify-center ${whatsappNumber ? 'bg-green-100' : 'bg-gray-100'}`}>
                 <svg className={`w-8 h-8 ${whatsappNumber ? 'text-green-600' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.964 9.964 0 001.333 4.993l-1.331 4.881 4.992-1.31A9.96 9.96 0 0012.012 22C17.525 22 22 17.522 22 12.016 22 6.495 17.525 2 12.012 2zm5.405 14.398c-.227.643-1.31 1.258-1.802 1.341-.492.083-1.127.136-3.411-.81-2.735-1.135-4.512-4.004-4.646-4.184-.134-.18-1.11-1.488-1.11-2.836S7.135 7.64 7.375 7.382c.241-.258.749-.318 1.04-.318.291 0 .584.01.81.01.229 0 .54-.087.848.66.309.747 1.053 2.57 1.144 2.753.091.183.153.398.035.635-.119.238-.18.384-.356.591-.176.208-.372.45-.53.606-.176.177-.361.371-.157.726.205.353.91 1.503 1.948 2.428 1.342 1.196 2.455 1.564 2.815 1.741.36.177.568.148.78-.101.21-.249.91-1.06 1.15-1.424.238-.363.477-.302.802-.186.326.115 2.057.971 2.41 1.148.354.177.591.267.676.417.087.151.087.876-.14 1.519z" />
                 </svg>
               </div>
-              <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${whatsappNumber ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+              <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${waDisconnected ? 'bg-red-500' : whatsappNumber ? 'bg-green-500' : 'bg-gray-400'}`}></div>
             </div>
             <div>
-              <p className={`font-semibold ${whatsappNumber ? 'text-green-800' : 'text-gray-700'}`}>
-                {whatsappNumber ? 'WhatsApp Connected' : 'WhatsApp Not Connected'}
+              <p className={`font-semibold ${waDisconnected ? 'text-red-800' : whatsappNumber ? 'text-green-800' : 'text-gray-700'}`}>
+                {waDisconnected ? 'WhatsApp Disconnected' : whatsappNumber ? 'WhatsApp Connected' : 'WhatsApp Not Connected'}
               </p>
               <p className="text-sm text-gray-500 mt-0.5">
                 {whatsappNumber ? (whatsappNumberIsPlaceholder ? '' : whatsappNumber) : 'Contact support@receptionai.in to connect your number'}

@@ -416,8 +416,8 @@ export default function CoexistenceConnect({ tenant, onConnected, addToast }) {
 
         {step === 'connected' && result && (
           <div className="space-y-3">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 space-y-1">
-              <div className="font-medium">✅ Connected</div>
+            <div className={`${result.saved && tenant?.wa_connection_state === 'disconnected' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800'} border rounded-lg p-3 text-sm space-y-1`}>
+              <div className="font-medium">{result.saved && tenant?.wa_connection_state === 'disconnected' ? '⚠️ Disconnected' : '✅ Connected'}</div>
               <div className="text-xs">Phone number id: {result.phoneNumberId || 'Unknown'}</div>
               {result.connectedAt && (
                 <div className="text-xs">Connected at: {new Date(result.connectedAt).toLocaleString()}</div>

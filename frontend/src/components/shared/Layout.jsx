@@ -40,6 +40,35 @@ const Layout = () => {
   const isEnquiry = industry === 'enquiry';
   const staff = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.STAFF_DATA) || '{}'); } catch { return {}; } })();
 
+  // WhatsApp connection state for the disconnected banner: clinic admins and managers only (never super admin), kept in component state
+  // only (nothing stored), loaded once when the browser is idle and then at most every 10 minutes while the tab is visible.
+  // A failed load leaves the banner as it was and shows nothing of its own.
+  const canSeeWaBanner = staff.role === 'admin' || staff.role === 'manager';
+  const [waConnection, setWaConnection] = useState(null);
+  const loadWaConnection = async () => {
+    if (!canSeeWaBanner) return;
+    try {
+      const res = await api.get('/settings', { silent: true });
+      setWaConnection(res?.data?.connection || null);
+    } catch {}
+  };
+  useEffect(() => {
+    if (!canSeeWaBanner) { setWaConnection(null); return undefined; }
+    let idleHandle = null;
+    let timeoutHandle = null;
+    if (typeof window.requestIdleCallback === 'function') {
+      idleHandle = window.requestIdleCallback(loadWaConnection, { timeout: 2000 });
+    } else {
+      timeoutHandle = setTimeout(loadWaConnection, 1500);
+    }
+    return () => {
+      if (idleHandle !== null && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleHandle);
+      if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+    };
+  }, [canSeeWaBanner]);
+  usePollWhileVisible(loadWaConnection, 10 * 60 * 1000);
+  const showWaDisconnectedBanner = canSeeWaBanner && waConnection?.wa_connection_state === 'disconnected';
+
   const isDashboard = location.pathname === '/dashboard';
   const headerSurface = isEnquiry ? 'bg-white border-gray-200' : 'bg-bg border-ink/[0.08]';
 
@@ -269,6 +298,15 @@ const Layout = () => {
               </div>
             )}
           </header>
+        )}
+
+        {showWaDisconnectedBanner && (
+          <div role="alert" className="flex-shrink-0 bg-red-600 text-white px-4 py-2 text-sm shadow-md">
+            <span>
+              Your WhatsApp is disconnected from ReceptionAI. Patients cannot reach the AI assistant until it is reconnected. Please contact ReceptionAI support.
+              {waConnection?.wa_disconnect_reason === 'PRIMARY_INACTIVITY' && ' It disconnected because the WhatsApp Business app was not opened for about 14 days.'}
+            </span>
+          </div>
         )}
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden relative">

@@ -8,6 +8,7 @@ import WhatsappTemplatesPanel from '../../components/shared/WhatsappTemplatesPan
 import SendFailuresPanel from '../../components/shared/SendFailuresPanel';
 import MetaInfoPanel from '../../components/shared/MetaInfoPanel';
 import PosterImage from '../../components/shared/PosterImage';
+import WhatsappStateBadge from '../../components/shared/WhatsappStateBadge';
 
 const PLANS = ['starter', 'growth', 'pro'];
 
@@ -522,7 +523,7 @@ export default function TenantEdit() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number<WhatsappStateBadge state={tenant.wa_connection_state} reason={tenant.wa_disconnect_reason} /></label>
             {tenant.whatsapp_connected ? (
               <>
                 <div className="flex gap-2">
