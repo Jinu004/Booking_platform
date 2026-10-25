@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { useIndustry } from '../../hooks/useIndustry';
@@ -45,13 +45,18 @@ const Layout = () => {
   // A failed load leaves the banner as it was and shows nothing of its own.
   const canSeeWaBanner = staff.role === 'admin' || staff.role === 'manager';
   const [waConnection, setWaConnection] = useState(null);
-  const loadWaConnection = async () => {
+  const lastWaLoadAt = useRef(0);
+  const loadWaConnection = useCallback(async () => {
     if (!canSeeWaBanner) return;
+    // Repeated tab switching must not repeat the request: skip when the last attempt was under 60 seconds ago
+    const now = Date.now();
+    if (now - lastWaLoadAt.current < 60 * 1000) return;
+    lastWaLoadAt.current = now;
     try {
-      const res = await api.get('/settings', { silent: true });
+      const res = await api.get('/settings', { silent: true, quiet: true });
       setWaConnection(res?.data?.connection || null);
     } catch {}
-  };
+  }, [canSeeWaBanner]);
   useEffect(() => {
     if (!canSeeWaBanner) { setWaConnection(null); return undefined; }
     let idleHandle = null;
@@ -65,7 +70,7 @@ const Layout = () => {
       if (idleHandle !== null && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleHandle);
       if (timeoutHandle !== null) clearTimeout(timeoutHandle);
     };
-  }, [canSeeWaBanner]);
+  }, [canSeeWaBanner, loadWaConnection]);
   usePollWhileVisible(loadWaConnection, 10 * 60 * 1000);
   const showWaDisconnectedBanner = canSeeWaBanner && waConnection?.wa_connection_state === 'disconnected';
 
@@ -303,7 +308,7 @@ const Layout = () => {
         {showWaDisconnectedBanner && (
           <div role="alert" className="flex-shrink-0 bg-red-600 text-white px-4 py-2 text-sm shadow-md">
             <span>
-              Your WhatsApp is disconnected from ReceptionAI. Patients cannot reach the AI assistant until it is reconnected. Please contact ReceptionAI support.
+              WhatsApp messages from patients are no longer reaching ReceptionAI, so the AI assistant is paused. Patients can still message your clinic number in the WhatsApp Business app. Please contact support@receptionai.in to reconnect.
               {waConnection?.wa_disconnect_reason === 'PRIMARY_INACTIVITY' && ' It disconnected because the WhatsApp Business app was not opened for about 14 days.'}
             </span>
           </div>

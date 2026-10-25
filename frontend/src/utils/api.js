@@ -61,12 +61,13 @@ api.interceptors.response.use(
   (error) => {
     if (!error.response && (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') && /timeout/i.test(String(error.message || ''))) {
       // A GET that timed out: a readable message for the page's error state (getErrorMessage / LoadError); never a logout
-      useStore.getState().addToast(TIMEOUT_MESSAGE, 'error');
+      // quiet: true (background polls) shows no toast; the rejected value is the same
+      if (!error.config?.quiet) useStore.getState().addToast(TIMEOUT_MESSAGE, 'error');
       return Promise.reject({ success: false, data: null, error: TIMEOUT_MESSAGE });
     }
 
     if (!error.response) {
-      useStore.getState().addToast('Cannot connect to server', 'error');
+      if (!error.config?.quiet) useStore.getState().addToast('Cannot connect to server', 'error');
       return Promise.reject({ success: false, data: null, error: 'Cannot connect to server' });
     }
 
@@ -77,7 +78,9 @@ api.interceptors.response.use(
     } else if (status === 403) {
       // "Account inactive / suspended / pending approval" explain themselves; every other 403 keeps the generic text
       const serverText = error.response.data?.error;
-      useStore.getState().addToast(typeof serverText === 'string' && serverText.startsWith('Account') ? serverText : 'You do not have permission', 'error');
+      if (!error.config?.quiet) {
+        useStore.getState().addToast(typeof serverText === 'string' && serverText.startsWith('Account') ? serverText : 'You do not have permission', 'error');
+      }
     } else if (status === 500) {
       if (!error.config?.silent) {
         useStore.getState().addToast('Something went wrong. Try again.', 'error');

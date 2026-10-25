@@ -180,7 +180,8 @@ export default function Settings() {
       .then(([hitlRes, settingsRes]) => {
         const hitlData = hitlRes?.data || hitlRes;
         const lang = settingsRes?.data?.language || settingsRes?.language;
-        setWaState(settingsRes?.data?.connection?.wa_connection_state || null);
+        // getSettings() returns the inner object (general, booking, ai, notifications, connection), so connection is read directly
+        setWaState(settingsRes?.connection?.wa_connection_state || null);
         setHITL(prev => ({
           working_hours: hitlData?.working_hours || prev.working_hours,
           handoff_message: hitlData?.handoff_message || prev.handoff_message,
