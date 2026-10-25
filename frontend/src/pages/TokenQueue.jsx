@@ -299,7 +299,7 @@ const TokenQueue = () => {
               aria-expanded={moreOpen}
               aria-controls={`row-more-${t.id}`}
               onClick={() => (moreOpen ? closeMore(true) : setOpenMore({ id: t.id, status: t.queue_status }))}
-              className="-my-1.5 md:my-0 h-10 w-10 md:h-8 md:w-8 flex items-center justify-center rounded-lg text-ink/55 hover:text-ink hover:bg-ink/[0.05] transition text-lg leading-none flex-shrink-0"
+              className="-my-1.5 md:my-0 h-10 w-10 md:h-8 md:w-8 flex items-center justify-center rounded-lg border border-ink/[0.12] text-ink/80 hover:text-ink hover:bg-ink/[0.04] transition text-lg leading-none flex-shrink-0"
             >⋯</button>
           )}
         </div>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getBookingStats, getBookings } from '../services/booking.service';
-import { getDoctors, getTokenQueue, updateTokenStatus } from '../services/clinic.service';
+import { getBookingStats, getBookings, completeBooking } from '../services/booking.service';
+import { getDoctors, getQueue, updateTokenStatus, setAppointmentQueueStatus } from '../services/clinic.service';
+import { getErrorMessage } from '../utils/errorMessage';
 import { getHITLConversations } from '../services/conversation.service';
 import { StatCardSkeleton, TableRowSkeleton, CardSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
@@ -11,6 +12,32 @@ import { plural } from '../utils/plural';
 import LoadError from '../components/LoadError';
 import NewBookingModal from '../components/NewBookingModal';
 import usePollWhileVisible from '../hooks/usePollWhileVisible';
+
+// The queue block uses the unified queue (GET /clinic/queue): token and appointment rows, queue_status waiting | arrived | in_consult | done.
+// These small helpers match the ones in pages/TokenQueue.jsx (same labels, colours and order).
+const PILL_STATUS = { waiting: 'waiting', arrived: 'arrived', in_consult: 'in_progress', done: 'done' };
+
+const isTokenRow = (r) => r.token_number !== null && r.token_number !== undefined;
+
+// "14:05" -> "2:05 PM"; null for a missing or malformed time
+const fmtClock = (t) => {
+  if (!t) return null;
+  const [h, m] = String(t).split(':').map(Number);
+  if (!Number.isInteger(h) || !Number.isInteger(m)) return null;
+  return `${h > 12 ? h - 12 : h || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+
+// Token rows by slot_time (missing last), then token number; appointment rows keep the order the server gives
+const sortTokenRows = (rows) => [...rows].sort((a, b) => {
+  const sa = a.slot_time || null;
+  const sb = b.slot_time || null;
+  if (sa !== sb) {
+    if (sa === null) return 1;
+    if (sb === null) return -1;
+    return sa < sb ? -1 : 1;
+  }
+  return (a.token_number || 0) - (b.token_number || 0);
+});
 
 const Dashboard = () => {
   const [stats, setStats] = useState({ bookingsToday: 0, activeConversations: 0, availableDoctors: 0, pendingTokens: 0 });
@@ -43,7 +70,7 @@ const Dashboard = () => {
         getBookingStats().catch(() => { statsDidFail = true; return { data: { total: 0 } }; }),
         isDoctor ? Promise.resolve({ data: [] }) : getHITLConversations({ since: '24h' }).catch(() => ({ data: { conversations: [] } })),
         getDoctors().catch(() => { doctorsDidFail = true; return { data: [] }; }),
-        getTokenQueue().catch(() => ({ data: [] })),
+        getQueue().catch(() => ({ data: [] })),
         // page AND limit: the server only limits the list when both are sent (response shape is the same: { bookings, total, page, limit })
         getBookings({ page: 1, limit: 5 }).catch(() => ({ data: { bookings: [] } }))
       ]);
@@ -67,7 +94,7 @@ const Dashboard = () => {
           bookingsToday: isDoctor ? filteredByDoctor.length : totalBookings,
           activeConversations: activeConvs.length,
           availableDoctors: availableDocsArray.length,
-          pendingTokens: filteredByDoctor.filter(t => t.status === 'arrived').length
+          pendingTokens: filteredByDoctor.filter(t => t.queue_status === 'arrived').length
         },
         tokenQueue: filteredByDoctor,
         recentConversations: activeConvs.slice(0, 5),
@@ -93,7 +120,8 @@ const Dashboard = () => {
       const cached = await loadFromCache('dashboard');
       if (cached) {
         setStats(cached.stats);
-        setTokenQueue(cached.tokenQueue);
+        // A copy saved before the unified queue has the old row shape (no queue_status): those rows are dropped
+        setTokenQueue((cached.tokenQueue || []).filter(r => r && r.queue_status));
         setRecentConversations(cached.recentConversations);
         setRecentBookings(cached.recentBookings);
         setDoctors(cached.doctors);
@@ -112,10 +140,29 @@ const Dashboard = () => {
   // separate visibility listener, so there is exactly one refresh on showing the tab). Called here, below fetchDashboardData's definition.
   usePollWhileVisible(fetchDashboardData, 30000);
 
-  const filteredTokens = activeFilter === 'all' ? tokenQueue
-    : activeFilter === 'arrived' ? tokenQueue.filter(t => t.status === 'arrived')
-      : activeFilter === 'in_consult' ? tokenQueue.filter(t => t.status === 'in_progress')
-        : tokenQueue.filter(t => t.status === 'done' || t.status === 'completed');
+  // Same order as Today's queue: token rows by session time and number, then appointment rows in the server's order
+  const orderedQueue = [...sortTokenRows(tokenQueue.filter(isTokenRow)), ...tokenQueue.filter(r => !isTokenRow(r))];
+  const filteredTokens = activeFilter === 'all' ? orderedQueue
+    : activeFilter === 'arrived' ? orderedQueue.filter(t => t.queue_status === 'arrived')
+      : activeFilter === 'in_consult' ? orderedQueue.filter(t => t.queue_status === 'in_consult')
+        : orderedQueue.filter(t => t.queue_status === 'done');
+
+  // One status action (same pattern as Today's queue): a failure shows the server's message in a toast; the queue is refreshed either way
+  const runQueueAction = async (row, action) => {
+    setLoadingToken(row.id);
+    try {
+      await action();
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Could not update this patient. Try again.'), 'error');
+    } finally {
+      try {
+        const res = await getQueue();
+        const rows = res?.data || [];
+        setTokenQueue(isDoctor ? rows.filter(r => r.doctor_id === staffDoctorId) : rows);
+      } catch { /* the next refresh will bring it up to date */ }
+      setLoadingToken(null);
+    }
+  };
 
   const getStatusPill = (status) => {
     switch (status) {
@@ -259,12 +306,12 @@ const Dashboard = () => {
       {/* Section 3 — Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-6">
 
-        {/* Left — Live Token Queue */}
+        {/* Left — Today's queue (tokens and appointments) */}
         <div className={`lg:col-span-2 ${cardBase} overflow-hidden`}>
           <div className="px-6 py-4 border-b border-ink/[0.08] flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-semibold tracking-tight">Live Token Queue</span>
+              <span className="font-semibold tracking-tight">Today's queue</span>
             </div>
             <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-full bg-ink/[0.06] text-ink/70">
               {tokenQueue.length}
@@ -289,7 +336,7 @@ const Dashboard = () => {
 
           {filteredTokens.length > 0 && (
             <div className={`${queueGrid} px-4 md:px-6 py-2.5 border-b border-ink/[0.08] bg-ink/[0.02] ${monoLabel} text-[10px] text-ink/45`}>
-              <span>Token</span>
+              <span>#</span>
               <span>Patient</span>
               <span className="hidden md:block">Doctor</span>
               <span className="hidden md:block">Status</span>
@@ -299,77 +346,63 @@ const Dashboard = () => {
 
           <div className="divide-y divide-ink/[0.08] max-h-[480px] overflow-y-auto">
             {filteredTokens.length === 0 ? (
-              <div className="p-12 text-center text-sm text-ink/55">No tokens in queue</div>
-            ) : filteredTokens.map(t => (
+              <div className="p-12 text-center text-sm text-ink/55">Nothing in the queue yet</div>
+            ) : filteredTokens.map(t => {
+              const tokenRow = isTokenRow(t);
+              const clockParts = fmtClock(t.slot_time) ? fmtClock(t.slot_time).split(' ') : null;
+              const busy = loadingToken === t.id;
+              return (
               <div key={t.id} className={`${queueGrid} px-4 md:px-6 py-3.5 hover:bg-ink/[0.02] transition`}>
-                <span className="inline-flex items-center justify-center h-8 px-2 rounded-md bg-ink/[0.05] font-mono text-[12px] font-semibold">
-                  {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
-                </span>
+                {tokenRow ? (
+                  <span className="inline-flex items-center justify-center h-8 px-2 rounded-md bg-ink/[0.05] font-mono text-[12px] font-semibold">
+                    {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
+                  </span>
+                ) : (
+                  <span className="inline-flex flex-col items-center justify-center h-9 px-1 rounded-md bg-ink/[0.05] font-mono font-semibold leading-tight">
+                    <span className="text-[11px]">{clockParts ? clockParts[0] : '—'}</span>
+                    {clockParts && <span className="text-[9px] text-ink/50">{clockParts[1]}</span>}
+                  </span>
+                )}
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{t.patient_name || 'Walk-in'}</p>
                   <p className="md:hidden text-xs text-ink/55 truncate">{t.doctor_name}</p>
-                  <div className="md:hidden mt-1.5">{getStatusPill(t.status)}</div>
+                  <div className="md:hidden mt-1.5">{getStatusPill(PILL_STATUS[t.queue_status] || t.queue_status)}</div>
                 </div>
                 <p className="hidden md:block text-sm text-ink/60 truncate">{t.doctor_name}</p>
-                <div className="hidden md:block">{getStatusPill(t.status)}</div>
+                <div className="hidden md:block">{getStatusPill(PILL_STATUS[t.queue_status] || t.queue_status)}</div>
                 <div className="flex items-center justify-end gap-2 md:min-w-[100px]">
-                  {t.status === 'waiting' && (
+                  {t.queue_status === 'waiting' && (
                     <button
-                      disabled={loadingToken === t.id}
-                      onClick={async () => {
-                        setLoadingToken(t.id);
-                        try {
-                          await updateTokenStatus(t.id, 'arrived');
-                          const res = await getTokenQueue();
-                          const tokens = res?.data || [];
-                          setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
-                        } catch (err) {
-                          alert(err?.error || err?.response?.data?.error || 'Failed to mark arrived');
-                        } finally { setLoadingToken(null); }
-                      }}
+                      disabled={busy}
+                      onClick={() => runQueueAction(t, () => (tokenRow ? updateTokenStatus(t.token_id, 'arrived') : setAppointmentQueueStatus(t.id, 'arrived')))}
                       className="px-3 py-1 text-xs font-semibold text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition"
-                    >{loadingToken === t.id ? '...' : 'Mark arrived'}</button>
+                    >{busy ? '...' : 'Mark arrived'}</button>
                   )}
-                  {t.status === 'arrived' && (
+                  {(t.queue_status === 'arrived' || (!tokenRow && t.queue_status === 'waiting')) && (
                     <button
-                      disabled={loadingToken === t.id || tokenQueue.some(tk => tk.doctor_id === t.doctor_id && tk.status === 'in_progress')}
-                      onClick={async () => {
-                        setLoadingToken(t.id);
-                        try {
-                          await updateTokenStatus(t.id, 'in_progress');
-                          const res = await getTokenQueue();
-                          const tokens = res?.data || [];
-                          setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
-                        } catch (err) {
-                          alert(err?.error || err?.response?.data?.error || 'Doctor already has a patient in consult');
-                        } finally { setLoadingToken(null); }
-                      }}
+                      disabled={busy || tokenQueue.some(tk => tk.doctor_id === t.doctor_id && tk.queue_status === 'in_consult')}
+                      onClick={() => runQueueAction(t, () => (tokenRow ? updateTokenStatus(t.token_id, 'in_progress') : setAppointmentQueueStatus(t.id, 'in_consult')))}
                       className="px-3 py-1 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition"
-                    >{loadingToken === t.id ? '...' : 'Call in'}</button>
+                    >{busy ? '...' : 'Call in'}</button>
                   )}
-                  {t.status === 'in_progress' && (
+                  {t.queue_status === 'in_consult' && (
                     <button
-                      disabled={loadingToken === t.id}
-                      onClick={async () => {
-                        setLoadingToken(t.id);
-                        try {
-                          await updateTokenStatus(t.id, 'completed');
-                          const res = await getTokenQueue();
-                          const tokens = res?.data || [];
-                          setTokenQueue(isDoctor ? tokens.filter(tk => tk.doctor_id === staffDoctorId) : tokens);
-                        } catch {}
-                        finally { setLoadingToken(null); }
-                      }}
+                      disabled={busy}
+                      onClick={() => runQueueAction(t, () => (tokenRow ? updateTokenStatus(t.token_id, 'completed') : completeBooking(t.id)))}
                       className="px-3 py-1 text-xs font-semibold text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
-                    >{loadingToken === t.id ? '...' : 'Finish'}</button>
+                    >{busy ? '...' : 'Finish'}</button>
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
-          <div className="px-6 py-3 border-t border-ink/[0.08] bg-ink/[0.02]">
-            <p className="text-sm text-ink/55">Showing {filteredTokens.length} of {plural(tokenQueue.length, 'token')} today</p>
+          <div className="px-6 py-3 border-t border-ink/[0.08] bg-ink/[0.02] flex items-center justify-between gap-3">
+            <p className="text-sm text-ink/55">Showing {filteredTokens.length} of {plural(tokenQueue.length, 'patient')} today</p>
+            <Link to="/queue" className="text-sm font-semibold text-ink hover:text-ink/70 flex-shrink-0">
+              View all →
+            </Link>
           </div>
         </div>
 
@@ -451,10 +484,10 @@ const Dashboard = () => {
                 )}
                 <div className="flex gap-3 mt-2.5 font-mono text-[11px] text-ink/55">
                   <span>
-                    Seen: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'done' || t.status === 'completed')).length}
+                    Seen: {tokenQueue.filter(t => t.doctor_name === d.name && t.queue_status === 'done').length}
                   </span>
                   <span>
-                    Queue: {tokenQueue.filter(t => t.doctor_name === d.name && (t.status === 'waiting' || t.status === 'in_progress')).length}
+                    Queue: {tokenQueue.filter(t => t.doctor_name === d.name && (t.queue_status === 'waiting' || t.queue_status === 'in_consult')).length}
                   </span>
                 </div>
               </div>
