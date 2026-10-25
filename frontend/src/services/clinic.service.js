@@ -33,6 +33,16 @@ export async function updateTokenStatus(id, status) {
   return api.patch(`/clinic/tokens/${id}/status`, { status });
 }
 
+// Today's live queue for tokens and appointments (one row per booking)
+export async function getQueue() {
+  return api.get('/clinic/queue');
+}
+
+// Appointment rows only (uses the booking id): status is 'arrived' or 'in_consult'. Token rows keep using updateTokenStatus.
+export async function setAppointmentQueueStatus(bookingId, status) {
+  return api.patch(`/bookings/${bookingId}/queue-status`, { status });
+}
+
 export async function getDoctorSchedule(doctorId) {
   return api.get(`/clinic/doctors/${doctorId}/schedule`);
 }

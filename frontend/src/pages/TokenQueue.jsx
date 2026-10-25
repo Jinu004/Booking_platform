@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getTokenQueue, updateTokenStatus } from '../services/clinic.service';
+import { getQueue, updateTokenStatus, setAppointmentQueueStatus } from '../services/clinic.service';
+import { completeBooking } from '../services/booking.service';
 import { getStoredStaff } from '../services/auth.service';
 import { plural } from '../utils/plural';
 import { getErrorMessage } from '../utils/errorMessage';
 import LoadError from '../components/LoadError';
+import NewBookingModal from '../components/NewBookingModal';
 import usePollWhileVisible from '../hooks/usePollWhileVisible';
+import useStore from '../store/useStore';
+
+// The queue serves token bookings and appointment bookings from one list. queue_status is waiting | arrived | in_consult | done.
+// The pill keeps the page's existing wording and colours: waiting = "Booked", arrived = "Waiting", in_consult = "In Consult", done = "Done".
+const PILL_STATUS = { waiting: 'waiting', arrived: 'arrived', in_consult: 'in_progress', done: 'done' };
 
 const getStatusPill = (status) => {
   switch (status) {
@@ -24,16 +31,60 @@ const getStatusPill = (status) => {
   }
 };
 
+// "14:05" -> "2:05 PM"; null for a missing or malformed time
+const fmtClock = (t) => {
+  if (!t) return null;
+  const [h, m] = String(t).split(':').map(Number);
+  if (!Number.isInteger(h) || !Number.isInteger(m)) return null;
+  return `${h > 12 ? h - 12 : h || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+
+// "HH:MM" -> minutes since midnight; null when missing or malformed
+const minutesOf = (t) => {
+  const match = /^([01]?[0-9]|2[0-3]):([0-5][0-9])/.exec(String(t || ''));
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+};
+
+// The current time in India as minutes since midnight (null if the time zone is not available)
+const nowMinutesIST = () => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+    const h = Number(parts.find(p => p.type === 'hour')?.value) % 24;
+    const m = Number(parts.find(p => p.type === 'minute')?.value);
+    return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
+  } catch {
+    return null;
+  }
+};
+
+const isTokenRow = (r) => r.token_number !== null && r.token_number !== undefined;
+
+// Token rows keep the order the old token endpoint gave: by slot_time (missing last), then token number
+const sortTokenRows = (rows) => [...rows].sort((a, b) => {
+  const sa = a.slot_time || null;
+  const sb = b.slot_time || null;
+  if (sa !== sb) {
+    if (sa === null) return 1;
+    if (sb === null) return -1;
+    return sa < sb ? -1 : 1;
+  }
+  return (a.token_number || 0) - (b.token_number || 0);
+});
+
+const LATE_AFTER_MINUTES = 10;
+
 const TokenQueue = () => {
-  const [tokenQueue, setTokenQueue] = useState([]);
+  const [queue, setQueue] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
-  const [loadingToken, setLoadingToken] = useState(null);
+  const [loadingId, setLoadingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [doctorFilter, setDoctorFilter] = useState('all');
   const [collapsedSessions, setCollapsedSessions] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [loadError, setLoadError] = useState('');   // the last load failed
   const [hasLoaded, setHasLoaded] = useState(false); // a load has worked at least once, so there is good data to keep on screen
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const { addToast } = useStore();
 
   const staff = getStoredStaff();
   const isDoctor = staff?.role === 'doctor';
@@ -41,14 +92,14 @@ const TokenQueue = () => {
 
   const fetchQueue = async () => {
     try {
-      const res = await getTokenQueue();
-      const tokens = res?.data || [];
-      setTokenQueue(isDoctor ? tokens.filter(t => t.doctor_id === staffDoctorId) : tokens);
+      const res = await getQueue();
+      const rows = res?.data || [];
+      setQueue(isDoctor ? rows.filter(t => t.doctor_id === staffDoctorId) : rows);
       setLoadError('');
       setHasLoaded(true);
     } catch (err) {
       // The last good data stays on screen; it is replaced by an error only while there is none
-      setLoadError(getErrorMessage(err, 'Could not load the token queue. Try again.'));
+      setLoadError(getErrorMessage(err, 'Could not load the queue. Try again.'));
     }
     finally { setLoading(false); }
   };
@@ -59,27 +110,146 @@ const TokenQueue = () => {
   // Refreshes every 15 s while the tab is visible; paused when hidden, refreshed once when it is shown again
   usePollWhileVisible(fetchQueue, 15000);
 
-  const doctors = [...new Set(tokenQueue.map(t => t.doctor_name))].filter(Boolean);
+  // One status action: a failure shows the server's message in a toast; the list is refreshed either way
+  const runAction = async (row, action) => {
+    setLoadingId(row.id);
+    try {
+      await action();
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Could not update this patient. Try again.'), 'error');
+    } finally {
+      await fetchQueue();
+      setLoadingId(null);
+    }
+  };
 
-  const filteredTokens = tokenQueue
-    .filter(t => activeFilter === 'all' ? (t.status !== 'done' && t.status !== 'completed' && t.status !== 'cancelled') : (activeFilter === 'arrived' ? t.status === 'arrived' : activeFilter === 'in_consult' ? t.status === 'in_progress' : t.status === 'done' || t.status === 'completed'))
+  const doctors = [...new Set(queue.map(t => t.doctor_name))].filter(Boolean);
+
+  const statusMatches = (t) => (
+    activeFilter === 'all' ? t.queue_status !== 'done'
+      : activeFilter === 'arrived' ? t.queue_status === 'arrived'
+        : activeFilter === 'in_consult' ? t.queue_status === 'in_consult'
+          : t.queue_status === 'done'
+  );
+
+  const filteredRows = queue
+    .filter(statusMatches)
     .filter(t => doctorFilter === 'all' || t.doctor_name === doctorFilter)
     .filter(t => !searchQuery || (t.patient_name || '').toLowerCase().includes(searchQuery.toLowerCase()) || (t.patient_phone || '').includes(searchQuery));
 
+  // Token rows in the old order, appointment rows in the order the server gives (doctor, status, time)
+  const tokenRows = sortTokenRows(filteredRows.filter(isTokenRow));
+  const appointmentRows = filteredRows.filter(r => !isTokenRow(r));
+
+  // "Up next": per doctor with nobody in consult, the first arrived row (else the first waiting row) in list order
+  const upNextIds = new Set();
+  {
+    const ordered = [...sortTokenRows(queue.filter(isTokenRow)), ...queue.filter(r => !isTokenRow(r))];
+    const byDoctor = {};
+    ordered.forEach(r => { (byDoctor[r.doctor_id] = byDoctor[r.doctor_id] || []).push(r); });
+    Object.values(byDoctor).forEach(rows => {
+      if (rows.some(r => r.queue_status === 'in_consult')) return;
+      const next = rows.find(r => r.queue_status === 'arrived') || rows.find(r => r.queue_status === 'waiting');
+      if (next) upNextIds.add(next.id);
+    });
+  }
+  const nowMins = nowMinutesIST();
+
+  const count = (status) => queue.filter(t => t.queue_status === status).length;
   const tabs = [
-    { key: 'all', label: 'All', count: tokenQueue.length },
-    { key: 'arrived', label: 'Waiting', count: tokenQueue.filter(t => t.status === 'arrived').length },
-    { key: 'in_consult', label: 'In Consult', count: tokenQueue.filter(t => t.status === 'in_progress').length },
-    { key: 'done', label: 'Done', count: tokenQueue.filter(t => t.status === 'done' || t.status === 'completed').length },
+    { key: 'all', label: 'All', count: queue.length },
+    { key: 'arrived', label: 'Waiting', count: count('arrived') },
+    { key: 'in_consult', label: 'In Consult', count: count('in_consult') },
+    { key: 'done', label: 'Done', count: count('done') },
   ];
+
+  const doctorBusy = (t) => queue.some(x => x.doctor_id === t.doctor_id && x.queue_status === 'in_consult');
+
+  const renderRow = (t) => {
+    const tokenRow = isTokenRow(t);
+    const clock = fmtClock(t.slot_time);
+    const clockParts = clock ? clock.split(' ') : null;
+    const endClock = fmtClock(t.end_time);
+    const startMins = minutesOf(t.slot_time);
+    const isLate = !tokenRow && t.queue_status === 'waiting' && startMins !== null && nowMins !== null && nowMins - startMins > LATE_AFTER_MINUTES;
+    const busy = loadingId === t.id;
+    const btn = 'px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-white rounded-lg disabled:opacity-50 transition';
+    return (
+      <div key={t.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-3 md:px-6 py-4 md:py-5 hover:bg-ink/[0.02] transition">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          {tokenRow ? (
+            <div className="w-10 h-10 md:w-14 md:h-14 bg-ink/[0.05] rounded-xl flex items-center justify-center font-mono font-semibold text-ink text-sm md:text-base flex-shrink-0">
+              {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
+            </div>
+          ) : (
+            <div className="w-10 h-10 md:w-14 md:h-14 bg-ink/[0.05] rounded-xl flex flex-col items-center justify-center font-mono font-semibold text-ink leading-tight flex-shrink-0">
+              <span className="text-[11px] md:text-sm">{clockParts ? clockParts[0] : '—'}</span>
+              {clockParts && <span className="text-[9px] md:text-[10px] text-ink/50">{clockParts[1]}</span>}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="font-semibold text-ink text-base truncate">{t.patient_name || 'Walk-in'}</p>
+            <p className="text-sm text-ink/60 font-medium">{t.doctor_name}</p>
+            {t.patient_phone && <p className="text-xs text-ink/40">{t.patient_phone}</p>}
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              {tokenRow
+                ? (clock && <span className="text-xs text-ink/40">🕘 {clock}</span>)
+                : (clock && <span className="text-xs text-ink/40">{clock}{endClock ? ` - ${endClock}` : ''}</span>)}
+              {t.source === 'walkin' ? (
+                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">Walk-in</span>
+              ) : t.source === 'whatsapp' ? (
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">WhatsApp</span>
+              ) : null}
+              {upNextIds.has(t.id) && (
+                <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-full font-semibold">Up next</span>
+              )}
+              {isLate && (
+                <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">Late</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 pl-14 md:pl-0 md:flex-shrink-0">
+          {getStatusPill(PILL_STATUS[t.queue_status] || t.queue_status)}
+          {t.queue_status === 'waiting' && (
+            <button
+              disabled={busy}
+              onClick={() => runAction(t, () => (tokenRow ? updateTokenStatus(t.token_id, 'arrived') : setAppointmentQueueStatus(t.id, 'arrived')))}
+              className={`${btn} bg-amber-500 hover:bg-amber-600`}
+            >{busy ? '...' : 'Mark arrived'}</button>
+          )}
+          {(t.queue_status === 'arrived' || (!tokenRow && t.queue_status === 'waiting')) && (
+            <button
+              disabled={busy || doctorBusy(t)}
+              onClick={() => runAction(t, () => (tokenRow ? updateTokenStatus(t.token_id, 'in_progress') : setAppointmentQueueStatus(t.id, 'in_consult')))}
+              className={`${btn} bg-blue-500 hover:bg-blue-600`}
+            >{busy ? '...' : 'Call in'}</button>
+          )}
+          {t.queue_status === 'in_consult' && (
+            <button
+              disabled={busy}
+              onClick={() => runAction(t, () => (tokenRow ? updateTokenStatus(t.token_id, 'completed') : completeBooking(t.id)))}
+              className={`${btn} bg-green-500 hover:bg-green-600`}
+            >{busy ? '...' : 'Finish'}</button>
+          )}
+          {(t.patient_id || t.customer_id) && (
+            <Link
+              to={`/patients/${t.patient_id || t.customer_id}`}
+              className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-ink/80 border border-ink/[0.12] rounded-lg hover:bg-ink/[0.04] transition"
+            >Profile</Link>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
           <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse inline-block flex-shrink-0"></span>
-          <h1 className="text-xl md:text-[28px] font-semibold tracking-[-0.035em] text-ink whitespace-nowrap">Live Token Queue</h1>
-          <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-full bg-ink/[0.06] text-ink/70">{tokenQueue.length}</span>
+          <h1 className="text-xl md:text-[28px] font-semibold tracking-[-0.035em] text-ink whitespace-nowrap">Today's queue</h1>
+          <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-full bg-ink/[0.06] text-ink/70">{queue.length}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -99,14 +269,21 @@ const TokenQueue = () => {
               {doctors.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           )}
+          <button
+            type="button"
+            onClick={() => setBookingOpen(true)}
+            className="px-4 py-2 text-sm font-medium bg-brand text-white rounded-lg hover:bg-brand-hover transition"
+          >
+            + New booking
+          </button>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-ink/55 mb-3 px-1">
-        <span>Today: <strong className="text-ink">{tokenQueue.length}</strong></span>
-        <span>· Waiting: <strong className="text-amber-600">{tokenQueue.filter(t => t.status === 'arrived').length}</strong></span>
-        <span>· In Consult: <strong className="text-blue-600">{tokenQueue.filter(t => t.status === 'in_progress').length}</strong></span>
-        <span>· Done: <strong className="text-green-600">{tokenQueue.filter(t => t.status === 'done' || t.status === 'completed').length}</strong></span>
+        <span>Today: <strong className="text-ink">{queue.length}</strong></span>
+        <span>· Waiting: <strong className="text-amber-600">{count('arrived')}</strong></span>
+        <span>· In Consult: <strong className="text-blue-600">{count('in_consult')}</strong></span>
+        <span>· Done: <strong className="text-green-600">{count('done')}</strong></span>
       </div>
       <div className="bg-white rounded-2xl border border-ink/[0.08] shadow-card overflow-hidden">
         <div className="flex gap-1.5 px-3 md:px-4 py-3 border-b border-ink/[0.06]">
@@ -130,109 +307,62 @@ const TokenQueue = () => {
           <div className="p-12 text-center text-sm text-ink/40">Loading queue...</div>
         ) : loadError && !hasLoaded ? (
           <div className="p-6"><LoadError message={loadError} onRetry={fetchQueue} /></div>
-        ) : filteredTokens.length === 0 ? (
-          <div className="p-12 text-center text-sm text-ink/40">No tokens in this queue</div>
+        ) : filteredRows.length === 0 ? (
+          <div className="p-12 text-center text-sm text-ink/40">Nothing in the queue yet</div>
         ) : (
           <div className="divide-y divide-ink/[0.08]">
             {(() => {
-              const fmtSlot = t => { if (!t) return null; const [h,m] = t.split(':').map(Number); return `${h>12?h-12:h||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`; };
-              const renderToken = (t) => (
-                <div key={t.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-3 md:px-6 py-4 md:py-5 hover:bg-ink/[0.02] transition">
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="w-10 h-10 md:w-14 md:h-14 bg-ink/[0.05] rounded-xl flex items-center justify-center font-mono font-semibold text-ink text-sm md:text-base flex-shrink-0">
-                      {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
+              const tokenBlock = (() => {
+                if (tokenRows.length === 0) return null;
+                const uniqueSlots = [...new Set(tokenRows.map(t => t.slot_time).filter(Boolean))];
+                if (uniqueSlots.length > 1 || isDoctor) {
+                  const slotKeys = [...new Set(tokenRows.map(t => t.slot_time || 'walkin'))];
+                  return slotKeys.map((key, ki) => {
+                    const group = tokenRows.filter(t => (t.slot_time || 'walkin') === key);
+                    const label = key === 'walkin' ? 'Walk-ins' : `Session ${ki + 1} — ${fmtClock(key) || key}`;
+                    const allDone = group.every(t => t.queue_status === 'done');
+                    const isCollapsed = collapsedSessions[key] !== undefined ? collapsedSessions[key] : allDone;
+                    return (
+                      <React.Fragment key={key}>
+                        <div
+                          className="px-4 py-2 bg-ink/[0.03] font-mono text-[11px] font-medium text-ink/55 uppercase tracking-[0.08em] border-b border-ink/[0.06] flex items-center justify-between cursor-pointer select-none"
+                          onClick={() => setCollapsedSessions(prev => ({ ...prev, [key]: !isCollapsed }))}
+                        >
+                          <span>{label} <span className="ml-2 font-normal text-ink/40">({plural(group.length, 'patient')})</span></span>
+                          <span>{isCollapsed ? '▸' : '▾'}</span>
+                        </div>
+                        {!isCollapsed && group.map(t => renderRow(t))}
+                      </React.Fragment>
+                    );
+                  });
+                }
+                return tokenRows.map(t => renderRow(t));
+              })();
+              return (
+                <>
+                  {tokenBlock}
+                  {appointmentRows.length > 0 && tokenRows.length > 0 && (
+                    <div className="px-4 py-2 bg-ink/[0.03] font-mono text-[11px] font-medium text-ink/55 uppercase tracking-[0.08em] border-b border-ink/[0.06]">
+                      Appointments <span className="ml-2 font-normal text-ink/40">({plural(appointmentRows.length, 'patient')})</span>
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-ink text-base truncate">{t.patient_name || 'Walk-in'}</p>
-                      <p className="text-sm text-ink/60 font-medium">{t.doctor_name}</p>
-                      {t.patient_phone && <p className="text-xs text-ink/40">{t.patient_phone}</p>}
-                      <div className="flex items-center gap-2 mt-1">
-                        {t.slot_time && <span className="text-xs text-ink/40">🕘 {fmtSlot(t.slot_time)}</span>}
-                        {t.source === 'walkin' ? (
-                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">Walk-in</span>
-                        ) : t.source === 'whatsapp' ? (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">WhatsApp</span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 md:gap-3 pl-14 md:pl-0 md:flex-shrink-0">
-                    {getStatusPill(t.status)}
-                    {t.status === 'waiting' && (
-                      <button
-                        disabled={loadingToken === t.id}
-                        onClick={async () => {
-                          setLoadingToken(t.id);
-                          try { await updateTokenStatus(t.id, 'arrived'); await fetchQueue(); }
-                          catch (err) { alert(err?.error || 'Failed'); }
-                          finally { setLoadingToken(null); }
-                        }}
-                        className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition"
-                      >{loadingToken === t.id ? '...' : 'Mark arrived'}</button>
-                    )}
-                    {t.status === 'arrived' && (
-                      <button
-                        disabled={loadingToken === t.id || tokenQueue.some(tk => tk.doctor_id === t.doctor_id && tk.status === 'in_progress')}
-                        onClick={async () => {
-                          setLoadingToken(t.id);
-                          try { await updateTokenStatus(t.id, 'in_progress'); await fetchQueue(); }
-                          catch (err) { alert(err?.error || 'Doctor already has a patient in consult'); }
-                          finally { setLoadingToken(null); }
-                        }}
-                        className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition"
-                      >{loadingToken === t.id ? '...' : 'Call in'}</button>
-                    )}
-                    {t.status === 'in_progress' && (
-                      <button
-                        disabled={loadingToken === t.id}
-                        onClick={async () => {
-                          setLoadingToken(t.id);
-                          try { await updateTokenStatus(t.id, 'completed'); await fetchQueue(); }
-                          catch {} finally { setLoadingToken(null); }
-                        }}
-                        className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
-                      >{loadingToken === t.id ? '...' : 'Finish'}</button>
-                    )}
-                    {(t.patient_id || t.customer_id) && (
-                      <Link
-                        to={`/patients/${t.patient_id || t.customer_id}`}
-                        className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-ink/80 border border-ink/[0.12] rounded-lg hover:bg-ink/[0.04] transition"
-                      >Profile</Link>
-                    )}
-                  </div>
-                </div>
+                  )}
+                  {appointmentRows.map(t => renderRow(t))}
+                </>
               );
-              const uniqueSlots = [...new Set(filteredTokens.map(t => t.slot_time).filter(Boolean))];
-              if (uniqueSlots.length > 1 || isDoctor) {
-                const slotKeys = [...new Set(filteredTokens.map(t => t.slot_time || 'walkin'))];
-                return slotKeys.map((key, ki) => {
-                  const group = filteredTokens.filter(t => (t.slot_time || 'walkin') === key);
-                  const label = key === 'walkin' ? 'Walk-ins' : `Session ${ki + 1} — ${fmtSlot(key)}`;
-                  const allDone = group.every(t => t.status === 'done' || t.status === 'completed' || t.status === 'cancelled');
-                  const isCollapsed = collapsedSessions[key] !== undefined ? collapsedSessions[key] : allDone;
-                  return (
-                    <React.Fragment key={key}>
-                      <div
-                        className="px-4 py-2 bg-ink/[0.03] font-mono text-[11px] font-medium text-ink/55 uppercase tracking-[0.08em] border-b border-ink/[0.06] flex items-center justify-between cursor-pointer select-none"
-                        onClick={() => setCollapsedSessions(prev => ({ ...prev, [key]: !isCollapsed }))}
-                      >
-                        <span>{label} <span className="ml-2 font-normal text-ink/40">({plural(group.length, 'token')})</span></span>
-                        <span>{isCollapsed ? '▸' : '▾'}</span>
-                      </div>
-                      {!isCollapsed && group.map(t => renderToken(t))}
-                    </React.Fragment>
-                  );
-                });
-              }
-              return filteredTokens.map(t => renderToken(t));
             })()}
           </div>
         )}
 
         <div className="px-6 py-3 border-t border-ink/[0.06] bg-ink/[0.02] text-sm text-ink/55">
-          Showing {filteredTokens.length} of {plural(tokenQueue.length, 'token')} today
+          Showing {filteredRows.length} of {plural(queue.length, 'patient')} today
         </div>
       </div>
+
+      <NewBookingModal
+        open={bookingOpen}
+        onClose={() => setBookingOpen(false)}
+        onSaved={fetchQueue}
+      />
     </div>
   );
 };
