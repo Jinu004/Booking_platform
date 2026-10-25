@@ -271,6 +271,11 @@ async function updateDoctor(req, res, next) {
       return errorResponse(res, 'Doctor not found', 404);
     }
 
+    // A changed consultation fee is part of the clinic information the AI quotes: let it ignore its own older replies
+    if (req.body.consultationFee !== undefined) {
+      await require('../../tenant/tenant.service').touchAiInfo(tenantId);
+    }
+
     return successResponse(res, result.rows[0]);
   } catch (err) {
     next(err);

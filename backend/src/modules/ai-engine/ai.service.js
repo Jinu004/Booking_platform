@@ -253,6 +253,9 @@ async function processMessage(context) {
         // Gemini uses 'model' not 'assistant' for AI role
         // Skip the last message — it will be sent fresh
         const errorPhrases = ['having trouble', 'could not process', 'try again'];
+        // With the CLINIC INFORMATION block, the AI's own replies from before the clinic last changed its information are not shown
+        // to the model (NaN, so nothing is skipped, when there is no block or no valid timestamp)
+        const infoChangedMs = additionalData.clinicInfoBlock ? Date.parse(configs.ai_info_changed_at || '') : NaN;
 
         const history = (recentMessages || [])
           .slice(-21, -1)
@@ -266,6 +269,7 @@ async function processMessage(context) {
               // With the CLINIC INFORMATION block, earlier assistant replies that talk about offers or discounts are left out:
               // the block is the only source of the clinic's current offers (patient messages are never dropped here)
               if (additionalData.clinicInfoBlock && /\b(offers?|discounts?)\b/i.test(msg.content || '')) return false;
+              if (Number.isFinite(infoChangedMs) && new Date(msg.created_at).getTime() < infoChangedMs) return false;
             }
             return true;
           })

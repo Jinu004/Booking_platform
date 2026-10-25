@@ -105,7 +105,8 @@ const RESERVED_CONFIG_KEYS = new Set([
   'wa_last_alert_event',
   'wa_app_reminder_last',
   'wa_app_reminder_enabled',
-  'ai_guided_kb'
+  'ai_guided_kb',
+  'ai_info_changed_at'
 ]);
 
 const setConfig = async (req, res) => {
@@ -139,7 +140,7 @@ const getAllConfigs = async (req, res) => {
     const configs = await tenantService.getAllConfigs(id);
     if (req.staff?.role === 'super_admin') return successResponse(res, configs, 200);
     // Internal connection and reminder keys (wa_*) and the guided knowledge base switch are for super admins only
-    const visible = Object.fromEntries(Object.entries(configs).filter(([key]) => !key.startsWith('wa_') && key !== 'ai_guided_kb'));
+    const visible = Object.fromEntries(Object.entries(configs).filter(([key]) => !key.startsWith('wa_') && key !== 'ai_guided_kb' && key !== 'ai_info_changed_at'));
     return successResponse(res, visible, 200);
   } catch (error) {
     return errorResponse(res, error.message, 404);

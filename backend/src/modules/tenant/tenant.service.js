@@ -234,6 +234,19 @@ const setConfig = async (tenantId, key, value) => {
 };
 
 /**
+ * Records that the clinic's information changed (answers, treatments, offers, hours, phone, address, fees). The AI then ignores its own
+ * earlier replies older than this moment when it has the CLINIC INFORMATION block. Best effort: a failure is only logged, never thrown,
+ * so it can never fail the save that called it.
+ */
+const touchAiInfo = async (tenantId) => {
+  try {
+    await setConfig(tenantId, 'ai_info_changed_at', new Date().toISOString());
+  } catch (err) {
+    logger.warn(`AI_INFO_TOUCH_FAILED tenant=${tenantId} ${String(err && err.message).slice(0, 100)}`);
+  }
+};
+
+/**
  * Makes sure the clinic has a tenant_settings row (same defaults as createTenant: the table's own column defaults).
  * Safe to call any number of times: an existing row is left exactly as it is.
  */
@@ -298,6 +311,7 @@ module.exports = {
   updateTenant,
   setConfig,
   ensureTenantSettings,
+  touchAiInfo,
   getAllConfigs,
   getConfig,
   setDefaultConfigs,

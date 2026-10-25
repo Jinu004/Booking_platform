@@ -126,6 +126,7 @@ async function putAiFaq(req, res, next) {
       [req.tenantId, JSON.stringify(toSet), toRemove]
     )
     await audit(req, 'ai_faq_updated', 'ai_faq', req.tenantId, keys)
+    await TenantService.touchAiInfo(req.tenantId)
     return successResponse(res, withAllFaqKeys(result.rows[0]?.ai_faq))
   } catch (err) {
     next(err)
@@ -196,6 +197,7 @@ async function createTreatment(req, res, next) {
     )
     if (!result.rows.length) return errorResponse(res, `You can add up to ${MAX_TREATMENTS} treatments`, 409)
     await audit(req, 'treatment_created', 'clinic_treatment', result.rows[0].id, Object.keys(v))
+    await TenantService.touchAiInfo(req.tenantId)
     return successResponse(res, result.rows[0], 201)
   } catch (err) {
     next(err)
@@ -215,6 +217,7 @@ async function updateTreatment(req, res, next) {
     if (!updated) return errorResponse(res, 'Treatment not found', 404)
     const result = await pool.query(`SELECT ${TREATMENT_COLUMNS} FROM clinic_treatments WHERE id = $1 AND tenant_id = $2`, [req.params.id, req.tenantId])
     await audit(req, 'treatment_updated', 'clinic_treatment', req.params.id, Object.keys(v))
+    await TenantService.touchAiInfo(req.tenantId)
     return successResponse(res, result.rows[0])
   } catch (err) {
     next(err)
@@ -228,6 +231,7 @@ async function deleteTreatment(req, res, next) {
     const result = await pool.query('DELETE FROM clinic_treatments WHERE id = $1 AND tenant_id = $2 RETURNING id', [req.params.id, req.tenantId])
     if (!result.rows.length) return errorResponse(res, 'Treatment not found', 404)
     await audit(req, 'treatment_deleted', 'clinic_treatment', req.params.id, null)
+    await TenantService.touchAiInfo(req.tenantId)
     return successResponse(res, { id: req.params.id })
   } catch (err) {
     next(err)
@@ -339,6 +343,7 @@ async function createOffer(req, res, next) {
     const id = result.rows[0].id
     const saved = await pool.query(`${OFFER_SELECT} WHERE id = $1 AND tenant_id = $2`, [id, req.tenantId])
     await audit(req, 'offer_created', 'clinic_offer', id, Object.keys(v))
+    await TenantService.touchAiInfo(req.tenantId)
     return successResponse(res, saved.rows[0], 201)
   } catch (err) {
     next(err)
@@ -364,6 +369,7 @@ async function updateOffer(req, res, next) {
     if (!updated) return errorResponse(res, 'Offer not found', 404)
     const saved = await pool.query(`${OFFER_SELECT} WHERE id = $1 AND tenant_id = $2`, [req.params.id, req.tenantId])
     await audit(req, 'offer_updated', 'clinic_offer', req.params.id, Object.keys(v))
+    await TenantService.touchAiInfo(req.tenantId)
     return successResponse(res, saved.rows[0])
   } catch (err) {
     next(err)
@@ -377,6 +383,7 @@ async function deleteOffer(req, res, next) {
     const result = await pool.query('DELETE FROM clinic_offers WHERE id = $1 AND tenant_id = $2 RETURNING id', [req.params.id, req.tenantId])
     if (!result.rows.length) return errorResponse(res, 'Offer not found', 404)
     await audit(req, 'offer_deleted', 'clinic_offer', req.params.id, null)
+    await TenantService.touchAiInfo(req.tenantId)
     return successResponse(res, { id: req.params.id })
   } catch (err) {
     next(err)

@@ -50,7 +50,7 @@ async function getSettings(req, res, next) {
 
     for (const [key, value] of Object.entries(configs)) {
       const k = key.toLowerCase()
-      if (key.startsWith('wa_') || key === 'ai_guided_kb') continue // internal keys: not shown to clinic staff
+      if (key.startsWith('wa_') || key === 'ai_guided_kb' || key === 'ai_info_changed_at') continue // internal keys: not shown to clinic staff
       if (
         k.includes('ai_') ||
         k.includes('escalation') ||
@@ -149,6 +149,7 @@ async function updateClinicSettings(req, res, next) {
     for (const [key, value] of Object.entries(updates)) {
        await TenantService.setConfig(req.tenantId, `clinic_${key}`, String(value))
     }
+    await TenantService.touchAiInfo(req.tenantId)
 
     return getClinicSettings(req, res, next)
   } catch (err) {
@@ -247,6 +248,7 @@ async function updateHITLSettings(req, res, next) {
     } catch (cacheErr) {
       logger.warn(`Could not clear the AI settings cache after a save: ${String(cacheErr && cacheErr.message).slice(0, 100)}`)
     }
+    await TenantService.touchAiInfo(req.tenantId)
     // ai_knowledge_base_saved: the text as it was really stored (after the plan limit and the filter), trimmed, for the UI to show
     const saved = result.rows[0]
     return successResponse(res, { ...saved, ai_knowledge_base_saved: (saved.ai_knowledge_base || '').trim() })
