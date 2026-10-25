@@ -25,6 +25,19 @@ const safe = (value) => String(value)
 
 const isText = (value) => typeof value === 'string' && value.trim() !== ''
 
+// Control characters and line breaks (written as escapes, so no literal separator characters sit in this file)
+const CONTROL_AND_BREAKS = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]+', 'g')
+
+// Phone and address come from the clinic's profile (tenant_settings.business_phone, tenant_configs clinic_address), which are saved without the
+// filter the guided answers get, so they are cleaned here: control characters and line breaks become spaces, trimmed, cut to the limit,
+// through the same injection filter (the block marker texts are removed later by safe()). Anything that is not text gives ''.
+function cleanProfileValue(value, max) {
+  if (typeof value !== 'string') return ''
+  const flat = value.replace(CONTROL_AND_BREAKS, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, max)
+  if (!flat) return ''
+  return sanitizeKnowledgeBase(flat, 'pro').trim().slice(0, max)
+}
+
 // "Monday 09:00-18:00" / "Sunday closed", one line per day that is configured. Null when no day is configured.
 function openingHoursLines(workingHours) {
   if (!workingHours || typeof workingHours !== 'object' || Array.isArray(workingHours) || Object.keys(workingHours).length === 0) return null
@@ -92,7 +105,7 @@ async function buildClinicInfoBlock(tenantId, { plan, industry } = {}) {
     if (!configs || configs.ai_guided_kb !== 'true') return ''
 
     const [settingsRes, treatmentsRes, offersRes, doctorsRes] = await Promise.all([
-      pool.query('SELECT ai_faq, working_hours, ai_knowledge_base FROM tenant_settings WHERE tenant_id = $1', [tenantId]),
+      pool.query('SELECT ai_faq, working_hours, ai_knowledge_base, business_phone FROM tenant_settings WHERE tenant_id = $1', [tenantId]),
       pool.query(
         `SELECT name, price_text, details FROM clinic_treatments
          WHERE tenant_id = $1 AND is_active = true ORDER BY sort_order ASC, created_at ASC`,
@@ -119,8 +132,13 @@ async function buildClinicInfoBlock(tenantId, { plan, industry } = {}) {
     // The existing free text goes in as Extra notes, through the same cleaning as when it is saved (a no-op for text already saved that way)
     const notes = isText(settings.ai_knowledge_base) ? sanitizeKnowledgeBase(settings.ai_knowledge_base.trim(), plan).trim() : ''
 
+    // Phone to call and Address: the clinic's existing profile values win; the guided answers are only the fallback. No other source
+    // (the WhatsApp number is never used as a phone). Both sources get the same cleaning; empty everywhere means the section is left out.
+    const phone = cleanProfileValue(settings.business_phone, 20) || cleanProfileValue(faq.clinic_phone, 20)
+    const address = cleanProfileValue(configs.clinic_address, 300) || cleanProfileValue(faq.address, 300)
+
     const parts = {
-      faq,
+      faq: { ...faq, clinic_phone: phone, address },
       hoursLines: openingHoursLines(settings.working_hours),
       fees: doctorsRes.rows.map(d => `- ${safe(d.name)}: ${feeText(d.consultation_fee)}`),
       treatments: treatmentsRes.rows,
