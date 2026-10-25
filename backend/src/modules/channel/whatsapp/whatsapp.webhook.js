@@ -1320,7 +1320,7 @@ if (isAIError) {
       })
     }
     // The flag is always set. The live alert and the push go out only while the clinic is inside its working hours (the same check the
-    // AI handoff uses). If the hours cannot be read or are not configured, the alert is sent (the safe side).
+    // AI handoff uses). Missing, empty or unreadable hours count as inside hours, so the alert is sent (the safe side).
     let insideWorkingHours = true
     try {
       const hoursSettings = await HITLModel.getTenantSettings(tenant.id)

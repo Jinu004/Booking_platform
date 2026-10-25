@@ -8,6 +8,11 @@ const logger = require('../../utils/logger');
 const pool = require('../../config/database');
 const { sendPushToTenant } = require('../push/push.service');
 const { addSseClient, removeSseClient, broadcastToTenant } = require('./sse');
+const TenantService = require('../tenant/tenant.service');
+
+// The tenant_settings column defaults, used only when the row can neither be read nor created
+const DEFAULT_HANDOFF_MESSAGE = 'Let me connect you with a staff member.';
+const DEFAULT_OUT_OF_HOURS_MESSAGE = 'We are currently closed.';
 
 /**
  * Checks if current IST time is within tenant working hours.
@@ -15,8 +20,14 @@ const { addSseClient, removeSseClient, broadcastToTenant } = require('./sse');
  * @returns {boolean}
  */
 function isWithinWorkingHours(workingHours) {
+  // Hours not set (missing, not an object, or no day configured at all) count as open, so a clinic that has not saved its hours
+  // never has its handoffs or alerts silenced. A non-empty object keeps the exact rules below (a day missing from it is closed).
+  if (!workingHours || typeof workingHours !== 'object' || Array.isArray(workingHours) || Object.keys(workingHours).length === 0) {
+    return true;
+  }
   const now = new Date();
-  const istOptions = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short' };
+  // hourCycle h23 (not hour12: false, which would win over it): midnight is "00", never "24"
+  const istOptions = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short' };
   const parts = new Intl.DateTimeFormat('en-IN', istOptions).formatToParts(now);
 
   const weekday = parts.find(p => p.type === 'weekday')?.value?.toLowerCase(); // 'mon', 'tue'...
@@ -37,11 +48,25 @@ function isWithinWorkingHours(workingHours) {
  * flips conversation mode, broadcasts SSE alert.
  */
 async function handleAIHandoffRequest(tenant, conversation, staffId = null) {
-  const settings = await HITLModel.getTenantSettings(tenant.id);
+  let settings = await HITLModel.getTenantSettings(tenant.id);
 
   if (!settings) {
-    logger.warn(`No tenant_settings for tenant ${tenant.id}`);
-    return { switched: false };
+    // No settings row yet: create it (standard defaults) and carry on with the normal handoff
+    logger.warn(`No tenant_settings for tenant ${tenant.id}: creating it`);
+    try {
+      await TenantService.ensureTenantSettings(tenant.id);
+      settings = await HITLModel.getTenantSettings(tenant.id);
+    } catch (createErr) {
+      logger.warn(`tenant_settings could not be created for tenant ${tenant.id}: ${String(createErr && createErr.message).slice(0, 100)}`);
+    }
+  }
+  if (!settings) {
+    // Still nothing: handle it as "hours not set" with the table's default messages, so the patient gets a reply and staff are alerted
+    settings = {
+      working_hours: {},
+      handoff_message: DEFAULT_HANDOFF_MESSAGE,
+      out_of_hours_message: DEFAULT_OUT_OF_HOURS_MESSAGE
+    };
   }
 
   const withinHours = isWithinWorkingHours(settings.working_hours);
