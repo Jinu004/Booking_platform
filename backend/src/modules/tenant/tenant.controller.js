@@ -97,7 +97,12 @@ const RESERVED_CONFIG_KEYS = new Set([
   'platform_token_allowed',
   'media_auto_reply',
   'plan_override',
-  'quota_override'
+  'quota_override',
+  'wa_connection_state',
+  'wa_disconnect_reason',
+  'wa_disconnect_initiated_by',
+  'wa_state_changed_at',
+  'wa_last_alert_event'
 ]);
 
 const setConfig = async (req, res) => {

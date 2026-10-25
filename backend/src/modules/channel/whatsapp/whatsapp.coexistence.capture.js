@@ -1,9 +1,11 @@
 const pool = require('../../../config/database')
 const logger = require('../../../utils/logger')
 
-// Log-only capture of the coexistence webhook fields (history, smb_app_state_sync, account_update).
+// Capture of the coexistence webhook fields (history, smb_app_state_sync, account_update).
 // Logs the SHAPE of the payload only: keys, types, lengths and counts. Never message bodies, names,
-// phone numbers, tokens or any raw payload. No database writes, no Redis, no SSE, no AI.
+// phone numbers, tokens or any raw payload. history and smb_app_state_sync stay log-only.
+// account_update additionally records the clinic's connection state (tenant_configs wa_* keys) and alerts once per event.
+// It never pauses or blocks any sending.
 
 const MAX_DEPTH = 8
 const MAX_SHAPE_CHARS = 4000
@@ -127,6 +129,137 @@ async function lookupTenant(phoneNumberId, wabaId) {
   return { tenantId: 'none', matched: 0 }
 }
 
+// account_update lookup: the clinic's WABA id from the payload (value.waba_info.waba_id) first, then phone number id, then entry.id.
+// The first step with any match decides: exactly one tenant is a match, more than one is ambiguous (no tenant is returned).
+async function lookupAccountUpdateTenant(phoneNumberId, payloadWabaId, entryId) {
+  const steps = [
+    ['SELECT id FROM tenants WHERE whatsapp_waba_id = $1 LIMIT 5', payloadWabaId],
+    ['SELECT id FROM tenants WHERE whatsapp_phone_number_id = $1 LIMIT 5', phoneNumberId],
+    ['SELECT id FROM tenants WHERE whatsapp_waba_id = $1 LIMIT 5', entryId]
+  ]
+  for (const [sql, param] of steps) {
+    if (!param) continue
+    const res = await pool.query(sql, [String(param)])
+    if (res.rows.length === 1) return { tenantId: res.rows[0].id, matched: 1 }
+    if (res.rows.length > 1) return { tenantId: 'none', matched: res.rows.length }
+  }
+  return { tenantId: 'none', matched: 0 }
+}
+
+const STATE_KEYS = ['wa_connection_state', 'wa_state_changed_at', 'wa_last_alert_event']
+const ALERT_LOCK_SECONDS = 7 * 24 * 60 * 60
+const EVENT_LABELS = {
+  PARTNER_REMOVED: 'Disconnected',
+  ACCOUNT_OFFBOARDED: 'Offboarded',
+  ACCOUNT_RECONNECTED: 'Reconnected',
+  PARTNER_ADDED: 'Reconnected'
+}
+const PUSH_INACTIVITY = 'Your WhatsApp Business app was not opened for about 14 days, so the ReceptionAI connection paused. Open the app and contact support to reconnect.'
+const PUSH_REMOVED = 'Your WhatsApp connection with ReceptionAI was removed. Contact support to reconnect.'
+
+// Enumerated names only (event, reason, initiated_by): anything else is dropped
+function enumToken(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_]{1,64}$/.test(value) ? value : ''
+}
+
+// Event time in ms: entry.time (seconds, or ms) when present, else null
+function eventTimeMs(entry) {
+  const t = Number(entry?.time)
+  if (!Number.isFinite(t) || t <= 0) return null
+  return t < 1e12 ? t * 1000 : t
+}
+
+async function readStateKeys(tenantId) {
+  const res = await pool.query('SELECT key, value FROM tenant_configs WHERE tenant_id = $1 AND key = ANY($2)', [tenantId, STATE_KEYS])
+  return Object.fromEntries(res.rows.map(r => [r.key, r.value]))
+}
+
+// Once per event: the Redis lock AND the stored wa_last_alert_event must both be free. With Redis down only the stored key decides.
+async function claimAlert(TenantService, tenantId, dedupeKey, stored) {
+  if (stored.wa_last_alert_event === dedupeKey) return false
+  try {
+    const redis = require('../../../config/redis')
+    const got = await redis.set(`wa_disc_alert:${tenantId}:${dedupeKey}`, '1', { NX: true, EX: ALERT_LOCK_SECONDS })
+    if (got !== 'OK') return false
+  } catch (_) {
+    // Redis unavailable: the stored key above is the guard
+  }
+  await TenantService.setConfig(tenantId, 'wa_last_alert_event', dedupeKey)
+  return true
+}
+
+async function alertSuperAdmins(tenantName, event, reason, initiatedBy, whenMs) {
+  const { sendWhatsappConnectionEmail } = require('../../../utils/email')
+  const admins = await pool.query(`SELECT email FROM staff WHERE role = 'super_admin' AND is_active = true AND email IS NOT NULL AND email <> ''`)
+  const whenIst = new Date(whenMs).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) + ' IST'
+  let sent = 0
+  for (const row of admins.rows) {
+    if (await sendWhatsappConnectionEmail({ to: row.email, clinicName: tenantName, eventLabel: EVENT_LABELS[event], reason, initiatedBy, whenIst })) sent++
+  }
+  return { recipients: admins.rows.length, sent }
+}
+
+// Connection state and alerts for one matched clinic. Called inside try/catch by the caller: never affects the webhook.
+async function handleConnectionEvent(entry, value, tenantId, wabaId) {
+  const event = enumToken(value?.event)
+  if (!EVENT_LABELS[event] && event !== 'ACCOUNT_OFFBOARDED') return // PARTNER_APP_UNINSTALLED and everything else: log only
+  const TenantService = require('../../tenant/tenant.service')
+
+  const reason = enumToken(value?.disconnection_info?.reason)
+  const initiatedBy = enumToken(value?.disconnection_info?.initiated_by)
+  const payloadMs = eventTimeMs(entry)
+  const whenMs = payloadMs || Date.now()
+  const stored = await readStateKeys(tenantId)
+  const previous = stored.wa_connection_state || ''
+
+  // A late, older event must not undo a newer state
+  const lastChange = Date.parse(stored.wa_state_changed_at || '')
+  if (payloadMs && Number.isFinite(lastChange) && payloadMs < lastChange) {
+    logger.info(`COEXISTENCE_STATE tenant=${tenantId} event=${event} result=stale_ignored`)
+    return
+  }
+
+  const newState = event === 'PARTNER_REMOVED' ? 'disconnected' : event === 'ACCOUNT_OFFBOARDED' ? 'offboarded' : 'connected'
+  await TenantService.setConfig(tenantId, 'wa_connection_state', newState)
+  await TenantService.setConfig(tenantId, 'wa_state_changed_at', new Date(whenMs).toISOString())
+  if (newState !== 'connected') {
+    await TenantService.setConfig(tenantId, 'wa_disconnect_reason', reason)
+    await TenantService.setConfig(tenantId, 'wa_disconnect_initiated_by', initiatedBy)
+  }
+  logger.info(`COEXISTENCE_STATE tenant=${tenantId} event=${event} state=${newState} previous=${previous || 'none'}`)
+
+  // Alerts: a disconnect, an offboarding, or a reconnect that follows one
+  const alertable = newState !== 'connected' || previous === 'disconnected' || previous === 'offboarded'
+  if (!alertable) return
+  const dedupeKey = `${wabaId}:${event}:${payloadMs ? Math.floor(payloadMs / 1000) : `n${Math.floor(Date.now() / 600000)}`}`
+  if (!(await claimAlert(TenantService, tenantId, dedupeKey, stored))) {
+    logger.info(`COEXISTENCE_ALERT tenant=${tenantId} event=${event} result=already_alerted`)
+    return
+  }
+
+  const tenantRow = (await pool.query('SELECT name, status FROM tenants WHERE id = $1', [tenantId])).rows[0]
+  if (!tenantRow) return
+  try {
+    const mail = await alertSuperAdmins(tenantRow.name, event, reason, initiatedBy, whenMs)
+    logger.info(`COEXISTENCE_ALERT tenant=${tenantId} event=${event} email_recipients=${mail.recipients} email_sent=${mail.sent}`)
+  } catch (mailErr) {
+    logger.warn(`COEXISTENCE_ALERT tenant=${tenantId} event=${event} email=failed`)
+  }
+  if (event === 'PARTNER_REMOVED' && tenantRow.status === 'active') {
+    try {
+      const { sendPushToTenant } = require('../../push/push.service')
+      await sendPushToTenant(tenantId, {
+        title: 'WhatsApp connection',
+        body: reason === 'PRIMARY_INACTIVITY' ? PUSH_INACTIVITY : PUSH_REMOVED,
+        data: { type: 'wa_disconnected' }
+      })
+      logger.info(`COEXISTENCE_ALERT tenant=${tenantId} event=${event} push=sent`)
+    } catch (pushErr) {
+      logger.warn(`COEXISTENCE_ALERT tenant=${tenantId} event=${event} push=failed`)
+    }
+  }
+}
+
 /**
  * Logs the shape of a history, smb_app_state_sync or account_update webhook change. Never throws.
  * @param {object} entry - entry[] item of the webhook body
@@ -142,7 +275,9 @@ async function captureCoexistenceEvent(entry, change) {
     let tenantId = 'none'
     let matched = 0
     try {
-      ({ tenantId, matched } = await lookupTenant(phoneNumberId, wabaId))
+      ({ tenantId, matched } = field === 'account_update'
+        ? await lookupAccountUpdateTenant(phoneNumberId, value?.waba_info?.waba_id, wabaId)
+        : await lookupTenant(phoneNumberId, wabaId))
     } catch (lookupErr) {
       logger.warn(`COEXISTENCE_CAPTURE field=${field} tenant_lookup=failed`)
     }
@@ -154,6 +289,20 @@ async function captureCoexistenceEvent(entry, change) {
 
     const counts = JSON.stringify(buildCounts(field, value)).slice(0, MAX_SHAPE_CHARS)
     logger.info(`COEXISTENCE_CAPTURE field=${field} tenant=${tenantId} counts=${counts}`)
+
+    if (field === 'account_update') {
+      const payloadWaba = value?.waba_info?.waba_id ? String(value.waba_info.waba_id) : (wabaId ? String(wabaId) : '')
+      if (matched !== 1 || tenantId === 'none') {
+        // Nothing is changed for a clinic we cannot identify exactly
+        logger.warn(`COEXISTENCE_UNMATCHED event=${safeToken(value?.event) || 'none'} waba_id=${payloadWaba ? safeToken(payloadWaba) : 'none'}`)
+      } else {
+        try {
+          await handleConnectionEvent(entry, value, tenantId, payloadWaba)
+        } catch (stateErr) {
+          logger.warn(`COEXISTENCE_STATE tenant=${tenantId} failed (ignored)`)
+        }
+      }
+    }
   } catch (err) {
     try {
       logger.warn('COEXISTENCE_CAPTURE failed (ignored)')

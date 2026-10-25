@@ -46,6 +46,9 @@ async function getAllTenants(req, res) {
              (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'recall_enabled') AS recall_enabled,
              (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'booking_mode') AS booking_mode_raw,
              (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'ai_appointment_booking') AS ai_appointment_booking_raw,
+             (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'wa_connection_state') AS wa_connection_state,
+             (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'wa_disconnect_reason') AS wa_disconnect_reason,
+             (SELECT value FROM tenant_configs tc WHERE tc.tenant_id = t.id AND tc.key = 'wa_state_changed_at') AS wa_state_changed_at,
              (SELECT email FROM staff s WHERE s.tenant_id = t.id AND s.role = 'admin' LIMIT 1) AS email
       FROM tenants t
       ORDER BY t.created_at DESC
@@ -73,14 +76,17 @@ async function getTenantDetails(req, res) {
     }
 
     const modeRows = await pool.query(
-      `SELECT key, value FROM tenant_configs WHERE tenant_id = $1 AND key IN ('booking_mode', 'ai_appointment_booking')`,
+      `SELECT key, value FROM tenant_configs WHERE tenant_id = $1 AND key IN ('booking_mode', 'ai_appointment_booking', 'wa_connection_state', 'wa_disconnect_reason', 'wa_state_changed_at')`,
       [id]
     );
     const modeConfig = Object.fromEntries(modeRows.rows.map((r) => [r.key, r.value]));
     return successResponse(res, withBookingModeFields({
       ...withWhatsappFlags(omitTenantSecrets(result.rows[0])),
       booking_mode_raw: modeConfig.booking_mode,
-      ai_appointment_booking_raw: modeConfig.ai_appointment_booking
+      ai_appointment_booking_raw: modeConfig.ai_appointment_booking,
+      wa_connection_state: modeConfig.wa_connection_state || null,
+      wa_disconnect_reason: modeConfig.wa_disconnect_reason || null,
+      wa_state_changed_at: modeConfig.wa_state_changed_at || null
     }));
   } catch (err) {
     logger.error('Error fetching tenant details:', err.message);

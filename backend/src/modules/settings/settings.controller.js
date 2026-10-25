@@ -40,8 +40,16 @@ async function getSettings(req, res, next) {
       notifications: {}
     }
 
+    // WhatsApp connection state is read-only here (written by the webhook and the Connect flow): shown under "connection", not in the groups
+    settings.connection = {
+      wa_connection_state: configs.wa_connection_state || null,
+      wa_disconnect_reason: configs.wa_disconnect_reason || null,
+      wa_state_changed_at: configs.wa_state_changed_at || null
+    }
+
     for (const [key, value] of Object.entries(configs)) {
       const k = key.toLowerCase()
+      if (key.startsWith('wa_')) continue
       if (
         k.includes('ai_') ||
         k.includes('escalation') ||

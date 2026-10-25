@@ -282,6 +282,15 @@ async function connectClinicNumber(req, res) {
     // 9. Drop cached copies of this tenant (lookup by incoming number)
     await clearTenantCache([tenantRow.whatsapp_number, normalizedDisplay]);
 
+    // Record the connection state (not fatal: the connection itself is already stored)
+    try {
+      const TenantService = require('../tenant/tenant.service');
+      await TenantService.setConfig(tenantId, 'wa_connection_state', 'connected');
+      await TenantService.setConfig(tenantId, 'wa_state_changed_at', new Date().toISOString());
+    } catch (stateErr) {
+      logger.warn(`WABA connect: recording the connection state failed for tenant ${tenantId}: ${stateErr.message}`);
+    }
+
     logger.info(`WABA connect: tenant ${tenantId} connected (phone number id ${phoneId}${isRetry ? ', retry without code' : ''})`);
 
     // 10. The token is never part of the response; the sync deadline follows the first connect
