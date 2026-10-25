@@ -170,4 +170,4 @@ async function buildClinicInfoBlock(tenantId, { plan, industry } = {}) {
   }
 }
 
-module.exports = { buildClinicInfoBlock }
+module.exports = { buildClinicInfoBlock, cleanProfileValue }

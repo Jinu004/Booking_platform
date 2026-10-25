@@ -55,6 +55,103 @@ async function findOwnedPatient(tenantId, customerId, patientId) {
   return res.rows[0] || null
 }
 
+// get_clinic_info, as it always answered (clinic_profiles + three tenant_configs keys, with fixed default hours). Only used when the new answer fails.
+async function getClinicInfoLegacy(tenant) {
+  const result = await pool.query(
+    `SELECT cp.clinic_name as name, cp.address, cp.working_hours,
+            cp.weekly_off, cp.phone as whatsapp_number
+     FROM clinic_profiles cp
+     WHERE cp.tenant_id = $1
+     LIMIT 1`,
+    [tenant.id]
+  )
+  const info = result.rows[0] || { name: tenant.name, whatsapp_number: 'Not set' }
+
+  const configResult = await pool.query(
+    `SELECT key, value FROM tenant_configs
+     WHERE tenant_id = $1
+     AND key IN ('opening_time', 'closing_time',
+                 'weekly_off')`,
+    [tenant.id]
+  )
+  const configs = {}
+  configResult.rows.forEach(r => {
+    configs[r.key] = r.value
+  })
+
+  return `${info.name}
+📍 WhatsApp: ${info.whatsapp_number}
+🕘 Opening: ${configs.opening_time || '9:00 AM'}
+🕔 Closing: ${configs.closing_time || '5:00 PM'}
+📅 Weekly off: ${configs.weekly_off || 'Sunday'}`
+}
+
+const CLINIC_INFO_DAYS = [
+  ['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'],
+  ['fri', 'Friday'], ['sat', 'Saturday'], ['sun', 'Sunday']
+]
+
+// "09:00" -> "9:00 AM", "18:30" -> "6:30 PM"; null when it is not a time
+function clock12(value) {
+  const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(String(value || '').trim())
+  if (!match) return null
+  const hour = Number(match[1])
+  const minute = match[2]
+  if (hour > 23 || Number(minute) > 59) return null
+  return `${hour % 12 || 12}:${minute} ${hour >= 12 ? 'PM' : 'AM'}`
+}
+
+// One line per day, Monday to Sunday, from tenant_settings.working_hours. Null when no day is configured at all.
+function workingHoursLines(workingHours) {
+  if (!workingHours || typeof workingHours !== 'object' || Array.isArray(workingHours)) return null
+  if (!CLINIC_INFO_DAYS.some(([key]) => workingHours[key] && typeof workingHours[key] === 'object')) return null
+  return CLINIC_INFO_DAYS.map(([key, label]) => {
+    const day = workingHours[key]
+    if (!day || typeof day !== 'object' || !day.enabled) return `${label} closed`
+    const open = clock12(day.open)
+    const close = clock12(day.close)
+    return open && close ? `${label} ${open} - ${close}` : `${label} open (hours not set)`
+  })
+}
+
+// get_clinic_info with the clinic's real details. Hours: the weekly hours the clinic saved in Settings; else the opening and closing times
+// in its config when BOTH exist; else "not set" (never a made-up time). Phone, WhatsApp number and address are printed only when they exist.
+async function getClinicInfoText(tenant) {
+  const { cleanProfileValue } = require('./clinicInfo')
+  const [profileRes, settingsRes, configs] = await Promise.all([
+    pool.query('SELECT clinic_name FROM clinic_profiles WHERE tenant_id = $1 LIMIT 1', [tenant.id]),
+    pool.query('SELECT working_hours, business_phone FROM tenant_settings WHERE tenant_id = $1', [tenant.id]),
+    require('../tenant/tenant.service').getAllConfigs(tenant.id) // the 60 s cached helper
+  ])
+  const name = (profileRes.rows[0] && profileRes.rows[0].clinic_name) || tenant.name
+  const settings = settingsRes.rows[0] || {}
+
+  const phone = cleanProfileValue(settings.business_phone, 20)
+  const whatsapp = cleanProfileValue(tenant.whatsapp_number, 20)
+  const whatsappIsPlaceholder = /^\+?9100000000/.test(whatsapp)
+  const address = cleanProfileValue(configs.clinic_address, 300)
+
+  const lines = [name]
+  if (phone) lines.push(`📞 Phone: ${phone}`)
+  if (whatsapp && !whatsappIsPlaceholder) lines.push(`📍 WhatsApp: ${whatsapp}`)
+  if (address) lines.push(`🏠 Address: ${address}`)
+
+  const hourLines = workingHoursLines(settings.working_hours)
+  const openTime = cleanProfileValue(configs.opening_time, 40)
+  const closeTime = cleanProfileValue(configs.closing_time, 40)
+  if (hourLines) {
+    lines.push('🕘 Opening hours:', ...hourLines)
+  } else if (openTime && closeTime) {
+    lines.push(`🕘 Opening: ${openTime}`, `🕔 Closing: ${closeTime}`)
+  } else {
+    lines.push('🕘 Opening hours: not set')
+  }
+  // The weekly off line only when the per-day hours are not used (they already say which days are closed)
+  const weeklyOff = cleanProfileValue(configs.weekly_off, 40)
+  if (!hourLines && weeklyOff) lines.push(`📅 Weekly off: ${weeklyOff}`)
+  return lines.join('\n')
+}
+
 // The ONLY writer of unanswered_questions: the log_unanswered_question tool (offered only while the CLINIC INFORMATION block is in the prompt).
 // Skips an identical question already logged for this clinic in the last 24 hours, and more than 3 per conversation per hour.
 // Never throws and always answers success to the model, so a failure here can never change the patient's reply.
@@ -133,33 +230,13 @@ async function executeFunction(name, args, ctx) {
       }
 
       case 'get_clinic_info': {
-        const result = await pool.query(
-          `SELECT cp.clinic_name as name, cp.address, cp.working_hours,
-                  cp.weekly_off, cp.phone as whatsapp_number
-           FROM clinic_profiles cp
-           WHERE cp.tenant_id = $1
-           LIMIT 1`,
-          [tenant.id]
-        )
-        const info = result.rows[0] || { name: tenant.name, whatsapp_number: 'Not set' }
-
-        const configResult = await pool.query(
-          `SELECT key, value FROM tenant_configs
-           WHERE tenant_id = $1
-           AND key IN ('opening_time', 'closing_time',
-                       'weekly_off')`,
-          [tenant.id]
-        )
-        const configs = {}
-        configResult.rows.forEach(r => {
-          configs[r.key] = r.value
-        })
-
-        return `${info.name}
-📍 WhatsApp: ${info.whatsapp_number}
-🕘 Opening: ${configs.opening_time || '9:00 AM'}
-🕔 Closing: ${configs.closing_time || '5:00 PM'}
-📅 Weekly off: ${configs.weekly_off || 'Sunday'}`
+        // The clinic's real hours, phone and address. If anything goes wrong the answer this tool always gave is returned instead.
+        try {
+          return await getClinicInfoText(tenant)
+        } catch (infoErr) {
+          logger.warn(`GET_CLINIC_INFO_FALLBACK tenant=${tenant.id} ${String(infoErr && infoErr.message).slice(0, 120)}`)
+          return await getClinicInfoLegacy(tenant)
+        }
       }
 
       case 'show_welcome': {
