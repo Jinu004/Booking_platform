@@ -63,6 +63,39 @@ function maskOtherNumbers(text, ownNumbers) {
   return text.replace(/\b(\+91[\s-]?)?[6-9]\d{9}\b/g, (match) => (ownNumbers.has(last10Digits(match)) ? match : '[number]'))
 }
 
+const HISTORY_ERROR_PHRASES = ['having trouble', 'could not process', 'try again'];
+
+/**
+ * Picks the messages the model sees as earlier conversation (the newest message is not part of it: the caller sends it fresh).
+ * `messages` is the already sliced history, oldest first. `hasBlock` is true with the CLINIC INFORMATION block;
+ * `infoChangedMs` is the time the clinic last changed its information (NaN when there is no block or no valid time).
+ * When an assistant reply is dropped for the block-only reasons (offers/discounts words, older than the information change),
+ * the run of patient messages waiting for it is dropped too, so the model never sees questions without an answer.
+ */
+function selectHistoryMessages(messages, hasBlock, infoChangedMs) {
+  const dropped = new Set();
+  messages.forEach((msg, i) => {
+    if (msg.role !== 'assistant') return;
+    const blockOnly =
+      (hasBlock && /\b(offers?|discounts?)\b/i.test(msg.content || '')) ||
+      (Number.isFinite(infoChangedMs) && new Date(msg.created_at).getTime() < infoChangedMs);
+    if (!blockOnly) return;
+    dropped.add(i);
+    for (let j = i - 1; j >= 0 && messages[j].role === 'user'; j--) dropped.add(j);
+  });
+  return messages.filter((msg, i) => {
+    if (dropped.has(i)) return false;
+    if (msg.role === 'staff') return false;
+    if (msg.role === 'assistant') {
+      const content = msg.content?.toLowerCase() || '';
+      if (HISTORY_ERROR_PHRASES.some(phrase => content.includes(phrase))) return false;
+      // Output-filter artefacts ("[number]", "[ref]") in an earlier reply make the model copy them
+      if (msg.content && (msg.content.includes('[number]') || msg.content.includes('[ref]'))) return false;
+    }
+    return true;
+  });
+}
+
 /**
  * Processes an incoming message through Gemini
  * Handles multi-turn function calling loop
@@ -252,27 +285,12 @@ async function processMessage(context) {
         // Build conversation history for Gemini
         // Gemini uses 'model' not 'assistant' for AI role
         // Skip the last message — it will be sent fresh
-        const errorPhrases = ['having trouble', 'could not process', 'try again'];
         // With the CLINIC INFORMATION block, the AI's own replies from before the clinic last changed its information are not shown
         // to the model (NaN, so nothing is skipped, when there is no block or no valid timestamp)
         const infoChangedMs = additionalData.clinicInfoBlock ? Date.parse(configs.ai_info_changed_at || '') : NaN;
 
-        const history = (recentMessages || [])
-          .slice(-21, -1)
-          .filter(msg => {
-            if (msg.role === 'staff') return false;
-            if (msg.role === 'assistant') {
-              const content = msg.content?.toLowerCase() || '';
-              if (errorPhrases.some(phrase => content.includes(phrase))) return false;
-              // Output-filter artefacts ("[number]", "[ref]") in an earlier reply make the model copy them
-              if (msg.content && (msg.content.includes('[number]') || msg.content.includes('[ref]'))) return false;
-              // With the CLINIC INFORMATION block, earlier assistant replies that talk about offers or discounts are left out:
-              // the block is the only source of the clinic's current offers (patient messages are never dropped here)
-              if (additionalData.clinicInfoBlock && /\b(offers?|discounts?)\b/i.test(msg.content || '')) return false;
-              if (Number.isFinite(infoChangedMs) && new Date(msg.created_at).getTime() < infoChangedMs) return false;
-            }
-            return true;
-          })
+        // slice(-21, -1) leaves out the newest message (the one being answered now), so it can never be dropped here
+        const history = selectHistoryMessages((recentMessages || []).slice(-21, -1), !!additionalData.clinicInfoBlock, infoChangedMs)
           .map(msg => ({
             role: msg.role === 'assistant' || msg.role === 'staff' ? 'model' : 'user',
             parts: [{ text: msg.content }]
@@ -481,4 +499,4 @@ async function processMessage(context) {
   }
 }
 
-module.exports = { processMessage, maskOtherNumbers, getClinicOwnNumbers }
+module.exports = { processMessage, maskOtherNumbers, getClinicOwnNumbers, selectHistoryMessages }
