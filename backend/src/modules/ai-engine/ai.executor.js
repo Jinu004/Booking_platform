@@ -80,7 +80,6 @@ async function getClinicInfoLegacy(tenant) {
   })
 
   return `${info.name}
-📍 WhatsApp: ${info.whatsapp_number}
 🕘 Opening: ${configs.opening_time || '9:00 AM'}
 🕔 Closing: ${configs.closing_time || '5:00 PM'}
 📅 Weekly off: ${configs.weekly_off || 'Sunday'}`
@@ -115,7 +114,7 @@ function workingHoursLines(workingHours) {
 }
 
 // get_clinic_info with the clinic's real details. Hours: the weekly hours the clinic saved in Settings; else the opening and closing times
-// in its config when BOTH exist; else "not set" (never a made-up time). Phone, WhatsApp number and address are printed only when they exist.
+// in its config when BOTH exist; else "not set" (never a made-up time). Phone and address are printed only when they exist.
 async function getClinicInfoText(tenant) {
   const { cleanProfileValue } = require('./clinicInfo')
   const [profileRes, settingsRes, configs] = await Promise.all([
@@ -127,13 +126,11 @@ async function getClinicInfoText(tenant) {
   const settings = settingsRes.rows[0] || {}
 
   const phone = cleanProfileValue(settings.business_phone, 20)
-  const whatsapp = cleanProfileValue(tenant.whatsapp_number, 20)
-  const whatsappIsPlaceholder = /^\+?9100000000/.test(whatsapp)
   const address = cleanProfileValue(configs.clinic_address, 300)
 
+  // Only the clinic's saved Business Phone is given to the model (never the WhatsApp number); no phone saved means no phone line
   const lines = [name]
   if (phone) lines.push(`📞 Phone: ${phone}`)
-  if (whatsapp && !whatsappIsPlaceholder) lines.push(`📍 WhatsApp: ${whatsapp}`)
   if (address) lines.push(`🏠 Address: ${address}`)
 
   const hourLines = workingHoursLines(settings.working_hours)

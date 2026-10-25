@@ -11,7 +11,7 @@ function getFunctionDefinitions(industry, options = {}) {
     return [
       {
         name: 'get_clinic_info',
-        description: "Get the clinic's own contact details and hours: opening hours by day, phone number, WhatsApp number and address. Call this when the patient asks for the clinic's phone number, contact details, address, location or timings, unless that information is already in the CLINIC INFORMATION block.",
+        description: "Get the clinic's own contact details and hours: opening hours by day, phone number and address. Call this when the patient asks for the clinic's phone number, contact details, address, location or timings, unless that information is already in the CLINIC INFORMATION block.",
         parameters: { type: 'OBJECT', properties: {}, required: [] }
       },
       {
@@ -55,7 +55,7 @@ function getFunctionDefinitions(industry, options = {}) {
   const commonFunctions = [
     {
       name: 'get_clinic_info',
-      description: "Get the clinic's own contact details and hours: opening hours by day, phone number, WhatsApp number and address. Call this when the patient asks for the clinic's phone number, contact details, address, location or timings, unless that information is already in the CLINIC INFORMATION block.",
+      description: "Get the clinic's own contact details and hours: opening hours by day, phone number and address. Call this when the patient asks for the clinic's phone number, contact details, address, location or timings, unless that information is already in the CLINIC INFORMATION block.",
       parameters: {
         type: 'OBJECT',
         properties: {},
