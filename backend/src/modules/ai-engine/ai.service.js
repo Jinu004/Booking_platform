@@ -30,6 +30,39 @@ function logGeminiUsage(tenant, conversation, modelName, geminiResult) {
   }
 }
 
+// The clinic's own contact numbers (business phone, the guided-answers phone, the WhatsApp number), as their last 10 digits. The AI's
+// reply may repeat these: every other phone number in a reply is still masked by the output filter. One query, kept 60 seconds per clinic
+// in memory (a saved change can take up to a minute to show).
+const OWN_NUMBERS_TTL_MS = 60 * 1000
+const ownNumbersCache = new Map()
+let ownNumbersWarnedAt = 0
+
+const last10Digits = (value) => {
+  const digits = String(value ?? '').replace(/\D/g, '')
+  return digits.length >= 10 ? digits.slice(-10) : null
+}
+
+async function getClinicOwnNumbers(tenantId) {
+  const cached = ownNumbersCache.get(tenantId)
+  if (cached && Date.now() - cached.at < OWN_NUMBERS_TTL_MS) return cached.numbers
+  const res = await pool.query(
+    `SELECT t.whatsapp_number, s.business_phone, s.ai_faq->>'clinic_phone' AS faq_phone
+     FROM tenants t LEFT JOIN tenant_settings s ON s.tenant_id = t.id
+     WHERE t.id = $1`,
+    [tenantId]
+  )
+  const row = res.rows[0] || {}
+  const numbers = new Set([row.business_phone, row.faq_phone, row.whatsapp_number].map(last10Digits).filter(Boolean))
+  if (ownNumbersCache.size > 500) ownNumbersCache.clear()
+  ownNumbersCache.set(tenantId, { at: Date.now(), numbers })
+  return numbers
+}
+
+// Masks every Indian mobile number in a reply except the clinic's own (ownNumbers: a Set of last-10-digit strings)
+function maskOtherNumbers(text, ownNumbers) {
+  return text.replace(/\b(\+91[\s-]?)?[6-9]\d{9}\b/g, (match) => (ownNumbers.has(last10Digits(match)) ? match : '[number]'))
+}
+
 /**
  * Processes an incoming message through Gemini
  * Handles multi-turn function calling loop
@@ -394,7 +427,17 @@ async function processMessage(context) {
         // Output filter — strip any leaked UUIDs or phone numbers before sending to patient
         let cleanText = text.trim();
         cleanText = cleanText.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '[ref]');
-        cleanText = cleanText.replace(/\b(\+91[\s-]?)?[6-9]\d{9}\b/g, '[number]');
+        // The clinic's own numbers stay visible; if they cannot be read, every number is masked as before
+        let ownNumbers = new Set();
+        try {
+          if (tenant && tenant.id) ownNumbers = await getClinicOwnNumbers(tenant.id);
+        } catch (ownErr) {
+          if (Date.now() - ownNumbersWarnedAt >= 60 * 1000) {
+            ownNumbersWarnedAt = Date.now();
+            logger.warn(`AI_OWN_NUMBERS_FAILED tenant=${tenant && tenant.id} ${String(ownErr && ownErr.message).slice(0, 100)}`);
+          }
+        }
+        cleanText = maskOtherNumbers(cleanText, ownNumbers);
         return cleanText;
 
       } catch (err) {
@@ -429,4 +472,4 @@ async function processMessage(context) {
   }
 }
 
-module.exports = { processMessage }
+module.exports = { processMessage, maskOtherNumbers, getClinicOwnNumbers }
