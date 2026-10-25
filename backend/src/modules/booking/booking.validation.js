@@ -61,7 +61,16 @@ const validateUpdateStatus = [
     .withMessage('Invalid status')
 ];
 
+const validateQueueStatus = [
+  param('id')
+    .isUUID().withMessage('Booking ID must be a valid UUID'),
+  body('status')
+    .isIn(['arrived', 'in_consult'])
+    .withMessage('Status must be arrived or in_consult')
+];
+
 module.exports = {
   validateCreateBooking,
-  validateUpdateStatus
+  validateUpdateStatus,
+  validateQueueStatus
 };

@@ -248,6 +248,73 @@ async function completeBooking(tenantId, bookingId) {
 }
 
 /**
+ * Live queue actions for an APPOINTMENT booking (tokens use PATCH /clinic/tokens/:id/status):
+ *   'arrived'    sets arrived_at (once)
+ *   'in_consult' sets consult_started_at (once) and arrived_at when it is still empty
+ * Only for today's (IST) appointments of this clinic that are still confirmed or pending. A doctor may act on their own bookings only.
+ * One patient in consult per doctor: refused (409) while that doctor has an appointment in consult today, or a token in progress today.
+ * The booking row and then the doctor row are locked inside one transaction, so two simultaneous calls for the same doctor cannot both succeed.
+ * Sends nothing to anyone: no WhatsApp message, push, email or live event.
+ */
+async function setAppointmentQueueStatus(tenantId, bookingId, status, staff) {
+  const fail = (message, code) => Object.assign(new Error(message), { queueError: true, status: code });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const bRes = await client.query(
+      `SELECT id, doctor_id, booking_type, status, arrived_at, consult_started_at,
+              booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date AS is_today
+       FROM bookings WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
+      [bookingId, tenantId]
+    );
+    const booking = bRes.rows[0];
+    if (!booking) throw fail('Booking not found', 404);
+    if (staff?.role === 'doctor' && (!staff.doctor_id || booking.doctor_id !== staff.doctor_id)) {
+      throw fail('You can only change your own schedule.', 403);
+    }
+    if (booking.booking_type !== 'appointment') throw fail('Token bookings use the token queue actions.', 400);
+    if (!booking.is_today) throw fail("Only today's appointments can be moved in the queue.", 400);
+    if (!['confirmed', 'pending'].includes(booking.status)) throw fail(`This booking is ${booking.status}.`, 400);
+
+    if (status === 'in_consult' && !booking.consult_started_at) {
+      // Serialise the "one in consult" check per doctor (appointment calls); today's rows only
+      await client.query('SELECT id FROM clinic_doctors WHERE id = $1 AND tenant_id = $2 FOR UPDATE', [booking.doctor_id, tenantId]);
+      const busy = await client.query(
+        `SELECT 1 FROM bookings x
+         WHERE x.tenant_id = $1 AND x.doctor_id = $2 AND x.id <> $3
+           AND x.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
+           AND x.booking_type = 'appointment' AND x.consult_started_at IS NOT NULL
+           AND x.status NOT IN ('completed', 'noshow', 'cancelled')
+         UNION ALL
+         SELECT 1 FROM clinic_tokens t JOIN bookings tb ON tb.id = t.booking_id
+         WHERE t.tenant_id = $1 AND t.doctor_id = $2 AND t.status = 'in_progress'
+           AND tb.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
+         LIMIT 1`,
+        [tenantId, booking.doctor_id, bookingId]
+      );
+      if (busy.rows.length) throw fail('This doctor already has a patient in consult.', 409);
+    }
+
+    const upd = await client.query(
+      status === 'in_consult'
+        ? `UPDATE bookings SET consult_started_at = COALESCE(consult_started_at, NOW()), arrived_at = COALESCE(arrived_at, NOW()), updated_at = NOW()
+           WHERE id = $1 AND tenant_id = $2 RETURNING id, arrived_at, consult_started_at`
+        : `UPDATE bookings SET arrived_at = COALESCE(arrived_at, NOW()), updated_at = NOW()
+           WHERE id = $1 AND tenant_id = $2 RETURNING id, arrived_at, consult_started_at`,
+      [bookingId, tenantId]
+    );
+    await client.query('COMMIT');
+    const row = upd.rows[0];
+    return { ...row, queue_status: row.consult_started_at ? 'in_consult' : 'arrived' };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Marks patient as no show
  *
  * @param {string} tenantId
@@ -334,5 +401,6 @@ module.exports = {
   cancelBookingWithRules,
   completeBooking,
   markNoShow,
+  setAppointmentQueueStatus,
   getBookingStats
 };

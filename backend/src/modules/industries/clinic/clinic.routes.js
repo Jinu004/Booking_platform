@@ -7,6 +7,7 @@ const {
   updateAvailability,
   addLeave,
   getTokenQueue,
+  getQueue,
   updateTokenStatus,
   updateDoctor,
   deleteDoctor,
@@ -36,6 +37,7 @@ router.get('/doctors/:id/schedule', getDoctorSchedule);
 router.post('/doctors/:id/schedule', requireRole('admin', 'manager'), saveDoctorSchedule);
 
 router.get('/tokens', getTokenQueue);
+router.get('/queue', getQueue);
 router.patch('/tokens/:id/status', updateTokenStatus);
 
 router.get('/doctors/:id/procedures', getProcedures);

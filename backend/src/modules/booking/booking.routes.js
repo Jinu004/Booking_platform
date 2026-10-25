@@ -8,6 +8,7 @@ const {
   getBookingStats,
   getBookingById,
   updateBookingStatus,
+  updateAppointmentQueueStatus,
   cancelBooking,
   completeBooking,
   markNoShow,
@@ -16,7 +17,8 @@ const {
   createManualBooking
 } = require('./booking.controller');
 const {
-  validateUpdateStatus
+  validateUpdateStatus,
+  validateQueueStatus
 } = require('./booking.validation');
 
 const router = express.Router();
@@ -40,6 +42,7 @@ router.get('/stats', getBookingStats);
 router.get('/:id', getBookingById);
 router.post('/manual', createManualBooking);
 router.patch('/:id/status', validateUpdateStatus, validate, updateBookingStatus);
+router.patch('/:id/queue-status', validateQueueStatus, validate, updateAppointmentQueueStatus);
 router.post('/:id/cancel', cancelBooking);
 router.post('/:id/complete', completeBooking);
 router.post('/:id/noshow', markNoShow);

@@ -179,6 +179,65 @@ SELECT ct.*, b.notes, b.slot_time, b.source,
   return result.rows
 }
 /**
+ * Today's live queue for any booking mode (GET /clinic/queue): token bookings (they have a clinic_tokens row) and appointment bookings
+ * (booking_type 'appointment'), one row per booking. Procedure bookings and cancelled/no-show bookings are left out.
+ * queue_status is computed here and only here: waiting | arrived | in_consult | done.
+ * @param {object} options - { doctorId } limits the rows to one doctor
+ */
+async function getQueue(pool, tenantId, { doctorId = null } = {}) {
+  const params = [tenantId];
+  let doctorClause = '';
+  if (doctorId) {
+    params.push(doctorId);
+    doctorClause = ` AND COALESCE(ct.doctor_id, b.doctor_id) = $${params.length}`;
+  }
+  const sql = `
+    SELECT q.* FROM (
+      SELECT b.id,
+             ct.id AS token_id,
+             COALESCE(b.booking_type, 'normal') AS booking_type,
+             ct.token_number AS token_number,
+             b.slot_time,
+             b.end_time,
+             CASE
+               WHEN ct.id IS NOT NULL THEN
+                 CASE ct.status WHEN 'arrived' THEN 'arrived' WHEN 'in_progress' THEN 'in_consult' WHEN 'completed' THEN 'done' WHEN 'done' THEN 'done' ELSE 'waiting' END
+               WHEN b.status = 'completed' THEN 'done'
+               WHEN b.consult_started_at IS NOT NULL THEN 'in_consult'
+               WHEN b.arrived_at IS NOT NULL THEN 'arrived'
+               ELSE 'waiting'
+             END AS queue_status,
+             COALESCE(b.patient_name, c.name) AS patient_name,
+             c.phone AS patient_phone,
+             COALESCE(ct.doctor_id, b.doctor_id) AS doctor_id,
+             cd.name AS doctor_name,
+             b.notes,
+             b.source,
+             b.patient_id,
+             b.customer_id,
+             b.arrived_at,
+             b.consult_started_at,
+             b.created_at
+      FROM bookings b
+      LEFT JOIN clinic_tokens ct ON ct.booking_id = b.id
+      LEFT JOIN customers c ON c.id = b.customer_id
+      JOIN clinic_doctors cd ON cd.id = COALESCE(ct.doctor_id, b.doctor_id)
+      WHERE b.tenant_id = $1
+        AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
+        AND b.status NOT IN ('cancelled', 'noshow')
+        AND (ct.id IS NOT NULL OR b.booking_type = 'appointment')
+        AND ct.status IS DISTINCT FROM 'cancelled'${doctorClause}
+    ) q
+    ORDER BY q.doctor_name ASC NULLS LAST, q.doctor_id,
+      CASE q.queue_status WHEN 'in_consult' THEN 0 WHEN 'arrived' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END,
+      CASE WHEN q.slot_time ~ '^([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$' THEN q.slot_time::time END ASC NULLS LAST,
+      q.token_number ASC NULLS LAST, q.created_at ASC, q.id ASC
+  `;
+  const result = await tenantQuery(tenantId, pool, sql, params.slice(1));
+  return result.rows;
+}
+
+/**
  * Updates token status
  */
 async function updateTokenStatus(pool, tenantId, tokenId, status) {
@@ -602,6 +661,7 @@ module.exports = {
   saveDoctorSchedule,
   addDoctorLeave,
   getTokenQueue,
+  getQueue,
   updateTokenStatus,
   getProcedures,
   createProcedure,

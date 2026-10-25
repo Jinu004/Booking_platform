@@ -169,6 +169,29 @@ async function getTokenQueue(req, res, next) {
 }
 
 /**
+ * GET /clinic/queue
+ * Today's live queue for tokens and appointments (one row per booking, see ClinicModel.getQueue).
+ * A doctor receives only their own rows; other roles see every doctor, optionally filtered by ?doctor_id.
+ */
+async function getQueue(req, res, next) {
+  try {
+    const tenantId = req.tenant.id;
+    let doctorId = null;
+    if (req.staff?.role === 'doctor') {
+      if (!req.staff.doctor_id) return errorResponse(res, 'Your account is not linked to a doctor. Ask your admin.', 403);
+      doctorId = req.staff.doctor_id;
+    } else if (req.query.doctor_id) {
+      if (!isUUID(String(req.query.doctor_id))) return errorResponse(res, 'Invalid doctor ID', 400);
+      doctorId = String(req.query.doctor_id);
+    }
+    const rows = await ClinicModel.getQueue(pool, tenantId, { doctorId });
+    return successResponse(res, rows);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * PATCH /clinic/tokens/:id/status
  * Updates token status
  * Body: { status: waiting|in_progress|done|cancelled }
@@ -575,6 +598,7 @@ module.exports = {
   updateAvailability,
   addLeave,
   getTokenQueue,
+  getQueue,
   updateTokenStatus,
   updateDoctor,
   deleteDoctor,

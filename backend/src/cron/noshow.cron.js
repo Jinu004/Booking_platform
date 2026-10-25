@@ -14,6 +14,7 @@ function startNoShowCron() {
         SET status = 'noshow', updated_at = NOW()
         WHERE status IN ('pending', 'confirmed')
         AND booking_date < CURRENT_DATE
+        AND arrived_at IS NULL AND consult_started_at IS NULL
         RETURNING id, tenant_id, customer_id
       `)
       // Also update corresponding clinic_tokens

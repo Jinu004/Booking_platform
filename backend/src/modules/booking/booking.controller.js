@@ -123,6 +123,21 @@ async function updateBookingStatus(req, res, next) {
 }
 
 /**
+ * PATCH /bookings/:id/queue-status
+ * Body: { status: 'arrived' | 'in_consult' } - appointment bookings only (tokens use PATCH /clinic/tokens/:id/status).
+ * Finish, no-show and cancel keep using POST /bookings/:id/complete, /noshow and /cancel.
+ */
+async function updateAppointmentQueueStatus(req, res, next) {
+  try {
+    const result = await BookingService.setAppointmentQueueStatus(req.tenant.id, req.params.id, req.body.status, req.staff);
+    return successResponse(res, result);
+  } catch (error) {
+    if (error && error.queueError) return errorResponse(res, error.message, error.status);
+    next(error);
+  }
+}
+
+/**
  * POST /bookings/:id/cancel
  * Cancels a booking
  */
@@ -513,6 +528,7 @@ module.exports = {
   getBookingStats,
   getBookingById,
   updateBookingStatus,
+  updateAppointmentQueueStatus,
   cancelBooking,
   completeBooking,
   markNoShow,
