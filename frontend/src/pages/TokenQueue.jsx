@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getQueue, updateTokenStatus, setAppointmentQueueStatus } from '../services/clinic.service';
 import { completeBooking } from '../services/booking.service';
@@ -73,6 +73,26 @@ const sortTokenRows = (rows) => [...rows].sort((a, b) => {
 
 const LATE_AFTER_MINUTES = 10;
 
+// Secondary actions behind a row's "⋯" button (only undo steps for now; extend this list to add more, e.g. No-show or Skip).
+// Each item: { key, label, run } where run() returns the request promise. A row with an empty list shows no "⋯" button.
+const getSecondaryActions = (t, tokenRow) => {
+  if (t.queue_status === 'arrived') {
+    return [{
+      key: 'undo_arrived',
+      label: 'Undo arrived',
+      run: () => (tokenRow ? updateTokenStatus(t.token_id, 'waiting') : setAppointmentQueueStatus(t.id, 'waiting'))
+    }];
+  }
+  if (t.queue_status === 'in_consult') {
+    return [{
+      key: 'undo_call_in',
+      label: 'Undo call-in',
+      run: () => (tokenRow ? updateTokenStatus(t.token_id, 'arrived') : setAppointmentQueueStatus(t.id, 'arrived'))
+    }];
+  }
+  return [];
+};
+
 const TokenQueue = () => {
   const [queue, setQueue] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -85,6 +105,36 @@ const TokenQueue = () => {
   const [hasLoaded, setHasLoaded] = useState(false); // a load has worked at least once, so there is good data to keep on screen
   const [bookingOpen, setBookingOpen] = useState(false);
   const { addToast } = useStore();
+
+  // The row whose "⋯" strip is open: { id, status } (the status it had when opened). Only one strip is open at a time.
+  const [openMore, setOpenMore] = useState(null);
+  const moreButtons = useRef({}); // row id -> its "⋯" button, so focus can return to it
+
+  const closeMore = (focusButton) => {
+    const id = openMore ? openMore.id : null;
+    setOpenMore(null);
+    if (focusButton && id && moreButtons.current[id]) moreButtons.current[id].focus();
+  };
+
+  // A refresh in which the row's status changed (or the row is gone) closes the strip; a refresh with the same status keeps it open
+  useEffect(() => {
+    if (openMore === null) return;
+    const row = queue.find(r => r.id === openMore.id);
+    if (!row || row.queue_status !== openMore.status) setOpenMore(null);
+  }, [queue, openMore]);
+
+  // Escape closes the open strip and returns focus to its button
+  useEffect(() => {
+    if (openMore === null) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setOpenMore(null);
+        if (moreButtons.current[openMore.id]) moreButtons.current[openMore.id].focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [openMore]);
 
   const staff = getStoredStaff();
   const isDoctor = staff?.role === 'doctor';
@@ -174,8 +224,11 @@ const TokenQueue = () => {
     const isLate = !tokenRow && t.queue_status === 'waiting' && startMins !== null && nowMins !== null && nowMins - startMins > LATE_AFTER_MINUTES;
     const busy = loadingId === t.id;
     const btn = 'px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-white rounded-lg disabled:opacity-50 transition';
+    const secondary = getSecondaryActions(t, tokenRow);
+    const moreOpen = openMore !== null && openMore.id === t.id && secondary.length > 0;
     return (
-      <div key={t.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-3 md:px-6 py-4 md:py-5 hover:bg-ink/[0.02] transition">
+      <div key={t.id}>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-3 md:px-6 py-4 md:py-5 hover:bg-ink/[0.02] transition">
         <div className="flex items-center gap-4 flex-1 min-w-0">
           {tokenRow ? (
             <div className="w-10 h-10 md:w-14 md:h-14 bg-ink/[0.05] rounded-xl flex items-center justify-center font-mono font-semibold text-ink text-sm md:text-base flex-shrink-0">
@@ -238,7 +291,34 @@ const TokenQueue = () => {
               className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-ink/80 border border-ink/[0.12] rounded-lg hover:bg-ink/[0.04] transition"
             >Profile</Link>
           )}
+          {secondary.length > 0 && (
+            <button
+              type="button"
+              ref={(el) => { moreButtons.current[t.id] = el; }}
+              aria-label="More actions"
+              aria-expanded={moreOpen}
+              aria-controls={`row-more-${t.id}`}
+              onClick={() => (moreOpen ? closeMore(true) : setOpenMore({ id: t.id, status: t.queue_status }))}
+              className="-my-1.5 md:my-0 h-10 w-10 md:h-8 md:w-8 flex items-center justify-center rounded-lg text-ink/55 hover:text-ink hover:bg-ink/[0.05] transition text-lg leading-none flex-shrink-0"
+            >⋯</button>
+          )}
         </div>
+      </div>
+      {moreOpen && (
+        <div id={`row-more-${t.id}`} className="px-3 md:px-6 pb-3 md:pb-4 -mt-1">
+          <div className="flex flex-wrap items-center gap-2 pl-14 md:pl-[4.5rem]">
+            {secondary.map(action => (
+              <button
+                key={action.key}
+                type="button"
+                disabled={busy}
+                onClick={() => { closeMore(true); runAction(t, action.run); }}
+                className="px-3 py-2 md:py-1.5 min-h-[40px] md:min-h-0 text-xs md:text-sm font-semibold text-ink/80 border border-ink/[0.15] rounded-lg hover:bg-ink/[0.04] disabled:opacity-50 transition"
+              >{busy ? '...' : action.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
       </div>
     );
   };
