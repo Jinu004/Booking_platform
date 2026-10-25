@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getAllTenants, updateTenant, setTenantBookingMode } from '../../services/superadmin.service';
+import { getTenantConfigs } from '../../services/tenant.service';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
 import CoexistenceConnect from '../../components/shared/CoexistenceConnect';
@@ -305,6 +306,8 @@ export default function TenantEdit() {
   const [bookingModeDraft, setBookingModeDraft] = useState('token');
   const [savingBookingMode, setSavingBookingMode] = useState(false);
   const savingBookingModeRef = useRef(false);
+  // "Guided AI answers" (tenant_configs ai_guided_kb): original = the value when the page loaded, value = the checkbox now
+  const [guidedKb, setGuidedKb] = useState({ loaded: false, failed: false, original: false, value: false });
 
   // The backend has no list-free way to get everything this page needs (recall and template flags, admin email,
   // connection flags), so the tenants list is loaded and this tenant is picked from it by id.
@@ -337,6 +340,22 @@ export default function TenantEdit() {
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [id]);
+
+  // The guided-answers switch is not part of the tenants list, so it is read from the clinic's config (a super admin sees every key)
+  useEffect(() => {
+    let cancelled = false;
+    setGuidedKb({ loaded: false, failed: false, original: false, value: false });
+    getTenantConfigs(id)
+      .then(configs => {
+        if (cancelled) return;
+        const on = !!configs && configs.ai_guided_kb === 'true';
+        setGuidedKb({ loaded: true, failed: false, original: on, value: on });
+      })
+      .catch(() => {
+        if (!cancelled) setGuidedKb({ loaded: false, failed: true, original: false, value: false });
       });
     return () => { cancelled = true; };
   }, [id]);
@@ -406,6 +425,18 @@ export default function TenantEdit() {
         value: String(proactiveTemplates)
       });
       await api.patch(`/superadmin/tenants/${tenant.id}/config`, { key: 'recall_enabled', value: String(form.recallEnabled) });
+      // Guided AI answers: only sent when the checkbox was changed since the page loaded. Its failure is reported on its own
+      // and never hides that the rest was saved.
+      if (guidedKb.loaded && guidedKb.value !== guidedKb.original) {
+        try {
+          await api.patch(`/superadmin/tenants/${tenant.id}/config`, { key: 'ai_guided_kb', value: String(guidedKb.value) });
+          setGuidedKb(g => ({ ...g, original: g.value }));
+        } catch (guidedErr) {
+          addToast('Clinic updated', 'success');
+          addToast(`Guided AI answers was not saved: ${guidedErr?.error || guidedErr?.response?.data?.error || 'try again'}`, 'error');
+          return; // stay on the page so it can be tried again
+        }
+      }
       addToast('Clinic updated', 'success');
       goToList();
     } catch (err) {
@@ -613,6 +644,23 @@ export default function TenantEdit() {
                 Send recall checkup WhatsApp reminders to patients not seen in 90 days (every Monday)
               </label>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Guided AI answers</label>
+            <div className="flex items-center gap-3 mt-1">
+              <input
+                type="checkbox"
+                id="guidedKb"
+                checked={guidedKb.value}
+                disabled={!guidedKb.loaded}
+                onChange={e => setGuidedKb(g => ({ ...g, value: e.target.checked }))}
+                className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+              />
+              <label htmlFor="guidedKb" className="text-sm text-gray-600">
+                The AI answers from the clinic's saved answers, treatments and offers. Works only for Growth and Pro clinics. Fill in the Clinic answers first.
+              </label>
+            </div>
+            {guidedKb.failed && <p className="mt-1 text-xs text-gray-400">Could not load this setting</p>}
           </div>
         </div>
 
