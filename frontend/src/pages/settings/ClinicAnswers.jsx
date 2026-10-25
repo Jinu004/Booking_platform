@@ -6,6 +6,7 @@ import useStore from '../../store/useStore';
 import { getErrorMessage } from '../../utils/errorMessage';
 import { plural } from '../../utils/plural';
 import {
+  getHITLSettings, updateHITLSettings, getClinicSettings, updateClinicSettings,
   getAiFaq, updateAiFaq,
   getTreatments, createTreatment, updateTreatment, deleteTreatment,
   getOffers, createOffer, updateOffer, deleteOffer,
@@ -20,17 +21,8 @@ const MAX_TREATMENTS = 60;
 const MAX_OFFERS = 20;
 const MAX_QA = 10;
 
+// The Basics section is BasicsSection below (it uses the clinic's existing phone and address); these are the other short-answer sections
 const FAQ_SECTIONS = [
-  {
-    id: 'basics',
-    title: 'Basics',
-    fields: [
-      { key: 'clinic_phone', label: 'Phone patients should call', max: 20, rows: 0, required: true },
-      { key: 'address', label: 'Address', max: 300, rows: 2 },
-      { key: 'maps_link', label: 'Map link', max: 300, rows: 0 }
-    ],
-    note: "Doctor consultation fees are taken from each doctor's profile on the Doctors page."
-  },
   {
     id: 'policies',
     title: 'Payments and policies',
@@ -582,6 +574,153 @@ function UnansweredSection({ open, onToggle }) {
 }
 
 // ---------------------------------------------------------------------------
+// Basics: the clinic's existing Business Phone (tenant_settings.business_phone, PUT /settings/hitl) and Clinic Address
+// (tenant_configs clinic_address, PUT /settings/clinic), plus the map link (ai-faq). Each is saved on its own and only when it changed.
+// ---------------------------------------------------------------------------
+function BasicsSection({ open, onToggle, faq, faqError, onRetryFaq, onFaqSaved }) {
+  const { addToast } = useStore();
+  const [loading, setLoading] = useState(true);
+  const [phoneLoadError, setPhoneLoadError] = useState('');
+  const [addressLoadError, setAddressLoadError] = useState('');
+  // saved: what is stored (null = not loaded yet); drafts: what is typed
+  const [saved, setSaved] = useState({ phone: null, address: null, maps: null });
+  const [drafts, setDrafts] = useState({ phone: '', address: '', maps: '' });
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  // A loaded value replaces the typed one only when nothing was typed over the old value (a retry never wipes typing)
+  const adopt = (field, value) => {
+    setDrafts(d => (saved[field] === null || d[field] === saved[field] ? { ...d, [field]: value } : d));
+    setSaved(s => ({ ...s, [field]: value }));
+  };
+
+  const loadProfile = async () => {
+    setLoading(true);
+    const [hitl, clinic] = await Promise.allSettled([getHITLSettings(), getClinicSettings()]);
+    if (hitl.status === 'fulfilled') {
+      setPhoneLoadError('');
+      adopt('phone', (hitl.value && hitl.value.business_phone) || '');
+    } else {
+      setPhoneLoadError(getErrorMessage(hitl.reason, 'Could not load the phone number. Try again.'));
+    }
+    if (clinic.status === 'fulfilled') {
+      setAddressLoadError('');
+      adopt('address', (clinic.value && clinic.value.address) || '');
+    } else {
+      setAddressLoadError(getErrorMessage(clinic.reason, 'Could not load the address. Try again.'));
+    }
+    setLoading(false);
+  };
+  useEffect(() => { loadProfile(); }, []);
+
+  // The map link comes from the shared short-answers load
+  useEffect(() => {
+    if (!faq) return;
+    adopt('maps', faq.maps_link || '');
+  }, [faq]);
+
+  const save = async () => {
+    const phone = drafts.phone.trim();
+    const address = drafts.address.trim();
+    const maps = drafts.maps.trim();
+    const nextErrors = {};
+    if (saved.phone !== null && !phone) nextErrors.phone = 'This is needed to save this section.';
+    setErrors(nextErrors);
+    if (nextErrors.phone) return;
+
+    const phoneChanged = saved.phone !== null && phone !== saved.phone.trim();
+    const addressChanged = saved.address !== null && address !== saved.address.trim();
+    const mapsChanged = saved.maps !== null && maps !== saved.maps.trim();
+    if (!phoneChanged && !addressChanged && !mapsChanged) {
+      addToast('No changes to save', 'info');
+      return;
+    }
+
+    setSaving(true);
+    let failed = false;
+    if (phoneChanged) {
+      try {
+        const result = await updateHITLSettings({ business_phone: phone });
+        const value = result && typeof result.business_phone === 'string' ? result.business_phone : phone;
+        setSaved(s => ({ ...s, phone: value }));
+        setDrafts(d => ({ ...d, phone: value }));
+      } catch (err) {
+        failed = true;
+        addToast(getErrorMessage(err, 'Could not save the phone number. Try again.'), 'error');
+      }
+    }
+    if (addressChanged) {
+      try {
+        const result = await updateClinicSettings({ address });
+        const value = result && typeof result.address === 'string' ? result.address : address;
+        setSaved(s => ({ ...s, address: value }));
+        setDrafts(d => ({ ...d, address: value }));
+      } catch (err) {
+        failed = true;
+        addToast(getErrorMessage(err, 'Could not save the address. Try again.'), 'error');
+      }
+    }
+    if (mapsChanged) {
+      try {
+        const result = await updateAiFaq({ maps_link: maps });
+        onFaqSaved(result);
+      } catch (err) {
+        failed = true;
+        addToast(getErrorMessage(err, 'Could not save the map link. Try again.'), 'error');
+      }
+    }
+    setSaving(false);
+    if (!failed) addToast('Saved', 'success');
+  };
+
+  return (
+    <Section title="Basics" open={open} onToggle={onToggle}>
+      {loading && saved.phone === null && saved.address === null && !faq && !faqError ? (
+        <CardSkeleton />
+      ) : (
+        <>
+          {phoneLoadError && <LoadError message={phoneLoadError} onRetry={loadProfile} />}
+          {addressLoadError && <LoadError message={addressLoadError} onRetry={loadProfile} />}
+          {faqError && <LoadError message={faqError} onRetry={onRetryFaq} />}
+          <TextField
+            id="basics-phone"
+            label="Phone patients should call"
+            value={drafts.phone}
+            onChange={v => setDrafts(d => ({ ...d, phone: v }))}
+            max={20}
+            required
+            disabled={saved.phone === null}
+            error={errors.phone}
+          />
+          <TextField
+            id="basics-address"
+            label="Address"
+            value={drafts.address}
+            onChange={v => setDrafts(d => ({ ...d, address: v }))}
+            max={300}
+            rows={2}
+            disabled={saved.address === null}
+          />
+          <TextField
+            id="basics-maps"
+            label="Map link"
+            value={drafts.maps}
+            onChange={v => setDrafts(d => ({ ...d, maps: v }))}
+            max={300}
+            disabled={saved.maps === null}
+          />
+          <p className="text-xs text-gray-500">Doctor consultation fees are taken from each doctor's profile on the Doctors page.</p>
+          <p className="text-xs text-gray-500">The phone and address are the same details shown in Settings, Clinic Profile.</p>
+          <div className="flex justify-end">
+            <button type="button" onClick={save} disabled={saving} className={primaryButton}>{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </>
+      )}
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // The tab
 // ---------------------------------------------------------------------------
 export default function ClinicAnswers({ plan }) {
@@ -621,6 +760,14 @@ export default function ClinicAnswers({ plan }) {
         </div>
       ) : (
         <>
+          <BasicsSection
+            open={!!openSections.basics}
+            onToggle={() => toggle('basics')}
+            faq={faq}
+            faqError={faqError}
+            onRetryFaq={loadFaq}
+            onFaqSaved={setFaq}
+          />
           {FAQ_SECTIONS.map(section => (
             <FaqSection
               key={section.id}
