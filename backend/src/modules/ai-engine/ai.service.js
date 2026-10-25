@@ -1,6 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai')
 const { getSystemPrompt } = require('./ai.prompts')
-const { getFunctionDefinitions } = require('./ai.functions')
+const { getFunctionDefinitions, getUnansweredQuestionDeclaration } = require('./ai.functions')
+const { buildClinicInfoBlock } = require('./clinicInfo')
 const { isAppointmentBookingOn } = require('../../utils/appointmentFlag')
 const { executeFunction } = require('./ai.executor')
 const logger = require('../../utils/logger')
@@ -166,9 +167,17 @@ async function processMessage(context) {
       }
     }
 
+    // Guided clinic information: '' unless the clinic has ai_guided_kb on, the growth or pro plan and the clinic industry.
+    // With '' nothing below changes: the prompts print exactly what they always did and the tool list is the same.
+    additionalData.clinicInfoBlock = await buildClinicInfoBlock(tenant.id, { plan: tenant.plan, industry: tenant.industry })
+
     const systemPrompt = getSystemPrompt(tenant, configs, additionalData)
     // Appointment-by-time clinics (both switches on) get a different tool set; every other clinic gets exactly the list it always had
-    const functionDeclarations = getFunctionDefinitions(tenant.industry, { appointmentBooking: isAppointmentBookingOn(configs) })
+    const baseFunctionDeclarations = getFunctionDefinitions(tenant.industry, { appointmentBooking: isAppointmentBookingOn(configs) })
+    // The unanswered-question tool is added only while the CLINIC INFORMATION block is in the prompt
+    const functionDeclarations = additionalData.clinicInfoBlock
+      ? [...baseFunctionDeclarations, getUnansweredQuestionDeclaration()]
+      : baseFunctionDeclarations
 
     const FALLBACK_MODEL = 'gemini-2.5-flash-lite';
     const MAX_ATTEMPTS = 3;

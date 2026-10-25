@@ -1,5 +1,16 @@
 const { isAppointmentBookingOn } = require('../../utils/appointmentFlag')
 
+// Appended to the clinic prompts ONLY when the guided CLINIC INFORMATION block is present (additionalData.clinicInfoBlock, see clinicInfo.js).
+// Without the block nothing is appended and the prompt text is exactly what it was before.
+const CLINIC_INFO_RULES = `CLINIC INFORMATION RULES (these override any earlier rule that conflicts with them in the situations below):
+1. Prices: say a price, fee or discount only if it appears in the CLINIC INFORMATION block or in a function result. Never calculate, estimate or convert a price, never invent an offer, and treat an offer as available only if it is listed under Current offers.
+2. Missing information: if the answer is not in the CLINIC INFORMATION block or in a function result, say plainly that you do not have that detail, ask the patient to call the clinic on the Phone to call number (if there is none, say the clinic will confirm), and offer to help with booking. Stay in the conversation. Do NOT call escalate_to_human for this; this overrides the earlier rule about offering to connect the patient with a staff member when you cannot help. Call log_unanswered_question once, with a short neutral rewording of the question that contains no names, phone numbers or other personal details.
+3. Services: if a treatment or service the patient asks about is not listed, do not say the clinic does not offer it. Use rule 2. This overrides the earlier rule about answering YES or NO from the clinic FAQ for services that are not listed.
+4. Use escalate_to_human only for: the topics listed under 'Topics to always hand to staff', complaints, emergencies, requests for medical advice, and a patient who asks to speak to a person.
+5. If opening hours are given in the block, use them instead of get_clinic_info for opening hours.
+6. All earlier rules about medical advice, booking confirmation and inventing doctor names stay in force.`
+const clinicInfoRulesText = (additionalData) => (additionalData && additionalData.clinicInfoBlock ? '\n' + CLINIC_INFO_RULES + '\n' : '')
+
 /**
  * Base system prompt shared across all industries
  *
@@ -102,9 +113,12 @@ function getClinicPrompt(tenant, configs, additionalData = {}) {
     }
   }
 
-  // Build Growth/Pro knowledge base block
+  // Build Growth/Pro knowledge base block. The guided CLINIC INFORMATION block, when there is one, replaces the free-text section
+  // (its content is inside the block as Extra notes); without it this is exactly the section it always was.
   let knowledgeBlock = '';
-  if (additionalData.knowledgeBase) {
+  if (additionalData.clinicInfoBlock) {
+    knowledgeBlock = '\n' + additionalData.clinicInfoBlock + '\n';
+  } else if (additionalData.knowledgeBase) {
     knowledgeBlock = '\nCLINIC FAQ & ADDITIONAL INFORMATION:\n' + additionalData.knowledgeBase + '\n';
   }
 
@@ -305,7 +319,7 @@ If the patient explicitly asks to speak to a real person, staff, doctor, or rece
 "real person", "staff", "doctor", "receptionist", "human", "talk to someone", "speak to", "call me", "talk to staff"
 → ALWAYS call the escalate_to_human function immediately
 → Do NOT respond with text first, call the function directly
-`
+${clinicInfoRulesText(additionalData)}`
 }
 
 /**
@@ -316,7 +330,10 @@ function getClinicAppointmentPrompt(tenant, configs, additionalData = {}) {
   const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
   const todayDate = nowIST.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata' })
   const currentTime = nowIST.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
-  const knowledgeBlock = additionalData.knowledgeBase ? '\nCLINIC FAQ & ADDITIONAL INFORMATION:\n' + additionalData.knowledgeBase + '\n' : ''
+  // The guided CLINIC INFORMATION block, when there is one, replaces the free-text section; without it this is exactly what it always was
+  const knowledgeBlock = additionalData.clinicInfoBlock
+    ? '\n' + additionalData.clinicInfoBlock + '\n'
+    : (additionalData.knowledgeBase ? '\nCLINIC FAQ & ADDITIONAL INFORMATION:\n' + additionalData.knowledgeBase + '\n' : '')
 
   return `${getBasePrompt(tenant, configs)}
 
@@ -339,7 +356,7 @@ BOOKING BY TIME:
 
 TONE:
 You are a caring, friendly clinic receptionist, not a chatbot. Keep replies under 3 sentences, use 1-2 emojis naturally, use line breaks for readability on WhatsApp.
-`
+${clinicInfoRulesText(additionalData)}`
 }
 
 function getEnquiryPrompt(tenant, configs, additionalData = {}) {

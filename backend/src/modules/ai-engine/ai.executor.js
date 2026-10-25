@@ -55,6 +55,53 @@ async function findOwnedPatient(tenantId, customerId, patientId) {
   return res.rows[0] || null
 }
 
+// The ONLY writer of unanswered_questions: the log_unanswered_question tool (offered only while the CLINIC INFORMATION block is in the prompt).
+// Skips an identical question already logged for this clinic in the last 24 hours, and more than 3 per conversation per hour.
+// Never throws and always answers success to the model, so a failure here can never change the patient's reply.
+async function logUnansweredQuestion(ctx, args) {
+  const ok = { success: true }
+  try {
+    const { tenant, conversation } = ctx
+    if (!tenant || !tenant.id) return ok
+    // Defence in depth: the tool is only declared when the guided block is on, but this checks the same switch again
+    const configs = await require('../tenant/tenant.service').getAllConfigs(tenant.id)
+    if (configs.ai_guided_kb !== 'true' || !['growth', 'pro'].includes(tenant.plan) || tenant.industry !== 'clinic') return ok
+
+    const { sanitizeKnowledgeBase } = require('../settings/settings.controller')
+    let question = typeof args?.question === 'string' ? args.question.trim().slice(0, 300) : ''
+    // Long digit runs look like phone numbers: never stored
+    question = question.replace(/\+?\d[\d\s-]{6,}\d/g, '[number]')
+    question = question ? sanitizeKnowledgeBase(question, 'pro').trim().slice(0, 300) : ''
+    if (!question) return ok
+
+    const duplicate = await pool.query(
+      `SELECT 1 FROM unanswered_questions
+       WHERE tenant_id = $1 AND LOWER(question) = LOWER($2) AND created_at > NOW() - INTERVAL '24 hours' LIMIT 1`,
+      [tenant.id, question]
+    )
+    if (duplicate.rows.length) return ok
+
+    const conversationId = conversation?.id || null
+    if (conversationId) {
+      const recent = await pool.query(
+        `SELECT COUNT(*)::int AS n FROM unanswered_questions
+         WHERE tenant_id = $1 AND conversation_id = $2 AND created_at > NOW() - INTERVAL '1 hour'`,
+        [tenant.id, conversationId]
+      )
+      if (recent.rows[0].n >= 3) return ok
+    }
+
+    await pool.query(
+      'INSERT INTO unanswered_questions (tenant_id, question, conversation_id) VALUES ($1, $2, $3)',
+      [tenant.id, question, conversationId]
+    )
+    logger.info(`UNANSWERED_QUESTION_LOGGED tenant=${tenant.id} conversation=${conversationId}`)
+  } catch (err) {
+    logger.warn(`UNANSWERED_QUESTION_LOG_FAILED ${String(err && err.message).slice(0, 120)}`)
+  }
+  return ok
+}
+
 /**
  * Executes a named AI function with given arguments.
  * All functions query PostgreSQL and return plain text results
@@ -79,6 +126,10 @@ async function executeFunction(name, args, ctx) {
         try { aptOn = isAppointmentBookingOn(await TenantServiceApt.getAllConfigs(tenant.id)) } catch { aptOn = false }
         if (!aptOn) return { success: false, message: 'Appointment booking by time is not available.' }
         return require('../channel/whatsapp/appointment.flow').startFromTool(ctx, args)
+      }
+
+      case 'log_unanswered_question': {
+        return await logUnansweredQuestion(ctx, args)
       }
 
       case 'get_clinic_info': {

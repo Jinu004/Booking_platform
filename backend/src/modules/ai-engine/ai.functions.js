@@ -271,4 +271,19 @@ function getFunctionDefinitions(industry, options = {}) {
   return commonFunctions
 }
 
-module.exports = { getFunctionDefinitions }
+// Offered ONLY on calls where the guided CLINIC INFORMATION block is in the prompt (see ai.service.js); never part of getFunctionDefinitions
+function getUnansweredQuestionDeclaration() {
+  return {
+    name: 'log_unanswered_question',
+    description: 'Record a patient question that you could not answer from the CLINIC INFORMATION block or a function result, so the clinic can add the answer. Call it once per such question, with a short neutral rewording that contains no names, phone numbers or other personal details.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        question: { type: 'STRING', description: 'The question reworded neutrally, without any personal details' }
+      },
+      required: ['question']
+    }
+  }
+}
+
+module.exports = { getFunctionDefinitions, getUnansweredQuestionDeclaration }
