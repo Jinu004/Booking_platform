@@ -16,6 +16,8 @@ const PUSH_BODY = 'Please open your WhatsApp Business app on your phone today. I
 
 // One query for every eligible clinic. ref_time = the latest of the last staff echo, the connect time and the last state change
 // (GREATEST ignores missing values). A missing wa_connection_state counts as connected; a disconnected or offboarded clinic is left out.
+// Echo rows carry no marker of their own (handleStaffEcho stores role 'staff', type 'text', no wamid), so system-written staff rows are
+// excluded by their text instead: "[Template sent..." (dashboard template send) and "[24-hour..." (window-expired notice). A heuristic.
 const ELIGIBLE_SQL = `
   SELECT t.id AS tenant_id,
          GREATEST(
@@ -34,6 +36,7 @@ const ELIGIBLE_SQL = `
     FROM messages m
     JOIN conversations c ON c.id = m.conversation_id
     WHERE m.role = 'staff' AND m.wa_message_id IS NULL AND m.delivery_status IS NULL
+      AND m.content NOT LIKE '[Template sent%' AND m.content NOT LIKE '[24-hour%'
     GROUP BY c.tenant_id
   ) e ON e.tenant_id = t.id
   WHERE t.status = 'active'

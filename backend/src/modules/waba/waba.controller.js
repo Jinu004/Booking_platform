@@ -285,8 +285,8 @@ async function connectClinicNumber(req, res) {
     // Record the connection state (not fatal: the connection itself is already stored)
     try {
       const TenantService = require('../tenant/tenant.service');
+      // wa_state_changed_at is written by webhook events only (Meta's event time); the connect time is whatsapp_connected_at
       await TenantService.setConfig(tenantId, 'wa_connection_state', 'connected');
-      await TenantService.setConfig(tenantId, 'wa_state_changed_at', new Date().toISOString());
     } catch (stateErr) {
       logger.warn(`WABA connect: recording the connection state failed for tenant ${tenantId}: ${stateErr.message}`);
     }

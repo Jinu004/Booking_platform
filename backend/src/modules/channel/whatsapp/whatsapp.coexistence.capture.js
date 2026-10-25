@@ -194,7 +194,14 @@ async function alertSuperAdmins(tenantName, event, reason, initiatedBy, whenMs) 
   const whenIst = new Date(whenMs).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) + ' IST'
   let sent = 0
   for (const row of admins.rows) {
-    if (await sendWhatsappConnectionEmail({ to: row.email, clinicName: tenantName, eventLabel: EVENT_LABELS[event], reason, initiatedBy, whenIst })) sent++
+    const mail = { to: row.email, clinicName: tenantName, eventLabel: EVENT_LABELS[event], reason, initiatedBy, whenIst }
+    let ok = await sendWhatsappConnectionEmail(mail)
+    if (!ok) {
+      // One retry for this address after about 2 seconds (a rate-limited or briefly failing send)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      ok = await sendWhatsappConnectionEmail(mail)
+    }
+    if (ok) sent++
   }
   return { recipients: admins.rows.length, sent }
 }
@@ -239,8 +246,11 @@ async function handleConnectionEvent(entry, value, tenantId, wabaId) {
 
   const tenantRow = (await pool.query('SELECT name, status FROM tenants WHERE id = $1', [tenantId])).rows[0]
   if (!tenantRow) return
+  let emailsSent = 0
+  let pushSent = 0
   try {
     const mail = await alertSuperAdmins(tenantRow.name, event, reason, initiatedBy, whenMs)
+    emailsSent = mail.sent
     logger.info(`COEXISTENCE_ALERT tenant=${tenantId} event=${event} email_recipients=${mail.recipients} email_sent=${mail.sent}`)
   } catch (mailErr) {
     logger.warn(`COEXISTENCE_ALERT tenant=${tenantId} event=${event} email=failed`)
@@ -248,15 +258,20 @@ async function handleConnectionEvent(entry, value, tenantId, wabaId) {
   if (event === 'PARTNER_REMOVED' && tenantRow.status === 'active') {
     try {
       const { sendPushToTenant } = require('../../push/push.service')
-      await sendPushToTenant(tenantId, {
+      const pushResult = await sendPushToTenant(tenantId, {
         title: 'WhatsApp connection',
         body: reason === 'PRIMARY_INACTIVITY' ? PUSH_INACTIVITY : PUSH_REMOVED,
         data: { type: 'wa_disconnected' }
       })
-      logger.info(`COEXISTENCE_ALERT tenant=${tenantId} event=${event} push=sent`)
+      pushSent = (pushResult && pushResult.sent) || 0
+      logger.info(`COEXISTENCE_ALERT tenant=${tenantId} event=${event} push_devices=${(pushResult && pushResult.total) || 0} push_sent=${pushSent}`)
     } catch (pushErr) {
       logger.warn(`COEXISTENCE_ALERT tenant=${tenantId} event=${event} push=failed`)
     }
+  }
+  // Every channel failed, or there was nobody to tell: visible in the log. The key is already stored, so this never repeats.
+  if (emailsSent === 0 && pushSent === 0) {
+    logger.error(`COEXISTENCE_ALERT tenant=${tenantId} event=${event} result=all_failed`)
   }
 }
 

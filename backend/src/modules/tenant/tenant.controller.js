@@ -136,7 +136,10 @@ const getAllConfigs = async (req, res) => {
     }
     await tenantService.getTenantById(id); // Ensures tenant exists
     const configs = await tenantService.getAllConfigs(id);
-    return successResponse(res, configs, 200);
+    if (req.staff?.role === 'super_admin') return successResponse(res, configs, 200);
+    // Internal connection and reminder keys (wa_*) are for super admins only
+    const visible = Object.fromEntries(Object.entries(configs).filter(([key]) => !key.startsWith('wa_')));
+    return successResponse(res, visible, 200);
   } catch (error) {
     return errorResponse(res, error.message, 404);
   }
