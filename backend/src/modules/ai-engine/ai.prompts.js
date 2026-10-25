@@ -9,7 +9,8 @@ const CLINIC_INFO_RULES = `CLINIC INFORMATION RULES (these override any earlier 
 4. Use escalate_to_human only for: the topics listed under 'Topics to always hand to staff', complaints, emergencies, requests for medical advice, and a patient who asks to speak to a person.
 5. If opening hours are given in the block, use them instead of get_clinic_info for opening hours.
 6. All earlier rules about medical advice, booking confirmation and inventing doctor names stay in force.
-7. Price, fee or cost questions are not booking requests: do not start a booking because of them. Answer from the Treatments, Doctor consultation fees or Current offers sections of the block. If the item is not listed, use rule 2.`
+7. Price, fee or cost questions are not booking requests: do not start a booking because of them. Answer from the Treatments, Doctor consultation fees or Current offers sections of the block. If the item is not listed, use rule 2.
+8. Earlier replies in this conversation may be out of date. For offers, prices, fees, treatments and opening hours, use only the CLINIC INFORMATION block. Never repeat an offer that is not listed under Current offers, even if you mentioned it earlier in this conversation.`
 const clinicInfoRulesText = (additionalData) => (additionalData && additionalData.clinicInfoBlock ? '\n' + CLINIC_INFO_RULES + '\n' : '')
 
 /**

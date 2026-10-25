@@ -263,6 +263,9 @@ async function processMessage(context) {
               if (errorPhrases.some(phrase => content.includes(phrase))) return false;
               // Output-filter artefacts ("[number]", "[ref]") in an earlier reply make the model copy them
               if (msg.content && (msg.content.includes('[number]') || msg.content.includes('[ref]'))) return false;
+              // With the CLINIC INFORMATION block, earlier assistant replies that talk about offers or discounts are left out:
+              // the block is the only source of the clinic's current offers (patient messages are never dropped here)
+              if (additionalData.clinicInfoBlock && /\b(offers?|discounts?)\b/i.test(msg.content || '')) return false;
             }
             return true;
           })
