@@ -50,7 +50,7 @@ async function getSettings(req, res, next) {
 
     for (const [key, value] of Object.entries(configs)) {
       const k = key.toLowerCase()
-      if (key.startsWith('wa_')) continue
+      if (key.startsWith('wa_') || key === 'ai_guided_kb') continue // internal keys: not shown to clinic staff
       if (
         k.includes('ai_') ||
         k.includes('escalation') ||
@@ -256,6 +256,7 @@ async function updateHITLSettings(req, res, next) {
 }
 
 module.exports = {
+  sanitizeKnowledgeBase,
   getSettings,
   updateSettings,
   getClinicSettings,
