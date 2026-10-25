@@ -10,6 +10,7 @@ import PosterImage from '../components/shared/PosterImage';
 import { plural, hourLabel } from '../utils/plural';
 import { getErrorMessage } from '../utils/errorMessage';
 import LoadError from '../components/LoadError';
+import ClinicAnswers from './settings/ClinicAnswers';
 
 const DAYS = [
   { key: 'mon', label: 'Monday' },
@@ -90,6 +91,11 @@ export default function Settings() {
   useEffect(() => {
     if (activeTab === 'posters' && !canUsePosters) setActiveTab('clinic');
   }, [activeTab, canUsePosters]);
+  // The Clinic answers tab is for admin and manager only (the backend allows nobody else); the plan lock is shown inside the tab
+  const canUseAnswers = ['admin', 'manager'].includes(staff?.role);
+  useEffect(() => {
+    if (activeTab === 'answers' && !canUseAnswers) setActiveTab('clinic');
+  }, [activeTab, canUseAnswers]);
   const [saving, setSaving] = useState(false);
   const [savingAI, setSavingAI] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
@@ -512,6 +518,7 @@ export default function Settings() {
   const tabs = [
     { key: 'clinic', label: 'Clinic Profile' },
     { key: 'ai', label: 'AI & HITL' },
+    ...(canUseAnswers ? [{ key: 'answers', label: 'Clinic answers' }] : []),
     { key: 'whatsapp', label: 'WhatsApp' },
     ...(plan === 'pro' ? [{ key: 'doctors', label: 'Doctor Profiles' }] : []),
     ...(canUsePosters ? [{ key: 'posters', label: 'Posters' }] : []),
@@ -862,6 +869,13 @@ export default function Settings() {
             )}
           </div>
         </>
+      )}
+
+      {/* CLINIC ANSWERS (guided answers, treatments, offers, unanswered questions) */}
+      {activeTab === 'answers' && canUseAnswers && (
+        <div className="px-4 md:px-0">
+          <ClinicAnswers plan={plan} />
+        </div>
       )}
 
       {/* WHATSAPP */}
