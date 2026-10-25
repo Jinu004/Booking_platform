@@ -2,6 +2,7 @@ const { successResponse, errorResponse } = require('../../utils/response')
 const TenantService = require('../tenant/tenant.service')
 const logger = require('../../utils/logger')
 const pool = require('../../config/database')
+const redisClient = require('../../config/redis')
 
 /**
  * Permitted keys for PUT /settings.
@@ -161,6 +162,8 @@ async function updateClinicSettings(req, res, next) {
  */
 async function getHITLSettings(req, res, next) {
   try {
+    // A clinic without a settings row gets one (with the standard defaults) instead of "not found"
+    await TenantService.ensureTenantSettings(req.tenantId)
     const result = await pool.query(
       'SELECT * FROM tenant_settings WHERE tenant_id = $1',
       [req.tenantId]
@@ -202,6 +205,12 @@ const sanitizeKnowledgeBase = (text, plan) => {
 async function updateHITLSettings(req, res, next) {
   try {
     const { working_hours, handoff_message, out_of_hours_message, ai_knowledge_base, business_address, business_phone, business_email, payment_upi, payment_phone } = req.body
+    // The knowledge text must be text (anything else would fail inside the sanitiser)
+    if (ai_knowledge_base !== undefined && ai_knowledge_base !== null && typeof ai_knowledge_base !== 'string') {
+      return errorResponse(res, 'Knowledge base must be text', 400)
+    }
+    // A clinic without a settings row gets one before the update
+    await TenantService.ensureTenantSettings(req.tenantId)
     const result = await pool.query(
       `UPDATE tenant_settings
        SET working_hours = COALESCE($1, working_hours),
@@ -232,7 +241,15 @@ async function updateHITLSettings(req, res, next) {
     if (!result.rows.length) {
       return errorResponse(res, 'HITL settings not found', 404)
     }
-    return successResponse(res, result.rows[0])
+    // The AI reads these settings through a 60 s cache: drop it so the change applies at once (best effort, never fails the save)
+    try {
+      await redisClient.del(`tenant_settings:${req.tenantId}`)
+    } catch (cacheErr) {
+      logger.warn(`Could not clear the AI settings cache after a save: ${String(cacheErr && cacheErr.message).slice(0, 100)}`)
+    }
+    // ai_knowledge_base_saved: the text as it was really stored (after the plan limit and the filter), trimmed, for the UI to show
+    const saved = result.rows[0]
+    return successResponse(res, { ...saved, ai_knowledge_base_saved: (saved.ai_knowledge_base || '').trim() })
   } catch (err) {
     next(err)
   }

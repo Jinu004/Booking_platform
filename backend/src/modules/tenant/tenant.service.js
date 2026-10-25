@@ -234,6 +234,17 @@ const setConfig = async (tenantId, key, value) => {
 };
 
 /**
+ * Makes sure the clinic has a tenant_settings row (same defaults as createTenant: the table's own column defaults).
+ * Safe to call any number of times: an existing row is left exactly as it is.
+ */
+const ensureTenantSettings = async (tenantId) => {
+  await pool.query(
+    'INSERT INTO tenant_settings (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING',
+    [tenantId]
+  );
+};
+
+/**
  * Gets all configs as a key-value object
  */
 const getAllConfigs = async (tenantId) => {
@@ -286,6 +297,7 @@ module.exports = {
   getTenantByPhoneNumberId,
   updateTenant,
   setConfig,
+  ensureTenantSettings,
   getAllConfigs,
   getConfig,
   setDefaultConfigs,
