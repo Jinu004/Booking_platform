@@ -12,6 +12,7 @@ import { CardSkeleton } from '../components/shared/Skeleton';
 import useStore from '../store/useStore';
 import api from '../utils/api';
 import { subscribeLiveEvents } from '../utils/liveEvents';
+import ErasePatientModal from '../components/patients/ErasePatientModal';
 
 // Short reasons shown under an outbound message that WhatsApp did not deliver, keyed by the Meta error code
 const DELIVERY_FAILURE_REASONS = {
@@ -94,7 +95,7 @@ export default function Conversations() {
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showChat, setShowChat] = useState(false);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const filteredConversations = searchQuery
     ? conversations.filter(c => {
@@ -107,6 +108,51 @@ export default function Conversations() {
   const messagesEndRef = useRef(null);
   const selectedConversationIdRef = useRef(selectedConversationId);
   const reloadTimerRef = useRef(null);
+
+  // "⋯" menu of the conversation header (admin only) and the "Erase patient data" window. eraseCustomerId is the customers.id
+  // the window was opened for (null = closed); it is kept in state so it cannot change while the window is open.
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [eraseCustomerId, setEraseCustomerId] = useState(null);
+  const moreMenuRef = useRef(null);
+
+  // The menu closes on a tap or click outside it and on Escape
+  useEffect(() => {
+    if (!moreOpen) return undefined;
+    const handlePointer = (e) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target)) setMoreOpen(false);
+    };
+    const handleKey = (e) => { if (e.key === 'Escape') setMoreOpen(false); };
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('touchstart', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('touchstart', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [moreOpen]);
+
+  // Another conversation selected: the menu closes
+  useEffect(() => { setMoreOpen(false); }, [selectedConversationId]);
+
+  // After a successful erasure: the window and menu close first, then every thread of that customer leaves the list,
+  // the open thread closes (phones return to the list), the ?id= param is removed and the list is loaded again
+  const handlePatientErased = () => {
+    const erasedCustomerId = eraseCustomerId;
+    setEraseCustomerId(null);
+    setMoreOpen(false);
+    addToast('Patient data erased', 'success');
+    setConversations(prev => prev.filter(c => !erasedCustomerId || c.customer_id !== erasedCustomerId));
+    setSelectedConversationId(null);
+    setMessages([]);
+    setShowChat(false);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.delete('id');
+      return next;
+    }, { replace: true });
+    fetchConversations();
+  };
 
 
 
@@ -218,6 +264,7 @@ export default function Conversations() {
               id: data.conversationId,
               customer_name: data.customerName,
               customer_phone: data.customerPhone,
+              customer_id: data.customer_id ?? null,
               mode: 'human',
               needs_attention: true,
               last_message_at: data.timestamp
@@ -515,6 +562,37 @@ export default function Conversations() {
                       Clear Chat
                     </button>
                   )}
+                  {/* "⋯" menu: clinic admin only, and only when the conversation has a customer id. Visible at every width. */}
+                  {staff?.role === 'admin' && selectedConversation.customer_id && (
+                    <div className="relative" ref={moreMenuRef}>
+                      <button
+                        type="button"
+                        onClick={() => setMoreOpen(open => !open)}
+                        aria-label="More actions"
+                        aria-haspopup="menu"
+                        aria-expanded={moreOpen}
+                        className="w-11 h-11 md:w-9 md:h-9 flex items-center justify-center rounded-lg text-xl leading-none text-ink/55 hover:bg-ink/[0.05] transition"
+                      >
+                        ⋯
+                      </button>
+                      {moreOpen && (
+                        <div role="menu" className="absolute right-0 top-full mt-1 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-ink/[0.08] z-30 py-1">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setMoreOpen(false);
+                              setEraseCustomerId(selectedConversation.customer_id);
+                            }}
+                            className="w-full text-left px-4 py-3 min-h-[48px] hover:bg-red-50 transition"
+                          >
+                            <span className="block text-sm font-semibold text-red-600">Erase patient data</span>
+                            <span className="block text-xs text-ink/55 mt-0.5">Removes the patient, bookings and all messages</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -747,6 +825,16 @@ export default function Conversations() {
         </div>
       </div>
     </div>
+
+    {/* Erase patient data (admin only: the menu item that opens it exists only for a clinic admin). customerId is the customers.id. */}
+    {staff?.role === 'admin' && (
+      <ErasePatientModal
+        isOpen={!!eraseCustomerId}
+        customerId={eraseCustomerId}
+        onClose={() => setEraseCustomerId(null)}
+        onErased={handlePatientErased}
+      />
+    )}
 
     {/* Template Message Modal */}
     {showTemplateModal && (
