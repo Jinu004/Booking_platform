@@ -69,15 +69,23 @@ async function countRows(client, tenantId, customerId, phone, ids) {
   };
 }
 
+// The patients an erasure of this customer would remove (one phone number can have several, e.g. a family): id and name only,
+// ordered by name, at most PREVIEW_PATIENT_LIMIT entries (counts.patients always holds the full number)
+const PREVIEW_PATIENT_LIMIT = 50;
+
 /**
- * Read-only: what an erasure would remove. Returns { customer: { id, name, phone }, counts }.
+ * Read-only: what an erasure would remove. Returns { customer: { id, name, phone }, counts, patients: [{ id, name }] }.
  * Throws ErasureError(404) when the customer is not in this clinic.
  */
 async function previewCustomerErasure(client, tenantId, customerId) {
   const customer = await loadCustomer(client, tenantId, customerId);
   const ids = await collectIds(client, tenantId, customerId);
   const counts = await countRows(client, tenantId, customerId, customer.phone, ids);
-  return { customer, counts };
+  const patientRows = await client.query(
+    'SELECT id, name FROM patients WHERE customer_id = $1 AND tenant_id = $2 ORDER BY name ASC, id ASC LIMIT $3',
+    [customerId, tenantId, PREVIEW_PATIENT_LIMIT]
+  );
+  return { customer, counts, patients: patientRows.rows.map((row) => ({ id: row.id, name: row.name })) };
 }
 
 // Removes the Redis keys of the customer. Never throws.
