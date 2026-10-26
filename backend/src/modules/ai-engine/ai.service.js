@@ -247,8 +247,13 @@ async function processMessage(context) {
 
     const FALLBACK_MODEL = 'gemini-2.5-flash-lite';
     const MAX_ATTEMPTS = 3;
+    // True once a tool (function) has been executed in this turn. A retry restarts the whole turn from the patient's message,
+    // so after a tool has run, a timeout is not retried (the tool could repeat, e.g. a booking).
+    let toolHasRun = false;
     const isTransientError = (err) => {
       const msg = err.message || '';
+      // A timeout / abort of the Gemini request is retried (with the fallback model) only before any tool has run
+      if (!toolHasRun && (err.name === 'AbortError' || /aborted|timed out|timeout/i.test(msg))) return true;
       return (
         msg.includes('503') ||
         msg.includes('Service Unavailable') ||
@@ -326,7 +331,8 @@ async function processMessage(context) {
         const chat = model.startChat({ history: cleanHistory })
 
         // Send the latest patient message
-        let response = await chat.sendMessage(latestMessage, { signal: AbortSignal.timeout(25000) })
+        // 25 s on the first attempt, 20 s on a retry (keeps the patient's worst-case wait down)
+        let response = await chat.sendMessage(latestMessage, { signal: AbortSignal.timeout(attempt === 1 ? 25000 : 20000) })
         let result = response.response
         logGeminiUsage(tenant, conversation, currentModel, result)
 
@@ -372,6 +378,7 @@ async function processMessage(context) {
 
             logger.info(`Gemini calling function: ${name}`, JSON.stringify(args))
 
+            toolHasRun = true
             const functionResult = await executeFunction(
               name,
               args,

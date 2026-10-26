@@ -61,7 +61,7 @@ async function runRetentionCleanup() {
     logger.info('Retention cleanup completed successfully')
   } catch (err) {
     await client.query('ROLLBACK')
-    logger.error('Retention cleanup failed, rolled back:', err.message)
+    logger.error(`Retention cleanup failed, rolled back: ${err.message}\n${err.stack}`)
   } finally {
     client.release()
   }
