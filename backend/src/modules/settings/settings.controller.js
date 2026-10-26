@@ -50,7 +50,7 @@ async function getSettings(req, res, next) {
 
     for (const [key, value] of Object.entries(configs)) {
       const k = key.toLowerCase()
-      if (key.startsWith('wa_') || key === 'ai_guided_kb' || key === 'ai_info_changed_at') continue // internal keys: not shown to clinic staff
+      if (key.startsWith('wa_') || key === 'ai_guided_kb' || key === 'ai_info_changed_at' || key === 'typing_indicator') continue // internal keys: not shown to clinic staff
       if (
         k.includes('ai_') ||
         k.includes('escalation') ||

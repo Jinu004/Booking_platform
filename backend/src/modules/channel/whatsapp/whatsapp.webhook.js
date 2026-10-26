@@ -5,6 +5,7 @@ const { executeFunction } = require('../../ai-engine/ai.executor')
 const { successResponse } = require('../../../utils/response')
 const logger = require('../../../utils/logger')
 const { maskPhone } = require('../../../utils/phone')
+const { shouldSendTypingIndicator } = require('./typingIndicator')
 const crypto = require('crypto');
 
 // Typed-name validation for the code booking flow (utils/patientName.js, shared with the appointment flow and the AI booking tools).
@@ -350,6 +351,33 @@ router.post('/', async (req, res) => {
         )
         logger.info(`Conversation ${context.conversation.id} is in human mode — skipping AI`)
         return
+      }
+
+      // Read receipt with the "typing..." indicator: the ONE call site for every reply branch below (appointment flow, menus, taps,
+      // coded booking flow and the AI path). It sits after the tenant-active, media, consent and human-mode returns above, so those
+      // never get it. Fire and forget: nothing waits for it, and an error here only logs a warning. Whether it is sent is decided by
+      // shouldSendTypingIndicator (coexistence clinics and the typing_indicator switch); the values are the tenant row, the clinic's
+      // token state (already resolved for this message) and tenant_configs (cached for 60 s), so there is no extra database query.
+      let typingRequested = false
+      if (!typingRequested) {
+        typingRequested = true
+        ;(async () => {
+          try {
+            const typingConfigs = await TenantService.getAllConfigs(tenant.id)
+            const tokenState = senderContext.getTokenState()
+            if (shouldSendTypingIndicator({
+              source,
+              message,
+              hasOwnToken: tokenState === 'ok' || tokenState === 'decrypt_failed',
+              connectedAt: tenant.whatsapp_connected_at,
+              typingConfig: typingConfigs?.typing_indicator
+            })) {
+              await require('./whatsapp.meta').markReadWithTyping(message.messageId)
+            }
+          } catch (typingErr) {
+            logger.warn(`TYPING_INDICATOR_SKIPPED tenant=${tenant.id} class=${String((typingErr && (typingErr.name || typingErr.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)}`)
+          }
+        })().catch(() => {})
       }
 
       // code_booking_flow flag (cached 60s via getAllConfigs); read lazily, once per message
@@ -1257,12 +1285,6 @@ router.post('/', async (req, res) => {
         } catch (inboundSaveErr) {
           logger.warn(`INBOUND_SAVE_FAILED tenant=${tenant.id} conversation=${context.conversation.id} class=${String((inboundSaveErr && (inboundSaveErr.name || inboundSaveErr.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)}`)
         }
-      }
-
-      // Read receipt with the "typing..." indicator while the AI works: typed text messages only (not taps, coded flows, media,
-      // consent keywords or human mode: those returned above). Fire and forget: it never waits, retries or touches the reply.
-      if (source === 'meta' && message.type === 'text' && !message.interactiveId && message.messageId) {
-        require('./whatsapp.meta').markReadWithTyping(message.messageId).catch(() => {})
       }
 
       const aiStartedAt = Date.now()
