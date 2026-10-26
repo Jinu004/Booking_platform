@@ -10,7 +10,7 @@ const pool = require('../../config/database')
 const redisClient = require('../../config/redis')
 const crypto = require('crypto')
 const senderContext = require('../channel/whatsapp/senderContext')
-const { runAttemptsWithRetry, isSafeToRepeatTool, safeReplyAfterStateChange } = require('./ai.retry')
+const { runAttemptsWithRetry, isSafeToRepeatTool, safeReplyAfterStateChange, createTurnDeadline, assertWithinTurnDeadline } = require('./ai.retry')
 
 const client = new GoogleGenerativeAI(
   process.env.GEMINI_API_KEY || ''
@@ -154,6 +154,9 @@ async function processMessage(context) {
     additionalData = {},
     interactiveId
   } = context
+
+  // The overall limit of this turn (90 s from here), per call of processMessage so turns never share it
+  const turnDeadline = createTurnDeadline()
 
   try {
     if (!process.env.GEMINI_API_KEY) {
@@ -314,6 +317,9 @@ async function processMessage(context) {
       getTurnState: () => ({ toolHasRun, stateChangingTool }),
       // A state-changing tool already ran: the patient gets a safe reply (sent and saved like any AI reply, and staff are alerted as for a failed turn)
       onStateChangingStop: () => ({ error: true, text: safeReplyAfterStateChange(tenant.industry) }),
+      // The turn used up its 90 s before a new attempt or a tool round: the failure text (enquiry clinics: the same text without a phone)
+      deadline: turnDeadline,
+      onDeadline: () => ({ error: true, text: buildHiccupText(tenant.industry === 'enquiry' ? null : additionalData.businessPhone) }),
       runAttempt: async (attempt) => {
         const currentModel = attempt === 1 ? MODEL : FALLBACK_MODEL;
         if (attempt > 1) {
@@ -401,6 +407,9 @@ async function processMessage(context) {
 
           // No more function calls — final text response
           if (!functionCallParts.length) break
+
+          // A tool round starts only while the turn still has time (otherwise the turn ends with the deadline reply)
+          assertWithinTurnDeadline(turnDeadline)
 
           // Execute each function call sequentially
           const functionResponses = []

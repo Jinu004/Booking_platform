@@ -39,6 +39,34 @@ function safeReplyAfterStateChange(industry) {
     : "Thanks, I've noted your request. Please check 'Check My Booking' or call the clinic to confirm.";
 }
 
+// ---------------------------------------------------------------------------------------------------------------------------------
+// The overall limit of one turn. It is measured from the start of processMessage and checked before every new attempt and before every
+// tool round (a call that is already running is not interrupted: each Gemini call keeps its own 25 s / 20 s timeout).
+// ---------------------------------------------------------------------------------------------------------------------------------
+const TURN_DEADLINE_MS = 90 * 1000;
+
+class TurnDeadlineError extends Error {
+  constructor() {
+    super('AI turn deadline exceeded');
+    this.name = 'TurnDeadlineError';
+  }
+}
+
+// `now` can be replaced (a fake clock in tests)
+function createTurnDeadline({ limitMs = TURN_DEADLINE_MS, now = Date.now } = {}) {
+  const startedAt = now();
+  return {
+    limitMs,
+    elapsed: () => now() - startedAt,
+    exceeded: () => now() - startedAt > limitMs
+  };
+}
+
+// Called before a tool round: throws TurnDeadlineError once the turn has used up its time (runAttemptsWithRetry turns that into the reply)
+function assertWithinTurnDeadline(deadline) {
+  if (deadline && deadline.exceeded()) throw new TurnDeadlineError();
+}
+
 const errorClass = (err) => String((err && (err.name || err.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40);
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -53,13 +81,25 @@ const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * @param {{ warn: Function }} o.logger
  * @param {string} [o.tenantId]
  * @param {(ms: number) => Promise<void>} [o.sleep]
+ * @param {{ exceeded: Function, elapsed: Function }} [o.deadline]  the overall limit of the turn (createTurnDeadline)
+ * @param {(state: object) => any} [o.onDeadline]  the result when the limit is passed and no state-changing tool ran (the failure text)
  */
-async function runAttemptsWithRetry({ maxAttempts, runAttempt, isTransient, getTurnState, onStateChangingStop, logger, tenantId = 'unknown', sleep = defaultSleep }) {
+async function runAttemptsWithRetry({ maxAttempts, runAttempt, isTransient, getTurnState, onStateChangingStop, logger, tenantId = 'unknown', sleep = defaultSleep, deadline = null, onDeadline = null }) {
+  // The turn ran out of time: one warn line (tenant id and elapsed time only), then the safe reply after a state-changing tool, else the failure text
+  const stopForDeadline = () => {
+    logger.warn(`AI_TURN_DEADLINE tenant=${tenantId} elapsed_ms=${deadline ? deadline.elapsed() : 0}`);
+    const state = getTurnState();
+    if (state && state.stateChangingTool) return onStateChangingStop(null, state);
+    return onDeadline ? onDeadline(state) : onStateChangingStop(null, state);
+  };
+
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (deadline && deadline.exceeded()) return stopForDeadline();
     try {
       return await runAttempt(attempt);
     } catch (err) {
+      if (err instanceof TurnDeadlineError) return stopForDeadline();
       lastError = err;
       const state = getTurnState();
       if (state && state.stateChangingTool) {
@@ -84,4 +124,7 @@ async function runAttemptsWithRetry({ maxAttempts, runAttempt, isTransient, getT
   throw lastError;
 }
 
-module.exports = { runAttemptsWithRetry, isSafeToRepeatTool, safeReplyAfterStateChange, SAFE_TO_REPEAT_TOOLS };
+module.exports = {
+  runAttemptsWithRetry, isSafeToRepeatTool, safeReplyAfterStateChange, SAFE_TO_REPEAT_TOOLS,
+  TURN_DEADLINE_MS, TurnDeadlineError, createTurnDeadline, assertWithinTurnDeadline
+};
