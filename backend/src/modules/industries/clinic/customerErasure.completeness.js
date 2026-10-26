@@ -13,6 +13,22 @@ const TARGETS = ['customers', 'patients', 'conversations', 'bookings'];
 const PLAIN_ID_COLUMNS = ['customer_id', 'patient_id', 'conversation_id', 'booking_id'];
 const RULES = { a: 'NO ACTION', r: 'RESTRICT', c: 'CASCADE', n: 'SET NULL', d: 'SET DEFAULT' };
 
+// Column names that look like a person's contact details or name
+const PERSONAL_COLUMNS = ['phone', 'email', 'name', 'customer_name', 'customer_phone'];
+
+// Tables with a tenant_id and such a column that are intentionally NOT patient data (table: why it is not erased with a patient)
+const NOT_PATIENT_DATA = {
+  customers: 'the erased row itself: deleted by the helper (its patients and profiles cascade)',
+  staff: "clinic staff accounts, not patients",
+  clinic_doctors: "the clinic's doctors (staff), not patients",
+  clinic_profiles: "the clinic's own contact details",
+  clinic_services: 'service names of the clinic',
+  clinic_treatments: 'treatment names and prices of the clinic',
+  procedures: "procedure names of the clinic's doctors",
+  catalogue_items: 'product names of the clinic (enquiry shop)',
+  tenant_templates: 'WhatsApp template names of the clinic'
+};
+
 /**
  * @param {{ query: Function }} client a database client or pool (only SELECTs are run)
  * @returns {Promise<{ ok: boolean, problems: string[], checked: number }>}
@@ -51,6 +67,23 @@ async function checkErasureCompleteness(client) {
     }
   }
 
+  // Tables of a clinic that hold a person's name, phone or email WITHOUT a foreign key to a customer, patient, conversation or booking
+  // (like leads): the foreign-key check cannot see them. Each must be handled by the erasure or be on the allowlist above.
+  const personal = await client.query(
+    `SELECT c.table_name, string_agg(DISTINCT p.column_name, ', ' ORDER BY p.column_name) AS columns
+     FROM information_schema.columns c
+     JOIN information_schema.columns p ON p.table_schema = c.table_schema AND p.table_name = c.table_name
+          AND p.column_name = ANY($1::text[])
+     JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name AND t.table_type = 'BASE TABLE'
+     WHERE c.table_schema = 'public' AND c.column_name = 'tenant_id'
+     GROUP BY c.table_name`,
+    [PERSONAL_COLUMNS]
+  );
+  for (const row of personal.rows) {
+    if (fkTables.has(row.table_name) || HANDLED_TABLES[row.table_name] || NOT_PATIENT_DATA[row.table_name]) continue;
+    problems.push(`${row.table_name} has tenant_id and personal columns (${row.columns}) but no foreign key to a customer, and is neither handled by the erasure nor on the not-patient-data allowlist`);
+  }
+
   // A listed table that no longer exists points at a rename: the erasure would silently skip the new name
   const existing = await client.query(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`);
   const names = new Set(existing.rows.map((row) => row.table_name));
@@ -61,7 +94,7 @@ async function checkErasureCompleteness(client) {
   return { ok: problems.length === 0, problems, checked: fks.rows.length + plain.rows.length };
 }
 
-module.exports = { checkErasureCompleteness };
+module.exports = { checkErasureCompleteness, NOT_PATIENT_DATA };
 
 if (require.main === module) {
   const pool = require('../../../config/database');

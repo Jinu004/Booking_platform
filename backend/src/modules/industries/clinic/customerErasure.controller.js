@@ -13,17 +13,20 @@ const tenantOf = (req) => req.tenantId || req.tenant?.id;
  * Read-only: the customer's name and phone and the counts of what an erasure would remove.
  */
 async function getErasePreview(req, res, next) {
-  const client = await pool.connect();
+  // The connection is taken inside the try: a pool failure then answers through next(err) instead of an unhandled rejection,
+  // and the client is released only when one was obtained
+  let client = null;
   try {
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid customer ID', 400);
+    client = await pool.connect();
     const preview = await previewCustomerErasure(client, tenantOf(req), id);
     return successResponse(res, preview);
   } catch (err) {
     if (err instanceof ErasureError) return errorResponse(res, err.message, err.statusCode);
     next(err);
   } finally {
-    client.release();
+    if (client) client.release();
   }
 }
 

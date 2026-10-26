@@ -96,6 +96,14 @@ function selectHistoryMessages(messages, hasBlock, infoChangedMs) {
   });
 }
 
+// Gemini requires the history to start with a user entry ("First content should be with role 'user'" otherwise). The history is cut
+// to start at its first user entry; with no user entry at all it is empty.
+function startHistoryWithUser(history) {
+  const firstUserIndex = history.findIndex(m => m.role === 'user');
+  if (firstUserIndex === -1) return [];
+  return firstUserIndex > 0 ? history.slice(firstUserIndex) : history;
+}
+
 /**
  * Processes an incoming message through Gemini
  * Handles multi-turn function calling loop
@@ -301,8 +309,7 @@ async function processMessage(context) {
             parts: [{ text: msg.content }]
           }))
 
-        const firstUserIndex = history.findIndex(m => m.role === 'user');
-        const cleanHistory = firstUserIndex > 0 ? history.slice(firstUserIndex) : history;
+        const cleanHistory = startHistoryWithUser(history);
 
         // Get the latest message text to send
         const latestMessage = recentMessages?.[recentMessages.length - 1]?.content || ''
@@ -506,4 +513,4 @@ async function processMessage(context) {
   }
 }
 
-module.exports = { processMessage, maskOtherNumbers, getClinicOwnNumbers, selectHistoryMessages }
+module.exports = { processMessage, maskOtherNumbers, getClinicOwnNumbers, selectHistoryMessages, startHistoryWithUser }

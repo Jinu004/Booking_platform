@@ -10,7 +10,7 @@
 //   4. bookings
 //   5. campaign_recipients of the customer
 //   6. unanswered_questions of the customer's conversations (they have only a plain conversation id column, no foreign key)
-//   7. queued WhatsApp retries to the customer's phone number (no foreign key either; their payload holds message text)
+//   7. queued WhatsApp retries and leads of the customer's phone number (no foreign key either; they hold message text / enquiry details)
 //   8. patient_conditions
 //   9. conversations (messages cascade)
 //  10. the customer (patients and patient_profiles cascade)
@@ -65,6 +65,10 @@ async function countRows(client, tenantId, customerId, phone, ids) {
     unansweredQuestions: await one('SELECT count(*) AS n FROM unanswered_questions WHERE tenant_id = $1 AND conversation_id = ANY($2::uuid[])', [tenantId, conversationIds]),
     queuedRetries: phoneTail(phone).length >= 8
       ? await one(`SELECT count(*) AS n FROM whatsapp_retry_queue WHERE tenant_id = $1 AND right(regexp_replace(to_number, '\\D', '', 'g'), 10) = $2`, [tenantId, phoneTail(phone)])
+      : 0,
+    // Leads (enquiry clinics) have no customer or conversation column: they are tied to the customer by phone number only
+    leads: phoneTail(phone).length >= 8
+      ? await one(`SELECT count(*) AS n FROM leads WHERE tenant_id = $1 AND right(regexp_replace(customer_phone, '\\D', '', 'g'), 10) = $2`, [tenantId, phoneTail(phone)])
       : 0
   };
 }
@@ -124,6 +128,10 @@ async function eraseCustomer(client, input) {
   let counts;
   try {
     await client.query('BEGIN');
+    // Lock the customer row first: a second erase of the same customer waits here (and then answers 404), and a new conversation for
+    // this customer (its foreign key needs a share lock on this row) waits until this transaction has finished
+    const locked = await client.query('SELECT id FROM customers WHERE id = $1 AND tenant_id = $2 FOR UPDATE', [customerId, tenantId]);
+    if (!locked.rows.length) throw new ErasureError('Not found', 404);
     const customer = await loadCustomer(client, tenantId, customerId);
     phone = customer.phone;
     const ids = await collectIds(client, tenantId, customerId);
@@ -151,6 +159,8 @@ async function eraseCustomer(client, input) {
     await client.query('DELETE FROM unanswered_questions WHERE tenant_id = $1 AND conversation_id = ANY($2::uuid[])', [tenantId, conversationIds]);
     if (phoneTail(phone).length >= 8) {
       await client.query(`DELETE FROM whatsapp_retry_queue WHERE tenant_id = $1 AND right(regexp_replace(to_number, '\\D', '', 'g'), 10) = $2`, [tenantId, phoneTail(phone)]);
+      // Leads (enquiry clinics): matched by phone number only (the table has no customer or conversation column), inside this clinic
+      await client.query(`DELETE FROM leads WHERE tenant_id = $1 AND right(regexp_replace(customer_phone, '\\D', '', 'g'), 10) = $2`, [tenantId, phoneTail(phone)]);
     }
 
     // 8. Conditions (some rows link by patient id only), 9. conversations (messages cascade)
@@ -191,6 +201,7 @@ const HANDLED_TABLES = {
   campaign_recipients: 'explicit',
   unanswered_questions: 'explicit',
   whatsapp_retry_queue: 'explicit',
+  leads: 'explicit', // matched by phone number (no foreign key)
   messages: 'cascade',
   patients: 'cascade',
   patient_profiles: 'cascade'
