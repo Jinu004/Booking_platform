@@ -8,6 +8,9 @@ const logger = require('../../utils/logger')
 const { maskPhone } = require('../../utils/phone')
 const pool = require('../../config/database')
 const redisClient = require('../../config/redis')
+const crypto = require('crypto')
+const senderContext = require('../channel/whatsapp/senderContext')
+const { runAttemptsWithRetry, isSafeToRepeatTool, safeReplyAfterStateChange } = require('./ai.retry')
 
 const client = new GoogleGenerativeAI(
   process.env.GEMINI_API_KEY || ''
@@ -94,6 +97,17 @@ function selectHistoryMessages(messages, hasBlock, infoChangedMs) {
     }
     return true;
   });
+}
+
+// An 8-character fingerprint of the final system prompt for the REPLY_TIMING log line. The current date/time line and the "Doctors on
+// duty today" line are removed first, so the same prompt gives the same hash from one minute to the next. The prompt text itself is
+// never logged.
+function hashPrompt(systemPrompt, plan, guided) {
+  const stable = String(systemPrompt || '')
+    .replace(/^CURRENT DATE & TIME \(IST\):.*$/m, '')
+    .replace(/^Doctors on duty today:.*$/m, '')
+  // The plan and the guided switch are part of the fingerprint, so a change of either always shows as a different hash
+  return crypto.createHash('sha256').update(`${stable}\n#plan=${plan || ''}\n#guided=${guided ? 'on' : 'off'}`).digest('hex').slice(0, 8)
 }
 
 // The reply when the AI fails. The clinic's saved Business Phone is named only when it is cleaned by cleanProfileValue and still looks like
@@ -287,13 +301,26 @@ async function processMessage(context) {
       );
     };
 
-    let lastError;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
+    // The first tool of this turn that is NOT read-only or safe to repeat (null = none). Per turn, declared here inside processMessage,
+    // so it is never shared between turns. After such a tool no error restarts the turn (see ai.retry.js).
+    let stateChangingTool = null;
+    const promptHash = hashPrompt(systemPrompt, tenant.plan, !!additionalData.clinicInfoBlock);
+
+    return await runAttemptsWithRetry({
+      maxAttempts: MAX_ATTEMPTS,
+      tenantId: tenant.id,
+      logger,
+      isTransient: isTransientError,
+      getTurnState: () => ({ toolHasRun, stateChangingTool }),
+      // A state-changing tool already ran: the patient gets a safe reply (sent and saved like any AI reply, and staff are alerted as for a failed turn)
+      onStateChangingStop: () => ({ error: true, text: safeReplyAfterStateChange(tenant.industry) }),
+      runAttempt: async (attempt) => {
         const currentModel = attempt === 1 ? MODEL : FALLBACK_MODEL;
         if (attempt > 1) {
           logger.warn(`Gemini falling back to ${FALLBACK_MODEL} on attempt ${attempt}`);
         }
+        // For the REPLY_TIMING log line: prompt hash, plan, guided switch and the model of this attempt (the last attempt wins)
+        senderContext.setAiTrace({ ph: promptHash, plan: tenant.plan, guided: !!additionalData.clinicInfoBlock, model: currentModel });
 
         // Initialize Gemini model with tools
         const model = client.getGenerativeModel({
@@ -398,6 +425,7 @@ async function processMessage(context) {
             logger.info(`Gemini calling function: ${name}`, JSON.stringify(args))
 
             toolHasRun = true
+            if (!stateChangingTool && !isSafeToRepeatTool(name)) stateChangingTool = name
             const functionResult = await executeFunction(
               name,
               args,
@@ -492,25 +520,8 @@ async function processMessage(context) {
         }
         cleanText = maskOtherNumbers(cleanText, ownNumbers);
         return cleanText;
-
-      } catch (err) {
-        lastError = err;
-        if (attempt < MAX_ATTEMPTS) {
-          if (isTransientError(err)) {
-            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000); // 1s, 2s, 4s cap 8s
-            logger.warn(`Gemini attempt ${attempt} failed (${err.message}). Retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-          } else {
-            // Non-transient error (bad API key, invalid request) — don't retry
-            logger.warn(`Gemini attempt ${attempt} failed with non-transient error — not retrying: ${err.message}`);
-            break;
-          }
-        }
       }
-    }
-    
-    // If both attempts fail, throw to the outer catch block
-    throw lastError;
+    });
 
   } catch (err) {
     logger.error('Gemini AI error: ' + JSON.stringify(err) + ' ' + err.stack)
@@ -524,4 +535,4 @@ async function processMessage(context) {
   }
 }
 
-module.exports = { processMessage, maskOtherNumbers, getClinicOwnNumbers, selectHistoryMessages, startHistoryWithUser, buildHiccupText }
+module.exports = { processMessage, maskOtherNumbers, getClinicOwnNumbers, selectHistoryMessages, startHistoryWithUser, buildHiccupText, hashPrompt }

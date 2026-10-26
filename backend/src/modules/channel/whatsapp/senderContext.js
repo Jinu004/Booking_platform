@@ -78,6 +78,25 @@ function getReplyTiming() {
   return storage.getStore()?.timing || null
 }
 
+// What the AI used for this inbound message, for the REPLY_TIMING log line: a short hash of the final system prompt (never the prompt
+// text), the plan, whether the guided clinic information was on, and the model of the attempt. Set by ai.service.js at the start of
+// each attempt (the last one wins); there is nothing here when the AI was not used.
+function setAiTrace(trace) {
+  const store = storage.getStore()
+  if (store) store.aiTrace = trace
+}
+
+function getAiTrace() {
+  return storage.getStore()?.aiTrace || null
+}
+
+// " ph=1a2b3c4d plan=pro guided=on model=gemini-2.5-flash" (empty when there is no trace). Only these four short fields are ever printed.
+function formatAiTrace(trace) {
+  if (!trace) return ''
+  const clean = (value) => String(value == null ? 'unknown' : value).replace(/[^A-Za-z0-9._-]/g, '').slice(0, 40) || 'unknown'
+  return ` ph=${clean(trace.ph)} plan=${clean(trace.plan)} guided=${trace.guided ? 'on' : 'off'} model=${clean(trace.model)}`
+}
+
 function getTenantId() {
   return storage.getStore()?.tenantId || null
 }
@@ -197,6 +216,9 @@ module.exports = {
   addAiTime,
   noteReplySent,
   getReplyTiming,
+  setAiTrace,
+  getAiTrace,
+  formatAiTrace,
   runAsTenant,
   hasContext
 }

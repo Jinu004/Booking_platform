@@ -25,7 +25,9 @@ function logReplyTiming(senderContext) {
     const timing = senderContext.getReplyTiming()
     if (!timing || !timing.reply) return
     const path = timing.reply.kind === 'text' ? (timing.aiMs > 0 ? 'ai-text' : 'coded-text') : timing.reply.kind
-    logger.info(`REPLY_TIMING tenant=${senderContext.getTenantId() || 'unknown'} path=${path} total_ms=${timing.reply.totalMs} ai_ms=${timing.aiMs} send_ms=${timing.reply.sendMs}`)
+    // ph / plan / guided / model only when the AI was used for this message (no prompt text, no personal data)
+    const aiFields = timing.aiMs > 0 ? senderContext.formatAiTrace(senderContext.getAiTrace()) : ''
+    logger.info(`REPLY_TIMING tenant=${senderContext.getTenantId() || 'unknown'} path=${path} total_ms=${timing.reply.totalMs} ai_ms=${timing.aiMs} send_ms=${timing.reply.sendMs}${aiFields}`)
   } catch (_) { /* never affects the reply */ }
 }
 
