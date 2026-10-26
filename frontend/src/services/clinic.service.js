@@ -79,3 +79,14 @@ export async function scheduleAppointmentBooking(doctorId, data) {
 export async function cancelProcedureBooking(bookingId) {
   return api.delete(`/clinic/bookings/${bookingId}/procedure`);
 }
+
+// Patient erasure (admin only). The id is the CUSTOMER id (customers.id), not the patient id.
+// Preview: resolves to { success, data: { customer: { id, name, phone }, counts, patients: [{ id, name }] } }
+export async function previewCustomerErasure(customerId) {
+  return api.get(`/clinic/customers/${customerId}/erase-preview`);
+}
+
+// Erases the customer and everything linked to their phone number. Resolves to { success, data: { counts, keepMedicalNotes } }
+export async function eraseCustomer(customerId, { keepMedicalNotes = false } = {}) {
+  return api.post(`/clinic/customers/${customerId}/erase`, { confirm: 'DELETE', keepMedicalNotes: keepMedicalNotes === true });
+}

@@ -12,6 +12,7 @@ import {
 import { getDoctors, getProcedures, getAvailableSlots, scheduleProcedureBooking } from '../services/clinic.service';
 import { completeBooking, cancelBooking } from '../services/booking.service';
 import NewBookingModal from '../components/NewBookingModal';
+import ErasePatientModal from '../components/patients/ErasePatientModal';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
 import api from '../utils/api';
@@ -279,6 +280,7 @@ export default function PatientProfile() {
 
   const staff = getStoredStaff();
   const [bookingOpen, setBookingOpen] = useState(false)
+  const [eraseOpen, setEraseOpen] = useState(false); // "Erase patient data" window (admin only)
   const [showProcedureModal, setShowProcedureModal] = useState(false);
   const [procedures, setProcedures] = useState([]);
   const [selectedProcedure, setSelectedProcedure] = useState(null);
@@ -1047,6 +1049,21 @@ export default function PatientProfile() {
         </div>
       )}
 
+      {/* ── DANGER ZONE (Overview tab, clinic admin only) ── */}
+      {activeTab === 'overview' && staff?.role === 'admin' && customer.customer_id && (
+        <div className="bg-white rounded-xl border border-red-200 p-6 max-md:p-4">
+          <h3 className="text-sm font-bold text-red-700 mb-1">Danger zone</h3>
+          <p className="text-sm text-gray-600 mb-4">Removes this patient and everything linked to their phone number.</p>
+          <button
+            type="button"
+            onClick={() => setEraseOpen(true)}
+            className="w-full md:w-auto px-4 py-2.5 text-sm font-semibold text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition"
+          >
+            Erase patient data
+          </button>
+        </div>
+      )}
+
       {/* ── MEDICAL HISTORY ── */}
       {activeTab === 'medical' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-8">
@@ -1347,6 +1364,20 @@ export default function PatientProfile() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Erase patient data: only mounted for a clinic admin. The id is the CUSTOMER id (customer.customer_id), not the patient id in the URL. */}
+      {staff?.role === 'admin' && customer.customer_id && (
+        <ErasePatientModal
+          isOpen={eraseOpen}
+          customerId={customer.customer_id}
+          onClose={() => setEraseOpen(false)}
+          onErased={() => {
+            setEraseOpen(false);
+            addToast('Patient data erased', 'success');
+            navigate('/patients', { replace: true });
+          }}
+        />
       )}
 
       {/* New booking for this patient (shared form, patient pre-filled and locked) */}
