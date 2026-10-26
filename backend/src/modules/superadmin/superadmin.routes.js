@@ -25,6 +25,8 @@ const { getPosterImageAsSuperAdmin } = require('../tenant/poster.controller');
 const { successResponse, errorResponse } = require('../../utils/response');
 const { createTemplatesForTenant, refreshTemplateStatuses, getTenantTemplates, createPosterTemplate, TemplateError } = require('../waba/waba.templates.service');
 
+const offboarding = require('./offboarding.controller');
+
 const router = express.Router();
 
 router.use(requireAuth);
@@ -87,6 +89,12 @@ router.post('/tenants/:id/booking-mode', setBookingMode);
 router.delete('/tenants/:id', deleteTenant);
 router.get('/stats', getPlatformStats);
 router.delete('/tenants/:id/conversations', clearTenantConversations);
+
+// Recorded clinic offboarding (30-day deletion on request): super admin only through the guard above
+router.post('/tenants/:id/deletion-request', offboarding.createDeletionRequest);
+router.get('/deletion-requests', offboarding.listDeletionRequests);
+router.get('/tenants/:id/deletion-preview', offboarding.previewDeletion);
+router.post('/tenants/:id/full-delete', offboarding.fullDelete);
 
 router.get('/platform-config', getConfig);
 router.put('/platform-config', updateConfig);
