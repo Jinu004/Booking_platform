@@ -22,9 +22,15 @@ const {
   cancelProcedureBooking
 } = require('./clinic.controller');
 
+const { getErasePreview, eraseCustomerData } = require('./customerErasure.controller');
+
 const router = express.Router();
 
 router.use(requireAuth);
+
+// Patient erasure (admin only): a read-only preview, then the erasure with a typed confirmation
+router.get('/customers/:id/erase-preview', requireRole('admin', 'super_admin'), getErasePreview);
+router.post('/customers/:id/erase', requireRole('admin', 'super_admin'), eraseCustomerData);
 
 router.get('/doctors', getDoctors);
 router.get('/doctors/:id', getDoctorById);
