@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getBookingStats, getBookings, completeBooking } from '../services/booking.service';
 import { getDoctors, getQueue, updateTokenStatus, setAppointmentQueueStatus } from '../services/clinic.service';
@@ -49,6 +49,9 @@ const Dashboard = () => {
   const [hasDoctors, setHasDoctors] = useState(true);
   const [statsFailed, setStatsFailed] = useState(false);     // the stats call failed: the number is unknown, not zero
   const [doctorsFailed, setDoctorsFailed] = useState(false); // the doctors call failed: "no doctors yet" must not be shown
+  const [queueFailed, setQueueFailed] = useState(false);     // the queue call failed: an error line with Retry is shown, not an empty queue
+  const fetchSeqRef = useRef(0);                              // an answer that arrives after a newer request was started is ignored
+  const lastGoodQueueRef = useRef(null);                      // the last queue that loaded (all rows), kept when a refresh fails
   const [doctors, setDoctors] = useState([]);
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -63,23 +66,29 @@ const Dashboard = () => {
   }, []);
 
   const fetchDashboardData = async () => {
+    const seq = ++fetchSeqRef.current;
     try {
       let statsDidFail = false;
       let doctorsDidFail = false;
+      let queueDidFail = false;
       const [statsRes, convRes, allDocsRes, tokensRes, bookingsRes] = await Promise.all([
         getBookingStats().catch(() => { statsDidFail = true; return { data: { total: 0 } }; }),
         isDoctor ? Promise.resolve({ data: [] }) : getHITLConversations({ since: '24h' }).catch(() => ({ data: { conversations: [] } })),
         getDoctors().catch(() => { doctorsDidFail = true; return { data: [] }; }),
-        getQueue().catch(() => ({ data: [] })),
+        getQueue().catch(() => { queueDidFail = true; return { data: [] }; }),
         // page AND limit: the server only limits the list when both are sent (response shape is the same: { bookings, total, page, limit })
         getBookings({ page: 1, limit: 5 }).catch(() => ({ data: { bookings: [] } }))
       ]);
+
+      if (seq !== fetchSeqRef.current) return; // a newer request was started: this answer is out of date
 
       const docsArray = allDocsRes?.data || [];
       // One doctors call: the "available" list is the full list filtered by the two fields the server's available=true filter used
       // (available_today, and being inside a session right now = available_now)
       const availableDocsArray = docsArray.filter(d => d.available_today && d.available_now);
-      const tokensArray = tokensRes?.data || [];
+      // A failed queue call is not an empty queue: the last good rows stay (none on a first load) and an error line is shown
+      if (!queueDidFail) lastGoodQueueRef.current = tokensRes?.data || [];
+      const tokensArray = queueDidFail ? (lastGoodQueueRef.current || []) : (tokensRes?.data || []);
 
       let activeConvs = Array.isArray(convRes?.data) ? convRes.data : (convRes?.data?.conversations || []);
       let totalBookings = statsRes?.data?.total || 0;
@@ -104,8 +113,11 @@ const Dashboard = () => {
         hasDoctors: docsArray.length > 0
       };
 
-      await saveToCache('dashboard', dashboardData);
+      // The offline copy is never overwritten with a failed (empty) queue: with no last good queue nothing is written
+      if (!queueDidFail || lastGoodQueueRef.current) await saveToCache('dashboard', dashboardData);
+      if (seq !== fetchSeqRef.current) return;
 
+      setQueueFailed(queueDidFail);
       setStats(dashboardData.stats);
       setTokenQueue(dashboardData.tokenQueue);
       setRecentConversations(dashboardData.recentConversations);
@@ -117,6 +129,7 @@ const Dashboard = () => {
       setDoctorsFailed(doctorsDidFail);
       setIsOffline(false);
     } catch (err) {
+      if (seq !== fetchSeqRef.current) return;
       const cached = await loadFromCache('dashboard');
       if (cached) {
         setStats(cached.stats);
@@ -132,7 +145,7 @@ const Dashboard = () => {
       }
       setIsOffline(true);
     } finally {
-      setLoading(false);
+      if (seq === fetchSeqRef.current) setLoading(false);
     }
   };
 
@@ -314,9 +327,16 @@ const Dashboard = () => {
               <span className="font-semibold tracking-tight">Today's queue</span>
             </div>
             <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-full bg-ink/[0.06] text-ink/70">
-              {tokenQueue.length}
+              {queueFailed && tokenQueue.length === 0 ? '–' : tokenQueue.length}
             </span>
           </div>
+
+          {queueFailed && (
+            <div role="alert" className="px-4 md:px-6 py-2.5 flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50">
+              <span className="text-sm text-amber-800">Could not load the queue</span>
+              <button type="button" onClick={fetchDashboardData} className="text-sm font-semibold text-amber-900 underline underline-offset-2">Retry</button>
+            </div>
+          )}
 
           <div className="px-4 py-3 flex flex-wrap gap-1.5 border-b border-ink/[0.08]">
             {filterTabs.map(tab => (
@@ -346,7 +366,7 @@ const Dashboard = () => {
 
           <div className="divide-y divide-ink/[0.08] max-h-[480px] overflow-y-auto">
             {filteredTokens.length === 0 ? (
-              <div className="p-12 text-center text-sm text-ink/55">Nothing in the queue yet</div>
+              <div className="p-12 text-center text-sm text-ink/55">{queueFailed ? 'The queue could not be loaded' : 'Nothing in the queue yet'}</div>
             ) : filteredTokens.map(t => {
               const tokenRow = isTokenRow(t);
               const clockParts = fmtClock(t.slot_time) ? fmtClock(t.slot_time).split(' ') : null;

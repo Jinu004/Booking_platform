@@ -25,6 +25,7 @@ const COUNT_ROWS = [
   ['conditions', 'Conditions'],
   ['campaignRecipients', 'Campaign records'],
   ['unansweredQuestions', 'Unanswered questions'],
+  ['leads', 'Leads'], // enquiry clinics; the key is missing on older responses, and zero rows are hidden
 ];
 
 // Props: isOpen, customerId (customers.id, NOT the patient id), onClose, onErased (the caller shows the success message and navigates)
@@ -72,7 +73,7 @@ export default function ErasePatientModal({ isOpen, customerId, onClose, onErase
   }, [isOpen, customerId]);
 
   const handleErase = async () => {
-    if (typed !== 'DELETE' || erasing || !data) return;
+    if (!confirmed || erasing || !data) return;
     setErasing(true);
     setEraseError('');
     try {
@@ -89,6 +90,8 @@ export default function ErasePatientModal({ isOpen, customerId, onClose, onErase
   // While the request runs nothing can close the window: not the X, the overlay, Escape or Cancel
   const safeClose = () => { if (!erasing) onClose(); };
 
+  // The typed confirmation is compared after trimming surrounding spaces (a phone keyboard often adds one); it stays case-sensitive
+  const confirmed = typed.trim() === 'DELETE';
   const counts = data?.counts || {};
   const patients = Array.isArray(data?.patients) ? data.patients : null;
   const patientCount = Number.isFinite(counts.patients) ? counts.patients : (patients ? patients.length : 0);
@@ -178,7 +181,7 @@ export default function ErasePatientModal({ isOpen, customerId, onClose, onErase
             </span>
           </label>
 
-          <p className="text-sm font-semibold text-red-700">This cannot be undone. Backups keep the data for up to 14 days.</p>
+          <p className="text-sm font-semibold text-red-700">This cannot be undone. Backups keep the data for up to about 15 days.</p>
 
           <div>
             <label htmlFor="erase-confirm" className="block text-xs text-gray-500 font-medium mb-1">Type DELETE to confirm</label>
@@ -193,6 +196,9 @@ export default function ErasePatientModal({ isOpen, customerId, onClose, onErase
               autoCapitalize="characters"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 disabled:bg-gray-100"
             />
+            {typed.trim() !== '' && !confirmed && (
+              <p className="mt-1 text-xs text-gray-500">Type DELETE in capital letters</p>
+            )}
           </div>
 
           {eraseError && <p className="text-sm text-red-600" role="alert">{eraseError}</p>}
@@ -210,7 +216,7 @@ export default function ErasePatientModal({ isOpen, customerId, onClose, onErase
               <button
                 type="button"
                 onClick={handleErase}
-                disabled={typed !== 'DELETE' || erasing}
+                disabled={!confirmed || erasing}
                 className="px-4 py-2.5 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
                 {erasing ? 'Erasing…' : 'Erase permanently'}

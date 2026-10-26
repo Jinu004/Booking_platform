@@ -130,13 +130,15 @@ function FaqSection({ section, open, onToggle, faq, faqError, onRetry, onSaved }
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // The fields start from what is stored, and again after a successful save or a reload; a failed save leaves them alone
+  // The fields start from what is stored, and again after a successful save or a reload of THIS section's own saved values; a failed
+  // save leaves them alone, and so does another section's save (the shared answers object changes, this section's own values do not)
+  const ownSavedKey = faq ? JSON.stringify(section.fields.map(f => faq[f.key] || '')) : null;
   useEffect(() => {
     if (!faq) return;
     const next = {};
     section.fields.forEach(f => { next[f.key] = faq[f.key] || ''; });
     setDrafts(next);
-  }, [faq]);
+  }, [ownSavedKey]);
 
   const save = async () => {
     const values = {};
@@ -220,8 +222,11 @@ function TreatmentModal({ editing, onClose, onSaved }) {
     }
   };
 
+  // Overlay tap and Escape are ignored while a save runs and once anything is typed; only Cancel or the X button close the window then
+  const locked = saving || !!(form.name.trim() || form.price_text.trim() || form.details.trim());
+
   return (
-    <Modal isOpen onClose={onClose} title={editing ? 'Edit treatment' : 'Add treatment'}>
+    <Modal isOpen onClose={onClose} title={editing ? 'Edit treatment' : 'Add treatment'} closeOnOverlay={!locked} closeOnEscape={!locked}>
       <div className="space-y-4">
         <TextField id="treatment-name" label="Treatment name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} max={120} required />
         <TextField id="treatment-price" label="Price" value={form.price_text} onChange={v => setForm(f => ({ ...f, price_text: v }))} max={60} hint="e.g. ₹1,500, ₹1,500–3,000, or After consultation" />
@@ -363,8 +368,11 @@ function OfferModal({ editing, onClose, onSaved }) {
     }
   };
 
+  // Overlay tap and Escape are ignored while a save runs and once anything is typed; only Cancel or the X button close the window then
+  const locked = saving || !!(form.title.trim() || form.details.trim() || form.start_date || form.end_date || qa.some(p => p.q.trim() || p.a.trim()));
+
   return (
-    <Modal isOpen onClose={onClose} title={editing ? 'Edit offer' : 'Add offer'} size="lg">
+    <Modal isOpen onClose={onClose} title={editing ? 'Edit offer' : 'Add offer'} size="lg" closeOnOverlay={!locked} closeOnEscape={!locked}>
       <div className="space-y-4">
         <TextField id="offer-title" label="Offer title" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} max={120} required />
         <TextField id="offer-details" label="Details" value={form.details} onChange={v => setForm(f => ({ ...f, details: v }))} max={500} rows={3} />
@@ -690,7 +698,7 @@ function BasicsSection({ open, onToggle, faq, faqError, onRetryFaq, onFaqSaved }
             max={20}
             required
             disabled={saved.phone === null}
-            error={errors.phone}
+            error={errors.phone || (saved.phone !== null && !drafts.phone.trim() ? 'The phone number is needed so the AI can tell patients where to call.' : undefined)}
           />
           <TextField
             id="basics-address"

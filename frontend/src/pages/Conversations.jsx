@@ -114,6 +114,12 @@ export default function Conversations() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [eraseCustomerId, setEraseCustomerId] = useState(null);
   const moreMenuRef = useRef(null);
+  // False once this page has been left: an erasure that finishes after that still shows its message but touches no page state
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // The menu closes on a tap or click outside it and on Escape
   useEffect(() => {
@@ -139,9 +145,10 @@ export default function Conversations() {
   // the open thread closes (phones return to the list), the ?id= param is removed and the list is loaded again
   const handlePatientErased = () => {
     const erasedCustomerId = eraseCustomerId;
+    addToast('Patient data erased', 'success');
+    if (!mountedRef.current) return; // the page was left while the request ran: no page state, no navigation
     setEraseCustomerId(null);
     setMoreOpen(false);
-    addToast('Patient data erased', 'success');
     setConversations(prev => prev.filter(c => !erasedCustomerId || c.customer_id !== erasedCustomerId));
     setSelectedConversationId(null);
     setMessages([]);
@@ -495,7 +502,7 @@ export default function Conversations() {
               {/* ── Header ── */}
               <div className="px-6 py-4 border-b border-ink/[0.08] bg-white flex items-center justify-between flex-shrink-0">
                 {/* Left: back button (mobile) + avatar + name + phone */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <button
                     onClick={() => setShowChat(false)}
                     className="md:hidden p-1.5 -ml-1 rounded-full hover:bg-ink/[0.05] text-ink/55 transition flex-shrink-0"
@@ -508,8 +515,8 @@ export default function Conversations() {
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${getAvatarColor(selectedConversation.customer_name || selectedConversation.customer_phone)}`}>
                     {getInitials(selectedConversation.customer_name, selectedConversation.customer_phone)}
                   </div>
-                  <div>
-                    <p className="font-semibold tracking-tight text-ink text-base leading-tight">
+                  <div className="min-w-0">
+                    <p className="font-semibold tracking-tight text-ink text-base leading-tight truncate">
                       {selectedConversation.customer_name || 'Unknown Patient'}
                     </p>
                     <p className="text-xs text-ink/40 mt-0.5">{selectedConversation.customer_phone}</p>
@@ -523,7 +530,7 @@ export default function Conversations() {
                 </div>
 
                 {/* Right: status badge + action button */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-shrink-0">
                   {selectedConversation.mode === 'human' ? (
                     <span className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
                       <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>

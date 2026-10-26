@@ -1,9 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId } from 'react';
 
-const Modal = ({ isOpen, onClose, title, children, size = 'md', showCloseButton = true }) => {
+// closeOnOverlay / closeOnEscape (both true by default, so every existing use behaves as before): a window with unsaved typing or a
+// running save can turn them off, so only its own Cancel / X buttons close it.
+const Modal = ({ isOpen, onClose, title, children, size = 'md', showCloseButton = true, closeOnOverlay = true, closeOnEscape = true }) => {
+  const titleId = useId();
+
   useEffect(() => {
     const handleEscape = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && closeOnEscape) onClose();
     };
 
     if (isOpen) {
@@ -15,7 +19,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md', showCloseButton 
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = '';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, closeOnEscape]);
 
   if (!isOpen) return null;
 
@@ -28,19 +32,24 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md', showCloseButton 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Overlay */}
-      <div 
-        className="fixed inset-0 bg-black/50 transition-opacity" 
-        onClick={onClose}
+      <div
+        className="fixed inset-0 bg-black/50 transition-opacity"
+        onClick={closeOnOverlay ? onClose : undefined}
         aria-hidden="true"
       />
-      
+
       {/* Modal */}
-      <div className={`relative bg-white rounded-lg shadow-xl w-full ${widthClass} flex flex-col max-h-[90vh]`}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className={`relative bg-white rounded-lg shadow-xl w-full ${widthClass} flex flex-col max-h-[90vh]`}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <h3 id={titleId} className="text-lg font-semibold text-gray-900">{title}</h3>
           {showCloseButton && (
-            <button 
+            <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-500 focus:outline-none transition-colors p-1 rounded-md"
             >
@@ -50,7 +59,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md', showCloseButton 
             </button>
           )}
         </div>
-        
+
         {/* Content */}
         <div className="px-6 py-4 overflow-y-auto">
           {children}

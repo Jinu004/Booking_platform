@@ -281,6 +281,12 @@ export default function PatientProfile() {
   const staff = getStoredStaff();
   const [bookingOpen, setBookingOpen] = useState(false)
   const [eraseOpen, setEraseOpen] = useState(false); // "Erase patient data" window (admin only)
+  // False once this page has been left: an erasure that finishes after that still shows its message but moves nothing
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   const [showProcedureModal, setShowProcedureModal] = useState(false);
   const [procedures, setProcedures] = useState([]);
   const [selectedProcedure, setSelectedProcedure] = useState(null);
@@ -1373,8 +1379,9 @@ export default function PatientProfile() {
           customerId={customer.customer_id}
           onClose={() => setEraseOpen(false)}
           onErased={() => {
-            setEraseOpen(false);
             addToast('Patient data erased', 'success');
+            if (!mountedRef.current) return; // the page was left while the request ran: no navigation, no page state
+            setEraseOpen(false);
             navigate('/patients', { replace: true });
           }}
         />

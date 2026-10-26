@@ -111,6 +111,13 @@ export default function Settings() {
   });
 
   const [clinic, setClinic] = useState({ opening_time: '09:00', closing_time: '18:00', address: '' });
+  // What was last loaded from (or saved to) the server. A save sends only the fields that differ from this, so a value another tab
+  // of Settings (for example Clinic answers) saved in the meantime is never written back with the old one.
+  const loadedRef = useRef({
+    phone: '',
+    clinic: { opening_time: '09:00', closing_time: '18:00', address: '' },
+    business: { business_address: '', business_phone: '', business_email: '', payment_upi: '', payment_phone: '' }
+  });
   const [hitl, setHITL] = useState({
     working_hours: {
       mon: { enabled: true, open: '09:00', close: '18:00' },
@@ -172,6 +179,7 @@ export default function Settings() {
         if (d) {
           // booking_mode is left out of the clinic profile: "Save Profile" sends the profile object back to PUT /settings/clinic
           const { booking_mode: _bookingMode, ...profileFields } = d;
+          loadedRef.current.clinic = { ...loadedRef.current.clinic, ...profileFields };
           setClinic(prev => ({ ...prev, ...profileFields }));
         }
       })
@@ -194,8 +202,16 @@ export default function Settings() {
           handoff_message: hitlData?.handoff_message || prev.handoff_message,
           out_of_hours_message: hitlData?.out_of_hours_message || prev.out_of_hours_message,
           language: lang || prev.language || 'english',
-          business_phone: hitlData?.business_phone || prev.business_phone || '',
+          business_phone: hitlData?.business_phone || '',
         }));
+        loadedRef.current.phone = hitlData?.business_phone || '';
+        loadedRef.current.business = {
+          business_address: hitlData?.business_address || '',
+          business_phone:   hitlData?.business_phone   || '',
+          business_email:   hitlData?.business_email   || '',
+          payment_upi:      hitlData?.payment_upi      || '',
+          payment_phone:    hitlData?.payment_phone    || '',
+        };
         if (hitlData?.ai_knowledge_base) {
           setKnowledgeBase(hitlData.ai_knowledge_base);
         }
@@ -216,13 +232,34 @@ export default function Settings() {
     loadHitl();
   }, []);
 
+  // The Business Phone lives in two forms of this page (Clinic profile and Business profile): after either saves it, both show and compare against it
+  const applySavedPhone = (value) => {
+    loadedRef.current.phone = value;
+    loadedRef.current.business = { ...loadedRef.current.business, business_phone: value };
+    setHITL(h => ({ ...h, business_phone: value }));
+    setBusinessProfile(p => ({ ...p, business_phone: value }));
+  };
+
   const handleSaveClinic = async () => {
-    if (hitl.business_phone !== undefined && hitl.business_phone !== '') {
-      await updateHITLSettings({ business_phone: hitl.business_phone }).catch(() => {});
+    const loaded = loadedRef.current;
+    // Only the fields changed in this tab since they were loaded are sent. An empty Business Phone is allowed (it clears the number).
+    const phoneNow = String(hitl.business_phone ?? '').trim();
+    if (phoneNow !== String(loaded.phone ?? '').trim()) {
+      try {
+        await updateHITLSettings({ business_phone: phoneNow });
+        applySavedPhone(phoneNow);
+      } catch (_) { /* as before: a failed phone save does not stop the profile save */ }
     }
+    const changed = {};
+    Object.keys(clinic).forEach(k => {
+      if (String(clinic[k] ?? '') !== String(loaded.clinic[k] ?? '')) changed[k] = clinic[k];
+    });
     try {
       setSaving(true);
-      await updateClinicSettings(clinic);
+      if (Object.keys(changed).length > 0) {
+        await updateClinicSettings(changed);
+        loadedRef.current.clinic = { ...loadedRef.current.clinic, ...changed };
+      }
       addToast('Clinic profile saved', 'success');
     } catch (err) {
       addToast(getErrorMessage(err, 'Failed to save'), 'error');
@@ -262,15 +299,21 @@ export default function Settings() {
   };
 
   const handleSaveBusinessProfile = async () => {
+    // Only the fields changed since they were loaded (or last saved) are sent; an empty value clears that field
+    const loaded = loadedRef.current.business;
+    const changed = {};
+    Object.keys(businessProfile).forEach(k => {
+      const now = k === 'business_phone' ? String(businessProfile[k] ?? '').trim() : String(businessProfile[k] ?? '');
+      const before = k === 'business_phone' ? String(loaded[k] ?? '').trim() : String(loaded[k] ?? '');
+      if (now !== before) changed[k] = now;
+    });
     try {
       setSavingProfile(true);
-      await updateHITLSettings({
-        business_address: businessProfile.business_address,
-        business_phone:   businessProfile.business_phone,
-        business_email:   businessProfile.business_email,
-        payment_upi:      businessProfile.payment_upi,
-        payment_phone:    businessProfile.payment_phone,
-      });
+      if (Object.keys(changed).length > 0) {
+        await updateHITLSettings(changed);
+        loadedRef.current.business = { ...loadedRef.current.business, ...changed };
+        if (Object.prototype.hasOwnProperty.call(changed, 'business_phone')) applySavedPhone(changed.business_phone);
+      }
       addToast('Business profile saved', 'success');
     } catch (err) {
       addToast(getErrorMessage(err, 'Failed to save business profile'), 'error');
@@ -570,6 +613,9 @@ export default function Settings() {
                     value={hitl.business_phone || ''}
                     onChange={e => setHITL(h => ({ ...h, business_phone: e.target.value }))}
                   />
+                  {!(hitl.business_phone || '').trim() && (
+                    <p className="mt-1 text-xs text-gray-500">Patients will be told to call the clinic without a number.</p>
+                  )}
                 </div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Address</label>
                 <textarea
@@ -763,6 +809,9 @@ export default function Settings() {
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       placeholder="+91 98765 43210"
                     />
+                    {!(businessProfile.business_phone || '').trim() && (
+                      <p className="mt-1 text-xs text-gray-500">Patients will be told to call the clinic without a number.</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Business Email</label>

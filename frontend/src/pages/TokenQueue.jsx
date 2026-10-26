@@ -140,18 +140,23 @@ const TokenQueue = () => {
   const isDoctor = staff?.role === 'doctor';
   const staffDoctorId = isDoctor ? staff?.doctor_id : null;
 
+  // Counts the requests: an answer that arrives after a newer request was started is ignored (a slow poll must not overwrite fresher data)
+  const fetchSeqRef = useRef(0);
   const fetchQueue = async () => {
+    const seq = ++fetchSeqRef.current;
     try {
       const res = await getQueue();
+      if (seq !== fetchSeqRef.current) return;
       const rows = res?.data || [];
       setQueue(isDoctor ? rows.filter(t => t.doctor_id === staffDoctorId) : rows);
       setLoadError('');
       setHasLoaded(true);
     } catch (err) {
+      if (seq !== fetchSeqRef.current) return;
       // The last good data stays on screen; it is replaced by an error only while there is none
       setLoadError(getErrorMessage(err, 'Could not load the queue. Try again.'));
     }
-    finally { setLoading(false); }
+    finally { if (seq === fetchSeqRef.current) setLoading(false); }
   };
 
   useEffect(() => {
@@ -381,7 +386,10 @@ const TokenQueue = () => {
         </div>
 
         {loadError && hasLoaded && (
-          <p className="px-4 py-2 text-xs text-amber-700 bg-amber-50 border-b border-amber-100">Could not refresh. Retrying…</p>
+          <div role="alert" className="px-4 py-2 flex items-center justify-between gap-3 text-xs text-amber-700 bg-amber-50 border-b border-amber-100">
+            <span>Could not load the queue. Showing the last list; retrying…</span>
+            <button type="button" onClick={fetchQueue} className="font-semibold text-amber-900 underline underline-offset-2">Retry</button>
+          </div>
         )}
         {loading ? (
           <div className="p-12 text-center text-sm text-ink/40">Loading queue...</div>
