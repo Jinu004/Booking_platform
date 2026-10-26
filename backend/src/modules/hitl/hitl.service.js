@@ -119,6 +119,7 @@ async function handleAIHandoffRequest(tenant, conversation, staffId = null) {
   // Alert all staff dashboards
   broadcastToTenant(tenant.id, 'handoff_requested', {
     conversationId: conversation.id,
+    customer_id: conversation.customer_id || null,
     customerName: conversation.customer_name,
     customerPhone: conversation.customer_phone,
     timestamp: new Date().toISOString(),
@@ -156,6 +157,7 @@ async function markNeedsAttention(tenant, conversation, { alert = false } = {}) 
 
   broadcastToTenant(tenant.id, 'handoff_requested', {
     conversationId: conversation.id,
+    customer_id: conversation.customer_id || null,
     customerName: conversation.customer_name,
     customerPhone: conversation.customer_phone,
     timestamp: new Date().toISOString(),
