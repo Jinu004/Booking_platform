@@ -3,6 +3,7 @@ const TenantService = require('../tenant/tenant.service')
 const logger = require('../../utils/logger')
 const pool = require('../../config/database')
 const redisClient = require('../../config/redis')
+const { stripInjection } = require('../../utils/injectionFilter')
 
 /**
  * Permitted keys for PUT /settings.
@@ -185,22 +186,10 @@ async function getHITLSettings(req, res, next) {
  */
 const KNOWLEDGE_BASE_MAX_LENGTHS = { growth: 1000, pro: 3500 };
 const getKnowledgeBaseMaxLength = (plan) => KNOWLEDGE_BASE_MAX_LENGTHS[plan] || 1000;
-const INJECTION_PATTERNS = [
-  /ignore\s+(all\s+)?previous\s+instructions?/gi,
-  /you\s+are\s+now/gi,
-  /new\s+instructions?:/gi,
-  /system\s*:/gi,
-  /\[system\]/gi,
-  /forget\s+(everything|all)/gi,
-  /disregard\s+(all\s+)?previous/gi,
-];
+// The injection patterns live in utils/injectionFilter.js (shared with the doctor profile text of the prompts)
 const sanitizeKnowledgeBase = (text, plan) => {
   if (!text) return text;
-  let sanitized = text.slice(0, getKnowledgeBaseMaxLength(plan));
-  for (const pattern of INJECTION_PATTERNS) {
-    sanitized = sanitized.replace(pattern, '[removed]');
-  }
-  return sanitized;
+  return stripInjection(text.slice(0, getKnowledgeBaseMaxLength(plan)));
 };
 
 async function updateHITLSettings(req, res, next) {

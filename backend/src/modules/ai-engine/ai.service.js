@@ -1,7 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai')
 const { getSystemPrompt } = require('./ai.prompts')
 const { getFunctionDefinitions, getUnansweredQuestionDeclaration } = require('./ai.functions')
-const { buildClinicInfoBlock } = require('./clinicInfo')
+const { buildClinicInfoBlock, cleanProfileValue } = require('./clinicInfo')
 const { isAppointmentBookingOn } = require('../../utils/appointmentFlag')
 const { executeFunction } = require('./ai.executor')
 const logger = require('../../utils/logger')
@@ -94,6 +94,18 @@ function selectHistoryMessages(messages, hasBlock, infoChangedMs) {
     }
     return true;
   });
+}
+
+// The reply when the AI fails. The clinic's saved Business Phone is named only when it is cleaned by cleanProfileValue and still looks like
+// a phone number (at least 6 digits); otherwise the text sends the patient to "the clinic" with no number. Both texts keep the words
+// "try again", so the history filter (HISTORY_ERROR_PHRASES) still skips them.
+function buildHiccupText(businessPhone) {
+  const phone = cleanProfileValue(businessPhone, 20)
+  const digits = phone.replace(/\D/g, '').length
+  if (phone && digits >= 6) {
+    return `We're having a brief hiccup on our end 😊 Please try again in a minute, or call us directly at ${phone} and our team will help you right away.`
+  }
+  return "We're having a brief hiccup on our end 😊 Please try again in a minute, or call the clinic and our team will help you right away."
 }
 
 // Gemini requires the history to start with a user entry ("First content should be with role 'user'" otherwise). The history is cut
@@ -508,9 +520,8 @@ async function processMessage(context) {
       return { error: true, text: 'Our AI assistant is currently unavailable. Please contact the clinic directly.' }
     }
 
-    const fallbackClinicPhone = additionalData.businessPhone ? ` at ${additionalData.businessPhone}` : ''
-    return { error: true, text: `We're having a brief hiccup on our end 😊 Please try again in a minute, or call us directly${fallbackClinicPhone} and our team will help you right away.` }
+    return { error: true, text: buildHiccupText(additionalData.businessPhone) }
   }
 }
 
-module.exports = { processMessage, maskOtherNumbers, getClinicOwnNumbers, selectHistoryMessages, startHistoryWithUser }
+module.exports = { processMessage, maskOtherNumbers, getClinicOwnNumbers, selectHistoryMessages, startHistoryWithUser, buildHiccupText }

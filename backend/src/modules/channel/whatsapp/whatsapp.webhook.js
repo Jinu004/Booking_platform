@@ -1323,8 +1323,7 @@ router.post('/', async (req, res) => {
       } catch (err) {
        senderContext.addAiTime(Date.now() - aiStartedAt)
        logger.error(`AI processing crashed for [redacted]: ${err?.message} ${err?.stack}`)
-        const clinicPhone = configs?.business_phone ? ` or call us at ${configs.business_phone}` : ''
-        aiResponse = `Sorry, I could not process that. Please say Hi to try again${clinicPhone}.`
+        aiResponse = 'Sorry, I could not process that. Please say Hi to try again.'
         isAIError = true
       }
 

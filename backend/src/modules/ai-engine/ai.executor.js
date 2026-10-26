@@ -79,10 +79,11 @@ async function getClinicInfoLegacy(tenant) {
     configs[r.key] = r.value
   })
 
+  // The weekly off line only when a weekly_off value is really saved (no made-up 'Sunday')
+  const weeklyOffLine = configs.weekly_off ? `\n📅 Weekly off: ${configs.weekly_off}` : ''
   return `${info.name}
 🕘 Opening: ${configs.opening_time || '9:00 AM'}
-🕔 Closing: ${configs.closing_time || '5:00 PM'}
-📅 Weekly off: ${configs.weekly_off || 'Sunday'}`
+🕔 Closing: ${configs.closing_time || '5:00 PM'}${weeklyOffLine}`
 }
 
 const CLINIC_INFO_DAYS = [
