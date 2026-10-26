@@ -20,6 +20,15 @@ function getVisitLengthMinutes(avgConsultationMinutes) {
   return Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_VISIT_MINUTES;
 }
 
+// The gap between two shown times for a normal appointment visit of this many minutes: 15 for visits of 15 minutes or more (and when
+// the length is missing), the visit length itself when it divides the hour evenly (5, 6, 10, 12), otherwise 5.
+function getSlotStepMinutes(durationMinutes) {
+  const minutes = parseInt(durationMinutes, 10);
+  if (!Number.isFinite(minutes) || minutes >= 15) return 15;
+  if (minutes >= 5 && 60 % minutes === 0) return minutes;
+  return 5;
+}
+
 // The clinic's booking mode, from the tenant_configs key booking_mode. Anything but 'appointment' (or no value) is 'token'.
 async function getBookingMode(pool, tenantId) {
   const res = await pool.query(`SELECT value FROM tenant_configs WHERE tenant_id = $1 AND key = 'booking_mode'`, [tenantId]);
@@ -293,7 +302,9 @@ async function deleteProcedure(pool, tenantId, procedureId) {
   return result.rows[0];
 }
 
-async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes) {
+// visitSlots (optional, default false): true for a normal appointment visit of the doctor (appointment mode), whose times follow
+// getSlotStepMinutes. Every other request (procedures, token mode) keeps the fixed 15-minute step.
+async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes, visitSlots = false) {
   const toMinutes = (t) => { const [h, m] = t.toString().split(':').map(Number); return h * 60 + m; };
   const toTimeStr = (mins) => { const h = Math.floor(mins / 60).toString().padStart(2, '0'); const m = (mins % 60).toString().padStart(2, '0'); return `${h}:${m}`; };
 
@@ -325,7 +336,9 @@ async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes
       .map(b => ({ start: toMinutes(b.slot_time), end: b.end_time ? toMinutes(b.end_time) : toMinutes(b.slot_time) + avgMins }))
       .sort((a, b) => a.start - b.start);
 
-    // Generate all possible start times at 30-min intervals within free windows
+    // Shown start times: a fixed 15-minute grid inside each free window (a window starts at the session start or at the end of a
+    // booking); for appointment visits shorter than 15 minutes the grid follows the visit length (see getSlotStepMinutes)
+    const step = visitSlots && appointmentMode ? getSlotStepMinutes(durationMinutes) : 15;
     const freeWindows = [];
     let windowStart = cursor;
     for (const booked of bookedInSession) {
@@ -335,11 +348,11 @@ async function getAvailableSlots(pool, tenantId, doctorId, date, durationMinutes
     if (sessionEnd > windowStart) freeWindows.push({ start: windowStart, end: sessionEnd });
 
     for (const window of freeWindows) {
-      const snap = Math.ceil(window.start / 15) * 15;
+      const snap = Math.ceil(window.start / step) * step;
       let t = snap;
       while (t + durationMinutes <= window.end) {
         availableSlots.push(toTimeStr(t));
-        t += 15;
+        t += step;
       }
     }
   }
@@ -677,6 +690,7 @@ module.exports = {
   createAppointmentBooking,
   getBookingMode,
   getVisitLengthMinutes,
+  getSlotStepMinutes,
   cancelProcedureBooking,
   rebuildScheduleOverridesAfterCancel
 };

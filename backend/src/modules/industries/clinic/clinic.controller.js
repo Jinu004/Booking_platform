@@ -394,14 +394,16 @@ async function getAvailableSlots(req, res, next) {
     const { date, duration } = req.query;
     if (!date || !isISODate(date)) return errorResponse(res, 'Valid date (YYYY-MM-DD) is required', 400);
     let durationMinutes = parseInt(duration);
+    let visitSlots = false;
     if (!duration || isNaN(durationMinutes)) {
       // Only an appointment-mode clinic may leave the duration out: the doctor's visit length is used. Token mode is unchanged.
       if ((await ClinicModel.getBookingMode(pool, tenantId)) !== 'appointment') return errorResponse(res, 'duration (minutes) is required', 400);
       const doctor = await ClinicModel.getDoctorById(pool, tenantId, id);
       if (!doctor) return errorResponse(res, 'Not found', 404);
       durationMinutes = ClinicModel.getVisitLengthMinutes(doctor.avg_consultation_minutes);
+      visitSlots = true; // no duration given: a normal appointment visit of this doctor, not a procedure
     }
-    const slots = await ClinicModel.getAvailableSlots(pool, tenantId, id, date, durationMinutes);
+    const slots = await ClinicModel.getAvailableSlots(pool, tenantId, id, date, durationMinutes, visitSlots);
     return successResponse(res, slots);
   } catch (err) { next(err); }
 }

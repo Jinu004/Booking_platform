@@ -543,7 +543,7 @@ function realDeps() {
     state: { get: flow.getFlow, set: flow.setFlow, clear: flow.clearFlow },
     clinic: {
       listDoctors: async (tenantId) => (await ClinicModel.getDoctors(pool, tenantId)) || [],
-      getSlots: async (tenantId, doctor, dateStr) => ClinicModel.getAvailableSlots(pool, tenantId, doctor.id, dateStr, ClinicModel.getVisitLengthMinutes(doctor.avg_consultation_minutes)),
+      getSlots: async (tenantId, doctor, dateStr) => ClinicModel.getAvailableSlots(pool, tenantId, doctor.id, dateStr, ClinicModel.getVisitLengthMinutes(doctor.avg_consultation_minutes), true),
       visitMinutes: (doctor) => ClinicModel.getVisitLengthMinutes(doctor.avg_consultation_minutes),
       createAppointment: (tenantId, doctorId, input) => ClinicModel.createAppointmentBooking(pool, tenantId, doctorId, input)
     },
