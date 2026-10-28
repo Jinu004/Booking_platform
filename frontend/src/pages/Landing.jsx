@@ -570,7 +570,7 @@ function Hero({ onNavigate }) {
 function WhatItDoes() {
   const cards = [
     { title: 'Answers patient questions', body: "Timings and fees, on your clinic's WhatsApp.", icon: <><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z" /></> },
-    { title: 'Books appointments', body: 'Patients choose a time or get a token. Your schedule updates by itself.', icon: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18" /></> },
+    { title: 'Books appointments', body: 'Time slots for skin and dental clinics, token queues for general clinics. Your schedule updates by itself.', icon: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18" /></> },
     { title: 'Sends reminders', body: 'Patients get a reminder the day before their visit.', icon: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8" /><path d="M10 21a2 2 0 0 0 4 0" /></> },
     { title: 'Hands over to your team', body: "Anything the AI can't handle goes to your staff.", icon: <><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-7 8-7s8 3 8 7" /></> },
   ];
