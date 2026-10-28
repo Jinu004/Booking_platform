@@ -355,7 +355,7 @@ function AnimatedWABody({ bodyRef, script = SCRIPT }) {
         );
         if (m.card === 'menu') return (
           <div className="rai-wa-card" key={m.id}>
-            <div style={{ fontSize: 12, color: '#111', lineHeight: 1.45 }}>Hello! Welcome to <strong>Menon Family Clinic</strong> 👋<br />Here are today's available doctors:</div>
+            <div style={{ fontSize: 12, color: '#111', lineHeight: 1.45 }}>Hello! Welcome to <strong>Skin Clinic</strong> 👋<br />Here are today's available doctors:</div>
             <div className="rai-wa-meta"><span>10:42 AM</span><span style={{ color: '#53bdeb', marginLeft: 3 }}>✓✓</span></div>
             <div style={{ marginTop: 6, paddingTop: 7, borderTop: '1px solid #e9edef', textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#00A884' }}>☰&nbsp;&nbsp;Book Today</div>
           </div>
@@ -439,9 +439,9 @@ function WAChrome({ children, dashboardHeader = false }) {
         </div>
       ) : (
         <div className="rai-wa-header">
-          <div className="rai-wa-avatar">M</div>
+          <div className="rai-wa-avatar">S</div>
           <div className="rai-wa-name">
-            <strong>Menon Family Clinic</strong>
+            <strong>Skin Clinic</strong>
             <small>online</small>
           </div>
           <div className="rai-wa-icons">
@@ -685,8 +685,8 @@ function FeatureWAPanel() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '420px', width: '100%', overflow: 'hidden' }}>
       <div className="rai-wa-header">
-        <div className="rai-wa-avatar">M</div>
-        <div className="rai-wa-name"><strong>Menon Family Clinic</strong><small>online</small></div>
+        <div className="rai-wa-avatar">S</div>
+        <div className="rai-wa-name"><strong>Skin Clinic</strong><small>online</small></div>
         <div className="rai-wa-icons">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 7l-7 5 7 5V7zM1 5h15v14H1z" /></svg>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
