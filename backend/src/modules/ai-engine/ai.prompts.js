@@ -33,6 +33,11 @@ const CLINIC_INFO_RULES = `CLINIC INFORMATION RULES (these override any earlier 
 9. Answer the question asked first and briefly. Mention an offer only if the patient asks about offers, prices or booking, or it is directly relevant to what they asked. Answer only the patient's latest message; earlier questions in the conversation are already handled.`
 const clinicInfoRulesText = (additionalData) => (additionalData && additionalData.clinicInfoBlock ? '\n' + CLINIC_INFO_RULES + '\n' : '')
 
+// Appointment-mode clinics only (their guided block carries a "Doctors:" list, see clinicInfo.js): one more line after rules 1-9, which stay
+// exactly as they are. Added only when the block really has a Doctors section.
+const DOCTOR_LIST_RULE = `If the patient asks which doctors the clinic has, or a doctor's speciality, answer from the Doctors list (up to 10 are shown) and offer to help book. Do not recommend a doctor for a medical problem and do not call log_unanswered_question for this.`
+const doctorListRuleText = (additionalData) => (additionalData && typeof additionalData.clinicInfoBlock === 'string' && additionalData.clinicInfoBlock.includes('\nDoctors:\n') ? DOCTOR_LIST_RULE + '\n' : '')
+
 /**
  * Base system prompt shared across all industries
  *
@@ -390,7 +395,7 @@ BOOKING BY TIME:
 
 TONE:
 You are a caring, friendly clinic receptionist, not a chatbot. Keep replies under 3 sentences, use 1-2 emojis naturally, use line breaks for readability on WhatsApp.
-${clinicInfoRulesText(additionalData)}`
+${clinicInfoRulesText(additionalData)}${doctorListRuleText(additionalData)}`
 }
 
 function getEnquiryPrompt(tenant, configs, additionalData = {}) {
@@ -510,6 +515,7 @@ function getSystemPrompt(tenant, configs, additionalData = {}) {
 }
 
 module.exports = {
+  cleanPromptText,
   getSystemPrompt,
   getBasePrompt,
   getClinicPrompt,
