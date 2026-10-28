@@ -165,15 +165,6 @@ const LANDING_CSS = `
 /* Trust */
 .rai-trust { padding: 80px 0; border-top: 1px solid var(--border); }
 
-/* Problem */
-.rai-problem-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-top: 56px; }
-.rai-problem-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px 24px; display: flex; flex-direction: column; gap: 12px; }
-.rai-problem-num { font-size: 11px; font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--fg-faint); letter-spacing: 0.08em; }
-.rai-problem-stat { font-size: 48px; font-weight: 600; letter-spacing: -0.04em; line-height: 1; }
-.rai-problem-stat .unit { font-size: 24px; margin-left: 3px; color: var(--fg-muted); }
-.rai-problem-card h3 { font-size: 16px; letter-spacing: -0.02em; font-weight: 600; margin: 0; }
-.rai-problem-card p { font-size: 13.5px; color: var(--fg-muted); line-height: 1.5; }
-
 /* Solution flow */
 .rai-flow { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; position: relative; margin-top: 56px; }
 .rai-flow-line { position: absolute; top: 52px; left: calc(33.3% + 12px); right: calc(33.3% + 12px); height: 1px; background: var(--border); pointer-events: none; }
@@ -263,7 +254,6 @@ const LANDING_CSS = `
   .rai-hero-grid { grid-template-columns: 1fr; gap: 48px; }
   .rai-hero-visual { height: 480px; }
   .rai-float-card { display: none; }
-  .rai-problem-grid { grid-template-columns: repeat(2,1fr); }
   .rai-what { padding: 44px 0; }
   .rai-what-grid { grid-template-columns: repeat(2,1fr); }
   .rai-flow { grid-template-columns: 1fr; }
@@ -281,7 +271,6 @@ const LANDING_CSS = `
   .rai-shell { padding: 0 16px; }
   .rai-section { padding: 60px 0; }
   .rai-h1 { font-size: 30px; }
-  .rai-problem-grid { grid-template-columns: 1fr; }
   .rai-what-grid { grid-template-columns: 1fr; }
   .rai-feature-grid { grid-template-columns: 1fr; }
   .rai-footer-grid { grid-template-columns: 1fr; }
@@ -478,7 +467,6 @@ function Nav({ onNavigate }) {
       <div className="rai-shell rai-nav-inner">
         <a href="#" className="rai-logo"><span className="rai-logo-mark" />ReceptionAI</a>
         <div className="rai-nav-links">
-          <a href="#problem">Problem</a>
           <a href="#solution">Solution</a>
           <a href="#features">Features</a>
           <a href="#pricing">Pricing</a>
@@ -615,39 +603,6 @@ function Trust() {
               <div>Founder, ReceptionAI · Kerala</div>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ─────────────────────────────────────────────
-   PROBLEM
-───────────────────────────────────────────── */
-function Problem() {
-  const items = [
-    { num: '01', title: 'Missed calls', body: "Calls outside opening hours go unanswered. That's patients who book somewhere else." },
-    { num: '02', title: 'Receptionist overload', body: 'Front desk juggles walk-ins, calls, and WhatsApp at once. Something always slips.' },
-    { num: '03', title: 'Booking errors', body: 'Manual entry mistakes — wrong slot, wrong doctor, wrong patient. Then awkward calls back.' },
-  ];
-  return (
-    <section id="problem" className="rai-section">
-      <div className="rai-shell">
-        <div className="rai-section-head">
-          <div>
-            <span className="rai-eyebrow"><span className="dot" />The problem</span>
-            <h2 className="rai-h2" style={{ marginTop: 16 }}>Reception is the bottleneck. Every clinic knows it.</h2>
-          </div>
-          <p className="rai-lead">One person, one phone, two hands — handling appointments, walk-ins, and questions. Here's where clinics lose patients, week after week.</p>
-        </div>
-        <div className="rai-problem-grid">
-          {items.map(p => (
-            <div className="rai-problem-card" key={p.num}>
-              <span className="rai-problem-num">{p.num}</span>
-              <h3>{p.title}</h3>
-              <p>{p.body}</p>
-            </div>
-          ))}
         </div>
       </div>
     </section>
@@ -1042,7 +997,6 @@ const Landing = () => {
       <Hero onNavigate={navigate} />
       <WhatItDoes />
       <Trust />
-      <Problem />
       <Solution />
       <Features />
       <HowItWorks />
