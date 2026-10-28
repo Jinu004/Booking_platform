@@ -604,9 +604,9 @@ function Trust() {
     <section className="rai-trust">
       <div className="rai-shell">
         <div style={{ maxWidth: 760, margin: '0 auto', textAlign: 'center' }}>
-          <span className="rai-eyebrow" style={{ justifyContent: 'center', display: 'inline-flex' }}><span className="dot" />From the team</span>
+          <span className="rai-eyebrow" style={{ justifyContent: 'center', display: 'inline-flex' }}><span className="dot" />From the founder</span>
           <p style={{ fontSize: 24, lineHeight: 1.4, letterSpacing: '-0.02em', fontWeight: 500, color: 'var(--fg)', marginTop: 24 }}>
-            "Most patients try to book appointments after clinic hours — when they're finally free from work. They message on WhatsApp, get no reply, and move on by morning. We built ReceptionAI so clinics never miss that window."
+            "When a patient wants to ask something or book a visit, they message the clinic on WhatsApp. If nobody replies, many go to another clinic. I built ReceptionAI so those messages get a reply within seconds and the booking gets done, any time of day."
           </p>
           <div style={{ marginTop: 28, display: 'inline-flex', alignItems: 'center', gap: 12, fontSize: 13, color: 'var(--fg-muted)' }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center', fontWeight: 600 }}>J</div>
@@ -981,7 +981,7 @@ function FinalCTA({ onNavigate }) {
         </p>
         <div className="rai-final-ctas">
           <button className="rai-btn rai-btn-accent rai-btn-lg" onClick={() => onNavigate('/onboarding')}>Get Started <span className="arr">→</span></button>
-          <button className="rai-btn rai-btn-ghost rai-btn-lg" onClick={() => window.open('mailto:support.receptionai@gmail.com')}>Get in Touch</button>
+          <button className="rai-btn rai-btn-ghost rai-btn-lg" onClick={() => window.open('mailto:support@receptionai.in')}>Get in Touch</button>
         </div>
       </div>
     </section>
@@ -1006,7 +1006,7 @@ function Footer() {
           </div>
           <div className="rai-footer-col">
             <h4>Company</h4>
-            <ul><li><a href="mailto:support.receptionai@gmail.com">Contact</a></li></ul>
+            <ul><li><a href="mailto:support@receptionai.in">Contact</a></li></ul>
           </div>
           <div className="rai-footer-col">
             <h4>Legal</h4>
