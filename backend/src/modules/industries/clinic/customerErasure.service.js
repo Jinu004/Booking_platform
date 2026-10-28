@@ -117,12 +117,15 @@ async function clearRedisKeys(tenantId, phone, conversationIds) {
 /**
  * Erases the customer. Runs BEGIN ... COMMIT on the given client (ROLLBACK on any error, the error is thrown again).
  * @param {object} client a dedicated database client (not a pool)
- * @param {{ tenantId: string, customerId: string, staffId?: string|null, keepMedicalNotes?: boolean, ipAddress?: string|null }} input
+ * @param {{ tenantId: string, customerId: string, staffId?: string|null, keepMedicalNotes?: boolean, ipAddress?: string|null, source?: 'retention' }} input
  * @returns {Promise<{ counts: object, keepMedicalNotes: boolean }>}
  */
 async function eraseCustomer(client, input) {
   const { tenantId, customerId, staffId = null, ipAddress = null } = input;
   const keepMedicalNotes = input.keepMedicalNotes === true;
+  // source 'retention' = the automatic 5-year delete (no staff member): the audit row gets the action customer_erased_auto
+  const source = input.source;
+  const automatic = source === 'retention';
   let phone = null;
   let conversationIds = [];
   let counts;
@@ -174,8 +177,9 @@ async function eraseCustomer(client, input) {
     // Audit entry: ids and counts only, never a name, a phone number or message text
     await client.query(
       `INSERT INTO audit_logs (tenant_id, staff_id, action, entity_type, entity_id, metadata, ip_address)
-       VALUES ($1, $2, 'customer_erased', 'customer', $3, $4, $5)`,
-      [tenantId, staffId && /^[0-9a-f-]{36}$/i.test(String(staffId)) ? staffId : null, customerId, JSON.stringify({ keepMedicalNotes, counts }), ipAddress]
+       VALUES ($1, $2, $3, 'customer', $4, $5, $6)`,
+      [tenantId, staffId && /^[0-9a-f-]{36}$/i.test(String(staffId)) ? staffId : null, automatic ? 'customer_erased_auto' : 'customer_erased', customerId,
+        JSON.stringify(automatic ? { source, keepMedicalNotes, counts } : { keepMedicalNotes, counts }), ipAddress]
     );
     await client.query('COMMIT');
   } catch (err) {
