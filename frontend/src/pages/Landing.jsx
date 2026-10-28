@@ -61,7 +61,7 @@ const LANDING_CSS = `
 .rai-eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(42,157,110,0.2); }
 
 /* Typography */
-.rai-h1 { font-size: clamp(40px, 6vw, 72px); line-height: 1.02; letter-spacing: -0.045em; font-weight: 600; margin: 0; }
+.rai-h1 { font-size: clamp(34px, 5vw, 60px); line-height: 1.02; letter-spacing: -0.045em; font-weight: 600; margin: 0; }
 .rai-h2 { font-size: clamp(32px, 4vw, 48px); line-height: 1.05; letter-spacing: -0.035em; font-weight: 600; margin: 0; }
 .rai-landing p { margin: 0; }
 .rai-lead { font-size: 19px; line-height: 1.5; color: var(--fg-muted); letter-spacing: -0.01em; max-width: 560px; }
@@ -249,7 +249,7 @@ const LANDING_CSS = `
   .rai-shell { padding: 0 20px; }
   .rai-section { padding: 72px 0; }
   .rai-section-head { grid-template-columns: 1fr; gap: 16px; }
-  .rai-h1 { font-size: clamp(32px, 8vw, 48px); }
+  .rai-h1 { font-size: clamp(28px, 7.5vw, 40px); }
   .rai-hero { padding: 48px 0 72px; }
   .rai-hero-grid { grid-template-columns: 1fr; gap: 48px; }
   .rai-hero-visual { height: 480px; }
@@ -269,7 +269,7 @@ const LANDING_CSS = `
 @media (max-width: 480px) {
   .rai-shell { padding: 0 16px; }
   .rai-section { padding: 60px 0; }
-  .rai-h1 { font-size: 36px; }
+  .rai-h1 { font-size: 30px; }
   .rai-problem-grid { grid-template-columns: 1fr; }
   .rai-feature-grid { grid-template-columns: 1fr; }
   .rai-footer-grid { grid-template-columns: 1fr; }
@@ -506,11 +506,10 @@ function Hero({ onNavigate }) {
           <div>
             <span className="rai-india-pill"><span className="rai-flag" />Built for clinics · Made in India</span>
             <h1 className="rai-h1" style={{ marginTop: 20 }}>
-              Your front <br />desk <span className="rai-strike">stops</span>{' '}
-              <span className="rai-accent-text">never sleeps.</span>
+              Your clinic's <span className="rai-accent-text">AI receptionist</span> on WhatsApp
             </h1>
             <p className="rai-lead" style={{ marginTop: 24 }}>
-              ReceptionAI books appointments, manages tokens, and answers patients on WhatsApp — round the clock. Your reception team handles the room. We handle the phone.
+              Patients message your clinic's WhatsApp any time, even at night or on Sundays. They get a reply and a booked appointment. Your reception team handles the room. ReceptionAI handles WhatsApp.
             </p>
             <div className="rai-hero-ctas">
               <button className="rai-btn rai-btn-accent rai-btn-lg" onClick={() => onNavigate('/onboarding')}>
