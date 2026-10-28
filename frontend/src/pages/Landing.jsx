@@ -286,7 +286,7 @@ const SCRIPT = [
   { side: 'typing', delay: 800 },
   { side: 'out', card: 'menu', delay: 400 },
   { side: 'out', card: 'more', delay: 600 },
-  { side: 'in', text: 'Dr. Rajan Kumar · General Medicine', delay: 2200 },
+  { side: 'in', text: 'Dr. Rajan Kumar · Dermatology', delay: 2200 },
   { side: 'typing', delay: 900 },
   { side: 'out', card: 'doctors', delay: 400 },
   { side: 'in', text: '9:00 AM - 1:00 PM', delay: 1800 },
@@ -379,7 +379,7 @@ function AnimatedWABody({ bodyRef, script = SCRIPT }) {
         if (m.card === 'askName') return (
           <div className="rai-wa-card" key={m.id}>
             <div className="rai-wa-card-title">Dr. Rajan Kumar</div>
-            <div className="rai-wa-card-sub">General Medicine</div>
+            <div className="rai-wa-card-sub">Dermatology</div>
             <div className="rai-wa-confirm-rows" style={{ paddingTop: 6 }}>
               <div><span>Session starts</span><strong>9:00 AM</strong></div>
               <div><span>Tokens remaining</span><strong>15</strong></div>
@@ -404,7 +404,7 @@ function AnimatedWABody({ bodyRef, script = SCRIPT }) {
             <div className="rai-wa-confirm-rows">
               <div><span>Patient</span><strong>Anjali</strong></div>
               <div><span>Doctor</span><strong>Dr. Rajan Kumar</strong></div>
-              <div><span>Department</span><strong>General Medicine</strong></div>
+              <div><span>Department</span><strong>Dermatology</strong></div>
               <div><span>Starts</span><strong>🕘 9:00 AM</strong></div>
             </div>
             <div style={{ fontSize: 11, color: '#667781', marginTop: 8, lineHeight: 1.4 }}>📍 Please arrive at the clinic and show your token number to reception.</div>
@@ -790,7 +790,7 @@ function HowtoPreview({ step }) {
             <span style={{ fontSize: 14, fontWeight: 600 }}>Book Today</span>
             <span style={{ fontSize: 15, color: 'var(--fg-muted)', lineHeight: 1 }}>✕</span>
           </div>
-          {[{ n: 'Dr. Rajan Kumar', s: 'General Medicine — 9:00 AM - 1:00 PM' }, { n: 'Dr. Priya Menon', s: 'Gynaecology — 9:00 AM - 12:00 PM' }, { n: 'Dr. Suresh Nair', s: 'Orthopaedics — 10:00 AM - 2:00 PM' }].map(d => (
+          {[{ n: 'Dr. Rajan Kumar', s: 'Dermatology — 9:00 AM - 1:00 PM' }, { n: 'Dr. Priya Menon', s: 'Cosmetology — 9:00 AM - 12:00 PM' }, { n: 'Dr. Suresh Nair', s: 'Trichology — 10:00 AM - 2:00 PM' }].map(d => (
             <div key={d.n} style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
               <div style={{ fontSize: 13.5, fontWeight: 500 }}>{d.n}</div>
               <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 2 }}>{d.s}</div>
