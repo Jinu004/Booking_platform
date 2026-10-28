@@ -639,7 +639,7 @@ function Solution() {
           <div className="rai-flow-step">
             <div className="rai-flow-num">1</div>
             <h3>Patient messages on WhatsApp</h3>
-            <p>They text the clinic number any time. The AI replies, asks the right questions, and finds an open slot.</p>
+            <p>They text your clinic's number any time.</p>
             <div className="rai-glyph">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', padding: '0 8px' }}>
                 <div style={{ alignSelf: 'flex-start', background: 'white', padding: '6px 10px', borderRadius: 8, borderTopLeftRadius: 0, fontSize: 11, border: '1px solid var(--border)' }}>Need an appointment Tuesday</div>
@@ -649,8 +649,8 @@ function Solution() {
           </div>
           <div className="rai-flow-step featured">
             <div className="rai-flow-num">2</div>
-            <h3>AI books and assigns a token</h3>
-            <p>Slot confirmed, token generated, calendar updated, confirmation sent.</p>
+            <h3>The AI replies and books</h3>
+            <p>It answers questions and books the appointment.</p>
             <div className="rai-glyph" style={{ flexDirection: 'column', gap: 6, alignItems: 'center' }}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Token</div>
               <div style={{ fontSize: 32, fontWeight: 600, background: 'rgba(255,255,255,0.12)', color: 'white', padding: '4px 14px', borderRadius: 8, fontFamily: 'monospace' }}>A-14</div>
@@ -659,8 +659,8 @@ function Solution() {
           </div>
           <div className="rai-flow-step">
             <div className="rai-flow-num">3</div>
-            <h3>Queue runs itself</h3>
-            <p>Live token queue on the reception dashboard. Staff sees who's waiting, in consult, and done — in real time.</p>
+            <h3>Your team sees it</h3>
+            <p>Bookings appear on your reception dashboard as they happen.</p>
             <div className="rai-glyph">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', padding: '0 12px' }}>
                 {[{ t: 'A-12', s: 'Done', c: 'var(--fg-faint)' }, { t: 'A-13', s: 'Now', c: 'var(--accent)', active: true }, { t: 'A-14', s: 'Next', c: 'var(--fg-muted)' }].map((r, i) => (
