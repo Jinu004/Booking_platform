@@ -153,11 +153,20 @@ const LANDING_CSS = `
 .rai-wa-typing span:nth-child(3) { animation-delay: 0.4s; }
 @keyframes rai-blink { 0%,80%,100% { opacity:0.3; transform:scale(0.9); } 40% { opacity:1; transform:scale(1); } }
 
+/* What it does */
+.rai-what { padding: 56px 0; border-top: 1px solid var(--border); }
+.rai-what-title { font-size: clamp(22px, 2.6vw, 30px); line-height: 1.15; letter-spacing: -0.03em; font-weight: 600; margin: 0; text-align: center; }
+.rai-what-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-top: 32px; }
+.rai-what-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 18px; display: flex; flex-direction: column; gap: 10px; }
+.rai-what-card h3 { font-size: 15px; letter-spacing: -0.015em; margin: 0; font-weight: 600; }
+.rai-what-card p { color: var(--fg-muted); font-size: 13px; line-height: 1.5; }
+.rai-what-note { margin-top: 24px; font-size: 14px; color: var(--fg-muted); text-align: center; }
+
 /* Trust */
 .rai-trust { padding: 80px 0; border-top: 1px solid var(--border); }
 
 /* Problem */
-.rai-problem-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-top: 56px; }
+.rai-problem-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-top: 56px; }
 .rai-problem-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px 24px; display: flex; flex-direction: column; gap: 12px; }
 .rai-problem-num { font-size: 11px; font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--fg-faint); letter-spacing: 0.08em; }
 .rai-problem-stat { font-size: 48px; font-weight: 600; letter-spacing: -0.04em; line-height: 1; }
@@ -255,6 +264,8 @@ const LANDING_CSS = `
   .rai-hero-visual { height: 480px; }
   .rai-float-card { display: none; }
   .rai-problem-grid { grid-template-columns: repeat(2,1fr); }
+  .rai-what { padding: 44px 0; }
+  .rai-what-grid { grid-template-columns: repeat(2,1fr); }
   .rai-flow { grid-template-columns: 1fr; }
   .rai-flow-line { display: none; }
   .rai-feature-hero { grid-template-columns: 1fr; }
@@ -271,6 +282,7 @@ const LANDING_CSS = `
   .rai-section { padding: 60px 0; }
   .rai-h1 { font-size: 30px; }
   .rai-problem-grid { grid-template-columns: 1fr; }
+  .rai-what-grid { grid-template-columns: 1fr; }
   .rai-feature-grid { grid-template-columns: 1fr; }
   .rai-footer-grid { grid-template-columns: 1fr; }
   .rai-final { padding: 80px 0; }
@@ -554,6 +566,37 @@ function Hero({ onNavigate }) {
 }
 
 /* ─────────────────────────────────────────────
+   WHAT IT DOES
+───────────────────────────────────────────── */
+function WhatItDoes() {
+  const cards = [
+    { title: 'Answers patient questions', body: "Timings, fees, doctors and location, on your clinic's WhatsApp.", icon: <><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z" /></> },
+    { title: 'Books appointments', body: 'Patients choose a time or get a token. Your schedule updates by itself.', icon: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18" /></> },
+    { title: 'Sends reminders', body: 'Patients get a reminder the day before their visit.', icon: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8" /><path d="M10 21a2 2 0 0 0 4 0" /></> },
+    { title: 'Hands over to your team', body: "Anything the AI can't handle goes to your staff.", icon: <><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-7 8-7s8 3 8 7" /></> },
+  ];
+  return (
+    <section id="what-it-does" className="rai-what">
+      <div className="rai-shell">
+        <h2 className="rai-what-title">What ReceptionAI does for your clinic</h2>
+        <div className="rai-what-grid">
+          {cards.map(c => (
+            <div className="rai-what-card" key={c.title}>
+              <div className="rai-feature-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">{c.icon}</svg>
+              </div>
+              <h3>{c.title}</h3>
+              <p>{c.body}</p>
+            </div>
+          ))}
+        </div>
+        <p className="rai-what-note">Works 24 hours a day, including nights, Sundays and holidays.</p>
+      </div>
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────
    TRUST
 ───────────────────────────────────────────── */
 function Trust() {
@@ -566,7 +609,7 @@ function Trust() {
             "Most patients try to book appointments after clinic hours — when they're finally free from work. They message on WhatsApp, get no reply, and move on by morning. We built ReceptionAI so clinics never miss that window."
           </p>
           <div style={{ marginTop: 28, display: 'inline-flex', alignItems: 'center', gap: 12, fontSize: 13, color: 'var(--fg-muted)' }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center', fontWeight: 600 }}>RM</div>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center', fontWeight: 600 }}>J</div>
             <div style={{ textAlign: 'left' }}>
               <div style={{ color: 'var(--fg)', fontWeight: 500 }}>Jinu</div>
               <div>Founder, ReceptionAI · Kerala</div>
@@ -583,9 +626,9 @@ function Trust() {
 ───────────────────────────────────────────── */
 function Problem() {
   const items = [
-    { num: '01', stat: '38', unit: '%', title: 'Missed calls', body: "Calls outside opening hours go unanswered. That's patients who book somewhere else." },
-    { num: '02', stat: '6', unit: 'hrs', title: 'Receptionist overload', body: 'Front desk juggles walk-ins, calls, and WhatsApp at once. Something always slips.' },
-    { num: '03', stat: '1 in 12', unit: '', title: 'Booking errors', body: 'Manual entry mistakes — wrong slot, wrong doctor, wrong patient. Then awkward calls back.' },
+    { num: '01', title: 'Missed calls', body: "Calls outside opening hours go unanswered. That's patients who book somewhere else." },
+    { num: '02', title: 'Receptionist overload', body: 'Front desk juggles walk-ins, calls, and WhatsApp at once. Something always slips.' },
+    { num: '03', title: 'Booking errors', body: 'Manual entry mistakes — wrong slot, wrong doctor, wrong patient. Then awkward calls back.' },
   ];
   return (
     <section id="problem" className="rai-section">
@@ -595,13 +638,12 @@ function Problem() {
             <span className="rai-eyebrow"><span className="dot" />The problem</span>
             <h2 className="rai-h2" style={{ marginTop: 16 }}>Reception is the bottleneck. Every clinic knows it.</h2>
           </div>
-          <p className="rai-lead">One person, one phone, two hands — handling appointments, walk-ins, and questions. Here's what that costs the average clinic, week after week.</p>
+          <p className="rai-lead">One person, one phone, two hands — handling appointments, walk-ins, and questions. Here's where clinics lose patients, week after week.</p>
         </div>
         <div className="rai-problem-grid">
           {items.map(p => (
             <div className="rai-problem-card" key={p.num}>
               <span className="rai-problem-num">{p.num}</span>
-              <div className="rai-problem-stat">{p.stat}<span className="unit">{p.unit}</span></div>
               <h3>{p.title}</h3>
               <p>{p.body}</p>
             </div>
@@ -642,7 +684,7 @@ function Solution() {
           <div className="rai-flow-step featured">
             <div className="rai-flow-num">2</div>
             <h3>AI books and assigns a token</h3>
-            <p>Slot confirmed, token generated, calendar updated, confirmation sent. No human touch needed.</p>
+            <p>Slot confirmed, token generated, calendar updated, confirmation sent.</p>
             <div className="rai-glyph" style={{ flexDirection: 'column', gap: 6, alignItems: 'center' }}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Token</div>
               <div style={{ fontSize: 32, fontWeight: 600, background: 'rgba(255,255,255,0.12)', color: 'white', padding: '4px 14px', borderRadius: 8, fontFamily: 'monospace' }}>A-14</div>
@@ -892,7 +934,7 @@ function Pricing({ onNavigate }) {
   const plans = [
     { name: 'Starter', price: '2,999', period: '/month', sub: 'For solo practices and single-doctor clinics.', features: ['1 doctor', 'Up to 300 bookings/month', 'WhatsApp AI booking 24/7', '24hr appointment reminders', 'Live token queue', 'Analytics dashboard', 'Email support'], cta: 'Get Started' },
     { name: 'Growth', price: '5,999', period: '/month', sub: 'For busy clinics with 2–5 doctors.', features: ['Up to 5 doctors', 'Up to 750 bookings/month', 'WhatsApp AI booking 24/7', '24hr appointment reminders', 'Live token queue', 'Analytics dashboard', 'Priority support'], cta: 'Get Started', featured: true, pill: 'Most popular' },
-    { name: 'Pro', price: '9,999', period: '/month', sub: 'For multi-doctor clinics and growing practices.', features: ['Up to 10 doctors', 'Up to 1,500 bookings/month', 'WhatsApp AI booking 24/7', '24hr appointment reminders', 'Live token queue', 'Analytics dashboard', '24/7 support', 'Dedicated success manager'], cta: 'Get Started' },
+    { name: 'Pro', price: '9,999', period: '/month', sub: 'For multi-doctor clinics and growing practices.', features: ['Up to 10 doctors', 'Up to 1,500 bookings/month', 'WhatsApp AI booking 24/7', '24hr appointment reminders', 'Live token queue', 'Analytics dashboard'], cta: 'Get Started' },
   ];
   return (
     <section id="pricing" className="rai-section">
@@ -902,7 +944,7 @@ function Pricing({ onNavigate }) {
             <span className="rai-eyebrow"><span className="dot" />Pricing</span>
             <h2 className="rai-h2" style={{ marginTop: 16 }}>Honest pricing for clinics, not enterprises.</h2>
           </div>
-          <p className="rai-lead">Pays for itself if it saves you a single missed booking a day. Setup fee covers your full WhatsApp onboarding.</p>
+          <p className="rai-lead">Pays for itself if it saves you a single missed booking a day.</p>
         </div>
         <div className="rai-pricing-grid">
           {plans.map(p => (
@@ -919,7 +961,7 @@ function Pricing({ onNavigate }) {
             </div>
           ))}
         </div>
-        <p className="rai-pricing-note">Extra bookings available at ₹500 per 100. Setup fee applies. Cancel anytime.</p>
+        <p className="rai-pricing-note">Extra bookings available at ₹500 per 100. Cancel anytime.</p>
       </div>
     </section>
   );
@@ -964,7 +1006,7 @@ function Footer() {
           </div>
           <div className="rai-footer-col">
             <h4>Company</h4>
-            <ul><li><a href="#">About</a></li><li><a href="#">Contact</a></li></ul>
+            <ul><li><a href="mailto:support.receptionai@gmail.com">Contact</a></li></ul>
           </div>
           <div className="rai-footer-col">
             <h4>Legal</h4>
@@ -998,6 +1040,7 @@ const Landing = () => {
     <div className="rai-landing">
       <Nav onNavigate={navigate} />
       <Hero onNavigate={navigate} />
+      <WhatItDoes />
       <Trust />
       <Problem />
       <Solution />
