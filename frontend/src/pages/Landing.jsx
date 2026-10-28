@@ -297,7 +297,18 @@ const SCRIPT = [
   { side: 'out', card: 'confirmed', delay: 400 },
 ];
 
-function AnimatedWABody({ bodyRef }) {
+// Enquiry conversation for the Features panel: plain text bubbles only
+const ENQUIRY_SCRIPT = [
+  { side: 'in', text: 'Are you open today?', delay: 600 },
+  { side: 'typing', delay: 800 },
+  { side: 'out', text: 'Yes, we are open today until 6 PM.', delay: 400 },
+  { side: 'in', text: 'What is the consultation fee?', delay: 2200 },
+  { side: 'typing', delay: 900 },
+  { side: 'out', text: 'The consultation fee is ₹300.', delay: 400 },
+  { side: 'out', text: 'Would you like to book an appointment?', delay: 1400 },
+];
+
+function AnimatedWABody({ bodyRef, script = SCRIPT }) {
   const [msgs, setMsgs] = useState([]);
   const tickRef = useRef(0);
 
@@ -309,9 +320,9 @@ function AnimatedWABody({ bodyRef }) {
         setMsgs([]);
         await new Promise(r => timeouts.push(setTimeout(r, 600)));
         let acc = [];
-        for (let i = 0; i < SCRIPT.length; i++) {
+        for (let i = 0; i < script.length; i++) {
           if (cancelled) return;
-          const step = SCRIPT[i];
+          const step = script[i];
           await new Promise(r => timeouts.push(setTimeout(r, step.delay)));
           if (cancelled) return;
           if (step.side === 'typing') {
@@ -330,7 +341,7 @@ function AnimatedWABody({ bodyRef }) {
     };
     run();
     return () => { cancelled = true; timeouts.forEach(clearTimeout); };
-  }, []);
+  }, [script]);
 
   useEffect(() => {
     if (bodyRef && bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
@@ -558,7 +569,7 @@ function Hero({ onNavigate }) {
 ───────────────────────────────────────────── */
 function WhatItDoes() {
   const cards = [
-    { title: 'Answers patient questions', body: "Timings, fees, doctors and location, on your clinic's WhatsApp.", icon: <><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z" /></> },
+    { title: 'Answers patient questions', body: "Timings and fees, on your clinic's WhatsApp.", icon: <><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z" /></> },
     { title: 'Books appointments', body: 'Patients choose a time or get a token. Your schedule updates by itself.', icon: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18" /></> },
     { title: 'Sends reminders', body: 'Patients get a reminder the day before their visit.', icon: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8" /><path d="M10 21a2 2 0 0 0 4 0" /></> },
     { title: 'Hands over to your team', body: "Anything the AI can't handle goes to your staff.", icon: <><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-7 8-7s8 3 8 7" /></> },
@@ -682,12 +693,13 @@ function FeatureWAPanel() {
         </div>
       </div>
       <div className="rai-wa-body" ref={bodyRef} style={{ background: '#ECE5DD' }}>
-        <AnimatedWABody bodyRef={bodyRef} />
+        <AnimatedWABody bodyRef={bodyRef} script={ENQUIRY_SCRIPT} />
       </div>
       <div className="rai-wa-input-bar">
         <div className="rai-wa-input-pill">Message</div>
         <div className="rai-wa-send"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z" /></svg></div>
       </div>
+      <div style={{ background: '#F0F0F0', textAlign: 'center', fontSize: 11, color: '#667781', padding: '0 0 6px' }}>Example conversation</div>
     </div>
   );
 }
@@ -720,12 +732,12 @@ function Features() {
         <div className="rai-feature-hero">
           <div className="rai-feature-hero-copy">
             <span className="rai-eyebrow"><span className="dot" />The flagship</span>
-            <h3 style={{ fontSize: 28, marginTop: 14, letterSpacing: '-0.025em', fontWeight: 600, margin: '14px 0 0' }}>WhatsApp booking, end-to-end</h3>
+            <h3 style={{ fontSize: 28, marginTop: 14, letterSpacing: '-0.025em', fontWeight: 600, margin: '14px 0 0' }}>Answers patient questions on WhatsApp</h3>
             <p style={{ color: 'var(--fg-muted)', marginTop: 12, fontSize: 15, lineHeight: 1.55, maxWidth: 360 }}>
-              Patients book, reschedule, and cancel without ever calling. Replies are conversational, not menu-driven.
+              Patients ask about timings and fees. ReceptionAI answers from your clinic's own information, then helps them book.
             </p>
             <ul style={{ listStyle: 'none', padding: 0, marginTop: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {['Understands typos and casual language', 'Confirms in under 30 seconds', 'Auto-sends reminders 24h before'].map(t => (
+              {['Timings and consultation fees', "Answers come from your clinic's own information", "Anything it can't answer goes to your staff"].map(t => (
                 <li key={t} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 14, color: 'var(--fg)' }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>
                   {t}
@@ -847,8 +859,8 @@ function HowItWorks() {
   const [active, setActive] = useState(0);
   const steps = [
     { title: 'Patient sends a message', body: "On WhatsApp, any time. They don't install anything, don't sign up, don't learn a new tool." },
-    { title: 'AI understands the request', body: 'Books, reschedules, cancels, answers FAQs. Knows your doctors, hours, and locations.' },
-    { title: 'Slot is confirmed instantly', body: 'Calendar checked, slot locked, token issued, confirmation card sent — all in one turn.' },
+    { title: 'AI understands the request', body: 'Books, reschedules, cancels, answers FAQs. Knows your hours and fees.' },
+    { title: 'Slot is confirmed within seconds', body: 'Calendar checked, slot locked, token issued, confirmation card sent — all in one turn.' },
     { title: 'Reception sees the schedule', body: 'Your dashboard updates live. Reception sees the live token queue. Reminders go out automatically.' },
   ];
   return (
@@ -857,7 +869,7 @@ function HowItWorks() {
         <div className="rai-section-head">
           <div>
             <span className="rai-eyebrow"><span className="dot" />How it works</span>
-            <h2 className="rai-h2" style={{ marginTop: 16 }}>From message to confirmed booking in under a minute.</h2>
+            <h2 className="rai-h2" style={{ marginTop: 16 }}>From message to confirmed booking in about a minute.</h2>
           </div>
           <p className="rai-lead">Click through each step to see what changes on the patient's side and on yours.</p>
         </div>
