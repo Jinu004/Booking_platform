@@ -17,6 +17,7 @@ const { successResponse } = require('./utils/response');
 const logger = require('./utils/logger');
 const { apiLimiter, webhookLimiter } = require('./middleware/rateLimiter');
 const channelRouter = require('./modules/channel/channel.router');
+const { webhookVerify, webhookRejectHandler } = require('./modules/channel/whatsapp/webhookSignature');
 
 // Database initialization
 const pool = require('./config/database');
@@ -46,12 +47,13 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 // WhatsApp webhook only: larger JSON bodies (history sync chunks). Registered before the global parser, which then skips the already parsed body.
+// In production its verify step checks the Meta signature BEFORE the body is parsed (webhookSignature.js); a rejection is answered by
+// webhookRejectHandler with the same 403/503 response the route gave before.
 app.use('/webhook', express.json({
   limit: '5mb',
-  verify: (req, res, buf) => {
-    req.rawBody = buf;
-  }
+  verify: webhookVerify
 }));
+app.use('/webhook', webhookRejectHandler);
 app.use(express.json({
   verify: (req, res, buf) => {
     req.rawBody = buf;

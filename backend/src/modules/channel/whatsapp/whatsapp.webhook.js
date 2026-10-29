@@ -7,6 +7,7 @@ const logger = require('../../../utils/logger')
 const { maskPhone } = require('../../../utils/phone')
 const { shouldSendTypingIndicator } = require('./typingIndicator')
 const crypto = require('crypto');
+const { checkWebhookSignature, sizeBucket } = require('./webhookSignature');
 
 // Typed-name validation for the code booking flow (utils/patientName.js, shared with the appointment flow and the AI booking tools).
 // Its cleaning is the same rule create_token_booking applies to patient_name, so the validated name is what gets stored.
@@ -143,33 +144,23 @@ if (process.env.NODE_ENV === 'production' && !process.env.META_APP_SECRET) {
 router.post('/', async (req, res) => {
   // Verify X-Hub-Signature-256. In production EVERY payload needs a valid Meta signature, whatever its shape;
   // outside production only Meta-shaped payloads are checked (so the WAHA development flow keeps working).
-  const signature = req.headers['x-hub-signature-256'];
-  const appSecret = process.env.META_APP_SECRET;
+  // The check itself lives in webhookSignature.js; the webhook JSON parser in index.js runs the same check before parsing in production,
+  // and this is the second guard (it also catches empty bodies and non-JSON content types, which the parser skips).
   const isMetaPayload = req.body?.object === 'whatsapp_business_account';
   const isProduction = process.env.NODE_ENV === 'production';
-  if (isProduction && !appSecret) {
-    logger.error('META_APP_SECRET not set — rejecting webhook');
-    return res.status(503).json({ success: false, error: 'Webhook not configured' });
+  const signatureResult = checkWebhookSignature({
+    signature: req.headers['x-hub-signature-256'],
+    rawBody: req.rawBody,
+    secret: process.env.META_APP_SECRET,
+    isProduction,
+    isMetaPayload,
+    ip: req.ip
+  });
+  if (!signatureResult.ok) {
+    return res.status(signatureResult.status).json({ success: false, error: signatureResult.error });
   }
-  if (appSecret && (isProduction || isMetaPayload)) {
-    // The raw body is the exact bytes received (captured by the JSON parser's verify hook in index.js, never re-serialised)
-    if (!signature || !Buffer.isBuffer(req.rawBody)) {
-      logger.warn(`WEBHOOK_REJECTED_UNSIGNED ip=${req.ip} reason=${signature ? 'no_raw_body' : 'missing_signature'}`);
-      return res.status(403).json({ success: false, error: 'Missing signature' });
-    }
-    const expectedSignature = 'sha256=' + crypto
-      .createHmac('sha256', appSecret)
-      .update(req.rawBody)
-      .digest('hex');
-    const sigBuffer = Buffer.from(String(signature));
-    const expectedBuffer = Buffer.from(expectedSignature);
-    const valid = sigBuffer.length === expectedBuffer.length &&
-      crypto.timingSafeEqual(sigBuffer, expectedBuffer);
-    if (!valid) {
-      logger.warn(`WEBHOOK_REJECTED_UNSIGNED ip=${req.ip} reason=invalid_signature`);
-      return res.status(403).json({ success: false, error: 'Invalid signature' });
-    }
-  }
+  // One line per accepted POST: only the size bucket of the body (no ids, numbers, text or address)
+  if (Buffer.isBuffer(req.rawBody)) logger.info(`WEBHOOK_SIZE bucket=${sizeBucket(req.rawBody.length)}`);
 
   res.status(200).json({ success: true, data: { received: true }, error: null })
 

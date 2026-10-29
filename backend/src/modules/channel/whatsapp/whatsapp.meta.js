@@ -289,9 +289,16 @@ function verifyWebhook(query) {
   const token = query['hub.verify_token']
   const challenge = query['hub.challenge']
 
+  // Without a configured token nothing is verified (an absent token must never match an unset variable)
+  const expected = process.env.META_WEBHOOK_VERIFY_TOKEN
+  if (typeof expected !== 'string' || expected === '') {
+    logger.warn('WEBHOOK_VERIFY_TOKEN_NOT_CONFIGURED GET verification refused')
+    return null
+  }
+
   if (
     mode === 'subscribe' &&
-    token === process.env.META_WEBHOOK_VERIFY_TOKEN
+    require('./webhookSignature').tokensMatch(token, expected)
   ) {
     return challenge
   }
