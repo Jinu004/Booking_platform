@@ -17,7 +17,7 @@ const { validatePatientName } = require('../../../utils/patientName');
 
 const MAX_DAYS_AHEAD = 14;
 const MIN_LEAD_MINUTES = 30;
-const APT_ID_RE = /^(aptdoc|aptday|apt|aptpat)\|/;
+const APT_ID_RE = /^(aptdoc|aptday|apt|aptpat|aptmiss)\|/;
 const GREETINGS = ['hi', 'hello', 'hey', 'hii', 'helo', 'hai', 'hiya', 'start', 'menu'];
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,16 @@ const MESSAGES = {
     ? `You already have an appointment with ${doctorLabel} on ${weekday}. To change it, reply CANCEL and I'll help you book a new time.`
     : 'You already have an appointment that day. To change it, reply CANCEL and I\'ll help you book a new time.'),
   handoff: () => 'No problem, I\'ll ask our team to help you. They\'ll reply shortly.',
-  genericFailure: () => 'Sorry, something went wrong on our side. Please try again, or call the clinic and we\'ll sort it out.'
+  genericFailure: () => 'Sorry, something went wrong on our side. Please try again, or call the clinic and we\'ll sort it out.',
+  // The miss ladder (a typed reply the current step cannot use): hint, then three buttons, then the staff handoff
+  exited: () => 'No problem, I\'ve stopped this booking. Say Hi any time to book, or tap Check My Booking to change an existing appointment.',
+  missTimeKnownDay: () => 'Sorry, I didn\'t catch a time. Please type a time like 5 pm, or reply Cancel to stop.',
+  missTimeNoDay: () => `${MESSAGES.didntCatch()} Or reply Cancel to stop.`,
+  missPick: () => 'Please tap one of the times above, or type a different time like 6 pm. Reply Cancel to stop.',
+  missDoctor: () => 'Please choose a doctor from the list, or reply Cancel to stop.',
+  missPatient: () => 'Please choose from the list above, or tap New patient. Reply Cancel to stop.',
+  missName: () => 'Please type the patient\'s full name, for example Anu Mathew. Reply Cancel to stop.',
+  missChoice: () => 'Would you like to try again, talk to our staff, or stop booking?'
 };
 
 function addDaysStr(dateStr, n) {
@@ -208,7 +217,58 @@ function buildMenuButtons() {
 function cleanPatientName(text) {
   const withoutTags = String(text || '').replace(/<[^>]*>/g, ' ');
   const checked = validatePatientName(withoutTags);
-  return checked ? checked.cleaned : null;
+  if (!checked) return null;
+  // "Later", "Nothing", "Stop" and the other exit words are replies, not names (this flow only; the shared validator is unchanged)
+  const plain = normaliseExitText(withoutTags);
+  if (EXIT_WHOLE.has(plain) || plain === 'stop') return null;
+  return checked.cleaned;
+}
+
+// ---------------------------------------------------------------------------
+// Exit words. Checked only after a step's normal reading found nothing, so "no, 5 pm please" or "dont want morning, 6 pm" still continue.
+// Marketing opt-out words (stop, unsubscribe, ...) are answered by the webhook before the flow and are not exit words here.
+// ---------------------------------------------------------------------------
+const EXIT_WHOLE = new Set(['cancel', 'no', 'not now', 'later', 'nothing', 'never mind', 'nevermind']);
+const EXIT_WHOLE_STRICT = new Set(['cancel', 'no']); // name and patient steps: a real name is never cut off
+const EXIT_LEADING = ['i dont want', 'i do not want', 'dont want', 'do not want', 'not interested', 'no thanks', 'no thank you', 'forget it'];
+
+/** Lower case, curly apostrophes and apostrophes removed (don't -> dont), punctuation and emoji removed, spaces collapsed */
+function normaliseExitText(text) {
+  return String(text == null ? '' : text)
+    .toLowerCase()
+    .replace(/[’‘`´]/g, '')
+    .replace(/'/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** True when the typed text asks to stop the booking. strict: only the whole words cancel and no (name and patient steps). */
+function isExitText(text, strict = false) {
+  const t = normaliseExitText(text);
+  if (!t) return false;
+  if ((strict ? EXIT_WHOLE_STRICT : EXIT_WHOLE).has(t)) return true;
+  if (strict) return false;
+  return EXIT_LEADING.some((p) => t === p || t.startsWith(`${p} `));
+}
+
+/**
+ * The doctor a typed text names, or null. When several are named, a doctor named after a refusal ("i dont want Dr. X, Dr. Y please")
+ * is skipped, so Dr. Y is chosen.
+ */
+function pickDoctorFromText(doctors, typed) {
+  const lower = String(typed || '').toLowerCase().replace(/[’‘]/g, '\'');
+  const hits = (doctors || [])
+    .map((d) => ({ d, key: String(d.name || '').toLowerCase().replace(/^dr\.?\s*/, '') }))
+    .filter((x) => x.key && lower.includes(x.key))
+    .map((x) => ({ ...x, at: lower.indexOf(x.key) }))
+    .sort((a, b) => a.at - b.at);
+  const refused = (at) => {
+    const segment = lower.slice(0, at).split(/[,;]|\bbut\b|\binstead\b|\band\b/).pop();
+    return /\b(dont|don't|do not|not|no|never)\b/.test(segment);
+  };
+  const chosen = hits.find((h) => !refused(h.at));
+  return chosen ? chosen.d : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -237,6 +297,38 @@ function createFlow(deps) {
   });
 
   const findDoctor = async (ctx, doctorId) => (await deps.clinic.listDoctors(ctx.tenant.id)).find((d) => d.id === doctorId) || null;
+
+  // The doctor list (up to 10) as one list message
+  const doctorListSpec = (doctors) => ({
+    type: 'list',
+    body: MESSAGES.whichDoctor(),
+    buttonText: 'Select Doctor',
+    items: doctors.slice(0, 10).map((d) => ({ id: `aptdoc|${d.id}`, title: clip(d.name, 24), description: clip(d.specialization || 'Doctor', 72) }))
+  });
+
+  // ---- The miss ladder. A "miss" is a typed reply the current step cannot use. Miss 1: a hint. Miss 2: three buttons. Miss 3: staff.
+  // The count is kept in the stored flow's `attempts` field (a missing value reads as 0). Every save that does not pass it starts again
+  // at 0, which is what moving to another step, or making progress (a day, a time, a doctor, a patient, a name), does.
+  const missButtons = () => [
+    { id: 'aptmiss|retry', title: 'Try again' },
+    { id: 'aptmiss|staff', title: 'Talk to staff' },
+    { id: 'aptmiss|cancel', title: 'Cancel' }
+  ];
+  const exitFlow = async (ctx) => {
+    await deps.state.clear(ctx.tenant.id, ctx.phone);
+    return [text(MESSAGES.exited())];
+  };
+  // hintSpecs: what miss 1 sends. saveAgain(misses): stores the same step again with the new count.
+  const handleMiss = async (ctx, d, hintSpecs, saveAgain) => {
+    const misses = (Number(d && d.attempts) || 0) + 1;
+    if (misses >= 3) {
+      await deps.state.clear(ctx.tenant.id, ctx.phone);
+      return [{ type: 'escalate' }];
+    }
+    await saveAgain(misses);
+    if (misses === 1) return hintSpecs;
+    return [buttons(MESSAGES.missChoice(), missButtons())];
+  };
 
   // Free, bookable times of a doctor on a date, as minutes
   const freeMinutes = async (ctx, doctor, dateStr) => {
@@ -304,14 +396,18 @@ function createFlow(deps) {
     const date = parsed.date || d.date || null;
     const times = parsed.times.length ? parsed.times : pending;
 
-    if (!date && times.length === 0) {
-      const attempts = (d.attempts || 0) + 1;
-      if (attempts >= 2) {
-        await deps.state.clear(ctx.tenant.id, ctx.phone);
-        return [{ type: 'escalate' }];
+    // Nothing new in this text (no day and no time): an exit word stops the booking, anything else is a miss, whatever was stored before
+    if (!parsed.date && parsed.times.length === 0) {
+      if (isExitText(input)) return exitFlow(ctx);
+      const base = { doctorId: doctor.id, doctorName: doctor.name, date: d.date || null, pending: d.sessionStart || null };
+      if (flow.step === 'apt_pick') {
+        return handleMiss(ctx, d, [text(MESSAGES.missPick())], (attempts) => save(ctx, 'apt_pick', { ...base, pending: null, attempts }));
       }
-      await save(ctx, 'apt_time', { doctorId: doctor.id, doctorName: doctor.name, attempts });
-      return [buttons(MESSAGES.didntCatch(), buildDayButtons(doctor.id, [nowIst().dateStr, addDaysStr(nowIst().dateStr, 1)], nowIst()))];
+      const now = nowIst();
+      const hint = d.date
+        ? [text(MESSAGES.missTimeKnownDay())]
+        : [buttons(MESSAGES.missTimeNoDay(), buildDayButtons(doctor.id, [now.dateStr, addDaysStr(now.dateStr, 1)], now))];
+      return handleMiss(ctx, d, hint, (attempts) => save(ctx, 'apt_time', { ...base, attempts }));
     }
     if (!date) return askForDay(ctx, doctor, times);
     if (date > addDaysStr(nowIst().dateStr, MAX_DAYS_AHEAD)) {
@@ -335,12 +431,7 @@ function createFlow(deps) {
     }
     if (!doctor) {
       await save(ctx, 'apt_doctor');
-      return [{
-        type: 'list',
-        body: MESSAGES.whichDoctor(),
-        buttonText: 'Select Doctor',
-        items: doctors.slice(0, 10).map((d) => ({ id: `aptdoc|${d.id}`, title: clip(d.name, 24), description: clip(d.specialization || 'Doctor', 72) }))
-      }];
+      return [doctorListSpec(doctors)];
     }
     return onDoctor(ctx, doctor, preferredText);
   };
@@ -408,6 +499,28 @@ function createFlow(deps) {
     }];
   };
 
+  // "Try again": the normal prompt of the step the patient is on, with the chosen doctor and day kept and the miss count back at 0
+  const retryStep = async (ctx, live) => {
+    const d = live.data;
+    if (live.step === 'apt_doctor') return startBooking(ctx, {});
+    const doctor = await findDoctor(ctx, d.doctorId);
+    if (!doctor) return startBooking(ctx, {});
+    if (live.step === 'apt_time') {
+      if (d.date) {
+        await save(ctx, 'apt_time', { doctorId: doctor.id, doctorName: doctor.name, date: d.date, pending: d.sessionStart });
+        return [text(MESSAGES.onlyDay(weekdayName(d.date)))];
+      }
+      const pending = (d.sessionStart || '').split(',').filter(Boolean).map(toMinutes);
+      if (pending.length > 0) return askForDay(ctx, doctor, pending);
+      await save(ctx, 'apt_time', { doctorId: doctor.id, doctorName: doctor.name });
+      return [askDayTime(doctor)];
+    }
+    if (live.step === 'apt_pick' && d.date) return showNearest(ctx, doctor, d.date, []);
+    if (live.step === 'apt_patient' && d.date && d.sessionStart) return onTime(ctx, doctor, d.date, toMinutes(d.sessionStart));
+    if (live.step === 'apt_name' && d.date && d.sessionStart) return askName(ctx, doctor, d.date, toMinutes(d.sessionStart));
+    return startBooking(ctx, {});
+  };
+
   const dispatchTap = async (ctx, id) => {
     const parts = id.split('|');
     const kind = parts[0];
@@ -435,6 +548,17 @@ function createFlow(deps) {
       if (!doctor || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '') || minutes === null) return [text('Sorry, that option has expired. Please send Hi to start again.')];
       return onTime(ctx, doctor, dateStr, minutes);
     }
+    if (kind === 'aptmiss') {
+      // The three buttons of the miss ladder; they only work while the flow is live (an expired one gets the usual expired answer)
+      if (!live) return [text('Sorry, that option has expired. Please send Hi to start again.')];
+      if (parts[1] === 'retry') return retryStep(ctx, live);
+      if (parts[1] === 'cancel') return exitFlow(ctx);
+      if (parts[1] === 'staff') {
+        await deps.state.clear(ctx.tenant.id, ctx.phone);
+        return [{ type: 'escalate' }];
+      }
+      return [text('Sorry, that option has expired. Please send Hi to start again.')];
+    }
     if (kind === 'aptpat') {
       if (!live || !live.data.doctorId || !live.data.date || !live.data.sessionStart) return [text('Sorry, that option has expired. Please send Hi to start again.')];
       const doctor = await findDoctor(ctx, live.data.doctorId);
@@ -458,12 +582,10 @@ function createFlow(deps) {
     }
     const name = cleanPatientName(input);
     if (!name) {
-      const attempts = (d.attempts || 0) + 1;
-      if (attempts >= 2) {
-        await deps.state.clear(ctx.tenant.id, ctx.phone);
-        return [text('Sorry, I could not read the name. Please call the clinic and our team will help you with the booking.')];
-      }
-      return askName(ctx, doctor, d.date, toMinutes(d.sessionStart), attempts);
+      // Only the whole words cancel and no stop the booking here, so a real name is never cut off
+      if (isExitText(input, true)) return exitFlow(ctx);
+      return handleMiss(ctx, d, [text(MESSAGES.missName())],
+        (attempts) => save(ctx, 'apt_name', { doctorId: doctor.id, doctorName: doctor.name, date: d.date, pending: d.sessionStart, attempts }));
     }
     return bookNow(ctx, doctor, d.date, toMinutes(d.sessionStart), { patientName: name });
   };
@@ -495,7 +617,9 @@ function createFlow(deps) {
     const flow = await deps.state.get(ctx.tenant.id, ctx.phone);
     if (!flow || flow.state !== 'apt') return { handled: false, specs: [] };
     // These buttons belong to other handlers: drop our state and let them answer
-    if (typed === 'Check My Booking' || typed === 'Talk to Staff' || (!id && /^cancel$/i.test(typed))) {
+    // A typed "cancel" while a typed step is live is an exit (handled below); for an expired flow it falls through as before
+    const typedStepLive = !flow.expired && ['apt_doctor', 'apt_time', 'apt_pick', 'apt_patient', 'apt_name'].includes(flow.step);
+    if (typed === 'Check My Booking' || typed === 'Talk to Staff' || (!id && /^cancel$/i.test(typed) && !typedStepLive)) {
       await deps.state.clear(ctx.tenant.id, ctx.phone);
       return { handled: false, specs: [] };
     }
@@ -508,10 +632,13 @@ function createFlow(deps) {
 
     if (flow.step === 'apt_doctor') {
       const doctors = await deps.clinic.listDoctors(ctx.tenant.id);
-      const lower = typed.toLowerCase();
-      const doctor = doctors.find((d) => lower.includes(d.name.toLowerCase().replace(/^dr\.?\s*/, '')));
+      const doctor = pickDoctorFromText(doctors, typed);
       if (doctor) return { handled: true, specs: await onDoctor(ctx, doctor) };
-      return { handled: true, specs: await startBooking(ctx, {}) };
+      if (isExitText(typed)) return { handled: true, specs: await exitFlow(ctx) };
+      return {
+        handled: true,
+        specs: await handleMiss(ctx, flow.data, [text(MESSAGES.missDoctor()), doctorListSpec(doctors)], (attempts) => save(ctx, 'apt_doctor', { attempts }))
+      };
     }
     if (flow.step === 'apt_time' || flow.step === 'apt_pick') return { handled: true, specs: await onTimeText(ctx, flow, typed) };
     if (flow.step === 'apt_patient') {
@@ -519,7 +646,15 @@ function createFlow(deps) {
       const doctor = await findDoctor(ctx, flow.data.doctorId);
       if (!doctor || !flow.data.date || !flow.data.sessionStart) return { handled: false, specs: [] };
       const name = cleanPatientName(typed);
-      if (!name) return { handled: true, specs: await askName(ctx, doctor, flow.data.date, toMinutes(flow.data.sessionStart)) };
+      if (!name) {
+        if (isExitText(typed, true)) return { handled: true, specs: await exitFlow(ctx) };
+        const d = flow.data;
+        return {
+          handled: true,
+          specs: await handleMiss(ctx, d, [text(MESSAGES.missPatient())],
+            (attempts) => save(ctx, 'apt_patient', { doctorId: doctor.id, doctorName: doctor.name, date: d.date, pending: d.sessionStart, attempts }))
+        };
+      }
       return { handled: true, specs: await bookNow(ctx, doctor, flow.data.date, toMinutes(flow.data.sessionStart), { patientName: name }) };
     }
     if (flow.step === 'apt_name') return { handled: true, specs: await onNameText(ctx, flow, typed) };
@@ -700,7 +835,7 @@ module.exports = {
   // pure helpers
   buildConfirmationText, buildDoctorLabel, formatConfirmDate, formatShortDate, weekdayName, MESSAGES,
   pickNearestSlots, resolveTarget, formatTimeLabel, formatDateLabel, bookableSlots, buildTimeButtons, buildDayButtons, buildMenuButtons,
-  cleanPatientName, istNowParts, addDaysStr, toMinutes,
+  cleanPatientName, istNowParts, addDaysStr, toMinutes, isExitText, normaliseExitText, pickDoctorFromText, APT_ID_RE,
   // the state machine (injectable) and the real wiring
   createFlow, handleIncoming, startFromTool
 };
