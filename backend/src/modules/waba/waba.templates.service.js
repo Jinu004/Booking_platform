@@ -264,7 +264,7 @@ const POSTER_TEMPLATE = {
   bodyExamples: ['Priya', 'Skin Clinic', 'Free skin check-up camp this Saturday, 10 am to 1 pm'],
   buttons: ['Stop offers']
 };
-const POSTER_BUCKET = 'receptionai-poster-uploads';
+const POSTER_BUCKET = process.env.POSTER_BUCKET_NAME || 'receptionai-posters-prod';
 const POSTER_URL_PREFIX = `https://storage.googleapis.com/${POSTER_BUCKET}/`;
 const POSTER_MIME_BY_EXTENSION = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 

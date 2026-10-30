@@ -14,7 +14,7 @@
 // a test bucket prefix and dummy Redis keys. createOffboardingService() with no arguments uses the real ones.
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const BUCKET_NAME = 'receptionai-poster-uploads';
+const BUCKET_NAME = process.env.POSTER_BUCKET_NAME || 'receptionai-posters-prod';
 const DELETION_DAYS = 30;
 const OPEN_STATUSES = ['requested', 'in_progress', 'failed'];
 const REDIS_BATCH = 200;

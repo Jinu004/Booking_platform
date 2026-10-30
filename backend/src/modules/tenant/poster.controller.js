@@ -5,7 +5,7 @@ const { successResponse, errorResponse } = require('../../utils/response')
 const logger = require('../../utils/logger')
 
 const storage = new Storage()
-const BUCKET = 'receptionai-poster-uploads'
+const BUCKET = process.env.POSTER_BUCKET_NAME || 'receptionai-posters-prod'
 
 async function submitPosterRequest(req, res) {
   try {
