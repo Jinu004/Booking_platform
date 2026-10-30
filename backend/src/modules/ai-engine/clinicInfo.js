@@ -57,7 +57,13 @@ function openingHoursLines(workingHours) {
 }
 
 // The saved fee as the clinic entered it ("300.00" is shown as 300; any other value is shown as stored)
-const feeText = (fee) => String(fee).replace(/\.00$/, '')
+// The rupee symbol is added only when the saved fee is a plain number (digits, optional commas and decimals); text such as "Free" or
+// "Call us", an empty value, or a fee that already starts with the symbol is shown exactly as it was.
+const feeText = (fee) => {
+  const text = String(fee).replace(/\.00$/, '')
+  const trimmed = text.trim()
+  return /^\d[\d,]*(\.\d+)?$/.test(trimmed) ? `₹${trimmed}` : text
+}
 
 function section(title, value) {
   return isText(value) ? `${title}: ${safe(value)}` : null
