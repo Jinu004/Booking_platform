@@ -5,6 +5,7 @@ const { sendTemplateMessage } = require('../../channel/whatsapp/whatsapp.adapter
 const { runAsTenant } = require('../../channel/whatsapp/senderContext');
 const { validatePhoneInput } = require('../../../utils/phone');
 const logger = require('../../../utils/logger');
+const { logAction } = require('../../../utils/audit');
 
 // Sentinel value used to soft-delete doctors from token queues
 // clinic.model.js getDoctors filters out records where leave_days equals this value
@@ -425,7 +426,12 @@ async function createAppointmentBooking(req, res, next) {
     if (req.staff?.role === 'doctor' && req.staff.doctor_id !== id) {
       return errorResponse(res, 'You can only book for your own schedule.', 403);
     }
-    const { patient_name, phone, date, start_time, notes, marketing_consent, send_whatsapp } = req.body;
+    const { patient_name, phone, date, start_time, notes, marketing_consent, send_whatsapp, extra, expected_start_time } = req.body;
+    // "Add anyway": the time is the one staff confirmed (expected_start_time); the model works out the real one under the doctor lock
+    const isExtra = extra === true;
+    if (isExtra && !String(expected_start_time || '').trim()) {
+      return errorResponse(res, 'expected_start_time is required when extra is true', 400);
+    }
 
     const patientName = Array.from(String(patient_name || '').trim().replace(/<[^>]*>/g, '')).slice(0, 255).join('');
     if (!patientName) return errorResponse(res, 'patient_name is required', 400);
@@ -433,8 +439,8 @@ async function createAppointmentBooking(req, res, next) {
     if (!phoneCheck.ok) return errorResponse(res, phoneCheck.error, 400);
     const normalizedPhone = phoneCheck.phone;
     if (!date || !isISODate(date)) return errorResponse(res, 'Valid date (YYYY-MM-DD) is required', 400);
-    const timeMatch = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(start_time || '').trim());
-    if (!timeMatch) return errorResponse(res, 'Invalid start_time. Use HH:MM', 400);
+    const timeMatch = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(isExtra ? expected_start_time : start_time || '').trim());
+    if (!timeMatch) return errorResponse(res, isExtra ? 'Invalid expected_start_time. Use HH:MM' : 'Invalid start_time. Use HH:MM', 400);
     const startTime = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
 
     const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
@@ -457,7 +463,24 @@ async function createAppointmentBooking(req, res, next) {
       date,
       startTime,
       marketingConsent: marketing_consent
-    });
+    }, isExtra ? { extra: true, expectedStartTime: startTime } : undefined);
+
+    // An "add anyway" booking is recorded once in the audit log. A failure of that write never affects the booking.
+    if (isExtra) {
+      try {
+        await logAction({
+          tenantId,
+          staffId: req.staff?.id,
+          action: 'appointment_extra',
+          entityType: 'booking',
+          entityId: booking.id,
+          metadata: { doctor_id: id, date, time: booking.confirmation.start_time },
+          ipAddress: req.ip
+        });
+      } catch (auditErr) {
+        logger.warn(`appointment_extra audit failed: ${String(auditErr && auditErr.message).slice(0, 120)}`);
+      }
+    }
 
     // Optional confirmation (off unless send_whatsapp is exactly true). Sent after the booking is saved; a failure never affects it.
     if (send_whatsapp === true) {
@@ -481,6 +504,38 @@ async function createAppointmentBooking(req, res, next) {
       });
     }
     return successResponse(res, booking, 201);
+  } catch (err) {
+    // A refusal that carries a code (EXTRA_TIME_CHANGED) goes back as JSON with that code and the new time, so the screen can ask again
+    if (err && err.name === 'BookingError' && err.code) {
+      return res.status(err.statusCode || 409).json({ success: false, data: null, error: err.message, code: err.code, time: err.time || null });
+    }
+    next(err);
+  }
+}
+
+/**
+ * GET /clinic/doctors/:id/extra-slot?date=YYYY-MM-DD
+ * Whether "add anyway" is possible for this doctor and date, and the time it would get: { allowed, time, reason, extrasUsed, extrasMax }.
+ * Appointment mode only. A doctor can ask for their own schedule only.
+ */
+async function getExtraSlot(req, res, next) {
+  try {
+    const tenantId = req.tenantId || req.tenant?.id;
+    const { id } = req.params;
+    if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
+    if (req.staff?.role === 'doctor' && !req.staff?.doctor_id) {
+      return errorResponse(res, 'Your account is not linked to a doctor. Ask your admin.', 403);
+    }
+    if (req.staff?.role === 'doctor' && req.staff.doctor_id !== id) {
+      return errorResponse(res, 'You can only book for your own schedule.', 403);
+    }
+    const { date } = req.query;
+    if (!date || !isISODate(date)) return errorResponse(res, 'Valid date (YYYY-MM-DD) is required', 400);
+    if (!(await doctorInTenant(tenantId, id))) return errorResponse(res, 'Not found', 404);
+    if ((await ClinicModel.getBookingMode(pool, tenantId)) !== 'appointment') {
+      return errorResponse(res, 'Appointment booking is not turned on for this clinic', 409);
+    }
+    return successResponse(res, await ClinicModel.findNextExtraTime(pool, tenantId, id, date, new Date()));
   } catch (err) { next(err); }
 }
 
@@ -624,5 +679,6 @@ module.exports = {
   getAvailableSlots,
   createProcedureBooking,
   createAppointmentBooking,
+  getExtraSlot,
   cancelProcedureBooking
 };

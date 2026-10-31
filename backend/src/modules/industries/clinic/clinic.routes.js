@@ -19,6 +19,7 @@ const {
   getAvailableSlots,
   createProcedureBooking,
   createAppointmentBooking,
+  getExtraSlot,
   cancelProcedureBooking
 } = require('./clinic.controller');
 
@@ -50,6 +51,7 @@ router.get('/doctors/:id/procedures', getProcedures);
 router.post('/doctors/:id/procedures', requireRole('admin', 'manager'), createProcedure);
 router.delete('/procedures/:procedureId', requireRole('admin', 'manager'), deleteProcedure);
 router.get('/doctors/:id/available-slots', getAvailableSlots);
+router.get('/doctors/:id/extra-slot', getExtraSlot);
 router.post('/doctors/:id/procedure-booking', createProcedureBooking);
 router.post('/doctors/:id/appointment-booking', createAppointmentBooking);
 router.delete('/bookings/:bookingId/procedure', cancelProcedureBooking);

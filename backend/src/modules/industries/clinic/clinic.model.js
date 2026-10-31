@@ -493,6 +493,109 @@ async function createProcedureBooking(pool, tenantId, doctorId, procedureId, cus
   }
 }
 
+// ---------------------------------------------------------------------------
+// "Add anyway": one more appointment when the doctor has no free time left on a date. The server places it at the first free time after
+// the doctor's last session; later extras follow one after another. Appointment mode only (createAppointmentBooking, options.extra).
+// ---------------------------------------------------------------------------
+const MAX_EXTRA_APPOINTMENTS_PER_DAY = 5;
+
+// Today's date (YYYY-MM-DD) and the minutes since midnight, in IST
+function istDateAndMinutes(now) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).formatToParts(now);
+  const get = (type) => parts.find((p) => p.type === type).value;
+  return { dateStr: `${get('year')}-${get('month')}-${get('day')}`, minutes: parseInt(get('hour'), 10) * 60 + parseInt(get('minute'), 10) };
+}
+
+/**
+ * The sessions of a doctor on a date, by the same rule as getAvailableSlots: the date's schedule_overrides row when there is one,
+ * otherwise the weekly doctor_schedules rows of that weekday. weeklyEnd is the latest end (minutes) of the WEEKLY schedule of that
+ * weekday, or null: it is the floor for "after the last session", because a procedure cuts the override sessions shorter.
+ * db is a pool or a client.
+ * @returns {Promise<{ sessions: Array<{ start_time: string, end_time: string }>, weeklyEnd: number|null }>}
+ */
+async function getSessionsForDate(db, tenantId, doctorId, date) {
+  const overrideRes = await db.query(`SELECT sessions FROM schedule_overrides WHERE tenant_id = $1 AND doctor_id = $2 AND override_date = $3`, [tenantId, doctorId, date]);
+  const dow = new Date(date).getDay();
+  const schedRes = await db.query(`SELECT start_time, end_time FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true ORDER BY start_time ASC`, [tenantId, doctorId, dow]);
+  const weekly = schedRes.rows.map((r) => ({ start_time: r.start_time, end_time: r.end_time }));
+  const sessions = overrideRes.rows.length > 0 ? (overrideRes.rows[0].sessions || []) : weekly;
+  const weeklyEnd = weekly.length > 0 ? Math.max(...weekly.map((s) => minutesOf(s.end_time))) : null;
+  return { sessions: sessions.map((s) => ({ start_time: s.start_time, end_time: s.end_time })), weeklyEnd };
+}
+
+/**
+ * Whether one more appointment may be added to a full day, and the time it would get.
+ * Allowed only when the date is not in the past, the doctor works that day, NO free time is left, fewer than
+ * MAX_EXTRA_APPOINTMENTS_PER_DAY extras exist and the visit still ends before midnight. The time is the first one at or after the end of
+ * the last session (and, today, after the current time) that no appointment or procedure of the doctor overlaps.
+ * db is a pool or a client (inside the booking transaction the client is passed, so the answer is the one the booking will use).
+ * @returns {Promise<{ allowed: boolean, time: string|null, reason: string|null, extrasUsed: number, extrasMax: number }>}
+ */
+async function findNextExtraTime(db, tenantId, doctorId, date, now = new Date()) {
+  const refuse = (reason, extrasUsed = 0) => ({ allowed: false, time: null, reason, extrasUsed, extrasMax: MAX_EXTRA_APPOINTMENTS_PER_DAY });
+
+  const docRes = await db.query('SELECT id, avg_consultation_minutes FROM clinic_doctors WHERE id = $1 AND tenant_id = $2', [doctorId, tenantId]);
+  if (!docRes.rows.length) return refuse('Not found');
+  const { dateStr: todayStr, minutes: nowMins } = istDateAndMinutes(now);
+  if (date < todayStr) return refuse('Cannot book an appointment in the past');
+
+  const visit = getVisitLengthMinutes(docRes.rows[0].avg_consultation_minutes);
+  const { sessions, weeklyEnd } = await getSessionsForDate(db, tenantId, doctorId, date);
+  if (sessions.length === 0 && weeklyEnd === null) return refuse('Doctor has no sessions on this date');
+
+  const free = await getAvailableSlots(db, tenantId, doctorId, date, visit, true);
+  if (free.length > 0) return refuse('Free times are still available');
+
+  const ends = sessions.map((s) => minutesOf(s.end_time));
+  if (weeklyEnd !== null) ends.push(weeklyEnd);
+  const lastEnd = Math.max(...ends);
+
+  // Extras already added: appointments of this doctor and date that start at or after the end of the last session
+  const usedRes = await db.query(
+    `SELECT count(*)::int AS n FROM bookings
+     WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3 AND booking_type = 'appointment'
+       AND status NOT IN ('cancelled', 'noshow')
+       AND slot_time ~ '^[0-9]{1,2}:[0-9]{2}'
+       AND (split_part(slot_time, ':', 1)::int * 60 + split_part(slot_time, ':', 2)::int) >= $4`,
+    [tenantId, doctorId, date, lastEnd]
+  );
+  const extrasUsed = usedRes.rows[0].n;
+  if (extrasUsed >= MAX_EXTRA_APPOINTMENTS_PER_DAY) {
+    return refuse(`The limit of ${MAX_EXTRA_APPOINTMENTS_PER_DAY} extra appointments for this day has been reached`, extrasUsed);
+  }
+
+  let candidate = lastEnd;
+  if (date === todayStr) {
+    // Today: strictly after the current time, on the slot grid
+    const step = getSlotStepMinutes(visit);
+    candidate = Math.max(candidate, (Math.floor(nowMins / step) + 1) * step);
+  }
+
+  const blocksRes = await db.query(
+    `SELECT slot_time, end_time FROM bookings
+     WHERE tenant_id = $1 AND doctor_id = $2 AND booking_date = $3
+       AND status NOT IN ('cancelled', 'noshow') AND booking_type IN ('appointment', 'procedure') AND slot_time IS NOT NULL`,
+    [tenantId, doctorId, date]
+  );
+  const clock = /^[0-9]{1,2}:[0-9]{2}/;
+  const blocks = blocksRes.rows
+    .filter((r) => clock.test(String(r.slot_time)))
+    .map((r) => {
+      const start = minutesOf(r.slot_time);
+      return { start, end: r.end_time && clock.test(String(r.end_time)) ? minutesOf(r.end_time) : start + visit };
+    });
+  for (let i = 0; i <= blocks.length + 1; i++) {
+    const hit = blocks.find((b) => b.start < candidate + visit && b.end > candidate);
+    if (!hit) break;
+    candidate = hit.end;
+  }
+
+  if (candidate + visit > 24 * 60) return refuse('No room today', extrasUsed);
+  return { allowed: true, time: timeOf(candidate), reason: null, extrasUsed, extrasMax: MAX_EXTRA_APPOINTMENTS_PER_DAY };
+}
+
 /**
  * Creates a time-based appointment for a doctor (appointment mode): no token, no schedule_overrides cut.
  * The visit lasts getVisitLengthMinutes(doctor) from startTime. The customer and patient are found or created
@@ -503,13 +606,28 @@ async function createProcedureBooking(pool, tenantId, doctorId, procedureId, cus
  * Returns the booking row plus patient_phone, doctor_name and a confirmation object (booking_id, doctor_name, date, start_time, end_time).
  * @param {{ patientName: string, phone: string, notes?: string, date: string, startTime: string (HH:MM), marketingConsent?: string, source?: string, patientId?: string }} input
  */
-async function createAppointmentBooking(pool, tenantId, doctorId, input) {
-  const { patientName, phone, notes, date, startTime, marketingConsent, patientId: patientIdInput } = input;
+async function createAppointmentBooking(pool, tenantId, doctorId, input, options = {}) {
+  let { patientName, phone, notes, date, startTime, marketingConsent, patientId: patientIdInput } = input;
   const bookingSource = input.source === 'whatsapp' ? 'whatsapp' : 'dashboard';
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const doctor = await lockDoctor(client, tenantId, doctorId);
+
+    // "Add anyway" (options.extra): the time is not the caller's choice. Under the doctor lock the next extra time is worked out again; if
+    // it is not the one staff confirmed (options.expectedStartTime), nothing is booked and the new time goes back (409 EXTRA_TIME_CHANGED).
+    // Only the session-hours check below is skipped; the overlap, midnight and past checks stay.
+    if (options.extra === true) {
+      const next = await findNextExtraTime(client, tenantId, doctorId, date, new Date());
+      if (!next.allowed) throw new BookingError(next.reason, 409);
+      const expected = /^([01]?\d|2[0-3]):([0-5]\d)$/.test(String(options.expectedStartTime || '').trim())
+        ? timeOf(minutesOf(String(options.expectedStartTime).trim()))
+        : null;
+      if (expected !== next.time) {
+        throw Object.assign(new BookingError('The next free time has changed. Please check the new time and confirm again.', 409), { code: 'EXTRA_TIME_CHANGED', time: next.time });
+      }
+      startTime = next.time;
+    }
 
     const startMins = minutesOf(startTime);
     const endMins = startMins + getVisitLengthMinutes(doctor.avg_consultation_minutes);
@@ -526,7 +644,7 @@ async function createAppointmentBooking(pool, tenantId, doctorId, input) {
       const schedRes = await client.query(`SELECT start_time, end_time FROM doctor_schedules WHERE tenant_id = $1 AND doctor_id = $2 AND day_of_week = $3 AND is_available = true`, [tenantId, doctorId, dow]);
       sessions = schedRes.rows;
     }
-    if (sessions.length > 0 && !sessions.some(s => startMins >= minutesOf(s.start_time) && endMins <= minutesOf(s.end_time))) {
+    if (options.extra !== true && sessions.length > 0 && !sessions.some(s => startMins >= minutesOf(s.start_time) && endMins <= minutesOf(s.end_time))) {
       throw new BookingError('That time is outside the doctor\'s session hours', 409);
     }
 
@@ -688,6 +806,9 @@ module.exports = {
   getAvailableSlots,
   createProcedureBooking,
   createAppointmentBooking,
+  findNextExtraTime,
+  getSessionsForDate,
+  MAX_EXTRA_APPOINTMENTS_PER_DAY,
   getBookingMode,
   getVisitLengthMinutes,
   getSlotStepMinutes,
