@@ -497,7 +497,7 @@ async function createProcedureBooking(pool, tenantId, doctorId, procedureId, cus
 // "Add anyway": one more appointment when the doctor has no free time left on a date. The server places it at the first free time after
 // the doctor's last session; later extras follow one after another. Appointment mode only (createAppointmentBooking, options.extra).
 // ---------------------------------------------------------------------------
-const MAX_EXTRA_APPOINTMENTS_PER_DAY = 5;
+const MAX_EXTRA_APPOINTMENTS_PER_DAY = 10;
 
 // Today's date (YYYY-MM-DD) and the minutes since midnight, in IST
 function istDateAndMinutes(now) {
