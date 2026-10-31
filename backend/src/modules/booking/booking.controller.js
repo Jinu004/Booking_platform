@@ -299,9 +299,16 @@ async function createManualBooking(req, res, next) {
   if (!isUUID(doctorId)) {
     return errorResponse(res, 'Invalid doctor ID', 400);
   }
-  // bookingDate is optional (today when absent); when given it must be a real YYYY-MM-DD date. Past dates are not refused here.
+  // bookingDate is optional (today when absent); when given it must be a real YYYY-MM-DD date that is not before today in IST.
   if (bookingDate !== undefined && bookingDate !== null && bookingDate !== '' && !isISODate(bookingDate)) {
     return errorResponse(res, 'Enter a valid date', 400);
+  }
+  if (bookingDate) {
+    const _today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const todayIST = `${_today.getFullYear()}-${String(_today.getMonth()+1).padStart(2,'0')}-${String(_today.getDate()).padStart(2,'0')}`;
+    if (bookingDate < todayIST) {
+      return errorResponse(res, 'Cannot book a token for a past date', 400);
+    }
   }
   // Token bookings are for token clinics; an appointment-mode clinic books by time (New booking form)
   if ((await ClinicModel.getBookingMode(pool, tenantId)) === 'appointment') {
