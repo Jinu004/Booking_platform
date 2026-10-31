@@ -4,6 +4,7 @@ import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
 import { CardSkeleton } from '../components/shared/Skeleton';
 import { getErrorMessage } from '../utils/errorMessage';
+import { DOCTOR_PREFIX_RE } from '../utils/doctorName';
 import LoadError from '../components/LoadError';
 
 const AVATAR_COLORS = [
@@ -26,7 +27,7 @@ function avatarColor(name) {
 
 function docInitials(name) {
   if (!name) return '?';
-  const parts = name.replace(/^Dr\.?\s*/i, '').trim().split(' ').filter(Boolean);
+  const parts = name.replace(DOCTOR_PREFIX_RE, '').trim().split(' ').filter(Boolean);
   if (parts.length === 0) return '?';
   if (parts.length === 1) return parts[0][0].toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
@@ -191,7 +192,7 @@ const Doctors = () => {
   const formatDoctorName = (value) => {
     // Remove all Dr. prefixes from start
     const cleaned = value
-      .replace(/^(Dr\.?\s*)*/i, ''); // don't trim — preserves trailing space mid-typing
+      .replace(/^(dr(\.\s*|\s+))*/i, ''); // don't trim — preserves trailing space mid-typing
 
     // If nothing left after removing Dr.
     if (!cleaned.trim()) return '';

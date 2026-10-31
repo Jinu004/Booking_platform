@@ -1,5 +1,7 @@
 import React from 'react';
 import useStore from '../../store/useStore';
+import { getStoredStaff } from '../../services/auth.service';
+import { withDoctorPrefix } from '../../utils/doctorName';
 
 const TokenReceipt = ({ booking, onClose }) => {
   const { tenant } = useStore();
@@ -16,7 +18,7 @@ const TokenReceipt = ({ booking, onClose }) => {
         
         {/* Receipt Content */}
         <div className="p-8 text-center print:p-4">
-          <h2 className="text-3xl font-extrabold text-gray-900 mb-1">{tenant?.name || 'Clinic Registration'}</h2>
+          <h2 className="text-3xl font-extrabold text-gray-900 mb-1">{tenant?.name || getStoredStaff()?.tenantName || 'Clinic Registration'}</h2>
           <p className="text-[10px] text-gray-400 mb-8 uppercase tracking-[0.2em] font-bold font-mono">ReceptionAI</p>
           
           <div className="flex justify-center mb-8">
@@ -35,7 +37,7 @@ const TokenReceipt = ({ booking, onClose }) => {
               </div>
               <div className="text-right">
                 <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider mb-1">Assigned Doctor</p>
-                <p className="text-lg font-bold text-gray-900">Dr. {booking.doctor_name || 'Assigned'}</p>
+                <p className="text-lg font-bold text-gray-900">{withDoctorPrefix(booking.doctor_name) || 'Assigned'}</p>
               </div>
             </div>
             

@@ -385,7 +385,7 @@ export default function PatientProfile() {
     return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
   }
 
-  // silent: reload without the full-page loading screen (used after a booking so the token receipt stays on screen)
+  // silent: reload without the full-page loading screen (used after a booking, so the page refreshes without flashing the loading screen)
   const loadData = async ({ silent = false } = {}) => {
     try {
       if (!silent) setLoading(true);

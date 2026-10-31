@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import useStore from '../../store/useStore';
+import { getStoredStaff } from '../../services/auth.service';
 import { getLeads } from '../../services/leads.service';
 import { getCatalogue } from '../../services/catalogue.service';
 import { getConversations } from '../../services/conversation.service';
@@ -62,7 +63,7 @@ export default function EnquiryDashboard() {
   const newLeads   = leads.filter(l => l.status === 'new').length;
   const recentLeads = leads.slice(0, 5);
 
-  const tenantName = tenant?.name || 'Dashboard';
+  const tenantName = tenant?.name || getStoredStaff()?.tenantName || 'Dashboard';
 
   if (loading) {
     return (

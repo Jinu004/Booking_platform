@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import BookingForm from './BookingForm';
-import TokenReceipt from './shared/TokenReceipt';
 import { getClinicSettings } from '../services/settings.service';
 import { getDoctors } from '../services/clinic.service';
 import { getStoredStaff } from '../services/auth.service';
@@ -17,8 +16,8 @@ import useStore from '../store/useStore';
 // A first load that answers after the timeout is still accepted when it is the newest request of the same login.
 // A failed or timed-out background refresh keeps the data already shown.
 // bookingMode is 'appointment' only when booking_mode === 'appointment' once loaded: a failed load never turns into token mode.
-// After a save it closes, shows the token receipt or a short toast, then calls onSaved(result).
-// Keep it mounted all the time: the receipt must stay on screen after the form has closed.
+// After a save it closes, shows a short success toast, then calls onSaved(result).
+// Keep it mounted all the time: the booking mode and the doctors it has loaded are kept between openings.
 const REQUEST_TIMEOUT_MS = 15000;
 
 export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
@@ -30,7 +29,6 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
   const [doctors, setDoctors] = useState(initial.doctors || []);
   const [doctorsLoaded, setDoctorsLoaded] = useState(initial.doctors !== null); // a doctor list (possibly empty) has been received
   const [doctorsFailed, setDoctorsFailed] = useState(false);             // only matters while no list has been received
-  const [receiptBooking, setReceiptBooking] = useState(null);
   const modeRequest = useRef(0);    // only the newest settings request may set the state
   const doctorsRequest = useRef(0); // same for the doctors request
   const timers = useRef(new Set()); // the 15-second failure timers, cleared when the wrapper unmounts
@@ -148,12 +146,11 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
     ? 'ready'
     : (((!hasMode && modeFailed) || (!doctorsLoaded && doctorsFailed)) ? 'error' : 'loading');
 
-  // After a save: close the form, then the token receipt or a short message, then let the host page refresh itself
+  // After a save: close the form, then a short success message, then let the host page refresh itself
   const handleBooked = (result) => {
     onClose();
     if (result?.kind === 'token_now') {
-      if (result.booking) setReceiptBooking(result.booking);
-      else addToast('Token issued', 'success');
+      addToast(result.booking?.token_number ? `Token #${result.booking.token_number} issued` : 'Token issued', 'success');
     } else if (result?.kind === 'appointment') {
       addToast('Appointment booked', 'success');
     } else if (result?.kind === 'procedure') {
@@ -178,9 +175,6 @@ export default function NewBookingModal({ open, onClose, onSaved, prefill }) {
         ownDoctorId={staff?.doctor_id}
         prefill={prefill}
       />
-      {receiptBooking && (
-        <TokenReceipt booking={receiptBooking} onClose={() => setReceiptBooking(null)} />
-      )}
     </>
   );
 }

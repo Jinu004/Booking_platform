@@ -9,6 +9,7 @@ import useStore from '../store/useStore';
 import { getStoredStaff } from '../services/auth.service';
 import { saveToCache, loadFromCache } from '../utils/offlineCache';
 import { plural } from '../utils/plural';
+import { doctorInitial } from '../utils/doctorName';
 import LoadError from '../components/LoadError';
 import NewBookingModal from '../components/NewBookingModal';
 import usePollWhileVisible from '../hooks/usePollWhileVisible';
@@ -375,7 +376,7 @@ const Dashboard = () => {
               <div key={t.id} className={`${queueGrid} px-4 md:px-6 py-3.5 hover:bg-ink/[0.02] transition`}>
                 {tokenRow ? (
                   <span className="inline-flex items-center justify-center h-8 px-2 rounded-md bg-ink/[0.05] font-mono text-[12px] font-semibold">
-                    {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
+                    {t.doctor_name ? doctorInitial(t.doctor_name) : '?'}-{t.token_number}
                   </span>
                 ) : (
                   <span className="inline-flex flex-col items-center justify-center h-9 px-1 rounded-md bg-ink/[0.05] font-mono font-semibold leading-tight">

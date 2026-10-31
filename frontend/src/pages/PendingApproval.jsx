@@ -23,6 +23,7 @@ export default function PendingApproval() {
   const handleLogout = () => {
     localStorage.removeItem('auth_token')
     localStorage.removeItem('staff_data')
+    localStorage.removeItem('tenant_data')
     navigate('/login')
   }
   return (

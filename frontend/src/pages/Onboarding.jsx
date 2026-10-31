@@ -97,6 +97,8 @@ export default function Onboarding() {
       const response = await api.post('/onboarding/clinic', { ...formData });
       if (response.success && response.data.token) {
         storeAuthData(response.data.token, response.data.staff);
+        useStore.setState({ tenant: null }); // a new clinic never inherits the clinic name of an earlier login
+        setStaff(response.data.staff); // and the store holds the new owner, not an earlier person
         setStep(5);
         setTimeout(() => {
           if (response.data.staff.tenantStatus === 'pending') {

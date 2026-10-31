@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login, storeAuthData, forgotPassword } from '../services/auth.service'
+import useStore from '../store/useStore'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -21,6 +22,8 @@ export default function Login() {
       const result = await login(email, password)
       if (result.success) {
         storeAuthData(result.data.token, result.data.staff)
+        useStore.setState({ tenant: null }) // the clinic name starts from this login's staff.tenantName, never from an earlier clinic
+        useStore.getState().setStaff(result.data.staff) // the store holds the person who just signed in, not the earlier one
         if (result.data.staff.tenantStatus === 'pending') {
           navigate('/pending')
         } else {

@@ -10,7 +10,7 @@ import { plural } from '../utils/plural';
 //   appointment clinic+visit -> date + free time                                 -> scheduleAppointmentBooking
 //   procedure (any clinic)   -> procedure + date + free slot                     -> scheduleProcedureBooking
 // onBooked(result) is called after a save: { kind: 'token_now' | 'token_session' | 'appointment' | 'procedure', booking? }.
-// The page closes the form, refreshes its list and shows the receipt or the toast.
+// The page closes the form, refreshes its list and shows the success toast.
 
 // Phone fields take digits, spaces and a leading "+" (the backend checks and normalises the number)
 const PHONE_HELP = '10 digits for India, or + and the country code for other countries';
@@ -338,6 +338,8 @@ export default function BookingForm({
     if (!f.name.trim()) { setError('Enter the patient name.'); return; }
     if (!f.doctorId) { setError('Choose a doctor.'); return; }
     if (path === 'tokenSession' && !f.session) { setError('Choose a session.'); return; }
+    // A date typed by hand can be earlier than the box's minimum: the server refuses it too, but the form says so first
+    if (path === 'tokenSession' && f.date < todayISTString()) { setError('Choose today or a later date'); return; }
     if (path === 'appointment' && !f.time && !(extraMode && extraTime)) { setError('Choose a free time.'); return; }
     if (path === 'procedure' && (!f.procedureId || !f.time)) { setError('Choose a procedure and a free time.'); return; }
     submitRef.current = true;
@@ -573,7 +575,7 @@ export default function BookingForm({
               <div>
                 <label className={LABEL}>Date</label>
                 <input type="date" value={f.date} disabled={submitting}
-                  min={path === 'tokenSession' ? undefined : todayISTString()}
+                  min={todayISTString()}
                   onChange={e => set({ date: e.target.value, time: '', session: '' })}
                   className={INPUT} />
               </div>

@@ -4,6 +4,7 @@ import { getQueue, updateTokenStatus, setAppointmentQueueStatus } from '../servi
 import { completeBooking } from '../services/booking.service';
 import { getStoredStaff } from '../services/auth.service';
 import { plural } from '../utils/plural';
+import { doctorInitial } from '../utils/doctorName';
 import { getErrorMessage } from '../utils/errorMessage';
 import LoadError from '../components/LoadError';
 import NewBookingModal from '../components/NewBookingModal';
@@ -237,7 +238,7 @@ const TokenQueue = () => {
         <div className="flex items-center gap-4 flex-1 min-w-0">
           {tokenRow ? (
             <div className="w-10 h-10 md:w-14 md:h-14 bg-ink/[0.05] rounded-xl flex items-center justify-center font-mono font-semibold text-ink text-sm md:text-base flex-shrink-0">
-              {t.doctor_name ? t.doctor_name.replace(/^Dr\.\s*/i, '').charAt(0) : '?'}-{t.token_number}
+              {t.doctor_name ? doctorInitial(t.doctor_name) : '?'}-{t.token_number}
             </div>
           ) : (
             <div className="w-10 h-10 md:w-14 md:h-14 bg-ink/[0.05] rounded-xl flex flex-col items-center justify-center font-mono font-semibold text-ink leading-tight flex-shrink-0">

@@ -8,6 +8,7 @@ import api from '../../utils/api';
 import { subscribeLiveEvents } from '../../utils/liveEvents';
 import usePollWhileVisible from '../../hooks/usePollWhileVisible';
 import { STORAGE_KEYS } from '../../constants';
+import { withDoctorPrefix } from '../../utils/doctorName';
 
 const Layout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -286,7 +287,7 @@ const Layout = () => {
                             }}
                           >
                             <div className="font-bold text-gray-900">Token {b.token_number || '-'} — {b.patient_name || 'Unknown'}</div>
-                            <div className="text-sm font-medium text-gray-700">Dr. {b.doctor_name}</div>
+                            <div className="text-sm font-medium text-gray-700">{withDoctorPrefix(b.doctor_name)}</div>
                             <div className="text-sm text-gray-500">
                               {new Date(b.booking_date).toLocaleDateString('en-IN') === new Date().toLocaleDateString('en-IN') ? 'Today' : new Date(b.booking_date).toLocaleDateString('en-IN')} — <span className="uppercase text-xs font-bold">{b.status}</span>
                             </div>

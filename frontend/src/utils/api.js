@@ -47,9 +47,11 @@ export function logoutUnauthorized() {
     clearBookingFormCache();
     localStorage.removeItem('auth_token');
     localStorage.removeItem('staff_data');
+    localStorage.removeItem('tenant_data');
     if (useStore.getState().clearAuth) {
       useStore.getState().clearAuth();
     }
+    useStore.setState({ tenant: null });
     window.location.href = '/login';
   }
 }

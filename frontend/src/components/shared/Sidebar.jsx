@@ -235,11 +235,11 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           <div className="flex items-center gap-2.5 mb-3 px-1">
             <div className={`w-8 h-8 rounded-lg ${avatarBg} flex items-center justify-center flex-shrink-0`}>
               <span className={`text-xs font-semibold ${avatarText}`}>
-                {(staff?.tenantName || tenant?.name || 'R')[0].toUpperCase()}
+                {(tenant?.name || staff?.tenantName || 'R')[0].toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`text-[13px] font-semibold truncate ${industry === 'enquiry' ? 'text-white' : 'text-ink'}`}>{staff?.tenantName || tenant?.name || 'Clinic'}</p>
+              <p className={`text-[13px] font-semibold truncate ${industry === 'enquiry' ? 'text-white' : 'text-ink'}`}>{tenant?.name || staff?.tenantName || 'Clinic'}</p>
               <p className={`font-mono text-[10px] tracking-[0.08em] uppercase ${sectionLabel}`}>{staff?.role || 'admin'}</p>
             </div>
           </div>
