@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
-import { getDoctorSchedule, getProcedures, getAvailableSlots, scheduleProcedureBooking, scheduleAppointmentBooking } from '../services/clinic.service';
+import { getDoctorSchedule, getProcedures, getAvailableSlots, getExtraSlot, scheduleProcedureBooking, scheduleAppointmentBooking } from '../services/clinic.service';
 import LoadError from './LoadError';
 import { getErrorMessage } from '../utils/errorMessage';
 import { plural } from '../utils/plural';
@@ -86,6 +86,12 @@ export default function BookingForm({
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsLoaded, setSlotsLoaded] = useState(false);
   const [slotsError, setSlotsError] = useState(false);
+  // "Add anyway" (appointment clinics): the answer of the extra-slot request for an empty day, and the extra mode itself
+  const [extraSlot, setExtraSlot] = useState({ status: 'idle', data: null });  // 'idle' | 'loading' | 'ready' | 'failed'
+  const [extraMode, setExtraMode] = useState(false);       // staff pressed "Add anyway": extraTime is the selected time
+  const [extraTime, setExtraTime] = useState('');          // "HH:MM" (24h) of the extra booking
+  const [extraNotice, setExtraNotice] = useState('');      // "The next free time changed to ..." after an EXTRA_TIME_CHANGED answer
+  const [extraDismissed, setExtraDismissed] = useState(false); // "Choose another date": the warning is hidden, the plain line stays
   const [reload, setReload] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -264,6 +270,33 @@ export default function BookingForm({
     return () => { cancelled = true; };
   }, [open, slotKind, f.doctorId, f.date, f.procedureId, reload]);
 
+  // "Add anyway": extra mode and its warning start again whenever the form opens or the doctor, the date, the booking type
+  // (visit or procedure, which changes the path) or the booking mode changes
+  useEffect(() => {
+    setExtraMode(false);
+    setExtraTime('');
+    setExtraNotice('');
+    setExtraDismissed(false);
+  }, [open, bookingMode, path, f.doctorId, f.date]);
+
+  // Free times appeared again (for example another booking was cancelled): the extra booking is no longer needed
+  useEffect(() => {
+    if (slots.length > 0) { setExtraMode(false); setExtraTime(''); }
+  }, [slots]);
+
+  // An appointment clinic's day with no free time left: ask whether one more patient may be added, and at which time
+  const needsExtraCheck = open && path === 'appointment' && !!f.doctorId && !!f.date
+    && slotsLoaded && !slotsLoading && !slotsError && slots.length === 0;
+  useEffect(() => {
+    if (!needsExtraCheck) { setExtraSlot({ status: 'idle', data: null }); return undefined; }
+    let cancelled = false;
+    setExtraSlot({ status: 'loading', data: null });
+    getExtraSlot(f.doctorId, f.date)
+      .then(res => { if (!cancelled) setExtraSlot({ status: 'ready', data: res?.data || null }); })
+      .catch(() => { if (!cancelled) setExtraSlot({ status: 'failed', data: null }); });
+    return () => { cancelled = true; };
+  }, [needsExtraCheck, f.doctorId, f.date, reload]);
+
   // The patient lookup waits 300 ms after the last keystroke. Every change of the number cancels a pending lookup and clears the
   // previous result at once; an answer for an older number is ignored (phoneRef guard).
   const handlePhone = (value) => {
@@ -293,18 +326,19 @@ export default function BookingForm({
     && (
       path === 'tokenNow'
       || (path === 'tokenSession' && !!f.date && sessionsLoaded && sessions.length > 0 && !!f.session)
-      || (path === 'appointment' && !!f.date && !!f.time)
+      || (path === 'appointment' && !!f.date && (!!f.time || (extraMode && !!extraTime)))
       || (path === 'procedure' && !!f.procedureId && !!f.date && !!f.time)
     );
 
   const submit = async () => {
     if (submitRef.current) return;
     setError('');
+    setExtraNotice('');
     if (!phoneReadyForLookup(f.phone)) { setError('Enter a valid phone number: 10 digits for India, or + and the country code for other countries.'); return; }
     if (!f.name.trim()) { setError('Enter the patient name.'); return; }
     if (!f.doctorId) { setError('Choose a doctor.'); return; }
     if (path === 'tokenSession' && !f.session) { setError('Choose a session.'); return; }
-    if (path === 'appointment' && !f.time) { setError('Choose a free time.'); return; }
+    if (path === 'appointment' && !f.time && !(extraMode && extraTime)) { setError('Choose a free time.'); return; }
     if (path === 'procedure' && (!f.procedureId || !f.time)) { setError('Choose a procedure and a free time.'); return; }
     submitRef.current = true;
     setSubmitting(true);
@@ -325,6 +359,12 @@ export default function BookingForm({
         result = { kind: 'token_session' };
       } else if (path === 'appointment') {
         const body = { patient_name: name, phone, date: f.date, start_time: f.time, notes, send_whatsapp: f.sendWhatsapp === true };
+        // "Add anyway": the confirmed time goes as expected_start_time, and start_time carries the same value
+        if (extraMode && extraTime) {
+          body.extra = true;
+          body.expected_start_time = extraTime;
+          body.start_time = extraTime;
+        }
         if (f.consent) body.marketing_consent = f.consent;
         await scheduleAppointmentBooking(f.doctorId, body);
         result = { kind: 'appointment' };
@@ -351,11 +391,20 @@ export default function BookingForm({
         await scheduleProcedureBooking(f.doctorId, body);
         result = { kind: 'procedure' };
       }
+      setExtraMode(false);
+      setExtraTime('');
+      setExtraNotice('');
       onBooked(result);
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not save, please try again.'));
-      // The time may have been taken meanwhile: show the current free times again
-      if (slotModeNeedsReload || path === 'tokenSession') setReload(n => n + 1);
+      if (extraMode && err && err.code === 'EXTRA_TIME_CHANGED' && /^\d{1,2}:\d{2}$/.test(String(err.time || ''))) {
+        // The next free time moved since staff saw it: the form stays open with the new time, and staff confirm again
+        setExtraTime(String(err.time));
+        setExtraNotice(`The next free time changed to ${clockText(String(err.time))}. Please confirm again.`);
+      } else {
+        setError(getErrorMessage(err, 'Could not save, please try again.'));
+        // The time may have been taken meanwhile: show the current free times again
+        if (slotModeNeedsReload || path === 'tokenSession') setReload(n => n + 1);
+      }
     } finally {
       submitRef.current = false;
       setSubmitting(false);
@@ -562,8 +611,46 @@ export default function BookingForm({
                   <p className="text-sm text-ink/40">Loading free times...</p>
                 ) : slotsError ? (
                   <LoadError message="Could not load the free times." onRetry={() => setReload(n => n + 1)} />
+                ) : slotsLoaded && slots.length === 0 && path === 'appointment' && extraMode && extraTime ? (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2" role="status">
+                    <p className="text-sm font-semibold text-amber-800">Extra booking: {clockText(extraTime)}</p>
+                    <p className="text-xs text-amber-700 mt-0.5">All appointments are full for this date. This patient is added after the last session.</p>
+                    {extraNotice && <p className="text-xs font-medium text-amber-800 mt-1">{extraNotice}</p>}
+                    <button type="button" disabled={submitting}
+                      onClick={() => { setExtraMode(false); setExtraTime(''); setExtraNotice(''); }}
+                      className="mt-1 text-xs font-medium text-amber-800 underline disabled:opacity-50">
+                      Not this
+                    </button>
+                  </div>
+                ) : slotsLoaded && slots.length === 0 && path === 'appointment' && extraSlot.status === 'loading' ? (
+                  <p className="text-sm text-ink/40">Checking for an extra time...</p>
+                ) : slotsLoaded && slots.length === 0 && path === 'appointment' && extraSlot.status === 'ready' && extraSlot.data?.allowed === true && /^\d{1,2}:\d{2}$/.test(String(extraSlot.data.time || '')) && !extraDismissed ? (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2" role="status">
+                    <p className="text-sm text-amber-800">
+                      All appointments are full for this date. The next free time is {clockText(extraSlot.data.time)} (extra {(Number(extraSlot.data.extrasUsed) || 0) + 1} of {extraSlot.data.extrasMax}).
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      <button type="button" disabled={submitting}
+                        onClick={() => { setExtraTime(extraSlot.data.time); setExtraMode(true); setExtraNotice(''); }}
+                        className="px-3 py-1.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-hover transition disabled:opacity-50">
+                        Add anyway
+                      </button>
+                      <button type="button" disabled={submitting}
+                        onClick={() => setExtraDismissed(true)}
+                        className="px-3 py-1.5 rounded-lg border border-ink/[0.12] text-sm font-medium text-ink/70 hover:bg-ink/[0.03] transition disabled:opacity-50">
+                        Choose another date
+                      </button>
+                    </div>
+                  </div>
                 ) : slotsLoaded && slots.length === 0 ? (
-                  <p className="text-sm text-red-500">No free times for this doctor on this date.</p>
+                  <>
+                    <p className="text-sm text-red-500">No free times for this doctor on this date.</p>
+                    {/* The reason of the extra-slot answer, except "free times are still available" and "no sessions" (the line above says it) */}
+                    {path === 'appointment' && extraSlot.status === 'ready' && extraSlot.data?.allowed === false && extraSlot.data.reason
+                      && !/free times are still available/i.test(extraSlot.data.reason) && !/no sessions/i.test(extraSlot.data.reason) && (
+                      <p className="text-sm text-red-500 mt-1">{extraSlot.data.reason}</p>
+                    )}
+                  </>
                 ) : (
                   <select value={f.time} disabled={submitting}
                     onChange={e => set({ time: e.target.value })}

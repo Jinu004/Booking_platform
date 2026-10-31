@@ -67,11 +67,19 @@ export async function getAvailableSlots(doctorId, date, duration) {
   return api.get(`/clinic/doctors/${doctorId}/available-slots`, { params: { date, duration } });
 }
 
+// Appointment mode, "add anyway": when a date has no free time left, resolves to { success, data: { allowed, time, reason, extrasUsed, extrasMax } }.
+// time is "HH:MM" (24h) when allowed; otherwise reason says why.
+export async function getExtraSlot(doctorId, date) {
+  return api.get(`/clinic/doctors/${doctorId}/extra-slot`, { params: { date } });
+}
+
 export async function scheduleProcedureBooking(doctorId, data) {
   return api.post(`/clinic/doctors/${doctorId}/procedure-booking`, data);
 }
 
 // Appointment mode: body { patient_name, phone, date (YYYY-MM-DD), start_time (HH:MM), notes? }
+// "Add anyway" bookings also send extra: true and expected_start_time (HH:MM, the time staff confirmed; start_time carries the same value).
+// The body is passed through as it is. A 409 with code EXTRA_TIME_CHANGED carries the new time in err.time.
 export async function scheduleAppointmentBooking(doctorId, data) {
   return api.post(`/clinic/doctors/${doctorId}/appointment-booking`, data);
 }
