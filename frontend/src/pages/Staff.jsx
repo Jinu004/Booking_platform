@@ -5,9 +5,15 @@ import { CardSkeleton } from '../components/shared/Skeleton';
 import { plural } from '../utils/plural';
 import { getErrorMessage } from '../utils/errorMessage';
 import LoadError from '../components/LoadError';
+import { getStoredStaff } from '../services/auth.service';
 
 const Staff = () => {
   const { addToast } = useStore();
+  // The signed-in person, read once from the stored login (no API call)
+  const me = getStoredStaff();
+  const myId = me?.id;
+  const isAdmin = me?.role === 'admin';
+  const canChangeRow = (row) => row.role !== 'admin' || isAdmin; // only an admin changes an admin's account
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -311,6 +317,7 @@ const Staff = () => {
                     {/* Actions */}
                     <td className="px-3 md:px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {canChangeRow(s) && s.id !== myId && (
                         <button
                           onClick={() => setEditRoleModal({ id: s.id, role: s.role })}
                           title="Edit role"
@@ -321,14 +328,18 @@ const Staff = () => {
                               d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                           </svg>
                         </button>
+                        )}
                         {s.is_active ? (
+                          isAdmin && canChangeRow(s) && (
                           <button
                             onClick={() => handleDelete(s.id)}
                             className="text-xs font-semibold text-red-500 hover:text-red-700 px-2.5 py-1 rounded-lg hover:bg-red-50 transition"
                           >
                             Deactivate
                           </button>
+                          )
                         ) : (
+                          canChangeRow(s) && (
                           <>
                             <button
                               onClick={() => handleActivate(s.id)}
@@ -336,13 +347,16 @@ const Staff = () => {
                             >
                               Activate
                             </button>
+                            {isAdmin && (
                             <button
                               onClick={() => handleDeletePermanent(s.id)}
                               className="text-xs font-semibold text-red-500 hover:text-red-700 px-2.5 py-1 rounded-lg hover:bg-red-50 transition"
                             >
                               Delete
                             </button>
+                            )}
                           </>
+                          )
                         )}
                       </div>
                     </td>
@@ -375,7 +389,7 @@ const Staff = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">Role</label>
                 <select value={inviteData.role} onChange={e => setInviteData({ ...inviteData, role: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border">
-                  <option value="admin">Admin</option>
+                  {isAdmin && <option value="admin">Admin</option>}
                   <option value="manager">Manager</option>
                   <option value="doctor">Doctor</option>
                   <option value="receptionist">Receptionist</option>
@@ -428,7 +442,7 @@ const Staff = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">New Role</label>
                 <select value={editRoleModal.role} onChange={e => setEditRoleModal({ ...editRoleModal, role: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border">
-                  <option value="admin">Admin</option>
+                  {isAdmin && <option value="admin">Admin</option>}
                   <option value="manager">Manager</option>
                   <option value="doctor">Doctor</option>
                   <option value="receptionist">Receptionist</option>
@@ -436,7 +450,7 @@ const Staff = () => {
               </div>
               <div className="flex justify-between mt-6 pt-4 border-t">
                 <div>
-                  {editRoleModal && !staffList.find(s => s.id === editRoleModal.id)?.is_active && (
+                  {isAdmin && editRoleModal && !staffList.find(s => s.id === editRoleModal.id)?.is_active && (
                     <button type="button" onClick={() => handleDeletePermanent(editRoleModal.id)} className="px-4 py-2 text-red-600 border border-red-200 rounded-md hover:bg-red-50 text-sm font-medium">
                       Delete Permanently
                     </button>

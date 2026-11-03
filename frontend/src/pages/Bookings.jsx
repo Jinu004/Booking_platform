@@ -350,7 +350,7 @@ const Bookings = () => {
         )}
 
         {doctors
-          .filter(doctor => staff?.role !== 'doctor' || doctor.name === staff?.name)
+          .filter(doctor => staff?.role !== 'doctor' || doctor.id === staff?.doctor_id)
           .map(doctor => {
             const count = bookings.filter(b => b.doctor_name === doctor.name).length;
             return (

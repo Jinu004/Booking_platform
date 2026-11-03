@@ -476,10 +476,14 @@ const Doctors = () => {
           </div>
         ) : doctorsLoadError && doctors.length === 0 ? (
           <LoadError message={doctorsLoadError} onRetry={fetchDoctors} />
+        ) : isDoctor && !staff?.doctor_id ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
+            <p className="text-gray-400 text-sm">Your account is not linked to a doctor profile. Ask your admin to link it on the Staff page.</p>
+          </div>
         ) : doctors.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
             <p className="text-gray-400 text-sm">No doctors added yet.</p>
-            <button onClick={openAddDoctor} className="mt-3 text-indigo-600 font-semibold text-sm hover:text-indigo-800">+ Add your first doctor</button>
+            {!isDoctor && !isReadOnly && <button onClick={openAddDoctor} className="mt-3 text-indigo-600 font-semibold text-sm hover:text-indigo-800">+ Add your first doctor</button>}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -523,6 +527,7 @@ const Doctors = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </button>
+                  {!isDoctor && (<>
                   <button
                     onClick={() => openEditDoctor(doc)}
                     title="Edit Doctor"
@@ -541,6 +546,7 @@ const Doctors = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                   </button>
+                  </>)}
                 </div>}
               </div>
             ))}
@@ -548,7 +554,8 @@ const Doctors = () => {
         )}
       </div>
 
-      {/* ── SECTION 2: Today's Availability ── */}
+      {/* ── SECTION 2: Today's Availability (not for the doctor role) ── */}
+      {!isDoctor && (
       <div className="border-t border-gray-200 pt-8">
 
         {/* Header */}
@@ -687,9 +694,10 @@ const Doctors = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* Leave Modal */}
-      {leaveModalDoc && (
+      {!isDoctor && leaveModalDoc && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full">
             <h2 className="text-lg font-medium mb-4">Mark Leave for {leaveModalDoc.name}</h2>
@@ -842,7 +850,7 @@ const Doctors = () => {
             <h2 className="text-xl font-bold mb-2">Weekly Schedule</h2>
             <p className="text-sm text-gray-500 mb-6">{scheduleModalDoc.name}</p>
 
-            <div className="space-y-3">
+            <fieldset disabled={isDoctor} className="space-y-3 border-0 p-0 m-0 min-w-0">
               {DAYS.map((day, idx) => {
                 const s = doctorSchedule[idx];
                 const sessions = s?.sessions || [{ start_time: '09:00', end_time: '18:00' }];
@@ -893,6 +901,7 @@ const Doctors = () => {
                             }}
                             className="border border-gray-300 rounded-md p-1.5 text-sm"
                           />
+                          {!isDoctor && (
                           <button
                             type="button"
                             onClick={() => {
@@ -904,6 +913,7 @@ const Doctors = () => {
                           >
                             + Add Session
                           </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -937,7 +947,7 @@ const Doctors = () => {
                               }}
                               className="border border-gray-300 rounded-md p-1.5 text-sm"
                             />
-                            {sessions.length > 1 && (
+                            {!isDoctor && sessions.length > 1 && (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -953,7 +963,7 @@ const Doctors = () => {
                             )}
                           </div>
                         ))}
-                        {sessions.length < 3 && (
+                        {!isDoctor && sessions.length < 3 && (
                           <button
                             type="button"
                             onClick={() => {
@@ -971,7 +981,7 @@ const Doctors = () => {
                   </div>
                 );
               })}
-            </div>
+            </fieldset>
 
             </div>
 
@@ -982,6 +992,7 @@ const Doctors = () => {
               >
                 Cancel
               </button>
+              {!isDoctor && (
               <button
                 onClick={handleScheduleSave}
                 disabled={savingSchedule}
@@ -989,6 +1000,7 @@ const Doctors = () => {
               >
                 {savingSchedule ? 'Saving...' : 'Save Schedule'}
               </button>
+              )}
             </div>
           </div>
         </div>
@@ -1017,13 +1029,16 @@ const Doctors = () => {
                       <p className="text-sm font-semibold text-gray-800">{p.name}</p>
                       <p className="text-xs text-gray-500">{p.duration_minutes} min</p>
                     </div>
+                    {!isDoctor && (
                     <button onClick={() => handleDeleteProcedure(p.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
+                    )}
                   </div>
                 ))
               )}
             </div>
+            {!isDoctor && (
             <div className="border-t border-gray-100 pt-4">
               <p className="text-sm font-semibold text-gray-700 mb-3">Add Procedure</p>
               <div className="flex gap-2 mb-2">
@@ -1050,6 +1065,7 @@ const Doctors = () => {
                 {savingProcedure ? 'Adding...' : '+ Add Procedure'}
               </button>
             </div>
+            )}
           </div>
         </div>
       )}

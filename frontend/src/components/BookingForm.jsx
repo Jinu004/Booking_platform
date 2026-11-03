@@ -161,7 +161,8 @@ export default function BookingForm({
   const modeReady = modeStatus === 'ready' && (bookingMode === 'token' || bookingMode === 'appointment');
 
   // The doctor role only books for their own doctor
-  const baseDoctors = staffRole === 'doctor' && ownDoctorId ? doctors.filter(d => d.id === ownDoctorId) : doctors;
+  // (a doctor with no doctor link is offered no doctor at all)
+  const baseDoctors = staffRole === 'doctor' ? (ownDoctorId ? doctors.filter(d => d.id === ownDoctorId) : []) : doctors;
 
   const isProcedure = f.type === 'procedure' && procedures.length > 0;
   const path = isProcedure
@@ -520,7 +521,9 @@ export default function BookingForm({
             )}
             {doctorOptions.length === 0 && (
               <p className="text-sm text-red-500">
-                {path === 'tokenNow' ? 'No doctor is available right now. Choose "Pick a session" to book a later time.' : 'No doctors found.'}
+                {staffRole === 'doctor' && !ownDoctorId
+                  ? 'Your account is not linked to a doctor profile'
+                  : path === 'tokenNow' ? 'No doctor is available right now. Choose "Pick a session" to book a later time.' : 'No doctors found.'}
               </p>
             )}
 
