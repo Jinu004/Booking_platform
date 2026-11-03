@@ -209,7 +209,7 @@ const LANDING_CSS = `
 
 /* Pricing */
 .rai-pricing-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
-.rai-pricing-note { margin-top: 24px; font-size: 13px; color: var(--fg-muted); text-align: center; }
+.rai-pricing-note { margin-top: 32px; font-size: 13px; color: var(--fg-muted); text-align: center; }
 .rai-price-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; display: flex; flex-direction: column; gap: 20px; position: relative; }
 .rai-price-card.featured { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .rai-price-card.featured .rai-price-name,.rai-price-card.featured .rai-price-tag { color: var(--bg); }
@@ -928,7 +928,7 @@ function Pricing({ onNavigate }) {
             </div>
           ))}
         </div>
-        <p className="rai-pricing-note">Cancel anytime.</p>
+        <p className="rai-pricing-note">No lock-in. Cancel anytime.</p>
       </div>
     </section>
   );
