@@ -5,6 +5,7 @@ const logger = require('../../utils/logger');
 const { sendDocument } = require('../channel/whatsapp/whatsapp.adapter');
 const { runAsTenant } = require('../channel/whatsapp/senderContext');
 const { isWindowOpen, PRESCRIPTION_WINDOW_CLOSED_MESSAGE } = require('../conversation/conversation.window');
+const { patientAllowed } = require('../../utils/doctorScope');
 
 function isPro(req) {
   return req.tenant?.plan === 'pro';
@@ -303,6 +304,7 @@ async function downloadPrescription(req, res, next) {
   try {
     const patientId = req.params.patientId || req.params.customerId;
     const { noteId } = req.params;
+    if (!(await patientAllowed(req, res, patientId))) return;
     const data = await getPrescriptionData(req.tenantId, patientId, noteId);
     if (!data) return errorResponse(res, 'Visit note not found', 404);
 
@@ -324,6 +326,7 @@ async function sendPrescriptionToWhatsApp(req, res, next) {
   try {
     const patientId = req.params.patientId || req.params.customerId;
     const { noteId } = req.params;
+    if (!(await patientAllowed(req, res, patientId))) return;
     const data = await getPrescriptionData(req.tenantId, patientId, noteId);
     if (!data) return errorResponse(res, 'Visit note not found', 404);
     if (!data.patient_phone) return errorResponse(res, 'Patient has no phone number', 400);

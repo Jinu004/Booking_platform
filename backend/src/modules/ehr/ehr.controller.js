@@ -3,6 +3,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 const { validatePhoneInput } = require('../../utils/phone');
 const { logAction } = require('../../utils/audit');
+const { doctorLinkOk, patientAllowed } = require('../../utils/doctorScope');
 
 // HTML tag stripper — prevents stored XSS in free-text fields
 const stripHtml = (str) => str ? str.replace(/<[^>]*>/g, '').trim() : str;
@@ -27,6 +28,8 @@ const bookingInTenant = (bookingId, tenantId) => rowInTenant('bookings', booking
 async function getPatients(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
+    // A doctor with no doctor link is refused (the list below is limited to the doctor's own patients)
+    if (!doctorLinkOk(req, res)) return;
     const { search, consent } = req.query;
     // Consent belongs to the phone number (customers), so patients who share a phone share the value
     let query = `
@@ -73,6 +76,7 @@ async function getPatients(req, res, next) {
 async function getConsentSummary(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
   try {
+    if (!doctorLinkOk(req, res)) return;
     let query = `
       SELECT
         COUNT(*) FILTER (WHERE cu.marketing_consent = 'all')::int AS all_count,
@@ -172,6 +176,7 @@ async function getPatient(req, res, next) {
   try {
     const rawId = req.params.patientId || req.params.customerId;
     if (!isUUID(rawId)) return errorResponse(res, 'Invalid patient ID', 400);
+    if (!(await patientAllowed(req, res, rawId))) return;
     const profile = await loadPatientProfile(rawId, req.tenantId);
     if (!profile) return errorResponse(res, 'Patient not found', 404);
     return successResponse(res, profile);
@@ -471,6 +476,7 @@ async function addCondition(req, res, next) {
   try {
     const patientId = req.params.patientId || req.params.customerId;
     if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
+    if (!(await patientAllowed(req, res, patientId))) return;
     const { type, name, notes } = req.body;
     if (!type || !name) return errorResponse(res, 'Type and name are required', 400);
     if (!['condition', 'allergy', 'medication'].includes(type)) return errorResponse(res, 'Invalid type', 400);
@@ -496,6 +502,7 @@ async function deleteCondition(req, res, next) {
     const { id } = req.params;
     if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
     if (!isUUID(id)) return errorResponse(res, 'Invalid condition ID', 400);
+    if (!(await patientAllowed(req, res, patientId))) return;
     await pool.query(`DELETE FROM patient_conditions WHERE id = $1 AND patient_id = $2 AND tenant_id = $3`, [id, patientId, req.tenantId]);
     return successResponse(res, { deleted: true });
   } catch (err) {
@@ -509,6 +516,7 @@ async function addVisitNote(req, res, next) {
   try {
     const patientId = req.params.patientId || req.params.customerId;
     if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
+    if (!(await patientAllowed(req, res, patientId))) return;
     const { visit_date, doctor_id, diagnosis, prescription, follow_up_date, notes, booking_id } = req.body;
     if (!visit_date) return errorResponse(res, 'Visit date is required', 400);
     if (diagnosis && diagnosis.length > 5000) return res.status(400).json({ success: false, error: 'Diagnosis too long (max 5000 chars)' });
@@ -540,6 +548,7 @@ async function updateVisitNote(req, res, next) {
     const { id } = req.params;
     if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
     if (!isUUID(id)) return errorResponse(res, 'Invalid visit note ID', 400);
+    if (!(await patientAllowed(req, res, patientId))) return;
     const { visit_date, doctor_id, diagnosis, prescription, follow_up_date, notes } = req.body;
     if (doctor_id && (!isUUID(doctor_id) || !(await doctorInTenant(doctor_id, req.tenantId)))) return errorResponse(res, 'Doctor not found', 404);
     const capitalizeFirst = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : str;

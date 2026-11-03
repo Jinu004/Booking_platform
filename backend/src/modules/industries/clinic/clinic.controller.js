@@ -6,6 +6,7 @@ const { runAsTenant } = require('../../channel/whatsapp/senderContext');
 const { validatePhoneInput } = require('../../../utils/phone');
 const logger = require('../../../utils/logger');
 const { logAction } = require('../../../utils/audit');
+const { doctorLinkOk, ownDoctorId } = require('../../../utils/doctorScope');
 
 // Sentinel value used to soft-delete doctors from token queues
 // clinic.model.js getDoctors filters out records where leave_days equals this value
@@ -162,7 +163,9 @@ async function addLeave(req, res, next) {
 async function getTokenQueue(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const tokens = await ClinicModel.getTokenQueue(pool, tenantId);
+    // A doctor receives only their own rows (a doctor with no doctor link is refused); other roles see every doctor
+    if (!doctorLinkOk(req, res)) return;
+    const tokens = await ClinicModel.getTokenQueue(pool, tenantId, { doctorId: ownDoctorId(req) });
     return successResponse(res, tokens);
   } catch (error) {
     next(error);

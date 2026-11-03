@@ -166,7 +166,8 @@ async function addDoctorLeave(pool, tenantId, doctorId, leaveDate, reason) {
 /**
  * Gets token queue for today
  */
-async function getTokenQueue(pool, tenantId) {
+async function getTokenQueue(pool, tenantId, { doctorId = null } = {}) {
+  const doctorClause = doctorId ? ' AND ct.doctor_id = $2' : ''
   const sql = `
 SELECT ct.*, b.notes, b.slot_time, b.source,
        COALESCE(b.patient_name, c.name) AS patient_name,
@@ -181,10 +182,10 @@ SELECT ct.*, b.notes, b.slot_time, b.source,
     JOIN clinic_doctors cd ON cd.id = ct.doctor_id
     WHERE ct.tenant_id = $1
     AND ct.status != 'cancelled'
-    AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
+    AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date${doctorClause}
     ORDER BY b.slot_time ASC NULLS LAST, ct.token_number ASC
   `
-  const result = await tenantQuery(tenantId, pool, sql, [])
+  const result = await tenantQuery(tenantId, pool, sql, doctorId ? [doctorId] : [])
   return result.rows
 }
 /**

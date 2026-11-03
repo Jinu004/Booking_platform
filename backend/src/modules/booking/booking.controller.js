@@ -10,6 +10,7 @@ const { logAction } = require('../../utils/audit');
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 const { validatePhoneInput } = require('../../utils/phone');
 const ClinicModel = require('../industries/clinic/clinic.model');
+const { doctorLinkOk, ownDoctorId, bookingAllowed } = require('../../utils/doctorScope');
 
 // A real calendar date written YYYY-MM-DD (2026-02-31 is refused)
 const isISODate = (str) => typeof str === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(str) && !isNaN(Date.parse(str))
@@ -51,8 +52,9 @@ async function getBookings(req, res, next) {
     const { date, status, customerId, page, limit, upcoming } = req.query;
     let { doctorId } = req.query;
 
-    // If logged in as doctor, only show their own bookings
-    if (req.staff.role === 'doctor' && req.staff.doctor_id) {
+    // If logged in as doctor, only show their own bookings (a doctor with no doctor link is refused)
+    if (!doctorLinkOk(req, res)) return;
+    if (req.staff.role === 'doctor') {
       doctorId = req.staff.doctor_id;
     }
 
@@ -73,7 +75,8 @@ async function getBookings(req, res, next) {
 async function getBookingStats(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const doctorId = req.staff.role === 'doctor' && req.staff.doctor_id ? req.staff.doctor_id : null;
+    if (!doctorLinkOk(req, res)) return;
+    const doctorId = ownDoctorId(req);
     const stats = await BookingService.getBookingStats(tenantId, doctorId);
     return successResponse(res, stats);
   } catch (error) {
@@ -89,7 +92,8 @@ async function getBookingById(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
-    
+    if (!(await bookingAllowed(req, res, id))) return;
+
     const booking = await BookingModel.getBookingById(pool, tenantId, id);
     if (!booking) {
       return errorResponse(res, 'Booking not found', 404);
@@ -110,7 +114,8 @@ async function updateBookingStatus(req, res, next) {
     const tenantId = req.tenant.id;
     const { id } = req.params;
     const { status } = req.body;
-    
+    if (!(await bookingAllowed(req, res, id))) return;
+
     const booking = await BookingModel.updateBookingStatus(pool, tenantId, id, status);
     if (!booking) {
       return errorResponse(res, 'Booking not found', 404);
@@ -145,7 +150,8 @@ async function cancelBooking(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
-    
+    if (!(await bookingAllowed(req, res, id))) return;
+
     const booking = await BookingService.cancelBookingWithRules(tenantId, id, 'staff');
     await logAction({ tenantId, staffId: req.staff?.id, action: 'booking.cancelled', entityType: 'booking', entityId: id, ipAddress: req.ip });
     return successResponse(res, booking);
@@ -165,7 +171,8 @@ async function completeBooking(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
-    
+    if (!(await bookingAllowed(req, res, id))) return;
+
     const booking = await BookingService.completeBooking(tenantId, id);
     return successResponse(res, booking);
   } catch (error) {
@@ -181,7 +188,8 @@ async function markNoShow(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
-    
+    if (!(await bookingAllowed(req, res, id))) return;
+
     const booking = await BookingService.markNoShow(tenantId, id);
     return successResponse(res, booking);
   } catch (error) {
@@ -197,17 +205,26 @@ async function markNoShow(req, res, next) {
 async function getTodayBookings(req, res, next) {
   try {
     const tenantId = req.tenant.id;
+    // A doctor sees their own bookings only (a doctor with no doctor link is refused)
+    if (!doctorLinkOk(req, res)) return;
+    const ownDoctor = ownDoctorId(req);
+    const params = [tenantId];
+    let doctorClause = '';
+    if (ownDoctor) {
+      params.push(ownDoctor);
+      doctorClause = ` AND b.doctor_id = $${params.length}`;
+    }
     const sql = `
       SELECT b.id, b.token_number, b.status, b.source, b.booking_date, b.created_at,
-             c.name as patient_name, c.phone as patient_phone, 
+             c.name as patient_name, c.phone as patient_phone,
              d.name as doctor_name
       FROM bookings b
       LEFT JOIN customers c ON b.customer_id = c.id
       LEFT JOIN clinic_doctors d ON b.doctor_id = d.id
-      WHERE b.tenant_id = $1 AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
+      WHERE b.tenant_id = $1 AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date${doctorClause}
       ORDER BY b.token_number ASC
     `;
-    const result = await pool.query(sql, [tenantId]);
+    const result = await pool.query(sql, params);
     return successResponse(res, result.rows);
   } catch (error) {
     next(error);

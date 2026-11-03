@@ -82,6 +82,14 @@ const search = rawSearch && rawSearch.trim() ? rawSearch.trim() : null;
   const params = [];
   let paramCount = 2;
 
+  // options.doctorId (doctor role): only customers with at least one booking with that doctor
+  const doctorId = options.doctorId || null;
+  if (doctorId) {
+    sql += ` AND EXISTS (SELECT 1 FROM bookings bk WHERE bk.tenant_id = c.tenant_id AND bk.customer_id = c.id AND bk.doctor_id = $${paramCount})`;
+    params.push(doctorId);
+    paramCount++;
+  }
+
   if (search) {
     sql += ` AND (LOWER(c.name) LIKE LOWER($${paramCount}) OR c.phone LIKE $${paramCount})`;
     params.push(`%${search}%`);
@@ -97,9 +105,13 @@ const search = rawSearch && rawSearch.trim() ? rawSearch.trim() : null;
   // count total
   let countSql = `SELECT COUNT(*) FROM customers WHERE tenant_id = $1`;
   const countParams = [tenantId];
+  if (doctorId) {
+    countParams.push(doctorId);
+    countSql += ` AND EXISTS (SELECT 1 FROM bookings bk WHERE bk.tenant_id = customers.tenant_id AND bk.customer_id = customers.id AND bk.doctor_id = $${countParams.length})`;
+  }
   if (search) {
-    countSql += ` AND (LOWER(name) LIKE LOWER($2) OR phone LIKE $2)`;
     countParams.push(`%${search}%`);
+    countSql += ` AND (LOWER(name) LIKE LOWER($${countParams.length}) OR phone LIKE $${countParams.length})`;
   }
   const countRes = await pool.query(countSql, countParams);
 

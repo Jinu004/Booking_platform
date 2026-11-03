@@ -5,6 +5,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 const { validatePhoneInput } = require('../../utils/phone');
 const { logAction } = require('../../utils/audit');
+const { doctorLinkOk, ownDoctorId, customerAllowed } = require('../../utils/doctorScope');
 
 // UUID v4 format validation helper
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -18,7 +19,9 @@ async function getCustomers(req, res, next) {
   try {
     const tenantId = req.tenant.id;
     const { search, page, limit } = req.query;
-    const result = await CRMService.searchCustomers(tenantId, { search, page, limit });
+    // A doctor sees only customers who have a booking with them (a doctor with no doctor link is refused)
+    if (!doctorLinkOk(req, res)) return;
+    const result = await CRMService.searchCustomers(tenantId, { search, page, limit, doctorId: ownDoctorId(req) });
     return successResponse(res, result);
   } catch (error) {
     next(error);
@@ -34,6 +37,7 @@ async function getCustomerById(req, res, next) {
     const tenantId = req.tenant.id;
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid customer ID', 400);
+    if (!(await customerAllowed(req, res, id))) return;
     const profile = await CRMService.getCustomerProfile(tenantId, id);
     return successResponse(res, profile);
   } catch (error) {
@@ -118,6 +122,7 @@ async function getCustomerHistory(req, res, next) {
     const tenantId = req.tenant.id;
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid customer ID', 400);
+    if (!(await customerAllowed(req, res, id))) return;
     const history = await CRMModel.getCustomerHistory(pool, tenantId, id);
     return successResponse(res, history);
   } catch (error) {
@@ -134,6 +139,9 @@ async function globalSearch(req, res) {
   try {
     const tenantId = req.tenant.id
     const { q } = req.query
+    // A doctor finds only customers (and bookings) tied to their own doctor; a doctor with no doctor link is refused
+    if (!doctorLinkOk(req, res)) return
+    const doctorId = ownDoctorId(req)
 
     if (!q || q.trim().length < 2) {
       return successResponse(res, {
@@ -154,9 +162,12 @@ async function globalSearch(req, res) {
          LOWER(name) LIKE LOWER($2)
          OR phone LIKE $2
        )
+       AND ($3::uuid IS NULL OR EXISTS (
+         SELECT 1 FROM bookings bk WHERE bk.tenant_id = customers.tenant_id AND bk.customer_id = customers.id AND bk.doctor_id = $3
+       ))
        ORDER BY name ASC
        LIMIT 5`,
-      [tenantId, `%${searchTerm}%`]
+      [tenantId, `%${searchTerm}%`, doctorId]
     )
 
     // Search recent bookings by patient name or phone
@@ -175,9 +186,10 @@ async function globalSearch(req, res) {
          LOWER(c.name) LIKE LOWER($2)
          OR c.phone LIKE $2
        )
+       AND ($3::uuid IS NULL OR b.doctor_id = $3)
        ORDER BY b.booking_date DESC
        LIMIT 5`,
-      [tenantId, `%${searchTerm}%`]
+      [tenantId, `%${searchTerm}%`, doctorId]
     )
 
     return successResponse(res, {
