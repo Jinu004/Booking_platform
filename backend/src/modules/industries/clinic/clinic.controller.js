@@ -8,6 +8,9 @@ const logger = require('../../../utils/logger');
 const { logAction } = require('../../../utils/audit');
 const { doctorLinkOk, ownDoctorId } = require('../../../utils/doctorScope');
 const { doctorLimitFor } = require('../../../config/plans');
+const StaffModel = require('../../staff/staff.model');
+const DoctorLogin = require('../../staff/doctorLogin');
+const { sendWelcomeEmail } = require('../../../utils/email');
 
 // Sentinel value used to soft-delete doctors from token queues
 // clinic.model.js getDoctors filters out records where leave_days equals this value
@@ -73,6 +76,49 @@ async function getDoctorById(req, res, next) {
   }
 }
 
+// POST /clinic/doctors with an email: the doctor profile and the doctor's staff login are created in ONE transaction
+// (doctor limit, email check, doctor insert, staff insert); the audit entry and the welcome email follow the commit.
+async function createDoctorWithLogin(req, res, email) {
+  const tenantId = req.tenant.id;
+  const temp = await DoctorLogin.makeTempPassword(); // hashing is slow: done before the transaction opens
+  const client = await pool.connect();
+  let doctor;
+  let staff;
+  try {
+    await client.query('BEGIN');
+    await DoctorLogin.lockEmail(client, email);
+
+    const doctorLimit = doctorLimitFor(req.tenant?.plan);
+    const activeDoctors = await client.query('SELECT COUNT(*)::int AS n FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true', [tenantId]);
+    if (activeDoctors.rows[0].n >= doctorLimit) {
+      await client.query('ROLLBACK');
+      return errorResponse(res, `Your plan allows up to ${doctorLimit} doctor(s). Upgrade your plan to add more.`, 403);
+    }
+    if (await StaffModel.isEmailInUse(client, email)) {
+      await client.query('ROLLBACK');
+      return errorResponse(res, DoctorLogin.EMAIL_TAKEN_MESSAGE, 409);
+    }
+
+    doctor = await ClinicModel.createDoctor(client, tenantId, { ...req.body, email });
+    staff = await DoctorLogin.insertDoctorLogin(client, tenantId, doctor, email, temp.hash);
+    await client.query('COMMIT');
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) { /* the connection is released below */ }
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  await logAction({ tenantId, staffId: req.staff?.id, action: 'staff.created', entityType: 'staff', entityId: staff?.id, ipAddress: req.ip });
+  const emailSent = await sendWelcomeEmail({
+    to: email,
+    name: doctor.name,
+    clinicName: req.tenant.name || 'Your Clinic',
+    tempPassword: temp.password
+  });
+  return successResponse(res, { ...doctor, login: { created: true, emailSent: emailSent === true } }, 201);
+}
+
 /**
  * POST /clinic/doctors
  * Creates new doctor — validates required fields, types, and lengths
@@ -99,6 +145,12 @@ async function createDoctor(req, res, next) {
     }
     if (consultationFee !== undefined && isNaN(Number(consultationFee))) {
       return errorResponse(res, 'consultationFee must be a number', 400);
+    }
+    // An optional email creates the doctor's login together with the profile (a separate path with its own transaction)
+    const emailInput = DoctorLogin.readEmail(req.body.email);
+    if (emailInput.given) {
+      if (!DoctorLogin.isValidEmail(emailInput.email)) return errorResponse(res, DoctorLogin.EMAIL_INVALID_MESSAGE, 400);
+      return await createDoctorWithLogin(req, res, emailInput.email);
     }
 
     // The plan limits how many active doctors a clinic can have (a removed doctor is soft-deleted with is_active = false and is not counted)
@@ -243,6 +295,109 @@ async function updateTokenStatus(req, res, next) {
   }
 }
 
+// The doctor UPDATE shared by the plain update and the update with an email. db is the pool or a transaction client.
+// email (already validated and lower-cased) is written only when given; null keeps the stored email, as before.
+function updateDoctorRow(db, req, id, tenantId, email = null) {
+  return db.query(
+    `UPDATE clinic_doctors
+     SET name                     = COALESCE($1, name),
+         specialization           = COALESCE($2, specialization),
+         phone                    = COALESCE($3, phone),
+         qualification            = COALESCE($4, qualification),
+         max_tokens_daily         = COALESCE($5, max_tokens_daily),
+         consultation_fee         = COALESCE($6, consultation_fee),
+         profile_description      = COALESCE($9, profile_description),
+         avg_consultation_minutes = COALESCE($10, avg_consultation_minutes),
+         email                    = COALESCE($11, email)
+     WHERE id = $7 AND tenant_id = $8
+     RETURNING *`,
+    [
+      req.body.name,
+      req.body.specialization,
+      req.body.phone,
+      req.body.qualification,
+      req.body.maxTokensDaily,
+      req.body.consultationFee,
+      id,
+      tenantId,
+      req.body.profileDescription !== undefined ? req.body.profileDescription : null,
+      req.body.avgConsultationMinutes !== undefined ? parseInt(req.body.avgConsultationMinutes) : null,
+      email
+    ]
+  );
+}
+
+// PATCH /clinic/doctors/:id with an email, in ONE transaction: the doctor update, then either the doctor's login is created (no login
+// is linked yet) or the linked login's email is changed (admin only). The audit entry and the welcome email follow the commit.
+async function updateDoctorWithEmail(req, res, email) {
+  const { id } = req.params;
+  const tenantId = req.tenant.id;
+  const temp = await DoctorLogin.makeTempPassword(); // hashing is slow: done before the transaction opens
+  const client = await pool.connect();
+  let doctor;
+  let createdStaff = null;
+  let changedStaffId = null;
+  try {
+    await client.query('BEGIN');
+    await DoctorLogin.lockEmail(client, email);
+
+    const updated = await updateDoctorRow(client, req, id, tenantId, email);
+    if (!updated.rows[0]) {
+      await client.query('ROLLBACK');
+      return errorResponse(res, 'Doctor not found', 404);
+    }
+    doctor = updated.rows[0];
+
+    // The login linked to this doctor profile in this clinic (active or not)
+    const linkedRes = await client.query(
+      'SELECT id, email FROM staff WHERE doctor_id = $1 AND tenant_id = $2 ORDER BY created_at ASC LIMIT 1',
+      [id, tenantId]
+    );
+    const linked = linkedRes.rows[0] || null;
+    const emailDiffers = !linked || String(linked.email || '').trim().toLowerCase() !== email;
+
+    if (linked && emailDiffers && req.staff?.role !== 'admin') {
+      await client.query('ROLLBACK');
+      return errorResponse(res, 'Only an admin can change a login email', 403);
+    }
+    if (emailDiffers && await StaffModel.isEmailInUse(client, email, linked ? linked.id : null)) {
+      await client.query('ROLLBACK');
+      return errorResponse(res, DoctorLogin.EMAIL_TAKEN_MESSAGE, 409);
+    }
+
+    if (!linked) {
+      createdStaff = await DoctorLogin.insertDoctorLogin(client, tenantId, doctor, email, temp.hash);
+    } else if (emailDiffers) {
+      await StaffModel.updateStaff(client, tenantId, linked.id, { email });
+      changedStaffId = linked.id;
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) { /* the connection is released below */ }
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  if (req.body.consultationFee !== undefined) {
+    await require('../../tenant/tenant.service').touchAiInfo(tenantId);
+  }
+  if (changedStaffId) {
+    await logAction({ tenantId, staffId: req.staff?.id, action: 'staff.email_changed', entityType: 'staff', entityId: changedStaffId, ipAddress: req.ip });
+  }
+  if (createdStaff) {
+    await logAction({ tenantId, staffId: req.staff?.id, action: 'staff.created', entityType: 'staff', entityId: createdStaff.id, ipAddress: req.ip });
+    const emailSent = await sendWelcomeEmail({
+      to: email,
+      name: doctor.name,
+      clinicName: req.tenant.name || 'Your Clinic',
+      tempPassword: temp.password
+    });
+    return successResponse(res, { ...doctor, login: { created: true, emailSent: emailSent === true } });
+  }
+  return successResponse(res, doctor);
+}
+
 /**
  * PATCH /clinic/doctors/:id
  * Updates doctor details
@@ -253,31 +408,14 @@ async function updateDoctor(req, res, next) {
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const tenantId = req.tenant.id;
 
-    const result = await pool.query(
-      `UPDATE clinic_doctors
-       SET name                     = COALESCE($1, name),
-           specialization           = COALESCE($2, specialization),
-           phone                    = COALESCE($3, phone),
-           qualification            = COALESCE($4, qualification),
-           max_tokens_daily         = COALESCE($5, max_tokens_daily),
-           consultation_fee         = COALESCE($6, consultation_fee),
-           profile_description      = COALESCE($9, profile_description),
-           avg_consultation_minutes = COALESCE($10, avg_consultation_minutes)
-       WHERE id = $7 AND tenant_id = $8
-       RETURNING *`,
-      [
-        req.body.name,
-        req.body.specialization,
-        req.body.phone,
-        req.body.qualification,
-        req.body.maxTokensDaily,
-        req.body.consultationFee,
-        id,
-        tenantId,
-        req.body.profileDescription !== undefined ? req.body.profileDescription : null,
-        req.body.avgConsultationMinutes !== undefined ? parseInt(req.body.avgConsultationMinutes) : null
-      ]
-    );
+    // An optional email creates the doctor's login or changes the linked login's email (a separate path with its own transaction)
+    const emailInput = DoctorLogin.readEmail(req.body.email);
+    if (emailInput.given) {
+      if (!DoctorLogin.isValidEmail(emailInput.email)) return errorResponse(res, DoctorLogin.EMAIL_INVALID_MESSAGE, 400);
+      return await updateDoctorWithEmail(req, res, emailInput.email);
+    }
+
+    const result = await updateDoctorRow(pool, req, id, tenantId);
 
     if (!result.rows[0]) {
       return errorResponse(res, 'Doctor not found', 404);
@@ -304,18 +442,39 @@ async function deleteDoctor(req, res, next) {
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const tenantId = req.tenant.id;
 
-    const result = await pool.query(
-      `UPDATE clinic_doctors
-       SET available_today = false,
-           is_active = false,
-           leave_days = $3
-       WHERE id = $1 AND tenant_id = $2
-       RETURNING *`,
-      [id, tenantId, DOCTOR_DELETED_SENTINEL]
-    );
+    // One transaction: the soft delete, and the doctor's login (role doctor only, linked to this profile) is switched off
+    // with its sessions ended (StaffModel.deleteStaff, the same code as DELETE /staff/:id)
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `UPDATE clinic_doctors
+         SET available_today = false,
+             is_active = false,
+             leave_days = $3
+         WHERE id = $1 AND tenant_id = $2
+         RETURNING *`,
+        [id, tenantId, DOCTOR_DELETED_SENTINEL]
+      );
 
-    if (!result.rows[0]) {
-      return errorResponse(res, 'Doctor not found', 404);
+      if (!result.rows[0]) {
+        await client.query('ROLLBACK');
+        return errorResponse(res, 'Doctor not found', 404);
+      }
+
+      const logins = await client.query(
+        `SELECT id FROM staff WHERE doctor_id = $1 AND tenant_id = $2 AND role = 'doctor'`,
+        [id, tenantId]
+      );
+      for (const login of logins.rows) {
+        await StaffModel.deleteStaff(client, tenantId, login.id);
+      }
+      await client.query('COMMIT');
+    } catch (txErr) {
+      try { await client.query('ROLLBACK'); } catch (_) { /* the connection is released below */ }
+      throw txErr;
+    } finally {
+      client.release();
     }
 
     return successResponse(

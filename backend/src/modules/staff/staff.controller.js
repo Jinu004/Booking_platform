@@ -6,6 +6,7 @@ const { bcrypt } = require('../../config/auth')
 const { sendWelcomeEmail } = require('../../utils/email')
 const { logAction } = require('../../utils/audit')
 const { doctorLimitFor } = require('../../config/plans')
+const { EMAIL_TAKEN_MESSAGE } = require('./doctorLogin')
 
 function generateTempPassword() {
   // crypto.randomBytes is cryptographically secure, unlike Math.random()
@@ -58,6 +59,10 @@ async function inviteStaff(req, res, next) {
     }
     if (staffData.role === 'admin' && req.staff.role !== 'admin') {
       return errorResponse(res, 'Only admins can create admin accounts', 403)
+    }
+    // An email is unique across all clinics (login and forgot-password look it up globally): checked before anything is inserted
+    if (await StaffModel.isEmailInUse(pool, staffData.email)) {
+      return errorResponse(res, EMAIL_TAKEN_MESSAGE, 409)
     }
     if (req.body.password && req.body.password.length < 8) {
       return errorResponse(res, 'Password must be at least 8 characters', 400)
@@ -165,8 +170,8 @@ async function updateStaff(req, res, next) {
           if (req.staff.role !== 'admin') {
             return errorResponse(res, 'Only an admin can change a staff email', 403)
           }
-          if (await StaffModel.isEmailInUse(pool, req.tenantId, newEmail, req.params.id)) {
-            return errorResponse(res, 'A staff member with this email already exists', 409)
+          if (await StaffModel.isEmailInUse(pool, newEmail, req.params.id)) {
+            return errorResponse(res, EMAIL_TAKEN_MESSAGE, 409)
           }
           emailChanged = true
         }

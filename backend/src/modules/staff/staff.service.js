@@ -15,12 +15,12 @@ async function inviteStaff(tenantId, staffData) {
     throw new Error('Invalid role specified');
   }
 
-  const staff = await StaffModel.createStaff(pool, tenantId, staffData)
+  let staff = await StaffModel.createStaff(pool, tenantId, staffData)
 
   // If role is doctor and specialized, we might need to sync with clinic doctors table.
   // In a robust implementation, Clinic module would listen to staff creation event or we do it here.
   if (staff.role === 'doctor' && !staffData.doctor_id) {
-    await ClinicModel.createDoctor(pool, tenantId, {
+    const doctor = await ClinicModel.createDoctor(pool, tenantId, {
       name: staff.name,
       email: staff.email,
       phone: staff.phone,
@@ -28,6 +28,9 @@ async function inviteStaff(tenantId, staffData) {
       maxTokensDaily: 30,
       consultationFee: 0
     });
+    // The new staff row is linked to the doctor record that was just created for it
+    const linked = await StaffModel.updateStaff(pool, tenantId, staff.id, { doctor_id: doctor.id })
+    if (linked) staff = linked
   }
 
   return staff

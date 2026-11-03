@@ -51,9 +51,10 @@ async function sendPasswordResetEmail({
   }
 }
 
+// Returns true when the email was sent and false when it was not (it never throws)
 async function sendWelcomeEmail({ to, name, clinicName, tempPassword }) {
   try {
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: 'ReceptionAI <noreply@receptionai.in>',
       to,
       subject: `Welcome to ReceptionAI — ${clinicName}`,
@@ -78,8 +79,15 @@ async function sendWelcomeEmail({ to, name, clinicName, tempPassword }) {
         </div>
       `
     })
+    // The Resend client answers an API problem (for example a refused address) as { error } instead of throwing
+    if (result && result.error) {
+      logger.error('Welcome email failed:', result.error)
+      return false
+    }
+    return true
   } catch (err) {
     logger.error('Welcome email failed:', err)
+    return false
   }
 }
 

@@ -32,13 +32,14 @@ async function createStaff(pool, tenantId, staffData) {
 }
 
 /**
- * Whether another staff row of the same tenant already uses this email (compared lower-cased).
- * excludeStaffId leaves out the row that is being changed.
+ * Whether another staff row in ANY clinic already uses this email (trimmed and lower-cased on both sides, active or not).
+ * Login and forgot-password look an email up across all clinics, so an email must be unique everywhere.
+ * excludeStaffId leaves out the row that is being changed. db is a pool or a client (inside a transaction).
  */
-async function isEmailInUse(pool, tenantId, email, excludeStaffId = null) {
-  const result = await pool.query(
-    'SELECT id FROM staff WHERE tenant_id = $1 AND LOWER(email) = LOWER($2) AND ($3::uuid IS NULL OR id <> $3::uuid) LIMIT 1',
-    [tenantId, email, excludeStaffId]
+async function isEmailInUse(db, email, excludeStaffId = null) {
+  const result = await db.query(
+    'SELECT id FROM staff WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) AND ($2::uuid IS NULL OR id <> $2::uuid) LIMIT 1',
+    [email, excludeStaffId]
   )
   return result.rows.length > 0
 }
