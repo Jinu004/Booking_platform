@@ -119,6 +119,7 @@ const Doctors = () => {
   const staff = getStoredStaff();
   const isReadOnly = staff?.role === 'receptionist';
   const isDoctor = staff?.role === 'doctor';
+  const canEditDoctors = ['admin', 'manager'].includes(staff?.role); // the roles that add and edit doctors (and may add an email)
   const [doctors, setDoctors] = useState([]);
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -183,9 +184,25 @@ const Doctors = () => {
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [manageMode, setManageMode] = useState('add');
   const [manageDoctorForm, setManageDoctorForm] = useState({
-    id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: ''
+    id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: '', email: '', emailOriginal: ''
   });
   const [formErrors, setFormErrors] = useState({});
+  // "Add email" opens the edit form with the Email field focused
+  const emailInputRef = useRef(null);
+  const [focusEmailOnOpen, setFocusEmailOnOpen] = useState(false);
+  useEffect(() => {
+    if (isManageModalOpen && focusEmailOnOpen) {
+      emailInputRef.current?.focus();
+      setFocusEmailOnOpen(false);
+    }
+  }, [isManageModalOpen, focusEmailOnOpen]);
+  // A login was created but its invite email did not go out: a notice that stays on the page until it is closed (or 15 seconds pass)
+  const [loginNotice, setLoginNotice] = useState('');
+  useEffect(() => {
+    if (!loginNotice) return undefined;
+    const timer = setTimeout(() => setLoginNotice(''), 15000);
+    return () => clearTimeout(timer);
+  }, [loginNotice]);
 
   const toTitleCase = (str) => str.replace(/\b\w/g, c => c.toUpperCase());
 
@@ -316,12 +333,13 @@ const Doctors = () => {
 
   const openAddDoctor = () => {
     setManageMode('add');
-    setManageDoctorForm({ id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: '', avgConsultationMinutes: 10 });
+    setManageDoctorForm({ id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: '', avgConsultationMinutes: 10, email: '', emailOriginal: '' });
     setFormErrors({});
     setIsManageModalOpen(true);
   };
 
-  const openEditDoctor = (doc) => {
+  const openEditDoctor = (doc, focusEmail = false) => {
+    setFocusEmailOnOpen(focusEmail);
     setManageMode('edit');
     setManageDoctorForm({
       id: doc.id,
@@ -331,7 +349,9 @@ const Doctors = () => {
       qualification: doc.qualification || '',
       maxTokensDaily: doc.max_tokens_daily || 30,
       consultationFee: doc.consultation_fee || '',
-      avgConsultationMinutes: doc.avg_consultation_minutes || 10
+      avgConsultationMinutes: doc.avg_consultation_minutes || 10,
+      email: doc.email || '',
+      emailOriginal: doc.email || ''
     });
     setFormErrors({});
     setIsManageModalOpen(true);
@@ -356,19 +376,35 @@ const Doctors = () => {
     setFormErrors({});
 
     try {
+      const { email: emailValue, emailOriginal, ...formFields } = manageDoctorForm;
       const payload = {
-        ...manageDoctorForm,
+        ...formFields,
         maxTokensDaily: parseInt(manageDoctorForm.maxTokensDaily),
         consultationFee: parseInt(manageDoctorForm.consultationFee),
         avgConsultationMinutes: parseInt(manageDoctorForm.avgConsultationMinutes) || 10
       };
-      if (manageMode === 'add') {
-        await createDoctor(payload);
-      } else {
-        await updateDoctor(payload.id, payload);
-      }
+      // The email is sent only when it is filled in (when editing: only when it differs from the doctor's current email)
+      const emailTrimmed = (emailValue || '').trim();
+      const emailChanged = manageMode === 'add'
+        ? !!emailTrimmed
+        : !!emailTrimmed && emailTrimmed.toLowerCase() !== (emailOriginal || '').trim().toLowerCase();
+      if (emailChanged) payload.email = emailTrimmed;
+
+      const response = manageMode === 'add'
+        ? await createDoctor(payload)
+        : await updateDoctor(payload.id, payload);
       setIsManageModalOpen(false);
       fetchDoctors();
+
+      // The server adds login: { created, emailSent } to the doctor when it created the doctor's login
+      const login = response?.data?.login;
+      if (login && login.created) {
+        if (login.emailSent) {
+          addToast('Doctor saved. An invite email has been sent.', 'success');
+        } else {
+          setLoginNotice('Login created, but the invite email could not be sent. Ask the doctor to use Forgot password on the login page to set a password.');
+        }
+      }
     } catch (err) {
       addToast(getErrorMessage(err, `Failed to ${manageMode} doctor`), 'error');
     }
@@ -457,6 +493,12 @@ const Doctors = () => {
 
       {/* ── SECTION 1: Doctor Cards ── */}
       <div>
+        {loginNotice && (
+          <div role="alert" className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm text-amber-800">{loginNotice}</p>
+            <button type="button" onClick={() => setLoginNotice('')} className="text-amber-700 hover:text-amber-900 text-sm font-semibold" aria-label="Close">✕</button>
+          </div>
+        )}
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Doctors</h2>
@@ -512,6 +554,16 @@ const Doctors = () => {
                     <p className="text-sm font-semibold text-gray-700">₹{doc.consultation_fee || '—'}</p>
                   </div>
                 </div>
+
+                {canEditDoctors && !doc.email && (
+                  <button
+                    type="button"
+                    onClick={() => openEditDoctor(doc, true)}
+                    className="self-start mb-4 -mt-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                  >
+                    Add email
+                  </button>
+                )}
 
                 {/* Action icons */}
                 {!isReadOnly && <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-4">
@@ -830,6 +882,18 @@ const Doctors = () => {
                   <option value={60}>60 minutes</option>
                 </select>
                 <p className="mt-1 text-xs text-gray-400">Used to calculate how many patients can be seen per session</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <input
+                  ref={emailInputRef}
+                  type="email"
+                  value={manageDoctorForm.email || ''}
+                  onChange={e => setManageDoctorForm({ ...manageDoctorForm, email: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500 border"
+                />
+                <p className="mt-1 text-xs text-gray-400">Optional. If you add an email, the doctor gets a login and an invite email.</p>
               </div>
 
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
