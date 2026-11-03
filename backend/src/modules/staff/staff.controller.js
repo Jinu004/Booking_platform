@@ -5,6 +5,7 @@ const { successResponse, errorResponse } = require('../../utils/response')
 const { bcrypt } = require('../../config/auth')
 const { sendWelcomeEmail } = require('../../utils/email')
 const { logAction } = require('../../utils/audit')
+const { doctorLimitFor } = require('../../config/plans')
 
 function generateTempPassword() {
   // crypto.randomBytes is cryptographically secure, unlike Math.random()
