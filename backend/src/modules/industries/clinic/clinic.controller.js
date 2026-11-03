@@ -7,6 +7,7 @@ const { validatePhoneInput } = require('../../../utils/phone');
 const logger = require('../../../utils/logger');
 const { logAction } = require('../../../utils/audit');
 const { doctorLinkOk, ownDoctorId } = require('../../../utils/doctorScope');
+const { doctorLimitFor } = require('../../../config/plans');
 
 // Sentinel value used to soft-delete doctors from token queues
 // clinic.model.js getDoctors filters out records where leave_days equals this value
@@ -98,6 +99,13 @@ async function createDoctor(req, res, next) {
     }
     if (consultationFee !== undefined && isNaN(Number(consultationFee))) {
       return errorResponse(res, 'consultationFee must be a number', 400);
+    }
+
+    // The plan limits how many active doctors a clinic can have (a removed doctor is soft-deleted with is_active = false and is not counted)
+    const doctorLimit = doctorLimitFor(req.tenant?.plan);
+    const activeDoctors = await pool.query('SELECT COUNT(*)::int AS n FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true', [tenantId]);
+    if (activeDoctors.rows[0].n >= doctorLimit) {
+      return errorResponse(res, `Your plan allows up to ${doctorLimit} doctor(s). Upgrade your plan to add more.`, 403);
     }
 
     const doctor = await ClinicModel.createDoctor(pool, tenantId, req.body);

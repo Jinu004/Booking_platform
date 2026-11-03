@@ -9,6 +9,7 @@ const { ensureCampaignMedia } = require('./campaign.media')
 const { classifyRecipient, cleanCaption } = require('./campaign.service')
 const { getBudgetSnapshot, isSendWindowOpen } = require('./campaign.budget')
 const C = require('./campaign.config')
+const { POSTER_PLANS } = require('../../config/plans')
 
 // Sends the clinic_poster template to the recipients of RUNNING campaigns, slowly, with safety stops.
 // Called once a minute by cron/campaign.cron.js. Nothing here logs phone numbers, names or captions.
@@ -397,7 +398,12 @@ async function runCampaignTick() {
   if (!inWindow()) return // outside the daytime window nothing is sent; running campaigns stay running
   tickRunning = true
   try {
-    const res = await pool.query(`SELECT id, tenant_id FROM campaigns WHERE status = 'running' ORDER BY created_at ASC`)
+    // Only clinics on a plan that includes posters and campaigns are sent for (a campaign of any other plan stays as it is)
+    const res = await pool.query(
+      `SELECT c.id, c.tenant_id FROM campaigns c JOIN tenants t ON t.id = c.tenant_id
+       WHERE c.status = 'running' AND t.plan = ANY($1::text[]) ORDER BY c.created_at ASC`,
+      [POSTER_PLANS]
+    )
     for (const campaign of res.rows) {
       try {
         await processCampaign(campaign)

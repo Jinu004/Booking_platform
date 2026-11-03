@@ -5,6 +5,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 const logger = require('../../utils/logger');
 const bcrypt = require('bcryptjs');
 const { generateToken } = require('../../config/auth');
+const { PLAN_NAMES } = require('../../config/plans');
 
 /**
  * POST /onboarding/clinic
@@ -28,6 +29,10 @@ async function onboardClinic(req, res) {
   }
   if (!password || password.length < 8) {
     return errorResponse(res, 'Password must be at least 8 characters', 400);
+  }
+  // A plan that is sent must be one of the three plans; a missing plan still becomes starter below
+  if (plan !== undefined && plan !== null && plan !== '' && !PLAN_NAMES.includes(plan)) {
+    return errorResponse(res, 'Invalid plan', 400);
   }
 
   const password_hash = await bcrypt.hash(password, 12);
@@ -200,36 +205,34 @@ async function getPlans(req, res) {
       name: 'Starter',
       price: 2999,
       features: [
-        'Up to 50 tokens per day',
-        'AI WhatsApp responses',
-        '1 doctor',
-        'Basic analytics',
-        'Email support'
+        'Patients book on WhatsApp any time, day or night',
+        'Automatic reminders before the appointment',
+        'A live list of who is waiting today',
+        'Automatic follow-up with patients who have not visited for a while',
+        'Simple reports on bookings, visits and missed appointments',
+        'Your staff can step in and reply to any chat',
+        '1 doctor'
       ]
     },
     growth: {
       name: 'Growth',
       price: 5999,
       features: [
-        'Up to 150 tokens per day',
-        'AI WhatsApp responses',
-        'Up to 5 doctors',
-        'Advanced analytics',
-        'Priority support',
-        'Custom AI responses'
+        'Everything in Starter',
+        "The AI answers patients' questions about your clinic: timings, treatments, fees, offers and location",
+        'Send offers and festival greetings to your patients on WhatsApp',
+        'Up to 5 doctors'
       ]
     },
     pro: {
       name: 'Pro',
       price: 9999,
       features: [
-        'Unlimited tokens',
-        'AI WhatsApp responses',
-        'Unlimited doctors',
-        'Full analytics',
-        '24/7 support',
-        'Custom branding',
-        'API access'
+        'Everything in Growth',
+        'Digital patient records: history, diagnosis and notes in one place',
+        'Prescriptions as a PDF sent to the patient on WhatsApp',
+        "The AI knows each doctor's speciality, timings and fee and helps patients pick the right one",
+        'Up to 10 doctors'
       ]
     }
   });

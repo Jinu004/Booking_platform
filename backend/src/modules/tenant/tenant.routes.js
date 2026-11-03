@@ -17,6 +17,7 @@ const {
   validateSetConfig
 } = require('./tenant.validation');
 const { requireAuth, requireRole } = require('../auth/auth.middleware');
+const { requirePostersPlan } = require('../../config/plans');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -54,8 +55,9 @@ router.get('/:id', getTenantById);
 router.put('/:id', requireRole('admin', 'manager', 'super_admin'), validateUpdateTenant, validate, updateTenant);
 router.post('/:id/config', requireRole('admin', 'manager', 'super_admin'), validateSetConfig, validate, setConfig);
 router.get('/:id/config', getAllConfigs);
-router.get('/:id/poster-requests', requireRole('admin', 'manager'), getPosterRequests);
-router.get('/:id/poster-requests/:requestId/image', requireRole('admin', 'manager'), getPosterImage);
-router.post('/:id/poster-request', requireRole('admin', 'manager'), upload.single('poster'), submitPosterRequest);
+// Posters are for the Growth and Pro plans (the plan check runs before the upload is read)
+router.get('/:id/poster-requests', requireRole('admin', 'manager'), requirePostersPlan, getPosterRequests);
+router.get('/:id/poster-requests/:requestId/image', requireRole('admin', 'manager'), requirePostersPlan, getPosterImage);
+router.post('/:id/poster-request', requireRole('admin', 'manager'), requirePostersPlan, upload.single('poster'), submitPosterRequest);
 
 module.exports = router;
