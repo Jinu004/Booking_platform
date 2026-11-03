@@ -61,6 +61,15 @@ async function inviteStaff(req, res, next) {
     if (req.body.password && req.body.password.length < 8) {
       return errorResponse(res, 'Password must be at least 8 characters', 400)
     }
+    // A doctor invited without a doctor_id gets a new doctor record from StaffService.inviteStaff: the plan limit applies
+    // (the same count and message as POST /clinic/doctors), before anything is inserted or any email is sent
+    if (staffData.role === 'doctor' && !staffData.doctor_id) {
+      const doctorLimit = doctorLimitFor(req.tenant?.plan)
+      const activeDoctors = await pool.query('SELECT COUNT(*)::int AS n FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true', [req.tenantId])
+      if (activeDoctors.rows[0].n >= doctorLimit) {
+        return errorResponse(res, `Your plan allows up to ${doctorLimit} doctor(s). Upgrade your plan to add more.`, 403)
+      }
+    }
 
     const password = req.body.password || generateTempPassword()
     const password_hash = await bcrypt.hash(password, 12)
