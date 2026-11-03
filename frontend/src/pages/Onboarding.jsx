@@ -300,11 +300,6 @@ export default function Onboarding() {
                           <div style={{ fontSize: 14, fontWeight: 600, color: active ? 'var(--accent-light)' : 'var(--text)', marginBottom: 6, marginTop: plan.popular ? 8 : 0 }}>{plan.name}</div>
                           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>{plan.price}<span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)' }}>/mo</span></div>
                           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {[plan.doctors, plan.conversations].map((f, i) => (
-                              <div key={i} style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--muted)', flexShrink: 0 }} />{f}
-                              </div>
-                            ))}
                             {plan.features.map((f, i) => (
                               <div key={i} style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>{f}

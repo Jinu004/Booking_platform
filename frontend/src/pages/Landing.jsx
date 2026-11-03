@@ -899,9 +899,9 @@ function HowItWorks() {
 ───────────────────────────────────────────── */
 function Pricing({ onNavigate }) {
   const plans = [
-    { name: 'Starter', price: '2,999', period: '/month', sub: 'For solo practices and single-doctor clinics.', features: ['1 doctor', 'Up to 300 bookings/month', 'WhatsApp AI booking 24/7', '24hr appointment reminders', 'Live token queue', 'Analytics dashboard', 'Email support'], cta: 'Get Started' },
-    { name: 'Growth', price: '5,999', period: '/month', sub: 'For busy clinics with 2–5 doctors.', features: ['Up to 5 doctors', 'Up to 750 bookings/month', 'WhatsApp AI booking 24/7', '24hr appointment reminders', 'Live token queue', 'Analytics dashboard', 'Priority support'], cta: 'Get Started', featured: true, pill: 'Most popular' },
-    { name: 'Pro', price: '9,999', period: '/month', sub: 'For multi-doctor clinics and growing practices.', features: ['Up to 10 doctors', 'Up to 1,500 bookings/month', 'WhatsApp AI booking 24/7', '24hr appointment reminders', 'Live token queue', 'Analytics dashboard'], cta: 'Get Started' },
+    { name: 'Starter', price: '2,999', period: '/month', sub: 'For solo practices and single-doctor clinics.', features: ['Patients book on WhatsApp any time, day or night', 'Automatic reminders before the appointment', 'A live list of who is waiting today', 'Automatic follow-up with patients who have not visited for a while', 'Simple reports on bookings, visits and missed appointments', 'Your staff can step in and reply to any chat', '1 doctor'], cta: 'Get Started' },
+    { name: 'Growth', price: '5,999', period: '/month', sub: 'For busy clinics with 2–5 doctors.', features: ['Everything in Starter', "The AI answers patients' questions about your clinic: timings, treatments, fees, offers and location", 'Send offers and festival greetings to your patients on WhatsApp', 'Up to 5 doctors'], cta: 'Get Started', featured: true, pill: 'Most popular' },
+    { name: 'Pro', price: '9,999', period: '/month', sub: 'For multi-doctor clinics and growing practices.', features: ['Everything in Growth', 'Digital patient records: history, diagnosis and notes in one place', 'Prescriptions as a PDF sent to the patient on WhatsApp', "The AI knows each doctor's speciality, timings and fee and helps patients pick the right one", 'Up to 10 doctors'], cta: 'Get Started' },
   ];
   return (
     <section id="pricing" className="rai-section">
@@ -928,7 +928,7 @@ function Pricing({ onNavigate }) {
             </div>
           ))}
         </div>
-        <p className="rai-pricing-note">Extra bookings available at ₹500 per 100. Cancel anytime.</p>
+        <p className="rai-pricing-note">Cancel anytime.</p>
       </div>
     </section>
   );

@@ -86,6 +86,8 @@ export default function Settings() {
 
   // The Posters tab, its upload form and the poster and campaign calls are for admin and manager only (the backend allows nobody else)
   const canUsePosters = ['admin', 'manager'].includes(staff?.role);
+  // Posters and campaigns are for the Growth and Pro plans (a missing plan counts as starter); other plans see a lock card and no poster or campaign call is made
+  const postersLocked = !['growth', 'pro'].includes(plan) && staff?.role !== 'super_admin';
   const [activeTab, setActiveTab] = useState('clinic');
   // A role that may not use the Posters tab never stays on it: fall back to the first tab
   useEffect(() => {
@@ -145,7 +147,7 @@ export default function Settings() {
   const kbOverLimit = knowledgeBase.length > kbLimit;
 
   useEffect(() => {
-    if (activeTab === 'posters' && canUsePosters) {
+    if (activeTab === 'posters' && canUsePosters && !postersLocked) {
       fetchPosterRequests();
       fetchCampaigns();
     }
@@ -153,7 +155,7 @@ export default function Settings() {
 
   // Refetch the campaign list when the browser tab comes back into view (no timers, no polling), only on the Posters tab
   useEffect(() => {
-    if (activeTab !== 'posters' || !canUsePosters) return undefined;
+    if (activeTab !== 'posters' || !canUsePosters || postersLocked) return undefined;
     let last = 0;
     const refresh = () => {
       if (document.visibilityState === 'hidden') return;
@@ -1004,7 +1006,26 @@ export default function Settings() {
           </div>
         )}
 
-      {activeTab === 'posters' && canUsePosters && (
+      {activeTab === 'posters' && canUsePosters && postersLocked && (
+        <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+          <div className="w-16 h-16 bg-ink/[0.05] rounded-full flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-ink/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold tracking-[-0.03em] text-ink mb-2">Offers and posters</h2>
+          <p className="text-ink/55 text-sm max-w-sm">
+            Offers and posters are available on the Growth and Pro plans. Contact{' '}
+            <a href="mailto:support@receptionai.in" className="text-ink font-medium underline underline-offset-2 hover:text-ink/70">
+              support@receptionai.in
+            </a>{' '}
+            to upgrade.
+          </p>
+        </div>
+      )}
+
+      {activeTab === 'posters' && canUsePosters && !postersLocked && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
             <h2 className="text-lg font-semibold text-gray-900">Upload Poster</h2>
