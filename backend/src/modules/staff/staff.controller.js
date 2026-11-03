@@ -82,6 +82,20 @@ async function inviteStaff(req, res, next) {
   }
 }
 
+// Why a staff member cannot be deactivated (the rules of DELETE /staff/:id): not yourself, and never the last active admin
+// of the clinic. Returns a message, or null when the deactivation is allowed.
+async function deactivationBlocker(req, target) {
+  if (req.params.id === req.staff.id) return 'You cannot deactivate your own account'
+  if (target?.role === 'admin') {
+    const adminCount = await pool.query(
+      'SELECT COUNT(*) FROM staff WHERE tenant_id = $1 AND role = $2 AND is_active = true',
+      [req.tenantId, 'admin']
+    )
+    if (parseInt(adminCount.rows[0].count) <= 1) return 'Cannot deactivate the last admin account'
+  }
+  return null
+}
+
 /**
  * PATCH /staff/:id
  */
@@ -89,6 +103,25 @@ async function updateStaff(req, res, next) {
   try {
     const updates = req.body
     let staff;
+
+    // The target must be a staff member of this clinic, and only an admin may change an admin account
+    const target = await StaffModel.getStaffById(pool, req.tenantId, req.params.id)
+    if (!target) {
+      return errorResponse(res, 'Staff member not found', 404)
+    }
+    if (target.role === 'admin' && req.staff.role !== 'admin') {
+      return errorResponse(res, 'Only an admin can change an admin account', 403)
+    }
+    if (updates.is_active !== undefined) {
+      if (typeof updates.is_active !== 'boolean') {
+        return errorResponse(res, 'is_active must be true or false', 400)
+      }
+      if (req.params.id === req.staff.id) {
+        return errorResponse(res, 'You cannot change your own active status', 400)
+      }
+    }
+    let emailChanged = false
+    let activeChanged = false
     
     if (updates.role) {
       if (req.params.id === req.staff.id) {
@@ -111,11 +144,50 @@ async function updateStaff(req, res, next) {
       }
       staff = await StaffService.updateStaffRole(req.tenantId, req.params.id, updates.role)
     } else {
-      staff = await StaffModel.updateStaff(pool, req.tenantId, req.params.id, updates)
+      const changes = { ...updates }
+      // Email change: admin only, and never an address another staff member of this clinic already uses
+      if (changes.email !== undefined) {
+        const newEmail = typeof changes.email === 'string' ? changes.email.trim() : ''
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+          return errorResponse(res, 'Invalid email address', 400)
+        }
+        if (newEmail.toLowerCase() !== String(target.email || '').toLowerCase()) {
+          if (req.staff.role !== 'admin') {
+            return errorResponse(res, 'Only an admin can change a staff email', 403)
+          }
+          if (await StaffModel.isEmailInUse(pool, req.tenantId, newEmail, req.params.id)) {
+            return errorResponse(res, 'A staff member with this email already exists', 409)
+          }
+          emailChanged = true
+        }
+        changes.email = newEmail
+      }
+      // Deactivating follows the rules of DELETE /staff/:id: the same blocker, and deleteStaff removes the person's sessions
+      const deactivating = changes.is_active === false && target.is_active !== false
+      if (deactivating) {
+        const blocker = await deactivationBlocker(req, target)
+        if (blocker) return errorResponse(res, blocker, 400)
+        delete changes.is_active
+        if (Object.keys(changes).length > 0) {
+          await StaffModel.updateStaff(pool, req.tenantId, req.params.id, changes)
+        }
+        staff = await StaffModel.deleteStaff(pool, req.tenantId, req.params.id)
+        activeChanged = true
+      } else {
+        staff = await StaffModel.updateStaff(pool, req.tenantId, req.params.id, changes)
+        activeChanged = !!staff && changes.is_active === true && target.is_active === false
+      }
     }
 
     if (!staff) {
       return errorResponse(res, 'Staff member not found', 404)
+    }
+    // Best-effort audit entries (logAction never throws); no email addresses are recorded
+    if (emailChanged) {
+      await logAction({ tenantId: req.tenantId, staffId: req.staff?.id, action: 'staff.email_changed', entityType: 'staff', entityId: req.params.id, ipAddress: req.ip })
+    }
+    if (activeChanged) {
+      await logAction({ tenantId: req.tenantId, staffId: req.staff?.id, action: 'staff.active_changed', entityType: 'staff', entityId: req.params.id, metadata: { is_active: staff.is_active }, ipAddress: req.ip })
     }
     const { password_hash: _ph3, ...safeStaff3 } = staff;
     return successResponse(res, { staff: safeStaff3 })
@@ -160,8 +232,16 @@ async function deleteStaff(req, res, next) {
  */
 async function activateStaff(req, res, next) {
   try {
+    const target = await StaffModel.getStaffById(pool, req.tenantId, req.params.id)
+    if (!target) return errorResponse(res, 'Staff member not found', 404)
+    if (target.role === 'admin' && req.staff.role !== 'admin') {
+      return errorResponse(res, 'Only an admin can change an admin account', 403)
+    }
     const staff = await StaffModel.updateStaff(pool, req.tenantId, req.params.id, { is_active: true })
     if (!staff) return errorResponse(res, 'Staff member not found', 404)
+    if (target.is_active === false) {
+      await logAction({ tenantId: req.tenantId, staffId: req.staff?.id, action: 'staff.active_changed', entityType: 'staff', entityId: req.params.id, metadata: { is_active: true }, ipAddress: req.ip })
+    }
     const { password_hash: _ph4, ...safeStaff4 } = staff;
     return successResponse(res, { staff: safeStaff4 })
   } catch (error) {

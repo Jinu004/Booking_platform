@@ -26,7 +26,8 @@ const {
 const router = express.Router()
 router.use(requireAuth)
 
-router.get('/', getSettings)
+// Callers of GET /settings: the Settings screen and the WhatsApp banner in Layout (admin and manager only)
+router.get('/', requireRole('admin', 'manager', 'super_admin'), getSettings)
 router.put('/', requireRole('admin', 'manager'), updateSettings)
 router.get('/clinic', getClinicSettings)
 router.put('/clinic', requireRole('admin', 'manager'), updateClinicSettings)

@@ -15,8 +15,9 @@ const router = express.Router()
 // All paths require auth
 router.use(requireAuth)
 
-router.get('/', getStaff)
-router.get('/:id', getStaffById)
+// Only the Staff screen (admin and manager link) calls these two reads
+router.get('/', requireRole('admin', 'manager', 'super_admin'), getStaff)
+router.get('/:id', requireRole('admin', 'manager', 'super_admin'), getStaffById)
 router.post('/', requireRole('admin', 'manager'), inviteStaff)
 router.patch('/:id', requireRole('admin', 'manager'), updateStaff)
 router.patch('/:id/activate', requireRole('admin', 'manager'), activateStaff)

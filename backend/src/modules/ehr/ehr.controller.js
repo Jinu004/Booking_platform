@@ -14,6 +14,15 @@ function isPro(req) {
   return req.tenant?.plan === 'pro';
 }
 
+// Ownership checks for ids that come from the request: the tenant is always the logged-in user's clinic (req.tenantId)
+const rowInTenant = async (table, id, tenantId) => {
+  const res = await pool.query(`SELECT 1 FROM ${table} WHERE id = $1 AND tenant_id = $2`, [id, tenantId]);
+  return res.rows.length > 0;
+};
+const patientInTenant = (patientId, tenantId) => rowInTenant('patients', patientId, tenantId);
+const doctorInTenant = (doctorId, tenantId) => rowInTenant('clinic_doctors', doctorId, tenantId);
+const bookingInTenant = (bookingId, tenantId) => rowInTenant('bookings', bookingId, tenantId);
+
 // GET /ehr/patients -- list all patients with profile summary
 async function getPatients(req, res, next) {
   if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
@@ -468,6 +477,7 @@ async function addCondition(req, res, next) {
     if (!name || !name.trim()) return res.status(400).json({ success: false, error: 'Condition name is required' });
     if (name.length > 500) return res.status(400).json({ success: false, error: 'Name too long (max 500 chars)' });
     if (notes && notes.length > 1000) return res.status(400).json({ success: false, error: 'Notes too long (max 1000 chars)' });
+    if (!(await patientInTenant(patientId, req.tenantId))) return errorResponse(res, 'Patient not found', 404);
     const result = await pool.query(`
       INSERT INTO patient_conditions (tenant_id, patient_id, type, name, notes)
       VALUES ($1, $2, $3, $4, $5) RETURNING *
@@ -504,6 +514,9 @@ async function addVisitNote(req, res, next) {
     if (diagnosis && diagnosis.length > 5000) return res.status(400).json({ success: false, error: 'Diagnosis too long (max 5000 chars)' });
     if (prescription && prescription.length > 5000) return res.status(400).json({ success: false, error: 'Prescription too long (max 5000 chars)' });
     if (notes && notes.length > 2000) return res.status(400).json({ success: false, error: 'Notes too long (max 2000 chars)' });
+    if (!(await patientInTenant(patientId, req.tenantId))) return errorResponse(res, 'Patient not found', 404);
+    if (doctor_id && (!isUUID(doctor_id) || !(await doctorInTenant(doctor_id, req.tenantId)))) return errorResponse(res, 'Doctor not found', 404);
+    if (booking_id && (!isUUID(booking_id) || !(await bookingInTenant(booking_id, req.tenantId)))) return errorResponse(res, 'Booking not found', 404);
     const capitalizeFirst = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
     const body = {};
     if (diagnosis) body.diagnosis = capitalizeFirst(stripHtml(diagnosis));
@@ -528,6 +541,7 @@ async function updateVisitNote(req, res, next) {
     if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
     if (!isUUID(id)) return errorResponse(res, 'Invalid visit note ID', 400);
     const { visit_date, doctor_id, diagnosis, prescription, follow_up_date, notes } = req.body;
+    if (doctor_id && (!isUUID(doctor_id) || !(await doctorInTenant(doctor_id, req.tenantId)))) return errorResponse(res, 'Doctor not found', 404);
     const capitalizeFirst = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
     const body = {};
     if (diagnosis) body.diagnosis = capitalizeFirst(diagnosis);

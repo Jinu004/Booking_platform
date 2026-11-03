@@ -32,6 +32,18 @@ async function createStaff(pool, tenantId, staffData) {
 }
 
 /**
+ * Whether another staff row of the same tenant already uses this email (compared lower-cased).
+ * excludeStaffId leaves out the row that is being changed.
+ */
+async function isEmailInUse(pool, tenantId, email, excludeStaffId = null) {
+  const result = await pool.query(
+    'SELECT id FROM staff WHERE tenant_id = $1 AND LOWER(email) = LOWER($2) AND ($3::uuid IS NULL OR id <> $3::uuid) LIMIT 1',
+    [tenantId, email, excludeStaffId]
+  )
+  return result.rows.length > 0
+}
+
+/**
  * Gets all staff for tenant
  * @param {object} pool
  * @param {string} tenantId
@@ -123,6 +135,7 @@ async function deleteStaff(pool, tenantId, staffId) {
 
 module.exports = {
   createStaff,
+  isEmailInUse,
   getStaff,
   getStaffById,
   getStaffByClerkId,

@@ -12,7 +12,7 @@ const sseAuth = (req, res, next) => {
 };
 
 // SSE route uses sseAuth first, then requireAuth
-router.get('/events', sseAuth, requireAuth, HITLController.sseStream);
+router.get('/events', sseAuth, requireAuth, requireRole('admin', 'manager', 'receptionist', 'super_admin'), HITLController.sseStream);
 
 // All other routes use requireAuth directly
 router.get('/conversations', requireAuth, requireRole('admin', 'manager', 'receptionist', 'super_admin'), HITLController.getConversations);
