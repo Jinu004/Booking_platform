@@ -184,7 +184,7 @@ const Doctors = () => {
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [manageMode, setManageMode] = useState('add');
   const [manageDoctorForm, setManageDoctorForm] = useState({
-    id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: '', email: '', emailOriginal: ''
+    id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: '', email: '', emailOriginal: '', hasLogin: false
   });
   const [formErrors, setFormErrors] = useState({});
   // "Add email" opens the edit form with the Email field focused
@@ -333,7 +333,7 @@ const Doctors = () => {
 
   const openAddDoctor = () => {
     setManageMode('add');
-    setManageDoctorForm({ id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: '', avgConsultationMinutes: 10, email: '', emailOriginal: '' });
+    setManageDoctorForm({ id: null, name: '', specialization: '', phone: '', qualification: '', maxTokensDaily: 30, consultationFee: '', avgConsultationMinutes: 10, email: '', emailOriginal: '', hasLogin: false });
     setFormErrors({});
     setIsManageModalOpen(true);
   };
@@ -350,8 +350,10 @@ const Doctors = () => {
       maxTokensDaily: doc.max_tokens_daily || 30,
       consultationFee: doc.consultation_fee || '',
       avgConsultationMinutes: doc.avg_consultation_minutes || 10,
-      email: doc.email || '',
-      emailOriginal: doc.email || ''
+      // With a login the field shows the login email (sent to admin and manager); otherwise the doctor profile email
+      email: doc.has_login ? (doc.login_email || doc.email || '') : (doc.email || ''),
+      emailOriginal: doc.has_login ? (doc.login_email || doc.email || '') : (doc.email || ''),
+      hasLogin: !!doc.has_login
     });
     setFormErrors({});
     setIsManageModalOpen(true);
@@ -376,18 +378,19 @@ const Doctors = () => {
     setFormErrors({});
 
     try {
-      const { email: emailValue, emailOriginal, ...formFields } = manageDoctorForm;
+      const { email: emailValue, emailOriginal, hasLogin, ...formFields } = manageDoctorForm;
       const payload = {
         ...formFields,
         maxTokensDaily: parseInt(manageDoctorForm.maxTokensDaily),
         consultationFee: parseInt(manageDoctorForm.consultationFee),
         avgConsultationMinutes: parseInt(manageDoctorForm.avgConsultationMinutes) || 10
       };
-      // The email is sent only when it is filled in (when editing: only when it differs from the doctor's current email)
+      // The email is sent only when it is filled in. When editing: when it differs from the prefilled value, or when the doctor has no
+      // login yet (so saving the doctor's profile email creates the login)
       const emailTrimmed = (emailValue || '').trim();
       const emailChanged = manageMode === 'add'
         ? !!emailTrimmed
-        : !!emailTrimmed && emailTrimmed.toLowerCase() !== (emailOriginal || '').trim().toLowerCase();
+        : !!emailTrimmed && (emailTrimmed.toLowerCase() !== (emailOriginal || '').trim().toLowerCase() || !hasLogin);
       if (emailChanged) payload.email = emailTrimmed;
 
       const response = manageMode === 'add'
@@ -555,14 +558,17 @@ const Doctors = () => {
                   </div>
                 </div>
 
-                {canEditDoctors && !doc.email && (
+                {canEditDoctors && !doc.has_login && (
                   <button
                     type="button"
                     onClick={() => openEditDoctor(doc, true)}
                     className="self-start mb-4 -mt-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                   >
-                    Add email
+                    {doc.email ? 'Create login' : 'Add email'}
                   </button>
+                )}
+                {canEditDoctors && doc.has_login && !doc.login_active && (
+                  <p className="self-start mb-4 -mt-2 text-xs text-gray-400">Login is switched off. Activate it on the Staff page.</p>
                 )}
 
                 {/* Action icons */}
@@ -891,9 +897,14 @@ const Doctors = () => {
                   type="email"
                   value={manageDoctorForm.email || ''}
                   onChange={e => setManageDoctorForm({ ...manageDoctorForm, email: e.target.value })}
+                  readOnly={manageMode === 'edit' && manageDoctorForm.hasLogin && staff?.role === 'manager'}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500 border"
                 />
-                <p className="mt-1 text-xs text-gray-400">Optional. If you add an email, the doctor gets a login and an invite email.</p>
+                <p className="mt-1 text-xs text-gray-400">
+                  {manageMode === 'edit' && manageDoctorForm.hasLogin
+                    ? "This is the doctor's login email. Only an admin can change it."
+                    : 'Optional. If you add an email, the doctor gets a login and an invite email.'}
+                </p>
               </div>
 
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
