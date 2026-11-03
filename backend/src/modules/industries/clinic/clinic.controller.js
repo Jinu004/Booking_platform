@@ -52,6 +52,10 @@ async function getDoctors(req, res, next) {
     else available = undefined;
 
     const doctors = await ClinicModel.getDoctors(pool, tenantId, available);
+    // The login email is shown to admin and manager (and super admin) only; has_login and login_active go to every role
+    if (!['admin', 'manager', 'super_admin'].includes(req.staff?.role)) {
+      for (const doctor of doctors) delete doctor.login_email;
+    }
     return successResponse(res, doctors);
   } catch (error) {
     next(error);

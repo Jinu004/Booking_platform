@@ -42,6 +42,15 @@ async function getBookingMode(pool, tenantId) {
  * @param {boolean} availableOnly
  * @returns {Promise<Array>}
  */
+// A subquery for one column of the staff row that stands for a doctor's login: the active doctor-role row first (oldest first if
+// several), otherwise the most recently created inactive one. LIMIT 1 means a doctor is never returned twice. column is a fixed name.
+const loginPick = (column) => `(SELECT st.${column} FROM staff st
+      WHERE st.doctor_id = clinic_doctors.id AND st.tenant_id = clinic_doctors.tenant_id AND st.role = 'doctor'
+      ORDER BY COALESCE(st.is_active, false) DESC,
+               CASE WHEN COALESCE(st.is_active, false) THEN st.created_at END ASC,
+               CASE WHEN COALESCE(st.is_active, false) THEN NULL ELSE st.created_at END DESC
+      LIMIT 1)`;
+
 async function getDoctors(pool, tenantId, availableOnly) {
   let sql = `SELECT *, EXISTS (
       SELECT 1 FROM doctor_schedules ds
@@ -50,7 +59,13 @@ async function getDoctors(pool, tenantId, availableOnly) {
         AND ds.is_available = true
         AND ds.start_time <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::time
         AND ds.end_time >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::time
-    ) AS available_now
+    ) AS available_now,
+    EXISTS (
+      SELECT 1 FROM staff st
+      WHERE st.doctor_id = clinic_doctors.id AND st.tenant_id = clinic_doctors.tenant_id AND st.role = 'doctor'
+    ) AS has_login,
+    COALESCE(${loginPick('is_active')}, false) AS login_active,
+    ${loginPick('email')} AS login_email
     FROM clinic_doctors WHERE tenant_id = $1 AND leave_days != 999 AND is_active = true`;
   const params = [];
   let paramCount = 2;

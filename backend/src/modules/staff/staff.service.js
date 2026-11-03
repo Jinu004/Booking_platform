@@ -41,21 +41,21 @@ async function inviteStaff(tenantId, staffData) {
  */
 async function getStaffWithStats(tenantId) {
   const staffArray = await StaffModel.getStaff(pool, tenantId)
-  // Get today's booking counts per doctor email
+  // Get today's booking counts per doctor (a staff member's count is the one of the doctor profile linked by staff.doctor_id)
   const bookingRes = await pool.query(`
-    SELECT d.email, COUNT(*) as count
+    SELECT b.doctor_id, COUNT(*) as count
     FROM bookings b
     JOIN clinic_doctors d ON d.id = b.doctor_id
     WHERE b.tenant_id = $1 AND b.booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
-    GROUP BY d.email
+    GROUP BY b.doctor_id
   `, [tenantId])
-  const countByEmail = {}
+  const countByDoctor = {}
   for (const row of bookingRes.rows) {
-    countByEmail[row.email] = parseInt(row.count) || 0
+    countByDoctor[row.doctor_id] = parseInt(row.count) || 0
   }
   return staffArray.map(({ password_hash, ...staff }) => ({
     ...staff,
-    bookings_count: countByEmail[staff.email] || 0
+    bookings_count: staff.doctor_id ? (countByDoctor[staff.doctor_id] || 0) : 0
   }))
 }
 
