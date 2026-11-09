@@ -1125,6 +1125,17 @@ Please reply with your name to confirm booking.`
       }
       return `${doctor.name} is fully booked for today. Would you like to book for tomorrow instead?\n\nReply *TOMORROW* to confirm tomorrow's booking or ignore to cancel.`
     }
+    // The duplicate check is repeated under the doctor-row lock: two simultaneous requests of the same patient cannot both pass the early check above
+    if (customer?.id) {
+      const lockedDuplicateRes = await bookingClient.query(
+        `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date AND LOWER(patient_name) = LOWER($3) AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
+        [customer.id, doctor.id, formattedName]
+      )
+      if (lockedDuplicateRes.rows.length > 0) {
+        await bookingClient.query('ROLLBACK')
+        return { success: false, message: `${formattedName} already has an active booking with ${doctor.name} today.` }
+      }
+    }
     const bookingRes = await bookingClient.query(
       `INSERT INTO bookings
          (tenant_id, customer_id, conversation_id, doctor_id,
@@ -1434,6 +1445,17 @@ For queries, contact us: ${contactPhone}`
           if (tomorrowIsFull(parseInt(lockedTomorrowRes.rows[0].count || 0))) {
             await tomorrowClient.query('ROLLBACK')
             return fullTomorrowMessage
+          }
+          // The duplicate check is repeated under the doctor-row lock: two simultaneous requests of the same patient cannot both pass the early check above
+          if (customer?.id) {
+            const lockedDuplicateTomorrowRes = await tomorrowClient.query(
+              `SELECT id FROM bookings WHERE customer_id = $1 AND doctor_id = $2 AND booking_date = $3 AND LOWER(patient_name) = LOWER($4) AND status NOT IN ('cancelled', 'completed') LIMIT 1`,
+              [customer.id, doctor.id, tomorrowDate, formattedName]
+            )
+            if (lockedDuplicateTomorrowRes.rows.length > 0) {
+              await tomorrowClient.query('ROLLBACK')
+              return { success: false, message: `${formattedName} already has a booking with ${doctor.name} tomorrow.` }
+            }
           }
           const bookingRes = await tomorrowClient.query(
             `INSERT INTO bookings
