@@ -4,11 +4,11 @@ const logger = require('../utils/logger')
 /**
  * General API rate limiter
  * Applies to all /api routes
- * 500 requests per 15 minutes per IP
+ * 3000 requests per 15 minutes per IP
  */
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 500,
+  max: 3000,
   message: {
     success: false,
     data: null,
@@ -24,12 +24,12 @@ const apiLimiter = rateLimit({
 
 /**
  * Webhook rate limiter
- * More generous — WhatsApp sends many webhooks
- * 1000 requests per 15 minutes per IP
+ * Loop guard only: just validly signed requests reach it
+ * 20000 requests per 15 minutes per IP
  */
 const webhookLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 20000,
   message: {
     success: false,
     data: null,
@@ -56,8 +56,27 @@ const authLimiter = rateLimit({
   legacyHeaders: false
 })
 
+/**
+ * Login limiter (own counter, separate from authLimiter)
+ * Only failed attempts (status 400 and above) count
+ * 20 failed attempts per 15 minutes per IP
+ */
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  skipSuccessfulRequests: true,
+  message: {
+    success: false,
+    data: null,
+    error: 'Too many login attempts. Please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+})
+
 module.exports = {
   apiLimiter,
   webhookLimiter,
-  authLimiter
+  authLimiter,
+  loginLimiter
 }
