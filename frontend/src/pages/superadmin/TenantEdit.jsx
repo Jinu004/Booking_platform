@@ -308,6 +308,8 @@ export default function TenantEdit() {
   const savingBookingModeRef = useRef(false);
   // "Guided AI answers" (tenant_configs ai_guided_kb): original = the value when the page loaded, value = the checkbox now
   const [guidedKb, setGuidedKb] = useState({ loaded: false, failed: false, original: false, value: false });
+  // "Enquiry only (booking off)" (tenant_configs booking_off): same shape as the guided-answers switch above
+  const [bookingOff, setBookingOff] = useState({ loaded: false, failed: false, original: false, value: false });
 
   // The backend has no list-free way to get everything this page needs (recall and template flags, admin email,
   // connection flags), so the tenants list is loaded and this tenant is picked from it by id.
@@ -348,14 +350,20 @@ export default function TenantEdit() {
   useEffect(() => {
     let cancelled = false;
     setGuidedKb({ loaded: false, failed: false, original: false, value: false });
+    setBookingOff({ loaded: false, failed: false, original: false, value: false });
     getTenantConfigs(id)
       .then(configs => {
         if (cancelled) return;
         const on = !!configs && configs.ai_guided_kb === 'true';
         setGuidedKb({ loaded: true, failed: false, original: on, value: on });
+        const off = !!configs && configs.booking_off === 'true';
+        setBookingOff({ loaded: true, failed: false, original: off, value: off });
       })
       .catch(() => {
-        if (!cancelled) setGuidedKb({ loaded: false, failed: true, original: false, value: false });
+        if (!cancelled) {
+          setGuidedKb({ loaded: false, failed: true, original: false, value: false });
+          setBookingOff({ loaded: false, failed: true, original: false, value: false });
+        }
       });
     return () => { cancelled = true; };
   }, [id]);
@@ -434,6 +442,17 @@ export default function TenantEdit() {
         } catch (guidedErr) {
           addToast('Clinic updated', 'success');
           addToast(`Guided AI answers was not saved: ${guidedErr?.error || guidedErr?.response?.data?.error || 'try again'}`, 'error');
+          return; // stay on the page so it can be tried again
+        }
+      }
+      // Enquiry only (booking off): same rule as above, only sent when changed, and its failure is reported on its own
+      if (bookingOff.loaded && bookingOff.value !== bookingOff.original) {
+        try {
+          await api.patch(`/superadmin/tenants/${tenant.id}/config`, { key: 'booking_off', value: String(bookingOff.value) });
+          setBookingOff(b => ({ ...b, original: b.value }));
+        } catch (bookingOffErr) {
+          addToast('Clinic updated', 'success');
+          addToast(`Enquiry only (booking off) was not saved: ${bookingOffErr?.error || bookingOffErr?.response?.data?.error || 'try again'}`, 'error');
           return; // stay on the page so it can be tried again
         }
       }
@@ -661,6 +680,23 @@ export default function TenantEdit() {
               </label>
             </div>
             {guidedKb.failed && <p className="mt-1 text-xs text-gray-400">Could not load this setting</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Enquiry only (booking off)</label>
+            <div className="flex items-center gap-3 mt-1">
+              <input
+                type="checkbox"
+                id="bookingOff"
+                checked={bookingOff.value}
+                disabled={!bookingOff.loaded}
+                onChange={e => setBookingOff(b => ({ ...b, value: e.target.checked }))}
+                className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+              />
+              <label htmlFor="bookingOff" className="text-sm text-gray-600">
+                The WhatsApp AI answers questions only and never books. Staff take over when a patient wants to book.
+              </label>
+            </div>
+            {bookingOff.failed && <p className="mt-1 text-xs text-gray-400">Could not load this setting</p>}
           </div>
         </div>
 
