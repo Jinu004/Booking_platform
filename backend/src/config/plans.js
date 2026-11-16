@@ -5,10 +5,14 @@ const PLAN_NAMES = ['starter', 'growth', 'pro']
 const DOCTOR_LIMITS = { starter: 1, growth: 5, pro: 10 }
 const POSTER_PLANS = ['growth', 'pro']
 const POSTERS_PLAN_MESSAGE = 'Offers and posters are available on the Growth and Pro plans.'
+const PATIENT_LIST_PLANS = ['growth', 'pro']
+const PATIENT_LIST_PLAN_MESSAGE = 'The patient list is available on the Growth and Pro plans.'
 
 const normalizePlan = (plan) => (PLAN_NAMES.includes(plan) ? plan : 'starter')
 const doctorLimitFor = (plan) => DOCTOR_LIMITS[normalizePlan(plan)]
 const postersAllowed = (plan) => POSTER_PLANS.includes(normalizePlan(plan))
+// The patient list, Add Patient, consent counts and the basic patient profile (no clinical records)
+const patientListAllowed = (plan) => PATIENT_LIST_PLANS.includes(normalizePlan(plan))
 
 // Route guard for everything that creates, schedules or reads posters and bulk campaigns (use after requireAuth).
 // A super admin is never refused here.
@@ -26,5 +30,8 @@ module.exports = {
   normalizePlan,
   doctorLimitFor,
   postersAllowed,
-  requirePostersPlan
+  requirePostersPlan,
+  PATIENT_LIST_PLANS,
+  PATIENT_LIST_PLAN_MESSAGE,
+  patientListAllowed
 }

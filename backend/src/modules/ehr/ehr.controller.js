@@ -4,6 +4,7 @@ const logger = require('../../utils/logger');
 const { validatePhoneInput } = require('../../utils/phone');
 const { logAction } = require('../../utils/audit');
 const { doctorLinkOk, patientAllowed } = require('../../utils/doctorScope');
+const { patientListAllowed, PATIENT_LIST_PLAN_MESSAGE } = require('../../config/plans');
 
 // HTML tag stripper — prevents stored XSS in free-text fields
 const stripHtml = (str) => str ? str.replace(/<[^>]*>/g, '').trim() : str;
@@ -26,7 +27,7 @@ const bookingInTenant = (bookingId, tenantId) => rowInTenant('bookings', booking
 
 // GET /ehr/patients -- list all patients with profile summary
 async function getPatients(req, res, next) {
-  if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
+  if (!patientListAllowed(req.tenant?.plan)) return errorResponse(res, PATIENT_LIST_PLAN_MESSAGE, 403);
   try {
     // A doctor with no doctor link is refused (the list below is limited to the doctor's own patients)
     if (!doctorLinkOk(req, res)) return;
@@ -95,7 +96,7 @@ async function getPatients(req, res, next) {
 // GET /ehr/patients/consent-summary -- how many patients have each marketing consent value.
 // Counts patient rows (the unit the patient list shows), with the same doctor restriction as the list.
 async function getConsentSummary(req, res, next) {
-  if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
+  if (!patientListAllowed(req.tenant?.plan)) return errorResponse(res, PATIENT_LIST_PLAN_MESSAGE, 403);
   try {
     if (!doctorLinkOk(req, res)) return;
     let query = `
@@ -138,8 +139,10 @@ async function getConsentSummary(req, res, next) {
   }
 }
 
-// The full patient profile (used by GET /ehr/patients/:patientId and returned by PATCH). Returns null when not found.
-async function loadPatientProfile(rawId, tenantId) {
+// The patient profile (used by GET /ehr/patients/:patientId and returned by PATCH). Returns null when not found.
+// Conditions and visit notes are clinical records: they are read and returned only when includeClinical is true (Pro plan).
+// Otherwise both are empty arrays (same keys) and their tables are not queried.
+async function loadPatientProfile(rawId, tenantId, includeClinical = false) {
     // Resolve real patient.id — accepts either patient.id or customer_id
     const patientRes = await pool.query(
       `SELECT * FROM patients WHERE (id = $1 OR customer_id = $1) AND tenant_id = $2 ORDER BY created_at ASC LIMIT 1`,
@@ -149,14 +152,18 @@ async function loadPatientProfile(rawId, tenantId) {
     const patientId = patientRes.rows[0].id;
     const customerIdForBookings = patientRes.rows[0].customer_id || rawId;
     const [conditionsRes, visitNotesRes, bookingsRes] = await Promise.all([
-      pool.query(`SELECT * FROM patient_conditions WHERE patient_id = $1 AND tenant_id = $2 ORDER BY created_at DESC`, [patientId, tenantId]),
-      pool.query(`
+      includeClinical
+        ? pool.query(`SELECT * FROM patient_conditions WHERE patient_id = $1 AND tenant_id = $2 ORDER BY created_at DESC`, [patientId, tenantId])
+        : Promise.resolve({ rows: [] }),
+      includeClinical
+        ? pool.query(`
         SELECT vn.*, d.name as doctor_name, d.specialization as doctor_specialization
         FROM visit_notes vn
         LEFT JOIN clinic_doctors d ON d.id = vn.doctor_id
         WHERE vn.patient_id = $1 AND vn.tenant_id = $2
         ORDER BY vn.visit_date DESC
-      `, [patientId, tenantId]),
+      `, [patientId, tenantId])
+        : Promise.resolve({ rows: [] }),
       pool.query(`
         SELECT b.*, d.name as doctor_name,
                (SELECT ds.start_time FROM doctor_schedules ds
@@ -199,14 +206,14 @@ async function loadPatientProfile(rawId, tenantId) {
     };
 }
 
-// GET /ehr/patients/:patientId -- full patient profile
+// GET /ehr/patients/:patientId -- patient profile (Growth and Pro; conditions and visit notes are returned for Pro only)
 async function getPatient(req, res, next) {
-  if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
+  if (!patientListAllowed(req.tenant?.plan)) return errorResponse(res, PATIENT_LIST_PLAN_MESSAGE, 403);
   try {
     const rawId = req.params.patientId || req.params.customerId;
     if (!isUUID(rawId)) return errorResponse(res, 'Invalid patient ID', 400);
     if (!(await patientAllowed(req, res, rawId))) return;
-    const profile = await loadPatientProfile(rawId, req.tenantId);
+    const profile = await loadPatientProfile(rawId, req.tenantId, isPro(req));
     if (!profile) return errorResponse(res, 'Patient not found', 404);
     return successResponse(res, profile);
   } catch (err) {
@@ -216,6 +223,9 @@ async function getPatient(req, res, next) {
 
 // POST /ehr/patients -- manually create a new patient record
 async function createPatient(req, res) {
+  if (!patientListAllowed(req.tenant?.plan)) {
+    return res.status(403).json({ success: false, data: null, error: PATIENT_LIST_PLAN_MESSAGE });
+  }
   const tenantId = req.tenantId;
   const { name, phone, age, gender, blood_group } = req.body;
 
@@ -281,7 +291,7 @@ async function createPatient(req, res) {
 
 // PUT /ehr/patients/:patientId/profile -- update patient demographics
 async function upsertProfile(req, res, next) {
-  if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
+  if (!patientListAllowed(req.tenant?.plan)) return errorResponse(res, PATIENT_LIST_PLAN_MESSAGE, 403);
   try {
     const patientId = req.params.patientId || req.params.customerId;
     if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
@@ -378,7 +388,7 @@ function validatePatientPatch(body) {
 // PATCH /ehr/patients/:patientId -- change demographics of one patient (only the fields that are sent).
 // The phone number belongs to the customer (a family can share it), so a phone change has extra rules.
 async function updatePatient(req, res, next) {
-  if (!isPro(req)) return errorResponse(res, 'EHR is a Pro plan feature', 403);
+  if (!patientListAllowed(req.tenant?.plan)) return errorResponse(res, PATIENT_LIST_PLAN_MESSAGE, 403);
   const patientId = req.params.patientId;
   if (!isUUID(patientId)) return errorResponse(res, 'Invalid patient ID', 400);
   const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -492,7 +502,7 @@ async function updatePatient(req, res, next) {
         ipAddress: req.ip
       });
     }
-    const profile = await loadPatientProfile(patientId, tenantId);
+    const profile = await loadPatientProfile(patientId, tenantId, isPro(req));
     return successResponse(res, profile);
   } catch (err) {
     return next(err);
