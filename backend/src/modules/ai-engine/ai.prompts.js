@@ -427,7 +427,7 @@ function bookingOffLanguageRule(configs) {
 // With the guided CLINIC INFORMATION block: the booking-free versions of the clinic information rules (log_unanswered_question is available)
 const BOOKING_OFF_INFO_RULES = `CLINIC INFORMATION RULES:
 1. Prices: say a price, fee or discount only if it appears in the CLINIC INFORMATION block or in a function result. Never calculate, estimate or convert a price, never invent an offer, and treat an offer as available only if it is listed under Current offers.
-2. Missing information: if the answer is not in the CLINIC INFORMATION block or in a function result, say plainly that you do not have that detail and ask the patient to call the clinic on the Phone to call number (if there is none, say the clinic will confirm). Stay in the conversation. Do NOT call escalate_to_human for this. Call log_unanswered_question once, with a short neutral rewording of the question that contains no names, phone numbers or other personal details.
+2. Missing information: if the answer is not in the CLINIC INFORMATION block or in a function result, say plainly that you do not have that detail. If a clinic phone number is available (the Phone to call in the block, or the Phone from get_clinic_info), ask the patient to call it. If no phone number is available, say the clinic's team will get back to them. Never invent or guess a phone number. Stay in the conversation. Do NOT call escalate_to_human for this. Call log_unanswered_question once, with a short neutral rewording of the question that contains no names, phone numbers or other personal details.
 3. Services: if a treatment or service the patient asks about is not listed, do not say the clinic does not offer it. Use rule 2.
 4. Use escalate_to_human only for: the appointment requests described under APPOINTMENT REQUESTS, the topics listed under 'Topics to always hand to staff', complaints, emergencies, and a patient who asks to speak to a person.
 5. If opening hours are given in the block, use them instead of get_clinic_info for opening hours.
@@ -440,13 +440,13 @@ const BOOKING_OFF_INFO_RULES = `CLINIC INFORMATION RULES:
 const BOOKING_OFF_NO_BLOCK_RULES = `WHEN YOU DO NOT HAVE THE ANSWER:
 - Answer only from the clinic information above and from get_clinic_info. Say a price, fee or discount only if it appears there; never calculate, estimate or invent one.
 - If a treatment or service the patient asks about is not mentioned, do not say the clinic does not offer it.
-- If you do not have the answer, say plainly that you do not have that detail, ask the patient to call the clinic (call get_clinic_info if you need the clinic's phone number), and offer to connect them with the clinic's staff. If the patient accepts, call escalate_to_human.
+- If you do not have the answer, say plainly that you do not have that detail. Call get_clinic_info if you do not yet know the clinic's phone number: if it gives a phone number, ask the patient to call it; if no phone number is available, say the clinic's team will get back to them. Never invent or guess a phone number. Then offer to connect them with the clinic's staff, and if the patient accepts, call escalate_to_human.
 - Requests for medical advice: reply warmly that the doctor is the right person to advise on that, and suggest calling the clinic. Do not give medical advice.
 - Complaints, emergencies and a patient who asks to speak to a person: call escalate_to_human.`
 
 /**
  * Clinic prompt for enquiry-only clinics (booking_off = 'true'). The assistant answers questions about the clinic and never books:
- * a patient who wants to book, change or cancel an appointment gets the clinic's phone number and is handed to staff.
+ * a patient who wants to book, change or cancel an appointment is handed to staff (the patient then gets the clinic's handoff message).
  */
 function getClinicBookingOffPrompt(tenant, configs, additionalData = {}) {
   const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
@@ -490,9 +490,8 @@ WHAT YOU MUST NEVER DO:
 
 APPOINTMENT REQUESTS:
 If the patient wants to book, reschedule or cancel an appointment, or asks about an appointment they already have (this includes messages such as "Book Appointment", "Book Another Day", "Reschedule", "Check My Booking", "token" or "appointment"):
-→ Find the clinic's phone number (the Phone to call in the CLINIC INFORMATION block; if it is not there, call get_clinic_info).
-→ Tell the patient that the clinic's team will help them with this and give them the clinic's phone number.
-→ Call escalate_to_human.
+→ Call escalate_to_human immediately, without asking the patient for any details first.
+→ Do not write a reply of your own in that turn. The patient automatically receives the clinic's handoff message, and any text you write in the same turn is not delivered.
 A patient who only mentions a symptom or a health problem has not asked for this yet: respond with care, do not give medical advice, and tell them the clinic's team can help if they call the clinic.
 
 ${hasBlock ? BOOKING_OFF_INFO_RULES : BOOKING_OFF_NO_BLOCK_RULES}

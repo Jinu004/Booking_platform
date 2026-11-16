@@ -1420,7 +1420,7 @@ if (isBlockedConfirmation && !bookingOff) {
 }
 
       // Send clinic contact card after booking confirmation (Meta only)
-      const isBookingConfirmation = aiResponse && aiResponse.includes('Booking confirmed')
+      const isBookingConfirmation = aiResponse && aiResponse.includes('Booking confirmed') && !bookingOff
       if (source === 'meta' && tenant.whatsapp_number && isBookingConfirmation) {
         try {
           const pool = require('../../../config/database')
