@@ -173,7 +173,7 @@ async function processMessage(context) {
           additionalData.doctorProfiles = JSON.parse(cachedProfiles)
         } else {
           const profilesResult = await pool.query(
-            `SELECT id, name, specialization, profile_description FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true AND profile_description IS NOT NULL AND profile_description != ''`,
+            `SELECT id, name, specialization, profile_description, leave_days FROM clinic_doctors WHERE tenant_id = $1 AND is_active = true AND profile_description IS NOT NULL AND profile_description != ''`,
             [tenant.id]
           )
           additionalData.doctorProfiles = profilesResult.rows
@@ -199,7 +199,7 @@ async function processMessage(context) {
         }
         if (!schedData) {
           const schedResult = await pool.query(
-            `SELECT d.name, d.specialization, ds.day_of_week, ds.start_time, ds.end_time, ds.is_available
+            `SELECT d.name, d.specialization, d.leave_days, ds.day_of_week, ds.start_time, ds.end_time, ds.is_available
              FROM clinic_doctors d
              LEFT JOIN doctor_schedules ds ON d.id = ds.doctor_id
              WHERE d.tenant_id = $1 AND d.is_active = true

@@ -17,7 +17,7 @@ function getFunctionDefinitions(industry, options = {}) {
       },
       {
         name: 'escalate_to_human',
-        description: "Hand the conversation to the clinic's staff. Call this when the patient wants to book, reschedule or cancel an appointment, asks about an existing appointment, asks to speak to a person, or when the instructions tell you to hand over.",
+        description: "Hand the conversation to the clinic's staff. Use it only when the patient asks to speak to a person, makes a complaint, or describes an emergency. Do not use it for ordinary appointment requests: answer those in text.",
         parameters: {
           type: 'OBJECT',
           properties: { reason: { type: 'STRING', description: 'Reason for escalation' } },
