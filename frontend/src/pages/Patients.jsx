@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getStoredStaff } from '../services/auth.service';
 import useStore from '../store/useStore';
@@ -96,8 +96,10 @@ export default function Patients() {
 
   const [patients, setPatients] = useState([]);
   const [total, setTotal] = useState(0);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(''); // what is typed in the box
+  const [appliedSearch, setAppliedSearch] = useState(''); // what the list was last asked for (the typed text after the 500 ms pause)
   const [loading, setLoading] = useState(true);
+  const requestIdRef = useRef(0); // only the latest list request may set state
   const [activeFilter, setActiveFilter] = useState('all');
   const [consentFilter, setConsentFilter] = useState(''); // '', all, checkups, none, not_asked
   const [consentSummary, setConsentSummary] = useState(null);
@@ -110,13 +112,27 @@ export default function Patients() {
   const [addPatientForm, setAddPatientForm] = useState({ name: '', age: '', gender: '', blood_group: '', marketing_consent: '' });
   const [addPatientSaving, setAddPatientSaving] = useState(false);
 
+  // Typing: the box updates at once; after a 500 ms pause the search is applied and the list goes back to page 1 (one change, one fetch)
+  useEffect(() => {
+    if (!isPro || search === appliedSearch) return undefined;
+    const timer = setTimeout(() => {
+      setAppliedSearch(search);
+      setCurrentPage(1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search, appliedSearch]);
+
+  // The list is fetched at once when the applied search, the tab, the consent chip or the page changes (and on the first load)
   useEffect(() => {
     if (!isPro) return;
-    const timer = setTimeout(fetchPatients, 500);
-    return () => clearTimeout(timer);
-  }, [search, consentFilter]);
+    fetchPatients();
+  }, [appliedSearch, activeFilter, consentFilter, currentPage]);
 
-  useEffect(() => { setCurrentPage(1); }, [search, activeFilter, consentFilter]);
+  // The clinic-wide counts are loaded once (and again after Add Patient), not on every page, search or filter change
+  useEffect(() => {
+    if (!isPro) return;
+    fetchConsentSummary();
+  }, []);
 
   // Counts for the whole clinic; if the call fails the chips are simply hidden
   const fetchConsentSummary = async () => {
@@ -128,18 +144,41 @@ export default function Patients() {
     }
   };
 
+  // One page of the list. Search, consent chip, New/Returning tab and the page all go to the server.
   const fetchPatients = async () => {
+    const myRequest = ++requestIdRef.current;
+    let pageCorrected = false;
     try {
       setLoading(true);
-      const res = await api.get('/ehr/patients', { params: { search, ...(consentFilter ? { consent: consentFilter } : {}) } });
-      setPatients(res?.data?.customers || []);
-      setTotal(res?.data?.total || 0);
+      const res = await api.get('/ehr/patients', {
+        params: {
+          search: appliedSearch,
+          ...(consentFilter ? { consent: consentFilter } : {}),
+          ...(activeFilter === 'new' || activeFilter === 'returning' ? { status: activeFilter } : {}),
+          page: currentPage,
+          limit: ITEMS_PER_PAGE
+        }
+      });
+      if (myRequest !== requestIdRef.current) return; // an older answer: ignored
+      const rows = res?.data?.customers || [];
+      const serverTotal = res?.data?.total || 0;
+      // An empty page beyond the last one (for example after the last row of the last page went away): go to the real last page
+      if (rows.length === 0 && currentPage > 1) {
+        const lastPage = Math.max(1, Math.ceil(serverTotal / ITEMS_PER_PAGE));
+        if (lastPage < currentPage) {
+          pageCorrected = true; // the page change fetches again; the loading state stays on until then
+          setCurrentPage(lastPage);
+          return;
+        }
+      }
+      setPatients(rows);
+      setTotal(serverTotal);
     } catch {
+      if (myRequest !== requestIdRef.current) return;
       addToast('Failed to load patients', 'error');
     } finally {
-      setLoading(false);
+      if (myRequest === requestIdRef.current && !pageCorrected) setLoading(false);
     }
-    fetchConsentSummary();
   };
 
   const handleSearchPhone = async () => {
@@ -147,7 +186,7 @@ export default function Patients() {
     setAddPatientSearching(true);
     try {
       // The value is encoded: a leading "+" would otherwise be read as a space and the existing patient would be missed
-      const res = await api.get('/ehr/patients', { params: { search: addPatientPhone.trim() } });
+      const res = await api.get('/ehr/patients', { params: { search: addPatientPhone.trim(), page: 1, limit: 20 } });
       setAddPatientSearch(res.data?.customers || []);
     } catch (err) {
       setAddPatientSearch([]);
@@ -175,6 +214,7 @@ export default function Patients() {
       setAddPatientSearch(null);
       setAddPatientForm({ name: '', age: '', gender: '', blood_group: '', marketing_consent: '' });
       fetchPatients();
+      fetchConsentSummary();
     } catch (err) {
       addToast(getErrorMessage(err, 'Failed to add patient'), 'error');
     } finally {
@@ -210,19 +250,11 @@ export default function Patients() {
     );
   }
 
-  const newCount = patients.filter(p => (parseInt(p.total_visits || 0)) === 0).length;
-  const returningCount = patients.filter(p => (parseInt(p.total_visits || 0)) > 0).length;
+  // Clinic-wide New / Returning counts come from the consent summary; without them the two numbers are hidden
+  const hasVisitCounts = typeof consentSummary?.new === 'number' && typeof consentSummary?.returning === 'number';
 
-  const filtered =
-    activeFilter === 'new' ? patients.filter(p => (parseInt(p.total_visits || 0)) === 0)
-    : activeFilter === 'returning' ? patients.filter(p => (parseInt(p.total_visits || 0)) > 0)
-    : patients;
-
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paginatedPatients = filtered.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  // The rows are one page from the server; total is the number of patients matching all filters
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
 
   return (
     <div className="p-4 md:p-8 space-y-6">
@@ -232,10 +264,14 @@ export default function Patients() {
           <h1 className="text-2xl md:text-[28px] font-semibold tracking-[-0.035em] text-ink">Patients</h1>
           <div className="flex items-center gap-3 mt-1">
             <span className="text-sm text-ink/55">{total} total</span>
-            <span className="w-1 h-1 bg-ink/[0.12] rounded-full" />
-            <span className="text-sm text-green-600 font-medium">{newCount} new</span>
-            <span className="w-1 h-1 bg-ink/[0.12] rounded-full" />
-            <span className="text-sm text-blue-600 font-medium">{returningCount} returning</span>
+            {hasVisitCounts && (
+              <>
+                <span className="w-1 h-1 bg-ink/[0.12] rounded-full" />
+                <span className="text-sm text-green-600 font-medium">{consentSummary.new} new</span>
+                <span className="w-1 h-1 bg-ink/[0.12] rounded-full" />
+                <span className="text-sm text-blue-600 font-medium">{consentSummary.returning} returning</span>
+              </>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
@@ -267,7 +303,7 @@ export default function Patients() {
         ].map(tab => (
           <button
             key={tab.key}
-            onClick={() => setActiveFilter(tab.key)}
+            onClick={() => { setActiveFilter(tab.key); setCurrentPage(1); }}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
               activeFilter === tab.key
                 ? 'border-accent text-accent'
@@ -288,7 +324,7 @@ export default function Patients() {
               return (
                 <button
                   key={chip.label}
-                  onClick={() => setConsentFilter(active && chip.key !== '' ? '' : chip.key)}
+                  onClick={() => { setConsentFilter(active && chip.key !== '' ? '' : chip.key); setCurrentPage(1); }}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                     active
                       ? 'border-accent bg-accent text-white'
@@ -310,7 +346,7 @@ export default function Patients() {
       <div className="bg-white rounded-2xl border border-ink/[0.08] shadow-card overflow-x-auto hidden md:block">
         {loading ? (
           <TableRowSkeleton rows={6} />
-        ) : filtered.length === 0 ? (
+        ) : patients.length === 0 ? (
           <div className="p-16 text-center text-ink/40 text-sm">{consentFilter ? 'No patients match this filter.' : 'No patients found'}</div>
         ) : (
           <table className="min-w-full divide-y divide-ink/[0.06]">
@@ -326,7 +362,7 @@ export default function Patients() {
               </tr>
             </thead>
             <tbody className="divide-y divide-ink/[0.06]">
-              {paginatedPatients.map(p => {
+              {patients.map(p => {
                 const isNew = (parseInt(p.total_visits || 0)) === 0;
                 const bloodGroup = p.blood_group;
                 return (
@@ -379,10 +415,12 @@ export default function Patients() {
 
       {/* Mobile patient list */}
       <div className="block md:hidden bg-white rounded-2xl border border-ink/[0.08] shadow-card overflow-hidden divide-y divide-ink/[0.06]">
-        {!loading && filtered.length === 0 ? (
+        {loading ? (
+          <div className="px-4 py-8 text-center text-sm text-ink/40">Loading...</div>
+        ) : patients.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-ink/40">{consentFilter ? 'No patients match this filter.' : 'No patients found.'}</div>
         ) : (
-          paginatedPatients.map(p => {
+          patients.map(p => {
             const isNew = parseInt(p.total_visits || 0) === 0;
             return (
               <div
@@ -420,15 +458,15 @@ export default function Patients() {
       </div>
 
       {/* Pagination */}
-      {!loading && filtered.length > 0 && (
+      {!loading && patients.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
           <p className="text-sm text-ink/55">
             Showing{' '}
             <span className="font-medium text-ink/80">
-              {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)}
+              {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, total)}
             </span>{' '}
             of{' '}
-            <span className="font-medium text-ink/80">{filtered.length}</span>{' '}
+            <span className="font-medium text-ink/80">{total}</span>{' '}
             patients
           </p>
           <div className="flex items-center gap-2">
