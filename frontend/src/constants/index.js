@@ -33,6 +33,7 @@ export const PLANS = {
       'Everything in Starter',
       "The AI answers patients' questions about your clinic: timings, treatments, fees, offers and location",
       'Send offers and festival greetings to your patients on WhatsApp',
+      'A patient list where your staff can add and find patients and see who agreed to offers',
       'Up to 5 doctors',
     ],
   },

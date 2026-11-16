@@ -98,9 +98,30 @@ function LockScreen() {
             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
       </div>
-      <h2 className="text-xl font-bold text-gray-900 mb-2">EHR is a Pro Feature</h2>
+      <h2 className="text-xl font-bold text-gray-900 mb-2">Patients</h2>
       <p className="text-gray-500 text-sm max-w-sm">
-        EHR is available on the Pro plan. Contact{' '}
+        The patient list is available on the Growth and Pro plans. Contact{' '}
+        <a href="mailto:support@receptionai.in" className="text-indigo-600 hover:underline">
+          support@receptionai.in
+        </a>{' '}
+        to upgrade.
+      </p>
+    </div>
+  );
+}
+
+// Shown instead of the medical history and the visit notes on the Growth plan (these records are Pro only)
+function RecordsLockCard() {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-12 max-md:p-6 text-center">
+      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      </div>
+      <p className="text-gray-500 text-sm max-w-sm mx-auto">
+        Patient records are available on the Pro plan. Contact{' '}
         <a href="mailto:support@receptionai.in" className="text-indigo-600 hover:underline">
           support@receptionai.in
         </a>{' '}
@@ -307,7 +328,9 @@ export default function PatientProfile() {
       .catch(() => setAvailableSlots([]))
       .finally(() => setSlotsLoading(false));
   }, [selectedProcedure, procedureDate]);
-  const isPro = staff?.tenantPlan === 'pro';
+  // The patient page (details, bookings) is for Growth and Pro; medical records (conditions, visit notes, prescriptions) are Pro only
+  const canSeePatients = ['growth', 'pro'].includes(String(staff?.tenantPlan || '').toLowerCase());
+  const isPro = String(staff?.tenantPlan || '').toLowerCase() === 'pro';
 
   // Data state
   const [loading, setLoading] = useState(true);
@@ -351,7 +374,7 @@ export default function PatientProfile() {
   const [savingNote, setSavingNote] = useState(false);
 
   useEffect(() => {
-    if (!isPro) return;
+    if (!canSeePatients) return;
     loadData();
   }, [customerId]);
 
@@ -676,9 +699,9 @@ export default function PatientProfile() {
     }
   };
 
-  // ── Pro gate ───────────────────────────────────────────────────────────────
+  // ── Plan gate (Growth and Pro) ─────────────────────────────────────────────
 
-  if (!isPro) return <LockScreen />;
+  if (!canSeePatients) return <LockScreen />;
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
@@ -712,7 +735,9 @@ export default function PatientProfile() {
   const completedBookings = bookings?.filter(b => b.status === 'completed') || [];
   const totalVisits = completedBookings.length;
   const isNew = totalVisits === 0;
-  const lastVisitDate = lastNote?.visit_date || completedBookings[0]?.booking_date;
+  // Last visit: the latest visit note, else the latest completed booking; a missing or unreadable date gives a dash
+  const isUsableDate = (d) => !!d && !Number.isNaN(new Date(d).getTime());
+  const lastVisitDate = [lastNote?.visit_date, completedBookings[0]?.booking_date].find(isUsableDate) || null;
 
   const now = new Date();
   const nextAppt = [...bookings]
@@ -884,7 +909,7 @@ export default function PatientProfile() {
           {TABS.map(t => (
             <button
               key={t.key}
-              onClick={() => { setActiveTab(t.key); if (t.key === 'notes') loadDoctors(); }}
+              onClick={() => { setActiveTab(t.key); if (t.key === 'notes' && isPro) loadDoctors(); }}
               className={`pb-3 px-1 border-b-2 text-sm font-semibold whitespace-nowrap transition-colors ${
                 activeTab === t.key
                   ? 'border-indigo-600 text-indigo-700'
@@ -1071,7 +1096,8 @@ export default function PatientProfile() {
       )}
 
       {/* ── MEDICAL HISTORY ── */}
-      {activeTab === 'medical' && (
+      {activeTab === 'medical' && !isPro && <RecordsLockCard />}
+      {activeTab === 'medical' && isPro && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-8">
           <ConditionSection
             title="Chronic Conditions"
@@ -1111,7 +1137,8 @@ export default function PatientProfile() {
       )}
 
       {/* ── VISIT NOTES ── */}
-      {activeTab === 'notes' && (
+      {activeTab === 'notes' && !isPro && <RecordsLockCard />}
+      {activeTab === 'notes' && isPro && (
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-900">

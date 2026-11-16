@@ -92,7 +92,9 @@ export default function Patients() {
   const navigate = useNavigate();
   const { addToast } = useStore();
   const staff = getStoredStaff();
-  const isPro = staff?.tenantPlan === 'pro';
+  // The patient list is for the Growth and Pro plans; Add Patient is for admin, manager and receptionist only
+  const canSeePatients = ['growth', 'pro'].includes(String(staff?.tenantPlan || '').toLowerCase());
+  const canAddPatients = ['admin', 'manager', 'receptionist'].includes(staff?.role);
 
   const [patients, setPatients] = useState([]);
   const [total, setTotal] = useState(0);
@@ -114,7 +116,7 @@ export default function Patients() {
 
   // Typing: the box updates at once; after a 500 ms pause the search is applied and the list goes back to page 1 (one change, one fetch)
   useEffect(() => {
-    if (!isPro || search === appliedSearch) return undefined;
+    if (!canSeePatients || search === appliedSearch) return undefined;
     const timer = setTimeout(() => {
       setAppliedSearch(search);
       setCurrentPage(1);
@@ -124,13 +126,13 @@ export default function Patients() {
 
   // The list is fetched at once when the applied search, the tab, the consent chip or the page changes (and on the first load)
   useEffect(() => {
-    if (!isPro) return;
+    if (!canSeePatients) return;
     fetchPatients();
   }, [appliedSearch, activeFilter, consentFilter, currentPage]);
 
   // The clinic-wide counts are loaded once (and again after Add Patient), not on every page, search or filter change
   useEffect(() => {
-    if (!isPro) return;
+    if (!canSeePatients) return;
     fetchConsentSummary();
   }, []);
 
@@ -229,7 +231,7 @@ export default function Patients() {
     setAddPatientForm({ name: '', age: '', gender: '', blood_group: '', marketing_consent: '' });
   };
 
-  if (!isPro) {
+  if (!canSeePatients) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
         <div className="w-16 h-16 bg-ink/[0.05] rounded-full flex items-center justify-center mb-4">
@@ -238,9 +240,9 @@ export default function Patients() {
               d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
         </div>
-        <h2 className="text-xl font-semibold tracking-[-0.03em] text-ink mb-2">EHR is a Pro Feature</h2>
+        <h2 className="text-xl font-semibold tracking-[-0.03em] text-ink mb-2">Patients</h2>
         <p className="text-ink/55 text-sm max-w-sm">
-          EHR is available on the Pro plan. Contact{' '}
+          The patient list is available on the Growth and Pro plans. Contact{' '}
           <a href="mailto:support@receptionai.in" className="text-ink font-medium underline underline-offset-2 hover:text-ink/70">
             support@receptionai.in
           </a>{' '}
@@ -275,15 +277,17 @@ export default function Patients() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          <button
-            onClick={() => setShowAddPatient(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-hover transition-colors whitespace-nowrap"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Patient
-          </button>
+          {canAddPatients && (
+            <button
+              onClick={() => setShowAddPatient(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-hover transition-colors whitespace-nowrap"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Patient
+            </button>
+          )}
           <input
             type="text"
             placeholder="Search name or phone..."
