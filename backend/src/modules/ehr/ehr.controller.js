@@ -30,42 +30,63 @@ async function getPatients(req, res, next) {
   try {
     // A doctor with no doctor link is refused (the list below is limited to the doctor's own patients)
     if (!doctorLinkOk(req, res)) return;
-    const { search, consent } = req.query;
+    const { search, consent, status } = req.query;
     // Consent belongs to the phone number (customers), so patients who share a phone share the value
-    let query = `
+    const selectSql = `
       SELECT p.id, p.name, p.phone, p.age, p.gender, p.blood_group, p.created_at,
              MAX(b.booking_date) as last_visit,
-             COUNT(DISTINCT b.id) as total_visits,
-             cu.marketing_consent, cu.consent_source, cu.consent_at
+             COUNT(DISTINCT b.id)::int as total_visits,
+             cu.marketing_consent, cu.consent_source, cu.consent_at`;
+    // The FROM and WHERE part is shared by the list query and the count query, so both use the same filters and the same params
+    let fromWhere = `
       FROM patients p
       LEFT JOIN customers cu ON cu.id = p.customer_id AND cu.tenant_id = p.tenant_id
       LEFT JOIN bookings b ON b.patient_id = p.id AND b.tenant_id = p.tenant_id AND b.status = 'completed'
       WHERE p.tenant_id = $1
     `;
     const params = [req.tenantId];
-    if (search) {
-      query += ` AND (p.name ILIKE $2 OR p.phone ILIKE $2)`;
-      params.push(`%${search}%`);
+    // Search by name or phone, contains match. \, % and _ typed by the user are escaped so they match literally.
+    if (typeof search === 'string' && search) {
+      params.push(`%${search.replace(/[\\%_]/g, '\\$&')}%`);
+      fromWhere += ` AND (p.name ILIKE $${params.length} ESCAPE '\\' OR p.phone ILIKE $${params.length} ESCAPE '\\')`;
     }
     // Optional consent filter (an invalid value is ignored): all, checkups, none, or not_asked (never asked)
     if (consent === 'not_asked') {
-      query += ` AND cu.marketing_consent IS NULL`;
+      fromWhere += ` AND cu.marketing_consent IS NULL`;
     } else if (['all', 'checkups', 'none'].includes(consent)) {
       params.push(consent);
-      query += ` AND cu.marketing_consent = $${params.length}`;
+      fromWhere += ` AND cu.marketing_consent = $${params.length}`;
     }
     // Doctors only see patients who have had a booking with them
     if (req.staff.role === 'doctor' && req.staff.doctor_id) {
-      const nextParam = params.length + 1;
-      query += ` AND p.id IN (
-        SELECT DISTINCT patient_id FROM bookings
-        WHERE tenant_id = $1 AND doctor_id = $${nextParam} AND patient_id IS NOT NULL
-      )`;
       params.push(req.staff.doctor_id);
+      fromWhere += ` AND p.id IN (
+        SELECT DISTINCT patient_id FROM bookings
+        WHERE tenant_id = $1 AND doctor_id = $${params.length} AND patient_id IS NOT NULL
+      )`;
     }
-    query += ` GROUP BY p.id, cu.id ORDER BY last_visit DESC NULLS LAST, p.created_at DESC`;
-    const result = await pool.query(query, params);
-    return successResponse(res, { customers: result.rows, total: result.rows.length });
+    // Optional New / Returning filter (any other value means no filter): by the number of completed bookings
+    let groupHaving = ` GROUP BY p.id, cu.id`;
+    if (status === 'new') groupHaving += ` HAVING COUNT(DISTINCT b.id) = 0`;
+    else if (status === 'returning') groupHaving += ` HAVING COUNT(DISTINCT b.id) > 0`;
+    const orderSql = ` ORDER BY last_visit DESC NULLS LAST, p.created_at DESC, p.id DESC`;
+
+    // Paging only when the request sends page or limit; otherwise every row is returned, as before
+    if (req.query.page === undefined && req.query.limit === undefined) {
+      const result = await pool.query(selectSql + fromWhere + groupHaving + orderSql, params);
+      return successResponse(res, { customers: result.rows, total: result.rows.length });
+    }
+    const pageNum = /^\d+$/.test(String(req.query.page)) ? parseInt(req.query.page, 10) : 1;
+    const limitNum = /^\d+$/.test(String(req.query.limit)) ? parseInt(req.query.limit, 10) : 10;
+    const page = pageNum >= 1 ? pageNum : 1;
+    const limit = limitNum >= 1 ? Math.min(limitNum, 100) : 10;
+    const countResult = await pool.query(`SELECT COUNT(*)::int AS n FROM (SELECT p.id ${fromWhere}${groupHaving}) t`, params);
+    const pageParams = [...params, limit, (page - 1) * limit];
+    const result = await pool.query(
+      selectSql + fromWhere + groupHaving + orderSql + ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      pageParams
+    );
+    return successResponse(res, { customers: result.rows, total: countResult.rows[0].n, page, limit });
   } catch (err) {
     next(err);
   }
@@ -83,9 +104,15 @@ async function getConsentSummary(req, res, next) {
         COUNT(*) FILTER (WHERE cu.marketing_consent = 'checkups')::int AS checkups_count,
         COUNT(*) FILTER (WHERE cu.marketing_consent = 'none')::int AS none_count,
         COUNT(*) FILTER (WHERE cu.marketing_consent IS NULL)::int AS not_asked_count,
+        COUNT(*) FILTER (WHERE v.patient_id IS NULL)::int AS new_count,
+        COUNT(*) FILTER (WHERE v.patient_id IS NOT NULL)::int AS returning_count,
         COUNT(*)::int AS total_count
       FROM patients p
       LEFT JOIN customers cu ON cu.id = p.customer_id AND cu.tenant_id = p.tenant_id
+      LEFT JOIN (
+        SELECT DISTINCT patient_id FROM bookings
+        WHERE tenant_id = $1 AND status = 'completed' AND patient_id IS NOT NULL
+      ) v ON v.patient_id = p.id
       WHERE p.tenant_id = $1
     `;
     const params = [req.tenantId];
@@ -102,6 +129,8 @@ async function getConsentSummary(req, res, next) {
       checkups: row.checkups_count,
       none: row.none_count,
       not_asked: row.not_asked_count,
+      new: row.new_count,
+      returning: row.returning_count,
       total: row.total_count
     });
   } catch (err) {
