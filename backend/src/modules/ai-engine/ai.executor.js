@@ -25,6 +25,19 @@ function escapeLike(str) {
   return str.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
+// Enquiry-only clinics (tenant_configs booking_off = 'true', see utils/appointmentFlag.js): every booking, availability and booking-menu
+// function below refuses at its first line, before any database or Redis write and before anything is sent to the patient.
+// The configs come from the same cached helper start_appointment_booking uses. A failed read counts as off (booking works as before).
+async function isBookingOffForTenant(tenant) {
+  try {
+    const { isBookingOff } = require('../../utils/appointmentFlag')
+    return isBookingOff(await require('../tenant/tenant.service').getAllConfigs(tenant.id))
+  } catch {
+    return false
+  }
+}
+const bookingOffResult = () => ({ success: false, message: 'Booking is not available for this clinic on WhatsApp. Please call the clinic and the team will help you.' })
+
 // Records the pending "Who is this booking for?" step. Never throws.
 async function recordPatientChoiceFlow(ctx, { kind, doctorId, doctorName, date, sessionStart }) {
   try {
@@ -214,6 +227,7 @@ async function executeFunction(name, args, ctx) {
     switch (name) {
 
       case 'start_appointment_booking': {
+        if (await isBookingOffForTenant(tenant)) return bookingOffResult()
         // Only offered to clinics with booking_mode 'appointment' AND ai_appointment_booking (see ai.functions.js); checked again here
         const TenantServiceApt = require('../tenant/tenant.service')
         const { isAppointmentBookingOn } = require('../../utils/appointmentFlag')
@@ -238,6 +252,7 @@ async function executeFunction(name, args, ctx) {
       }
 
       case 'show_welcome': {
+      if (await isBookingOffForTenant(tenant)) return bookingOffResult()
       // Only for clinic industry
       if (tenant.industry !== 'clinic') break
 
@@ -321,6 +336,7 @@ async function executeFunction(name, args, ctx) {
     }
 
     case 'get_available_doctors': {
+        if (await isBookingOffForTenant(tenant)) return bookingOffResult()
         const todayDowAD = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay()
         const doctorsResult = await pool.query(
           `SELECT cd.id, cd.name, cd.specialization, cd.max_tokens_daily,
@@ -392,6 +408,7 @@ async function executeFunction(name, args, ctx) {
       }
 
       case 'show_all_doctors': {
+      if (await isBookingOffForTenant(tenant)) return bookingOffResult()
       const { sendDoctorList } = require('../channel/whatsapp/whatsapp.adapter')
       const nowISTAD = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
       const todayDowAD2 = nowISTAD.getDay()
@@ -461,6 +478,7 @@ async function executeFunction(name, args, ctx) {
     }
 
       case 'get_available_doctors_tomorrow': {
+        if (await isBookingOffForTenant(tenant)) return bookingOffResult()
         // Compute tomorrow in IST to avoid UTC date boundary issues
         const nowIST_td = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
         const tomorrowDt = new Date(nowIST_td)
@@ -518,6 +536,7 @@ async function executeFunction(name, args, ctx) {
       }
 
       case 'get_doctor_schedule': {
+      if (await isBookingOffForTenant(tenant)) return bookingOffResult()
       const { sendButtons } = require('../channel/whatsapp/whatsapp.adapter')
       const doctorNameGDS = (args.doctor_name || '').trim()
       const nowISTGDS = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
@@ -714,6 +733,7 @@ async function executeFunction(name, args, ctx) {
     }
 
       case 'check_doctor_availability': {
+        if (await isBookingOffForTenant(tenant)) return bookingOffResult()
         const { doctor_name } = args
         const result = await pool.query(
           `SELECT cd.id, cd.name, cd.specialization,
@@ -937,6 +957,7 @@ Please reply with your name to confirm booking.`
       }
 
       case 'create_token_booking': {
+  if (await isBookingOffForTenant(tenant)) return bookingOffResult()
   const { doctor_name, patient_name: patientNameArgCTB, session_start_time, patient_id: patientIdArgCTB, doctor_id: doctorIdArgCTB } = args
   // Internal-only patient_id: use the stored name of a patient owned by this customer
   let patient_name = patientNameArgCTB
@@ -1295,6 +1316,7 @@ For queries, contact us: ${contactPhone}`
 }
 
       case 'create_tomorrow_booking': {
+        if (await isBookingOffForTenant(tenant)) return bookingOffResult()
         const { doctor_name, patient_name: patientNameArgTMR, patient_id: patientIdArgTMR, doctor_id: doctorIdArgTMR } = args
         // Internal-only patient_id: use the stored name of a patient owned by this customer
         let patient_name = patientNameArgTMR
@@ -1509,6 +1531,7 @@ For queries, contact us: ${contactPhoneTmr}`
       }
 
       case 'get_patient_profiles': {
+      if (await isBookingOffForTenant(tenant)) return bookingOffResult()
       const { sendDoctorList } = require('../channel/whatsapp/whatsapp.adapter')
       const customerPhone = ctx.customer?.phone
       const customerId = ctx.customer?.id
@@ -1590,6 +1613,7 @@ For queries, contact us: ${contactPhoneTmr}`
     }
 
     case 'create_future_booking': {
+      if (await isBookingOffForTenant(tenant)) return bookingOffResult()
       const { doctor_name: doctorNameFB, patient_name: patientNameArgFB, booking_date: bookingDateFB, session_start_time: sessionStartFB, patient_id: patientIdArgFB, doctor_id: doctorIdArgFB } = args
       // Internal-only patient_id: use the stored name of a patient owned by this customer
       let patientNameFB = patientNameArgFB

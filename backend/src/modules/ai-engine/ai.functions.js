@@ -6,6 +6,27 @@
  * @returns {Array} Gemini function declarations
  */
 function getFunctionDefinitions(industry, options = {}) {
+  // Enquiry-only clinics (tenant_configs booking_off = 'true'): no booking, availability, token or booking-status tools at all.
+  // Checked first, so it wins over both booking modes. log_unanswered_question is still added by ai.service.js when the guided block exists.
+  if (options.bookingOff && industry !== 'enquiry') {
+    return [
+      {
+        name: 'get_clinic_info',
+        description: "Get the clinic's own contact details and hours: opening hours by day, phone number and address. Call this when the patient asks for the clinic's phone number, contact details, address, location or timings, or when you need the clinic's phone number to give to the patient, unless that information is already in the CLINIC INFORMATION block.",
+        parameters: { type: 'OBJECT', properties: {}, required: [] }
+      },
+      {
+        name: 'escalate_to_human',
+        description: "Hand the conversation to the clinic's staff. Call this when the patient wants to book, reschedule or cancel an appointment, asks about an existing appointment, asks to speak to a person, or when the instructions tell you to hand over.",
+        parameters: {
+          type: 'OBJECT',
+          properties: { reason: { type: 'STRING', description: 'Reason for escalation' } },
+          required: ['reason']
+        }
+      }
+    ]
+  }
+
   // Clinics with booking_mode 'appointment' AND ai_appointment_booking: booking by clock time. No token booking or token availability tools.
   if (options.appointmentBooking && industry !== 'enquiry') {
     return [

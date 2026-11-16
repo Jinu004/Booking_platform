@@ -12,6 +12,7 @@ const { checkWebhookSignature, sizeBucket } = require('./webhookSignature');
 // Typed-name validation for the code booking flow (utils/patientName.js, shared with the appointment flow and the AI booking tools).
 // Its cleaning is the same rule create_token_booking applies to patient_name, so the validated name is what gets stored.
 const { validatePatientName, isConfidentName } = require('../../../utils/patientName')
+const { isBookingOff } = require('../../../utils/appointmentFlag')
 
 // Coexistence: how long a conversation stays in human mode after the clinic replies from the WhatsApp Business app.
 // hitl.cron.js resets a human conversation one minute after mode_changed_at, so an echo stores mode_changed_at in the
@@ -391,7 +392,18 @@ router.post('/', async (req, res) => {
 
       // Appointment booking by clock time: only clinics with booking_mode 'appointment' AND ai_appointment_booking (appointment.flow.js).
       // It sits after the tenant-active and human-mode checks above, so neither can reach it; every other clinic falls straight through.
-      if (await require('./appointment.flow').handleIncoming({ tenant, context, message, source })) return
+      // Enquiry-only mode (tenant_configs booking_off = 'true', see utils/appointmentFlag.js): read once per message from the cached
+      // configs. When it is on, every booking shortcut below is skipped and the message goes to the AI, which has no booking tools.
+      // A failed read counts as off, so the clinic behaves as it always did.
+      let bookingOff = false
+      try {
+        bookingOff = isBookingOff(await TenantService.getAllConfigs(tenant.id))
+      } catch (bookingOffErr) {
+        logger.warn(`BOOKING_OFF_CONFIG_READ_FAILED tenant=${tenant.id} class=${String((bookingOffErr && (bookingOffErr.name || bookingOffErr.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)}`)
+        bookingOff = false
+      }
+
+      if (!bookingOff && await require('./appointment.flow').handleIncoming({ tenant, context, message, source })) return
 
       // ---- Code flow: typed new-patient name helpers (used by the text branch and the two button handlers) ----
       const logName = (result, extra = '', confidence = null) => logger.info(`CODE_BOOKING_FLOW step=new_name${confidence ? ` confidence=${confidence}` : ''} result=${result}${extra} tenant=${tenant.id} conversation=${context.conversation.id}`)
@@ -572,7 +584,7 @@ router.post('/', async (req, res) => {
       const isBookAppointment = message.message?.trim() === 'Book Appointment'
       const isGreeting = greetings.includes(message.message?.toLowerCase().trim()) || isBookAppointment
 
-      if (isGreeting) {
+      if (isGreeting && !bookingOff) {
         if (await isCodeFlowOn()) await CodeFlow.clearFlow(tenant.id, message.from)
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
@@ -596,7 +608,7 @@ router.post('/', async (req, res) => {
         return
       }
 
-      if (message.message === 'Book Another Day') {
+      if (message.message === 'Book Another Day' && !bookingOff) {
         if (await isCodeFlowOn()) await CodeFlow.clearFlow(tenant.id, message.from)
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
@@ -620,7 +632,7 @@ router.post('/', async (req, res) => {
         return
       }
 
-      if (message.message === 'Reschedule') {
+      if (message.message === 'Reschedule' && !bookingOff) {
         if (await isCodeFlowOn()) await CodeFlow.clearFlow(tenant.id, message.from)
         try {
           const result = await executeFunction('show_welcome', {}, {
@@ -662,7 +674,7 @@ router.post('/', async (req, res) => {
         return
       }
 
-      if (message.message === 'Check My Booking') {
+      if (message.message === 'Check My Booking' && !bookingOff) {
         if (await isCodeFlowOn()) await CodeFlow.clearFlow(tenant.id, message.from)
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
@@ -688,7 +700,7 @@ router.post('/', async (req, res) => {
       // Code-only "today" booking when the patient taps their name (per-clinic flag code_booking_flow, default off).
       // Falls through to the AI path unless the flag is on and a live choose_patient/today flow exists.
       const patientTapMatch = (message.interactiveId || '').match(/^patient_([0-9a-fA-F-]{36})$/)
-      if (patientTapMatch) {
+      if (patientTapMatch && !bookingOff) {
         let codeFlowOn = false
         try {
           const codeFlowConfigs = await TenantService.getAllConfigs(tenant.id)
@@ -931,7 +943,7 @@ router.post('/', async (req, res) => {
       }
 
       // Code flow: confirm / change buttons shown after a typed new-patient name (ids cannot match patient_<uuid>)
-      if ((message.interactiveId === 'newname_yes' || message.interactiveId === 'newname_change') && await isCodeFlowOn()) {
+      if (!bookingOff && (message.interactiveId === 'newname_yes' || message.interactiveId === 'newname_change') && await isCodeFlowOn()) {
         const tapFlow = await CodeFlow.getFlow(tenant.id, message.from)
         const tapLive = !!tapFlow && !tapFlow.expired && tapFlow.state === 'choose_patient' && tapFlow.step === 'confirm_new_name' &&
           ((tapFlow.data?.kind === 'today' && !!tapFlow.data.doctorId && !!tapFlow.data.sessionStart) ||
@@ -954,7 +966,7 @@ router.post('/', async (req, res) => {
       }
 
       // Intercept "Book for someone else" tap — ask for name
-      if (message.interactiveId === 'patient_new') {
+      if (message.interactiveId === 'patient_new' && !bookingOff) {
         // Code flow: remember that the next typed text is a name (today flow with known doctor and session only)
         if (await isCodeFlowOn()) {
           const listFlow = await CodeFlow.getFlow(tenant.id, message.from)
@@ -990,7 +1002,7 @@ router.post('/', async (req, res) => {
       }
 
       // Intercept doctor selection from Book Today list (id format: "booktoday_<uuid>")
-      if (message.interactiveId && /^booktoday_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(message.interactiveId)) {
+      if (!bookingOff && message.interactiveId && /^booktoday_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(message.interactiveId)) {
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
           const result = await executeFunction('check_doctor_availability', { doctor_name: message.message }, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: message.interactiveId, doctorProfiles: [] })
@@ -1019,7 +1031,7 @@ router.post('/', async (req, res) => {
       }
 
       // Intercept session selection button taps (id format: "session_<uuid>_HH-MM-SS")
-      if (message.interactiveId && /^session_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_\d{2}-\d{2}-\d{2}$/.test(message.interactiveId)) {
+      if (!bookingOff && message.interactiveId && /^session_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_\d{2}-\d{2}-\d{2}$/.test(message.interactiveId)) {
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
           const result = await executeFunction('get_patient_profiles', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: message.interactiveId, doctorProfiles: [] })
@@ -1059,7 +1071,7 @@ router.post('/', async (req, res) => {
       }
 
       // Intercept day selection from get_doctor_schedule list (id format: "DOW::YYYY-MM-DD")
-      if (message.interactiveId && /^\d+::\d{4}-\d{2}-\d{2}$/.test(message.interactiveId)) {
+      if (!bookingOff && message.interactiveId && /^\d+::\d{4}-\d{2}-\d{2}$/.test(message.interactiveId)) {
         try {
           const { executeFunction } = require('../../ai-engine/ai.executor')
           // Code flow: when the offered day has exactly one session for the stored doctor, pass them on so the flow knows the doctor and session
@@ -1102,7 +1114,7 @@ router.post('/', async (req, res) => {
 
       // Code flow: Book Another Day doctor tap (a bare doctor uuid whose list row description says "this week").
       // Placed after the other interactive shortcuts; anything that does not match falls through to the AI path unchanged.
-      if (message.interactiveId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.interactiveId) &&
+      if (!bookingOff && message.interactiveId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.interactiveId) &&
           /this week/i.test(message.interactiveDescription || '') && await isCodeFlowOn()) {
         const logAnotherDay = (result) => logger.info(`CODE_BOOKING_FLOW step=another_day_doctor result=${result} tenant=${tenant.id} conversation=${context.conversation.id}`)
         await ConversationService.saveInboundMessage(context.conversation.id, message.message, message.type || 'text')
@@ -1136,7 +1148,7 @@ router.post('/', async (req, res) => {
 
       // TOMORROW intent interception — read Redis key set when today was fully booked
       // or booking was outside hours. Bypass Gemini entirely for this case.
-      if (message.message?.trim().toUpperCase() === 'TOMORROW' && tenant.industry === 'clinic') {
+      if (!bookingOff && message.message?.trim().toUpperCase() === 'TOMORROW' && tenant.industry === 'clinic') {
         try {
           const redisClient = require('../../../config/redis')
           const tomorrowKey = `tomorrow_booking:${context.conversation.id}`
@@ -1212,7 +1224,7 @@ router.post('/', async (req, res) => {
 
       // Code-only typed new-patient name for the book-today and book-tomorrow flows (flag on, flow step await_new_name / confirm_new_name).
       // Anything that does not match falls through to the AI path unchanged.
-      if (message.type === 'text' && !message.interactiveId && await isCodeFlowOn()) {
+      if (!bookingOff && message.type === 'text' && !message.interactiveId && await isCodeFlowOn()) {
         const nameCheck = validatePatientName(message.message)
         const nameFlow = await CodeFlow.getFlow(tenant.id, message.from)
 
@@ -1391,7 +1403,8 @@ if (!isEscalated && !isInteractiveSent && aiResponse) {
 }
 
 // After a blocked fake confirmation, resend the welcome menu so the patient can start over
-if (isBlockedConfirmation) {
+// (not for an enquiry-only clinic: it has no booking menu, and the patient already got the neutral text above)
+if (isBlockedConfirmation && !bookingOff) {
   try {
     const welcome = await executeFunction('show_welcome', {}, { tenant, customer: context.customer, conversation: context.conversation, latestMessage: message.message, interactiveId: null, doctorProfiles: [] })
     const welcomeContent = typeof welcome === 'string' && welcome.startsWith('DIRECT:') ? welcome.slice(7).trim() : ''

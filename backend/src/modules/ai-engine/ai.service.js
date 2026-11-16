@@ -2,7 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai')
 const { getSystemPrompt } = require('./ai.prompts')
 const { getFunctionDefinitions, getUnansweredQuestionDeclaration } = require('./ai.functions')
 const { buildClinicInfoBlock, cleanProfileValue } = require('./clinicInfo')
-const { isAppointmentBookingOn } = require('../../utils/appointmentFlag')
+const { isAppointmentBookingOn, isBookingOff } = require('../../utils/appointmentFlag')
 const { executeFunction } = require('./ai.executor')
 const logger = require('../../utils/logger')
 const { maskPhone } = require('../../utils/phone')
@@ -276,7 +276,9 @@ async function processMessage(context) {
 
     const systemPrompt = getSystemPrompt(tenant, configs, additionalData)
     // Appointment-by-time clinics (both switches on) get a different tool set; every other clinic gets exactly the list it always had
-    const baseFunctionDeclarations = getFunctionDefinitions(tenant.industry, { appointmentBooking: isAppointmentBookingOn(configs) })
+    // Enquiry-only clinics (booking_off = 'true') get get_clinic_info and escalate_to_human only; false for everyone else, so nothing changes for them
+    const bookingOff = isBookingOff(configs)
+    const baseFunctionDeclarations = getFunctionDefinitions(tenant.industry, { appointmentBooking: isAppointmentBookingOn(configs), bookingOff })
     // The unanswered-question tool is added only while the CLINIC INFORMATION block is in the prompt
     const functionDeclarations = additionalData.clinicInfoBlock
       ? [...baseFunctionDeclarations, getUnansweredQuestionDeclaration()]
@@ -376,6 +378,8 @@ async function processMessage(context) {
         ];
         if (injectionPatterns.some(pattern => pattern.test(latestMessage))) {
           logger.warn(`Possible prompt injection attempt: ${latestMessage.slice(0, 100)}`);
+          // Enquiry-only clinics: the same refusal without the booking wording
+          if (bookingOff) return 'I can only help with questions about the clinic 😊 Please say Hi to start again.';
           return 'I can only help with clinic appointments and bookings 😊 Please say Hi to start again.';
         }
 
@@ -511,6 +515,12 @@ async function processMessage(context) {
         // so a confirmation-looking reply written by Gemini here was never backed by a booking.
         if (/booking confirmed/i.test(text) && /token number/i.test(text) && !patientBookingsCalled) {
           logger.warn(`AI_FAKE_CONFIRMATION_BLOCKED tenant=${tenant.id} conversation=${conversation?.id} phone=${maskPhone(customer?.phone)}`)
+          // Enquiry-only clinics: neutral wording (no booking words, no menu), with the clinic's phone when it is saved and looks like one
+          if (bookingOff) {
+            const offPhone = cleanProfileValue(additionalData.businessPhone, 20)
+            const offCall = offPhone && offPhone.replace(/\D/g, '').length >= 6 ? `call the clinic on ${offPhone}` : 'call the clinic'
+            return { blockedConfirmation: true, text: `Sorry, I can't help with that here. Please ${offCall} and our team will help you.` }
+          }
           return { blockedConfirmation: true, text: 'Sorry, I could not complete your booking. Please tap Book Appointment to try again, or tap Talk to Staff.' }
         }
 

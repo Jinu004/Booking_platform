@@ -6,4 +6,10 @@ function isAppointmentBookingOn(configs) {
   return !!configs && configs.booking_mode === 'appointment' && configs.ai_appointment_booking === 'true';
 }
 
-module.exports = { isAppointmentBookingOn };
+// Enquiry-only mode: tenant_configs booking_off = 'true' (set by a super admin). The WhatsApp AI then never starts or continues a booking
+// for that clinic. A missing key, or any other value, means booking works exactly as before.
+function isBookingOff(configs) {
+  return !!configs && configs.booking_off === 'true';
+}
+
+module.exports = { isAppointmentBookingOn, isBookingOff };

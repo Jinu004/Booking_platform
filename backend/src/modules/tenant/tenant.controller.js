@@ -93,6 +93,7 @@ const RESERVED_CONFIG_KEYS = new Set([
   'code_booking_flow',
   'ai_appointment_booking',
   'booking_mode',
+  'booking_off',
   'recall_enabled',
   'platform_token_allowed',
   'media_auto_reply',
