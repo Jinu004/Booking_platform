@@ -11,25 +11,33 @@ const redisClient = require('../../config/redis')
 const crypto = require('crypto')
 const senderContext = require('../channel/whatsapp/senderContext')
 const { runAttemptsWithRetry, isSafeToRepeatTool, safeReplyAfterStateChange, createTurnDeadline, assertWithinTurnDeadline } = require('./ai.retry')
+const { DEFAULT_MODEL, FALLBACK_MODEL, resolveModel, generationConfigFor } = require('./ai.models')
 
 const client = new GoogleGenerativeAI(
   process.env.GEMINI_API_KEY || ''
 )
 
-const MODELS = {
-  pro: 'gemini-2.5-pro',
-  growth: 'gemini-2.5-flash',
-  starter: 'gemini-2.5-flash'
-}
-const MODEL = 'gemini-2.5-flash' // default fallback
-
 // One log line per Gemini response with its token usage. Never throws, so it cannot affect a reply.
-function logGeminiUsage(tenant, conversation, modelName, geminiResult) {
+// served = the model that answered (the response's modelVersion; the SDK passes the API's JSON through but does not declare the field,
+// so it is null when absent). calls = function calls in this response; responses = function responses sent in the request it answers.
+function logGeminiUsage(tenant, conversation, modelName, geminiResult, sentResponses = 0) {
   try {
     const usage = geminiResult?.usageMetadata
-    logger.info(`GEMINI_USAGE tenant=${tenant?.id || 'unknown'} conv=${conversation?.id || 'none'} model=${modelName || 'unknown'} prompt=${usage?.promptTokenCount ?? 0} cached=${usage?.cachedContentTokenCount ?? 0} output=${usage?.candidatesTokenCount ?? 0} total=${usage?.totalTokenCount ?? 0}`)
+    const candidate = geminiResult?.candidates?.[0]
+    const calls = (candidate?.content?.parts || []).filter(part => part && part.functionCall).length
+    logger.info(`GEMINI_USAGE tenant=${tenant?.id || 'unknown'} conv=${conversation?.id || 'none'} model=${modelName || 'unknown'} served=${geminiResult?.modelVersion || null} finish=${candidate?.finishReason || null} prompt=${usage?.promptTokenCount ?? 0} cached=${usage?.cachedContentTokenCount ?? 0} output=${usage?.candidatesTokenCount ?? 0} thoughts=${usage?.thoughtsTokenCount ?? null} total=${usage?.totalTokenCount ?? 0} calls=${calls} responses=${sentResponses}`)
   } catch (usageLogErr) {
     // ignore: usage logging is best effort
+  }
+}
+
+// One warn line per failed Gemini call: tenant, conversation, model, HTTP status and error class only (no message text). Never throws.
+function logGeminiFailure(tenant, conversation, modelName, err) {
+  try {
+    const errClass = String((err && (err.name || err.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)
+    logger.warn(`GEMINI_CALL_FAILED tenant=${tenant?.id || 'unknown'} conv=${conversation?.id || 'none'} model=${modelName || 'unknown'} status=${err?.status ?? null} class=${errClass}`)
+  } catch (failLogErr) {
+    // ignore: logging is best effort
   }
 }
 
@@ -284,12 +292,25 @@ async function processMessage(context) {
       ? [...baseFunctionDeclarations, getUnansweredQuestionDeclaration()]
       : baseFunctionDeclarations
 
-    const FALLBACK_MODEL = 'gemini-2.5-flash-lite';
     const MAX_ATTEMPTS = 3;
+    // Attempt 1: the clinic's allowed override (tenants.ai_model), else DEFAULT_MODEL. Attempts 2 and 3: FALLBACK_MODEL, except that a
+    // newer (not gemini-2.5) model's HTTP 400 is retried once with DEFAULT_MODEL (see isTransientError).
+    const firstModel = resolveModel(tenant.ai_model);
+    let lastAttemptModel = firstModel;
+    let retryWithDefault = false;
+    let newerModel400Handled = false;
     // True once a tool (function) has been executed in this turn. A retry restarts the whole turn from the patient's message,
     // so after a tool has run, a timeout is not retried (the tool could repeat, e.g. a booking).
     let toolHasRun = false;
     const isTransientError = (err) => {
+      // A newer model rejected the request (HTTP 400): one retry with DEFAULT_MODEL. Never for gemini-2.5 models (their 400 is handled as
+      // before), and never after a state-changing tool (runAttemptsWithRetry stops before asking, so no write can run twice).
+      if (err && err.status === 400 && !newerModel400Handled && !String(lastAttemptModel).startsWith('gemini-2.5') && !stateChangingTool) {
+        newerModel400Handled = true;
+        retryWithDefault = true;
+        logger.warn(`GEMINI_NEWER_MODEL_400 tenant=${tenant.id} model=${lastAttemptModel} retry_model=${DEFAULT_MODEL} error=${String(err.message || '').replace(/\s+/g, ' ').slice(0, 300)}`);
+        return true;
+      }
       const msg = err.message || '';
       // A timeout / abort of the Gemini request is retried (with the fallback model) only before any tool has run
       if (!toolHasRun && (err.name === 'AbortError' || /aborted|timed out|timeout/i.test(msg))) return true;
@@ -323,9 +344,14 @@ async function processMessage(context) {
       deadline: turnDeadline,
       onDeadline: () => ({ error: true, text: buildHiccupText(tenant.industry === 'enquiry' ? null : additionalData.businessPhone) }),
       runAttempt: async (attempt) => {
-        const currentModel = attempt === 1 ? MODEL : FALLBACK_MODEL;
+        let currentModel = attempt === 1 ? firstModel : FALLBACK_MODEL;
+        if (attempt > 1 && retryWithDefault) {
+          retryWithDefault = false;
+          currentModel = DEFAULT_MODEL;
+        }
+        lastAttemptModel = currentModel;
         if (attempt > 1) {
-          logger.warn(`Gemini falling back to ${FALLBACK_MODEL} on attempt ${attempt}`);
+          logger.warn(`Gemini falling back to ${currentModel} on attempt ${attempt}`);
         }
         // For the REPLY_TIMING log line: prompt hash, plan, guided switch and the model of this attempt (the last attempt wins)
         senderContext.setAiTrace({ ph: promptHash, plan: tenant.plan, guided: !!additionalData.clinicInfoBlock, model: currentModel });
@@ -335,11 +361,7 @@ async function processMessage(context) {
           model: currentModel,
           systemInstruction: systemPrompt,
           tools: [{ functionDeclarations }],
-          generationConfig: {
-            thinkingConfig: {
-              thinkingBudget: 0
-            }
-          }
+          generationConfig: generationConfigFor(currentModel)
         })
 
         // Build conversation history for Gemini
@@ -388,9 +410,15 @@ async function processMessage(context) {
 
         // Send the latest patient message
         // 25 s on the first attempt, 20 s on a retry (keeps the patient's worst-case wait down)
-        let response = await chat.sendMessage(latestMessage, { signal: AbortSignal.timeout(attempt === 1 ? 25000 : 20000) })
+        let response
+        try {
+          response = await chat.sendMessage(latestMessage, { signal: AbortSignal.timeout(attempt === 1 ? 25000 : 20000) })
+        } catch (sendErr) {
+          logGeminiFailure(tenant, conversation, currentModel, sendErr)
+          throw sendErr
+        }
         let result = response.response
-        logGeminiUsage(tenant, conversation, currentModel, result)
+        logGeminiUsage(tenant, conversation, currentModel, result, 0)
 
         // Function calling loop — Gemini may call multiple functions
         const maxIterations = 5
@@ -417,10 +445,13 @@ async function processMessage(context) {
 
           // Execute each function call sequentially
           const functionResponses = []
-          const executedFunctions = new Set()
+          // name -> the response sent for its first call in this round (null while that call runs)
+          const executedFunctions = new Map()
 
           for (const part of functionCallParts) {
             const { name, args } = part.functionCall
+            // The model's call id, echoed in our response when the model sent one (otherwise the response is exactly as before)
+            const callIdField = part.functionCall.id ? { id: part.functionCall.id } : {}
             // patient_id / doctor_id are internal-only; never accept them from Gemini
             if (args) {
               delete args.patient_id
@@ -431,9 +462,14 @@ async function processMessage(context) {
             }
 
             if (executedFunctions.has(name)) {
+              // A repeated call of the same function in this round is not run again (so a write never runs twice): it gets the first
+              // call's result, so every call has an answer
+              functionResponses.push({
+                functionResponse: { ...callIdField, name, response: executedFunctions.get(name) || { result: '' } }
+              })
               continue;
             }
-            executedFunctions.add(name);
+            executedFunctions.set(name, null);
 
             logger.info(`Gemini calling function: ${name}`, JSON.stringify(args))
 
@@ -459,10 +495,13 @@ async function processMessage(context) {
               }
               // New patient signal — return text to Gemini as function result so it asks for name
               if (directContent.startsWith('NEW_PATIENT::')) {
+                const newPatientResponse = { result: 'No existing profiles found. Please ask the patient for their name.' }
+                executedFunctions.set(name, newPatientResponse)
                 functionResponses.push({
                   functionResponse: {
+                    ...callIdField,
                     name,
-                    response: { result: 'No existing profiles found. Please ask the patient for their name.' }
+                    response: newPatientResponse
                   }
                 })
                 continue
@@ -479,21 +518,29 @@ async function processMessage(context) {
               break;
             }
 
+            const toolResponse = { result: functionResult }
+            executedFunctions.set(name, toolResponse)
             functionResponses.push({
               functionResponse: {
+                ...callIdField,
                 name,
-                response: { result: functionResult }
+                response: toolResponse
               }
             })
           }
-          
+
           if (escalated) break;
 
           // Feed function results back to Gemini
           // Same style of timeout as the first call (20 s here): an abort is a "timeout" error and goes through the existing retry loop
-          response = await chat.sendMessage(functionResponses, { signal: AbortSignal.timeout(20000) })
+          try {
+            response = await chat.sendMessage(functionResponses, { signal: AbortSignal.timeout(20000) })
+          } catch (sendErr) {
+            logGeminiFailure(tenant, conversation, currentModel, sendErr)
+            throw sendErr
+          }
           result = response.response
-          logGeminiUsage(tenant, conversation, currentModel, result)
+          logGeminiUsage(tenant, conversation, currentModel, result, functionResponses.length)
         }
 
         if (escalated) {

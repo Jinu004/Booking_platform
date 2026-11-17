@@ -13,6 +13,7 @@ const { omitTenantSecrets } = require('../../utils/secretBox');
 const { fetchWabaInfo } = require('../waba/waba.info.service');
 const tenantModel = require('../tenant/tenant.model');
 const { logAction } = require('../../utils/audit');
+const { ALLOWED_OVERRIDES } = require('../ai-engine/ai.models');
 
 // The clinic's booking mode and its AI appointment switch, read from the two tenant_configs rows (additive fields on the tenant screens)
 function withBookingModeFields(row) {
@@ -252,7 +253,8 @@ async function updateTenant(req, res) {
   try {
     const { id } = req.params;
     const { clinicName, plan, whatsappNumber, industry, aiModel, email, whatsappPhoneNumberId } = req.body;
-    const VALID_AI_MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
+    // The per-clinic AI model override: only the models the WhatsApp AI actually uses (ai.models.js)
+    const VALID_AI_MODELS = ALLOWED_OVERRIDES
     if (aiModel && !VALID_AI_MODELS.includes(aiModel)) {
       return errorResponse(res, 'Invalid AI model. Must be one of: ' + VALID_AI_MODELS.join(', '), 400)
     }
