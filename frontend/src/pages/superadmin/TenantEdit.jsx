@@ -28,6 +28,14 @@ const statusBadge = (status) => {
 
 const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
 
+// The AI model override values the backend accepts. A saved value that is empty or not in this list is shown as the default.
+const AI_MODEL_OPTIONS = [
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (current default)' },
+  { value: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite (new model, for testing)' }
+];
+const DEFAULT_AI_MODEL = 'gemini-2.5-flash';
+const aiModelForForm = (saved) => (AI_MODEL_OPTIONS.some(o => o.value === saved) ? saved : DEFAULT_AI_MODEL);
+
 // The form values for a tenant row of the list (same fields and defaults the Edit popup used)
 const formFromTenant = (t) => ({
   clinicName: t.name,
@@ -35,7 +43,7 @@ const formFromTenant = (t) => ({
   whatsappNumber: t.whatsapp_number || '',
   whatsappPhoneNumberId: t.whatsapp_phone_number_id || '',
   industry: t.industry || 'clinic',
-  aiModel: t.ai_model || '',
+  aiModel: aiModelForForm(t.ai_model),
   proactiveTemplates: t.proactive_templates_enabled === 'true',
   recallEnabled: t.recall_enabled !== 'false',
   email: t.email || ''
@@ -628,11 +636,11 @@ export default function TenantEdit() {
               onChange={e => setForm(f => ({ ...f, aiModel: e.target.value }))}
               className={inputClass}
             >
-              <option value="">Use plan default</option>
-              <option value="gemini-2.5-pro">gemini-2.5-pro (Pro quality)</option>
-              <option value="gemini-2.5-flash">gemini-2.5-flash (Balanced)</option>
-              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Fast)</option>
+              {AI_MODEL_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
             </select>
+            <p className="text-xs text-gray-400 mt-1">Leave on Gemini 2.5 Flash for real clinics. Use the new model only on a test clinic.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Proactive Template Messaging</label>
