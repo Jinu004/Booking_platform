@@ -21,4 +21,10 @@ function generationConfigFor(model) {
   return {}
 }
 
-module.exports = { DEFAULT_MODEL, FALLBACK_MODEL, ALLOWED_OVERRIDES, resolveModel, generationConfigFor }
+// Which SDK answers a model (ai.gemini.js): gemini-2.5 models stay on the old SDK (@google/generative-ai) exactly as before; every other
+// model uses the new SDK (@google/genai), which sends tool results with role 'user' as the newer models require.
+function usesNewSdk(model) {
+  return typeof model === 'string' && !model.startsWith('gemini-2.5')
+}
+
+module.exports = { DEFAULT_MODEL, FALLBACK_MODEL, ALLOWED_OVERRIDES, resolveModel, generationConfigFor, usesNewSdk }

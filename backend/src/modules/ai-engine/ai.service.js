@@ -1,4 +1,3 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai')
 const { getSystemPrompt } = require('./ai.prompts')
 const { getFunctionDefinitions, getUnansweredQuestionDeclaration } = require('./ai.functions')
 const { buildClinicInfoBlock, cleanProfileValue } = require('./clinicInfo')
@@ -12,10 +11,11 @@ const crypto = require('crypto')
 const senderContext = require('../channel/whatsapp/senderContext')
 const { runAttemptsWithRetry, isSafeToRepeatTool, safeReplyAfterStateChange, createTurnDeadline, assertWithinTurnDeadline } = require('./ai.retry')
 const { DEFAULT_MODEL, FALLBACK_MODEL, resolveModel, generationConfigFor } = require('./ai.models')
+// Gemini calls go through the adapter: the old SDK for gemini-2.5 models (unchanged requests), the new SDK for every other model
+const { startTurn } = require('./ai.gemini')
 
-const client = new GoogleGenerativeAI(
-  process.env.GEMINI_API_KEY || ''
-)
+// HTTP statuses of a failed Gemini call that are retried (with the fallback model), as 429 and 503 always were
+const RETRYABLE_HTTP_STATUSES = [408, 429, 500, 502, 503, 504]
 
 // One log line per Gemini response with its token usage. Never throws, so it cannot affect a reply.
 // served = the model that answered (the response's modelVersion; the SDK passes the API's JSON through but does not declare the field,
@@ -314,6 +314,8 @@ async function processMessage(context) {
       const msg = err.message || '';
       // A timeout / abort of the Gemini request is retried (with the fallback model) only before any tool has run
       if (!toolHasRun && (err.name === 'AbortError' || /aborted|timed out|timeout/i.test(msg))) return true;
+      // The HTTP status first, when the SDK gives one (both SDKs set err.status); the message checks below stay as the fallback
+      if (err && typeof err.status === 'number' && RETRYABLE_HTTP_STATUSES.includes(err.status)) return true;
       return (
         msg.includes('503') ||
         msg.includes('Service Unavailable') ||
@@ -356,14 +358,6 @@ async function processMessage(context) {
         // For the REPLY_TIMING log line: prompt hash, plan, guided switch and the model of this attempt (the last attempt wins)
         senderContext.setAiTrace({ ph: promptHash, plan: tenant.plan, guided: !!additionalData.clinicInfoBlock, model: currentModel });
 
-        // Initialize Gemini model with tools
-        const model = client.getGenerativeModel({
-          model: currentModel,
-          systemInstruction: systemPrompt,
-          tools: [{ functionDeclarations }],
-          generationConfig: generationConfigFor(currentModel)
-        })
-
         // Build conversation history for Gemini
         // Gemini uses 'model' not 'assistant' for AI role
         // Skip the last message — it will be sent fresh
@@ -405,20 +399,25 @@ async function processMessage(context) {
           return 'I can only help with clinic appointments and bookings 😊 Please say Hi to start again.';
         }
 
-        // Start chat session with conversation history
-        const chat = model.startChat({ history: cleanHistory })
+        // Start the turn with the conversation history (ai.gemini.js picks the SDK for this attempt's model)
+        const turn = startTurn({
+          model: currentModel,
+          systemPrompt,
+          tools: functionDeclarations,
+          generationConfig: generationConfigFor(currentModel),
+          history: cleanHistory
+        })
 
         // Send the latest patient message
         // 25 s on the first attempt, 20 s on a retry (keeps the patient's worst-case wait down)
-        let response
+        let result
         try {
-          response = await chat.sendMessage(latestMessage, { signal: AbortSignal.timeout(attempt === 1 ? 25000 : 20000) })
+          result = await turn.send(latestMessage, attempt === 1 ? 25000 : 20000)
         } catch (sendErr) {
           logGeminiFailure(tenant, conversation, currentModel, sendErr)
           throw sendErr
         }
-        let result = response.response
-        logGeminiUsage(tenant, conversation, currentModel, result, 0)
+        logGeminiUsage(tenant, conversation, currentModel, result.raw, 0)
 
         // Function calling loop — Gemini may call multiple functions
         const maxIterations = 5
@@ -430,12 +429,8 @@ async function processMessage(context) {
         while (iteration < maxIterations) {
           iteration++
 
-          const candidate = result.candidates?.[0]
-          if (!candidate) break
-
-          // Collect any function calls in this response
-          const functionCallParts = (candidate.content?.parts || [])
-            .filter(part => part.functionCall)
+          // The function calls in this response (none when there is no candidate)
+          const functionCallParts = result.functionCallParts
 
           // No more function calls — final text response
           if (!functionCallParts.length) break
@@ -534,26 +529,24 @@ async function processMessage(context) {
           // Feed function results back to Gemini
           // Same style of timeout as the first call (20 s here): an abort is a "timeout" error and goes through the existing retry loop
           try {
-            response = await chat.sendMessage(functionResponses, { signal: AbortSignal.timeout(20000) })
+            result = await turn.send(functionResponses, 20000)
           } catch (sendErr) {
             logGeminiFailure(tenant, conversation, currentModel, sendErr)
             throw sendErr
           }
-          result = response.response
-          logGeminiUsage(tenant, conversation, currentModel, result, functionResponses.length)
+          logGeminiUsage(tenant, conversation, currentModel, result.raw, functionResponses.length)
         }
 
         if (escalated) {
           return { escalated: true, text: escalationMessage };
         }
 
-        // Extract final text response from Gemini
-        let text;
-        try {
-          text = result.text()
-        } catch (textErr) {
+        // Extract final text response from Gemini: a blocked response (old SDK: text() threw; new SDK: no candidates, a block reason,
+        // or neither text nor function calls) gets the same reply as always
+        if (result.blocked) {
           return { error: true, text: 'Sorry, I didn\'t quite catch that! Please say Hi to start again 😊' };
         }
+        const text = result.text;
         if (!text || !text.trim()) {
           throw new Error('Empty text response from Gemini');
         }
