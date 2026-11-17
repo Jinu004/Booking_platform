@@ -733,15 +733,17 @@ export default function Settings() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Response Language</label>
                   <p className="text-xs text-gray-400 mb-2">Language the AI uses when responding to patients</p>
                   <select
-                    value={hitl.language || 'english'}
+                    value={['both', 'bilingual'].includes(hitl.language) ? 'auto' : (hitl.language || 'english')}
                     onChange={e => setHITL(p => ({ ...p, language: e.target.value }))}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
+                    <option value="auto">Patient's language (English, Malayalam, Manglish)</option>
                     <option value="english">English</option>
                     <option value="malayalam">Malayalam</option>
                     <option value="hindi">Hindi</option>
-                    {/* A stored value the list does not offer (for example "both") is kept and saved back unchanged */}
-                    {hitl.language && !['english', 'malayalam', 'hindi'].includes(hitl.language) && (
+                    {/* The older saved values "both" and "bilingual" mean the same as "auto" and are shown as Patient's language.
+                        Any other stored value the list does not offer is kept and saved back unchanged */}
+                    {hitl.language && !['auto', 'both', 'bilingual', 'english', 'malayalam', 'hindi'].includes(hitl.language) && (
                       <option value={hitl.language}>{hitl.language} (current)</option>
                     )}
                   </select>
