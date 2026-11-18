@@ -530,8 +530,17 @@ async function createManualBooking(req, res, next) {
     const docRes = await pool.query('SELECT name FROM clinic_doctors WHERE id = $1', [doctorId]);
     booking.patient_phone = normalizedPhone;
     booking.doctor_name = docRes.rows[0]?.name;
-    // Send WhatsApp confirmation in background only if requested
+    // Send WhatsApp confirmation in background only if requested, and only while the clinic's daily staff template cap allows it
+    let sendAllowed = false;
     if (sendWhatsapp) {
+      const { reserveStaffTemplateSend } = require('../../utils/delay');
+      sendAllowed = (await reserveStaffTemplateSend(tenantId)).allowed;
+      if (!sendAllowed) {
+        booking.whatsapp_skipped = true;
+        booking.whatsapp_skipped_reason = 'daily_limit';
+      }
+    }
+    if (sendAllowed) {
       setImmediate(async () => {
         const { runAsTenant } = require('../channel/whatsapp/senderContext')
         await runAsTenant(tenantId, async () => {

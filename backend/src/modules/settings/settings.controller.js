@@ -140,13 +140,32 @@ async function getClinicSettings(req, res, next) {
   }
 }
 
+const CLINIC_PROFILE_KEYS = new Set(['address', 'opening_time', 'closing_time'])
+const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/
+
 /**
  * PUT /settings/clinic
  */
 async function updateClinicSettings(req, res, next) {
   try {
     const updates = req.body
-    
+    if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+      return errorResponse(res, 'Invalid clinic settings', 400)
+    }
+    // Allow-list: the Settings screen and Clinic Answers send only these (stored as clinic_address, clinic_opening_time, clinic_closing_time)
+    const rejectedKeys = Object.keys(updates).filter(k => !CLINIC_PROFILE_KEYS.has(k))
+    if (rejectedKeys.length > 0) {
+      const shown = rejectedKeys.slice(0, 5).map(k => String(k).replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)).join(', ')
+      return errorResponse(res, `Unknown clinic settings: ${shown}. Allowed: address, opening_time, closing_time`, 400)
+    }
+    for (const [key, value] of Object.entries(updates)) {
+      if (typeof value !== 'string') return errorResponse(res, `${key} must be text`, 400)
+      if (key === 'address' && value.length > 500) return errorResponse(res, 'Address is too long (maximum 500 characters)', 400)
+      if ((key === 'opening_time' || key === 'closing_time') && !HH_MM.test(value)) {
+        return errorResponse(res, `${key} must be a time in HH:MM format`, 400)
+      }
+    }
+
     for (const [key, value] of Object.entries(updates)) {
        await TenantService.setConfig(req.tenantId, `clinic_${key}`, String(value))
     }
@@ -198,6 +217,18 @@ async function updateHITLSettings(req, res, next) {
     // The knowledge text must be text (anything else would fail inside the sanitiser)
     if (ai_knowledge_base !== undefined && ai_knowledge_base !== null && typeof ai_knowledge_base !== 'string') {
       return errorResponse(res, 'Knowledge base must be text', 400)
+    }
+    // Length limits of the free-text fields (a missing or null value keeps the stored one, as before)
+    const textLimits = [
+      ['handoff_message', handoff_message, 1000, 'Handoff message'],
+      ['out_of_hours_message', out_of_hours_message, 1000, 'Out of hours message'],
+      ['business_address', business_address, 500, 'Business address'],
+      ['payment_upi', payment_upi, 100, 'Payment UPI ID']
+    ]
+    for (const [, value, max, label] of textLimits) {
+      if (value === undefined || value === null) continue
+      if (typeof value !== 'string') return errorResponse(res, `${label} must be text`, 400)
+      if (value.length > max) return errorResponse(res, `${label} is too long (maximum ${max} characters)`, 400)
     }
     // A clinic without a settings row gets one before the update
     await TenantService.ensureTenantSettings(req.tenantId)

@@ -1,10 +1,11 @@
-const { saveSubscription } = require('./push.service');
+const { saveSubscription, isValidPushSubscription } = require('./push.service');
 const { successResponse, errorResponse } = require('../../utils/response');
 
 async function subscribe(req, res) {
   try {
     const { subscription } = req.body;
     if (!subscription) return errorResponse(res, 'Subscription required', 400);
+    if (!isValidPushSubscription(subscription)) return errorResponse(res, 'Invalid push subscription', 400);
     await saveSubscription(req.tenantId, req.staff.id, subscription);
     return successResponse(res, { message: 'Subscribed to push notifications' });
   } catch (err) {

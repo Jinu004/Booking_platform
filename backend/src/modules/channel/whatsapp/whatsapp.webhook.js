@@ -223,12 +223,12 @@ router.post('/', async (req, res) => {
       const redisClient = require('../../../config/redis')
       if (message.messageId && redisClient) {
         try {
-          const isDuplicate = await redisClient.get(`msg_dedup:${message.messageId}`)
-          if (isDuplicate) {
+          // One atomic call: the key is created only when it does not exist yet (NX), kept 24 hours. null means it already existed.
+          const firstDelivery = await redisClient.set(`msg_dedup:${message.messageId}`, '1', { NX: true, EX: 86400 })
+          if (firstDelivery === null) {
             logger.warn(`Duplicate message detected and skipped: ${message.messageId}`)
             return
           }
-          await redisClient.set(`msg_dedup:${message.messageId}`, '1', { EX: 300 })
         } catch (dedupeErr) {
           // Redis problem: the message is still processed (dropping it would lose it and Meta does not retry); only the error class is logged
           logger.warn(`WEBHOOK_DEDUPE_REDIS_ERROR class=${String((dedupeErr && (dedupeErr.name || dedupeErr.code)) || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)}`)

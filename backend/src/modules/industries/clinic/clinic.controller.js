@@ -11,6 +11,7 @@ const { doctorLimitFor } = require('../../../config/plans');
 const StaffModel = require('../../staff/staff.model');
 const DoctorLogin = require('../../staff/doctorLogin');
 const { sendWelcomeEmail } = require('../../../utils/email');
+const { reserveStaffTemplateSend } = require('../../../utils/delay');
 
 // Sentinel value used to soft-delete doctors from token queues
 // clinic.model.js getDoctors filters out records where leave_days equals this value
@@ -182,6 +183,14 @@ async function updateAvailability(req, res, next) {
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const { available, leaveDays } = req.body;
+    // Staff input: 0 to 60 whole days (a missing value still means 0, as before). 999 is the internal "removed doctor" marker,
+    // written only by deleteDoctor below, never through this route.
+    if (leaveDays !== undefined && leaveDays !== null) {
+      const days = Number(leaveDays);
+      if (!Number.isInteger(days) || days < 0 || days > 60) {
+        return errorResponse(res, 'Leave days must be a whole number from 0 to 60', 400);
+      }
+    }
 
     const doctor = await ClinicModel.updateDoctorAvailability(pool, tenantId, id, available, leaveDays);
     if (!doctor) {
@@ -412,6 +421,15 @@ async function updateDoctor(req, res, next) {
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const tenantId = req.tenant.id;
 
+    // Length limits (the columns: phone varchar(20), qualification varchar(255), profile_description text)
+    const textLimits = [['profileDescription', 1000, 'Profile description'], ['phone', 20, 'Phone'], ['qualification', 200, 'Qualification']];
+    for (const [field, max, label] of textLimits) {
+      const value = req.body[field];
+      if (value === undefined || value === null) continue;
+      if (typeof value !== 'string') return errorResponse(res, `${label} must be text`, 400);
+      if (value.length > max) return errorResponse(res, `${label} is too long (maximum ${max} characters)`, 400);
+    }
+
     // An optional email creates the doctor's login or changes the linked login's email (a separate path with its own transaction)
     const emailInput = DoctorLogin.readEmail(req.body.email);
     if (emailInput.given) {
@@ -507,6 +525,20 @@ async function saveDoctorSchedule(req, res, next) {
     const { id } = req.params;
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const { schedules } = req.body;
+    // At most 21 rows: 7 days x up to 3 sessions a day (the Doctors screen allows 3 sessions per day).
+    // Each row: day_of_week 0-6, is_available true/false, start_time and end_time as HH:MM or HH:MM:SS.
+    if (!Array.isArray(schedules) || schedules.length > 21) {
+      return errorResponse(res, 'Schedules must be a list of at most 21 entries', 400);
+    }
+    const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+    for (const s of schedules) {
+      const day = Number(s && s.day_of_week);
+      if (!s || typeof s !== 'object' || !Number.isInteger(day) || day < 0 || day > 6
+        || typeof s.is_available !== 'boolean'
+        || (s.is_available && (!TIME_RE.test(String(s.start_time)) || !TIME_RE.test(String(s.end_time))))) {
+        return errorResponse(res, 'Each schedule entry needs day_of_week (0-6), is_available, and start_time and end_time as HH:MM', 400);
+      }
+    }
     if (!(await doctorInTenant(tenantId, id))) return errorResponse(res, 'Not found', 404);
     const result = await ClinicModel.saveDoctorSchedule(pool, tenantId, id, schedules);
     const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
@@ -544,6 +576,13 @@ async function createProcedure(req, res, next) {
     if (!isUUID(id)) return errorResponse(res, 'Invalid doctor ID', 400);
     const { name, duration_minutes } = req.body;
     if (!name || !duration_minutes) return errorResponse(res, 'name and duration_minutes are required', 400);
+    if (typeof name !== 'string' || name.trim().length < 1 || name.trim().length > 100) {
+      return errorResponse(res, 'Procedure name must be 1 to 100 characters', 400);
+    }
+    const duration = Number(duration_minutes);
+    if (!Number.isInteger(duration) || duration < 1 || duration > 600) {
+      return errorResponse(res, 'Duration must be a whole number of minutes from 1 to 600', 400);
+    }
     if (!(await doctorInTenant(tenantId, id))) return errorResponse(res, 'Not found', 404);
     const procedure = await ClinicModel.createProcedure(pool, tenantId, id, name, duration_minutes);
     return successResponse(res, procedure, 201);
@@ -657,7 +696,16 @@ async function createAppointmentBooking(req, res, next) {
     }
 
     // Optional confirmation (off unless send_whatsapp is exactly true). Sent after the booking is saved; a failure never affects it.
+    // The clinic's daily cap on staff-triggered templates applies: over the cap the booking stands and only the message is skipped.
+    let sendAllowed = false;
     if (send_whatsapp === true) {
+      sendAllowed = (await reserveStaffTemplateSend(tenantId)).allowed;
+      if (!sendAllowed) {
+        booking.whatsapp_skipped = true;
+        booking.whatsapp_skipped_reason = 'daily_limit';
+      }
+    }
+    if (sendAllowed) {
       setImmediate(async () => {
         await runAsTenant(tenantId, async () => {
           try {
@@ -782,8 +830,16 @@ async function createProcedureBooking(req, res, next) {
 
     const booking = await ClinicModel.createProcedureBooking(pool, tenantId, id, procedure_id, customer_id, patient_id, patient_name, date, start_time, end_time, contact);
 
-    // Send WhatsApp notification to patient (unless send_whatsapp is exactly false)
-    if (send_whatsapp !== false) setImmediate(async () => {
+    // Send WhatsApp notification to patient (unless send_whatsapp is exactly false), within the clinic's daily staff template cap
+    let sendAllowed = false;
+    if (send_whatsapp !== false) {
+      sendAllowed = (await reserveStaffTemplateSend(tenantId)).allowed;
+      if (!sendAllowed) {
+        booking.whatsapp_skipped = true;
+        booking.whatsapp_skipped_reason = 'daily_limit';
+      }
+    }
+    if (sendAllowed) setImmediate(async () => {
       await runAsTenant(tenantId, async () => {
       try {
         const phoneRes = await pool.query(`SELECT phone FROM customers WHERE id = $1 AND tenant_id = $2`, [booking.customer_id, tenantId]);

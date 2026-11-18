@@ -8,6 +8,32 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY
 );
 
+// A push subscription is accepted (and later used) only when its endpoint is an https URL of a known browser push service,
+// so the server never posts notifications to an arbitrary address.
+const PUSH_HOSTS_EXACT = ['fcm.googleapis.com', 'web.push.apple.com'];
+const PUSH_HOST_SUFFIXES = ['.push.services.mozilla.com', '.notify.windows.com', '.push.apple.com'];
+
+function isValidPushEndpoint(endpoint) {
+  if (typeof endpoint !== 'string' || endpoint.length === 0 || endpoint.length > 1000) return false;
+  let url;
+  try { url = new URL(endpoint); } catch (_) { return false; }
+  if (url.protocol !== 'https:') return false;
+  const host = url.hostname.toLowerCase();
+  return PUSH_HOSTS_EXACT.includes(host) || PUSH_HOST_SUFFIXES.some(suffix => host.endsWith(suffix));
+}
+
+// The shape web-push needs: { endpoint, keys: { p256dh, auth } }, each key a string of at most 200 characters
+function isValidPushSubscription(subscription) {
+  if (!subscription || typeof subscription !== 'object' || Array.isArray(subscription)) return false;
+  if (!isValidPushEndpoint(subscription.endpoint)) return false;
+  const keys = subscription.keys;
+  if (!keys || typeof keys !== 'object') return false;
+  for (const field of ['p256dh', 'auth']) {
+    if (typeof keys[field] !== 'string' || keys[field].length === 0 || keys[field].length > 200) return false;
+  }
+  return true;
+}
+
 async function saveSubscription(tenantId, staffId, subscription) {
   await pool.query(
     `INSERT INTO push_subscriptions (tenant_id, staff_id, subscription, created_at)
@@ -26,8 +52,14 @@ async function sendPushToTenant(tenantId, payload) {
     let sent = 0;
     for (const row of result.rows) {
       try {
+        const subscription = JSON.parse(row.subscription);
+        // Rows stored before the endpoint check are not used when they fail it
+        if (!isValidPushSubscription(subscription)) {
+          logger.warn(`Push notification skipped: stored subscription failed the endpoint check (tenant=${tenantId})`);
+          continue;
+        }
         await webpush.sendNotification(
-          JSON.parse(row.subscription),
+          subscription,
           JSON.stringify(payload)
         );
         sent++;
@@ -49,4 +81,4 @@ async function sendPushToTenant(tenantId, payload) {
   }
 }
 
-module.exports = { saveSubscription, sendPushToTenant };
+module.exports = { saveSubscription, sendPushToTenant, isValidPushSubscription };

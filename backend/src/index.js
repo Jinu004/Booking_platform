@@ -206,3 +206,9 @@ setTimeout(() => {
 app.listen(PORT, '127.0.0.1', () => {
   logger.info(`Server running on port ${PORT}`);
 });
+
+// A promise rejection nobody handled is logged (message and stack only) instead of stopping the process
+process.on('unhandledRejection', (reason) => {
+  const message = reason && reason.message ? reason.message : String(reason);
+  logger.error(`UNHANDLED_REJECTION ${String(message).slice(0, 300)} ${reason && reason.stack ? String(reason.stack).slice(0, 1500) : ''}`);
+});

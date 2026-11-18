@@ -36,7 +36,8 @@ const getTenantById = async (req, res) => {
     const tenant = await tenantService.getTenantById(id);
     return successResponse(res, tenant, 200);
   } catch (error) {
-    return errorResponse(res, error.message, 404);
+    if (error.message !== 'Tenant not found') logger.error('Error fetching tenant by id:', error.message);
+    return errorResponse(res, 'Not found', 404);
   }
 };
 
@@ -47,13 +48,15 @@ const getTenantBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
     const tenant = await tenantModel.getTenantBySlug(pool, slug);
-    if (!tenant) throw new Error('Tenant not found');
+    if (!tenant) return errorResponse(res, 'Not found', 404);
+    // Another clinic's slug answers exactly like a missing one, so a clinic user cannot learn which slugs exist
     if (req.staff?.role !== 'super_admin' && tenant.id !== req.tenantId) {
-      return errorResponse(res, 'Forbidden', 403);
+      return errorResponse(res, 'Not found', 404);
     }
     return successResponse(res, tenant, 200);
   } catch (error) {
-    return errorResponse(res, error.message, 404);
+    logger.error('Error fetching tenant by slug:', error.message);
+    return errorResponse(res, 'Not found', 404);
   }
 };
 

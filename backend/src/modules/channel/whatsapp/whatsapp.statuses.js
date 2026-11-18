@@ -74,11 +74,16 @@ async function recordFailedStatus(value, status) {
 
   // Mark the stored message of this send as failed, if we tracked it. The Meta message id is only a query parameter (never logged).
   // No match (status arrived before the send was recorded, or an untracked send): nothing more to do.
-  if (status.id) {
+  // Only for a clinic matched by the phone number id: messages has no tenant_id column, so the clinic is checked through its conversation.
+  if (status.id && !tenantId) {
+    logger.debug('META_STATUS_FAILED message update skipped: no tenant matched the phone number id')
+  }
+  if (status.id && tenantId) {
     await pool.query(
       `UPDATE messages SET delivery_status = 'failed', delivery_error = $2
-       WHERE wa_message_id = $1 AND delivery_status IS DISTINCT FROM 'failed'`,
-      [String(status.id), code !== null ? String(code) : 'none']
+       WHERE wa_message_id = $1 AND delivery_status IS DISTINCT FROM 'failed'
+         AND conversation_id IN (SELECT id FROM conversations WHERE tenant_id = $3)`,
+      [String(status.id), code !== null ? String(code) : 'none', tenantId]
     )
   }
 }

@@ -245,7 +245,9 @@ function parseIncomingMessage(payload) {
     let interactiveId = null
     let interactiveDescription = null
     if (message.type === 'text') {
-      messageText = message.text?.body || ''
+      // Always a string: a malformed body (number, object) is converted, null or undefined becomes empty
+      const rawBody = message.text?.body
+      messageText = rawBody === null || rawBody === undefined ? '' : (typeof rawBody === 'string' ? rawBody : String(rawBody))
     } else if (message.type === 'interactive') {
       messageText = message.interactive?.button_reply?.title
         || message.interactive?.list_reply?.title
