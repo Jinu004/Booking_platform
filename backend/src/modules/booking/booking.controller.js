@@ -269,10 +269,17 @@ async function exportBookings(req, res, next) {
     const result = await pool.query(sql, params);
     
     const escCsv = (v) => `"${String(v ?? '').replace(/\"/g, '""')}"`;
+    // Text typed by patients or staff (names, phone): a value starting with =, +, -, @, tab or CR is prefixed with ' so a spreadsheet
+    // never runs it as a formula. A phone that is only an optional + and digits is a real number and is left as it is.
+    const escText = (v) => {
+      const s = String(v ?? '');
+      const risky = /^[=+\-@\t\r]/.test(s) && !/^\+?\d+$/.test(s);
+      return escCsv(risky ? `'${s}` : s);
+    };
     let csv = '"Token","Patient Name","Phone","Doctor","Status","Date"\n';
     for (const row of result.rows) {
       const d = row.booking_date.toISOString().split('T')[0];
-      csv += `${escCsv(row.token_number)},${escCsv(row.patient_name)},${escCsv(row.phone)},${escCsv(row.doctor_name)},${escCsv(row.status)},${escCsv(d)}\n`;
+      csv += `${escCsv(row.token_number)},${escText(row.patient_name)},${escText(row.phone)},${escText(row.doctor_name)},${escCsv(row.status)},${escCsv(d)}\n`;
     }
     
     res.setHeader('Content-Type', 'text/csv');

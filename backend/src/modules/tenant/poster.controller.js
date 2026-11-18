@@ -7,6 +7,16 @@ const logger = require('../../utils/logger')
 const storage = new Storage()
 const BUCKET = process.env.POSTER_BUCKET_NAME || 'receptionai-posters-prod'
 
+// Reads the magic bytes of an uploaded file: JPEG (FF D8 FF), PNG (89 50 4E 47 0D 0A 1A 0A) or WebP ("RIFF" .... "WEBP").
+// Returns { mime, ext } or null for anything else.
+function detectImageType(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 12) return null
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { mime: 'image/jpeg', ext: 'jpg' }
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { mime: 'image/png', ext: 'png' }
+  if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return { mime: 'image/webp', ext: 'webp' }
+  return null
+}
+
 async function submitPosterRequest(req, res) {
   try {
     const { id: tenantId } = req.params
@@ -27,13 +37,18 @@ async function submitPosterRequest(req, res) {
     if (caption.length > 300) {
       return errorResponse(res, 'Caption is too long (maximum 300 characters).', 400)
     }
-    const ext = req.file.originalname.split('.').pop()
-    const filename = `${tenantId}/${uuidv4()}-${req.file.originalname}`
+    // The file header decides the type (the client's MIME header and filename are not trusted)
+    const detected = detectImageType(req.file.buffer)
+    if (!detected) {
+      return errorResponse(res, 'Only JPEG, PNG or WebP images are allowed', 400)
+    }
+    // Stored name: generated id plus the extension of the verified type, never the client's original filename
+    const filename = `${tenantId}/${uuidv4()}.${detected.ext}`
 
     const bucket = storage.bucket(BUCKET)
     const blob = bucket.file(filename)
     await blob.save(req.file.buffer, {
-      contentType: req.file.mimetype,
+      contentType: detected.mime,
       metadata: { cacheControl: 'public, max-age=31536000' }
     })
 

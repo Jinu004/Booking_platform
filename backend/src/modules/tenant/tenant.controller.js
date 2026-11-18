@@ -2,6 +2,10 @@ const tenantService = require('./tenant.service');
 const { successResponse, errorResponse } = require('../../utils/response');
 const pool = require('../../config/database');
 const tenantModel = require('./tenant.model');
+const logger = require('../../utils/logger');
+
+// Unexpected errors: the real message stays in the server log, the client gets a fixed text
+const GENERIC_ERROR = 'Something went wrong. Please try again.';
 
 /**
  * POST / — Create new tenant
@@ -15,7 +19,8 @@ const createTenant = async (req, res) => {
     if (error.message === 'WhatsApp number is already registered') {
       return errorResponse(res, error.message, 400);
     }
-    return errorResponse(res, error.message, 500);
+    logger.error('Error creating tenant:', error.message);
+    return errorResponse(res, GENERIC_ERROR, 500);
   }
 };
 
@@ -80,7 +85,8 @@ const updateTenant = async (req, res) => {
     if (error.code === '23505' && error.constraint === 'tenants_whatsapp_number_key') {
       return errorResponse(res, 'This WhatsApp number is already used by another clinic', 409);
     }
-    return errorResponse(res, error.message, 500);
+    logger.error('Error updating tenant:', error.message);
+    return errorResponse(res, GENERIC_ERROR, 500);
   }
 };
 
@@ -88,27 +94,19 @@ const updateTenant = async (req, res) => {
  * POST /:id/config — Set single config value
  * Only super_admin may write config for a different tenant.
  */
-const RESERVED_CONFIG_KEYS = new Set([
-  'proactive_templates_enabled',
-  'code_booking_flow',
-  'ai_appointment_booking',
-  'booking_mode',
-  'booking_off',
-  'recall_enabled',
-  'platform_token_allowed',
-  'media_auto_reply',
-  'plan_override',
-  'quota_override',
-  'wa_connection_state',
-  'wa_disconnect_reason',
-  'wa_disconnect_initiated_by',
-  'wa_state_changed_at',
-  'wa_last_alert_event',
-  'wa_app_reminder_last',
-  'wa_app_reminder_enabled',
-  'ai_guided_kb',
-  'ai_info_changed_at',
-  'typing_indicator'
+// Allow-list for clinic users (admin, manager): the same keys a clinic may save on the Settings screen (PUT /settings,
+// ALLOWED_SETTINGS_KEYS in settings.controller.js) without booking_mode, which only a super admin changes. Any other key
+// (feature flags, quotas, wa_* state, AI flags) is refused. A super admin may still write any key.
+const CLINIC_CONFIG_KEYS = new Set([
+  'language',
+  'ai_personality', 'ai_language', 'ai_greeting', 'ai_name', 'ai_tone',
+  'ai_escalation_message', 'ai_response_delay',
+  'escalation_threshold', 'escalation_timeout',
+  'booking_advance_days', 'booking_confirmation_msg', 'booking_cancel_msg',
+  'booking_same_day', 'token_prefix', 'token_format',
+  'weekly_off', 'avg_consultation_minutes', 'reset_time', 'max_tokens_per_day',
+  'opening_time', 'closing_time',
+  'notification_reminder_hours', 'reminder_enabled', 'notification_channel'
 ]);
 
 const setConfig = async (req, res) => {
@@ -118,13 +116,14 @@ const setConfig = async (req, res) => {
       return errorResponse(res, 'Forbidden', 403);
     }
     const { key, value } = req.body;
-    if (req.staff?.role !== 'super_admin' && RESERVED_CONFIG_KEYS.has(key)) {
+    if (req.staff?.role !== 'super_admin' && !CLINIC_CONFIG_KEYS.has(key)) {
       return errorResponse(res, 'Forbidden — this config key can only be set by a super admin', 403);
     }
     const config = await tenantService.setConfig(id, key, value);
     return successResponse(res, config, 200);
   } catch (error) {
-    return errorResponse(res, error.message, 500);
+    logger.error('Error setting tenant config:', error.message);
+    return errorResponse(res, GENERIC_ERROR, 500);
   }
 };
 

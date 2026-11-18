@@ -14,7 +14,8 @@ function generateToken(payload) {
 }
 
 function verifyToken(token) {
-  return jwt.verify(token, JWT_SECRET)
+  // generateToken signs with jsonwebtoken's default for a string secret, HS256; only that algorithm is accepted
+  return jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] })
 }
 
 module.exports = {

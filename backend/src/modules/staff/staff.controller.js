@@ -8,6 +8,14 @@ const { logAction } = require('../../utils/audit')
 const { doctorLimitFor } = require('../../config/plans')
 const { EMAIL_TAKEN_MESSAGE } = require('./doctorLogin')
 
+// A doctor_id sent by the client must be a doctor of the same clinic (any other id, or a malformed one, is refused with a 400)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+async function doctorBelongsToTenant(tenantId, doctorId) {
+  if (typeof doctorId !== 'string' || !UUID_RE.test(doctorId)) return false
+  const result = await pool.query('SELECT 1 FROM clinic_doctors WHERE id = $1 AND tenant_id = $2', [doctorId, tenantId])
+  return result.rows.length > 0
+}
+
 function generateTempPassword() {
   // crypto.randomBytes is cryptographically secure, unlike Math.random()
   const crypto = require('crypto');
@@ -59,6 +67,9 @@ async function inviteStaff(req, res, next) {
     }
     if (staffData.role === 'admin' && req.staff.role !== 'admin') {
       return errorResponse(res, 'Only admins can create admin accounts', 403)
+    }
+    if (staffData.doctor_id && !(await doctorBelongsToTenant(req.tenantId, staffData.doctor_id))) {
+      return errorResponse(res, 'Invalid doctor for this clinic', 400)
     }
     // An email is unique across all clinics (login and forgot-password look it up globally): checked before anything is inserted
     if (await StaffModel.isEmailInUse(pool, staffData.email)) {
@@ -126,6 +137,9 @@ async function updateStaff(req, res, next) {
     }
     if (target.role === 'admin' && req.staff.role !== 'admin') {
       return errorResponse(res, 'Only an admin can change an admin account', 403)
+    }
+    if (updates.doctor_id && !(await doctorBelongsToTenant(req.tenantId, updates.doctor_id))) {
+      return errorResponse(res, 'Invalid doctor for this clinic', 400)
     }
     if (updates.is_active !== undefined) {
       if (typeof updates.is_active !== 'boolean') {
