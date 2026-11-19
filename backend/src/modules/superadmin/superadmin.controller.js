@@ -13,7 +13,7 @@ const { omitTenantSecrets } = require('../../utils/secretBox');
 const { fetchWabaInfo } = require('../waba/waba.info.service');
 const tenantModel = require('../tenant/tenant.model');
 const { logAction } = require('../../utils/audit');
-const { ALLOWED_OVERRIDES } = require('../ai-engine/ai.models');
+const { ALLOWED_OVERRIDES, RETIRED_OVERRIDES } = require('../ai-engine/ai.models');
 
 // The clinic's booking mode and its AI appointment switch, read from the two tenant_configs rows (additive fields on the tenant screens)
 function withBookingModeFields(row) {
@@ -253,10 +253,16 @@ async function updateTenant(req, res) {
   try {
     const { id } = req.params;
     const { clinicName, plan, whatsappNumber, industry, aiModel, email, whatsappPhoneNumberId } = req.body;
-    // The per-clinic AI model override: only the models the WhatsApp AI actually uses (ai.models.js)
-    const VALID_AI_MODELS = ALLOWED_OVERRIDES
-    if (aiModel && !VALID_AI_MODELS.includes(aiModel)) {
-      return errorResponse(res, 'Invalid AI model. Must be one of: ' + VALID_AI_MODELS.join(', '), 400)
+    // The per-clinic AI model override (ai.models.js). aiModel not sent: the stored value is kept. null, '' or a retired model
+    // (gemini-2.5-flash, still sent by the older dropdown): stored as NULL = "use the default model". A model in ALLOWED_OVERRIDES: stored.
+    // Anything else: 400.
+    const aiModelSent = Object.prototype.hasOwnProperty.call(req.body, 'aiModel');
+    let aiModelValue = null;
+    if (aiModelSent && aiModel !== null && aiModel !== '' && !RETIRED_OVERRIDES.includes(aiModel)) {
+      if (typeof aiModel !== 'string' || !ALLOWED_OVERRIDES.includes(aiModel)) {
+        return errorResponse(res, 'Invalid AI model. Must be one of: ' + ALLOWED_OVERRIDES.join(', ') + ' (or empty for the default model)', 400)
+      }
+      aiModelValue = aiModel;
     }
 
     const hasPhoneNumberId = whatsappPhoneNumberId !== undefined && whatsappPhoneNumberId !== null;
@@ -284,12 +290,12 @@ async function updateTenant(req, res) {
            plan = COALESCE($2, plan),
            whatsapp_number = COALESCE($3, whatsapp_number),
            industry = COALESCE($4, industry),
-           ai_model = COALESCE($6, ai_model),
+           ai_model = CASE WHEN $9::boolean THEN $6 ELSE ai_model END,
            whatsapp_phone_number_id = CASE WHEN $7::boolean THEN $8 ELSE whatsapp_phone_number_id END,
            updated_at = NOW()
        WHERE id = $5
        RETURNING *`,
-      [clinicName || null, plan || null, normalizedWhatsapp, industry || null, id, aiModel || null, hasPhoneNumberId, phoneNumberIdValue || null]
+      [clinicName || null, plan || null, normalizedWhatsapp, industry || null, id, aiModelValue, hasPhoneNumberId, phoneNumberIdValue || null, aiModelSent]
     );
 
     if (result.rows.length === 0) {

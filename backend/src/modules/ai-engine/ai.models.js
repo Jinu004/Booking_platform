@@ -1,13 +1,16 @@
 // The Gemini model names of the WhatsApp AI, in one place.
 // DEFAULT_MODEL (gemini-3.5-flash-lite, on the new SDK) answers attempt 1 for every clinic without an allowed override, including every
 // clinic created later (tenants.ai_model starts as NULL). FALLBACK_MODEL (gemini-2.5-flash-lite, on the old SDK) answers the retry
-// attempts (2 and 3). gemini-2.5-flash stays choosable as an override until Google retires it (1 Dec 2026).
+// attempts (2 and 3). gemini-2.5-flash is retired by Google on 1 Dec 2026 and is no longer selectable: gemini-3.5-flash-lite is the
+// only override. The old-SDK paths below (generationConfigFor, usesNewSdk) stay, because FALLBACK_MODEL still uses them.
 // A clinic's tenants.ai_model (the super admin "AI Model Override") is used only when it is one of ALLOWED_OVERRIDES; anything else
-// (null, empty, gemini-2.5-pro, unknown text) is ignored and the clinic gets DEFAULT_MODEL.
+// (null, empty, a stored gemini-2.5-flash, gemini-2.5-pro, unknown text) is ignored and the clinic gets DEFAULT_MODEL.
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite'
 const FALLBACK_MODEL = 'gemini-2.5-flash-lite'
-const ALLOWED_OVERRIDES = ['gemini-2.5-flash', 'gemini-3.5-flash-lite']
+const ALLOWED_OVERRIDES = ['gemini-3.5-flash-lite']
+// The retired model: a save that still sends it (the older super admin dropdown) is stored as "no override" (NULL), never refused
+const RETIRED_OVERRIDES = ['gemini-2.5-flash']
 
 function resolveModel(tenantAiModel) {
   return typeof tenantAiModel === 'string' && ALLOWED_OVERRIDES.includes(tenantAiModel) ? tenantAiModel : DEFAULT_MODEL
@@ -29,4 +32,4 @@ function usesNewSdk(model) {
   return typeof model === 'string' && !model.startsWith('gemini-2.5')
 }
 
-module.exports = { DEFAULT_MODEL, FALLBACK_MODEL, ALLOWED_OVERRIDES, resolveModel, generationConfigFor, usesNewSdk }
+module.exports = { DEFAULT_MODEL, FALLBACK_MODEL, ALLOWED_OVERRIDES, RETIRED_OVERRIDES, resolveModel, generationConfigFor, usesNewSdk }
