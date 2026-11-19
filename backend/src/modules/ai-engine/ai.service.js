@@ -294,8 +294,11 @@ async function processMessage(context) {
 
     const MAX_ATTEMPTS = 3;
     // Attempt 1: the clinic's allowed override (tenants.ai_model), else DEFAULT_MODEL. Attempts 2 and 3: FALLBACK_MODEL, except that a
-    // newer (not gemini-2.5) model's HTTP 400 is retried once with DEFAULT_MODEL (see isTransientError).
+    // newer (not gemini-2.5) model's HTTP 400 is retried once on a DIFFERENT model (see isTransientError): DEFAULT_MODEL, or
+    // FALLBACK_MODEL when the model that failed is DEFAULT_MODEL itself (never the same model twice).
     const firstModel = resolveModel(tenant.ai_model);
+    const retryModelAfter400 = (failedModel) => (failedModel === DEFAULT_MODEL ? FALLBACK_MODEL : DEFAULT_MODEL);
+    let retryModel400 = null;
     let lastAttemptModel = firstModel;
     let retryWithDefault = false;
     let newerModel400Handled = false;
@@ -303,12 +306,13 @@ async function processMessage(context) {
     // so after a tool has run, a timeout is not retried (the tool could repeat, e.g. a booking).
     let toolHasRun = false;
     const isTransientError = (err) => {
-      // A newer model rejected the request (HTTP 400): one retry with DEFAULT_MODEL. Never for gemini-2.5 models (their 400 is handled as
-      // before), and never after a state-changing tool (runAttemptsWithRetry stops before asking, so no write can run twice).
+      // A newer model rejected the request (HTTP 400): one retry on a different model (retryModelAfter400). Never for gemini-2.5 models
+      // (their 400 is handled as before), and never after a state-changing tool (runAttemptsWithRetry stops before asking, so no write can run twice).
       if (err && err.status === 400 && !newerModel400Handled && !String(lastAttemptModel).startsWith('gemini-2.5') && !stateChangingTool) {
         newerModel400Handled = true;
         retryWithDefault = true;
-        logger.warn(`GEMINI_NEWER_MODEL_400 tenant=${tenant.id} model=${lastAttemptModel} retry_model=${DEFAULT_MODEL} error=${String(err.message || '').replace(/\s+/g, ' ').slice(0, 300)}`);
+        retryModel400 = retryModelAfter400(lastAttemptModel);
+        logger.warn(`GEMINI_NEWER_MODEL_400 tenant=${tenant.id} model=${lastAttemptModel} retry_model=${retryModel400} error=${String(err.message || '').replace(/\s+/g, ' ').slice(0, 300)}`);
         return true;
       }
       const msg = err.message || '';
@@ -349,7 +353,7 @@ async function processMessage(context) {
         let currentModel = attempt === 1 ? firstModel : FALLBACK_MODEL;
         if (attempt > 1 && retryWithDefault) {
           retryWithDefault = false;
-          currentModel = DEFAULT_MODEL;
+          currentModel = retryModel400 || DEFAULT_MODEL;
         }
         lastAttemptModel = currentModel;
         if (attempt > 1) {
