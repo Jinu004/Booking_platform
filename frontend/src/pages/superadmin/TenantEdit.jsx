@@ -28,13 +28,14 @@ const statusBadge = (status) => {
 
 const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
 
-// The AI model override values the backend accepts. A saved value that is empty or not in this list is shown as the default.
+// The AI model override values the backend accepts. "" = no override (the backend stores NULL and the clinic uses the default model).
+// A saved value that is empty, NULL or anything not in this list (for example the retired gemini-2.5-flash) is shown as Default.
 const AI_MODEL_OPTIONS = [
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (current default)' },
-  { value: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite (new model, for testing)' }
+  { value: '', label: 'Default (currently gemini-3.5-flash-lite)' },
+  { value: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite (override)' }
 ];
-const DEFAULT_AI_MODEL = 'gemini-2.5-flash';
-const aiModelForForm = (saved) => (AI_MODEL_OPTIONS.some(o => o.value === saved) ? saved : DEFAULT_AI_MODEL);
+const DEFAULT_AI_MODEL = '';
+const aiModelForForm = (saved) => (AI_MODEL_OPTIONS.some(o => o.value && o.value === saved) ? saved : DEFAULT_AI_MODEL);
 
 // The form values for a tenant row of the list (same fields and defaults the Edit popup used)
 const formFromTenant = (t) => ({
@@ -630,7 +631,7 @@ export default function TenantEdit() {
             <p className="text-xs text-gray-400 mt-1">From WhatsApp Manager (gear icon next to the number). Used to send reminders and staff replies from this clinic's number.</p>
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">AI Model Override <span className="text-gray-400 font-normal">(optional — overrides plan default)</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">AI Model Override</label>
             <select
               value={form.aiModel}
               onChange={e => setForm(f => ({ ...f, aiModel: e.target.value }))}
@@ -640,7 +641,7 @@ export default function TenantEdit() {
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
-            <p className="text-xs text-gray-400 mt-1">Leave on Gemini 2.5 Flash for real clinics. Use the new model only on a test clinic.</p>
+            <p className="text-xs text-gray-400 mt-1">Leave on Default unless told otherwise.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Proactive Template Messaging</label>
